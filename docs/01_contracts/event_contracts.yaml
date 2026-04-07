@@ -1,0 +1,48 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze domain event contracts and audit-sensitive event boundaries.
+  layer: L2 Contracts
+
+version: 0.1.0
+events:
+  - name: OrganizationReviewed
+    producer: Server.organization
+    consumers: [Server.message, Server.audit]
+    audit_required: true
+  - name: ProjectPublished
+    producer: Server.project
+    consumers: [Server.message, Server.review]
+    audit_required: true
+  - name: BidSubmitted
+    producer: Server.bidding
+    consumers: [Server.message, Server.audit]
+    audit_required: true
+  - name: OrderActivated
+    producer: Server.order
+    consumers: [Server.milestone, Server.message]
+    audit_required: true
+  - name: ContractConfirmed
+    producer: Server.contract
+    consumers: [Server.message, Server.audit]
+    audit_required: true
+  - name: MilestoneSubmitted
+    producer: Server.milestone
+    consumers: [Server.message, Server.audit]
+    audit_required: true
+  - name: InspectionSubmitted
+    producer: Server.inspection
+    consumers: [Server.message, Server.audit]
+    audit_required: true
+  - name: InspectionResultChanged
+    producer: Server.inspection
+    consumers: [Server.message, Server.review]
+    audit_required: true
+  - name: RatingSubmitted
+    producer: Server.rating
+    consumers: [Server.message, Server.audit]
+    audit_required: true
+  - name: DisputeOpened
+    producer: Server.dispute
+    consumers: [Server.message, Server.review, Server.audit]
+    audit_required: true

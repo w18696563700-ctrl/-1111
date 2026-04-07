@@ -1,0 +1,476 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze the minimum L2 transport contract set for login, session, organization, certification, permission, and security flows.
+  layer: L2 Contracts
+
+version: 0.1.0
+
+scope:
+  current_goal:
+    - phone OTP login
+    - access token plus refresh token session flow
+    - shell context loading
+    - create organization or join organization
+    - organization switch
+    - certification state consumption and submit or resubmit
+    - minimum device and security action surface
+  current_non_goals:
+    - password login
+    - WeChat login
+    - SSO
+    - advanced multi-organization collaboration
+    - full security center
+    - complete member-center feature family
+
+alignment:
+  depends_on:
+    - docs/00_ssot/account_login_identity_permission_minimum_freeze_addendum.md
+    - docs/01_contracts/auth_contracts.yaml
+    - docs/00_ssot/permission_matrix.md
+    - docs/02_backend/service_boundaries.md
+  route_prefix_rule:
+    flutter_app: /api/app
+    admin: /server/admin
+  hard_rules:
+    - Flutter App must not consume bare /auth/* or bare /organizations/* paths.
+    - Admin uses Server Admin APIs directly and does not consume BFF.
+    - BFF may normalize auth but must not own identity truth.
+    - Server remains the only owner of user, session, organization, membership, and certification truth.
+    - raw authorization is transport carrier only and is not verified current-session truth.
+    - x-actor-id, x-user-id, x-organization-id, and x-actor-role are forwarding hints only and are not final auth truth.
+    - reviewer and support admin guards must come from verified DB-backed platform membership truth, never from raw header role alone.
+
+clients:
+  flutter_app:
+    login_mode: phone_code_plus_org_invite
+    consumes: BFF
+    minimum_shell_flow:
+      - unauthenticated
+      - session_refreshing
+      - no_organization
+      - authenticated
+  admin:
+    login_mode: account_password_plus_second_factor
+    consumes: Server admin APIs
+
+auth_session_boundary:
+  access_transport_carrier:
+    current_round_candidates:
+      - authorization
+    role: transport_only
+    rules:
+      - BFF may forward the raw carrier
+      - raw authorization is not verified current-session truth
+      - raw authorization presence alone must not satisfy protected guards
+  refresh_session_persistence_truth:
+    table_family: sessions
+    minimum_truth:
+      - refresh_token_hash
+      - status
+      - expires_at
+      - revoked_at
+      - device_id
+    rules:
+      - refresh-session persistence truth remains Server-owned
+      - refresh-session persistence truth must not be used to reverse-infer raw access authorization
+  protected_request_verification_target:
+    name: verified_current_session_context
+    owner: Server
+    rules:
+      - protected handlers require server-side verification before actor, scope, or authorization truth is released
+      - header hints are not final auth truth
+      - BFF may forward carriers and hints but must not verify them
+
+forwarding_header_boundary:
+  authorization: access_transport_carrier_only
+  x-actor-id: forwarding_hint_only
+  x-user-id: forwarding_hint_only_legacy_alias
+  x-organization-id: requested_scope_hint_only
+  x-actor-role: forwarding_hint_only
+  x-request-id: trace_audit_attribution_only
+  x-trace-id: trace_audit_attribution_only
+
+shell_context:
+  required_fields:
+    - userId
+    - organizationId
+    - roleKeys
+    - certificationStatus
+    - membershipStatus
+    - visibleBuildings
+    - featureFlagsVersion
+    - unreadSummary
+  optional_fields_allowed_next:
+    - availableOrganizations
+    - currentOrganization
+    - entitlements
+    - securityHints
+    - paidMembershipTier
+    - paidMembershipEntitlementsSummary
+    - paidMembershipQuotaSummary
+    - paidMembershipNextRefreshAt
+  rules:
+    - Flutter App must not guess missing shell fields locally.
+    - Optional fields require contract freeze first.
+
+app_route_groups:
+  auth:
+    - method: POST
+      path: /api/app/auth/otp/send
+      request: OtpSendRequest
+      response: OtpSendResponse
+      purpose: send login OTP with rate limit and anti-abuse semantics
+      guard: public_rate_limited
+    - method: POST
+      path: /api/app/auth/otp/login
+      request: OtpLoginRequest
+      response: SessionEstablishResponse
+      purpose: verify OTP, bind or create user identity, and establish session
+      guard: public_rate_limited
+    - method: POST
+      path: /api/app/auth/refresh
+      request: RefreshSessionRequest
+      response: SessionRefreshResponse
+      purpose: rotate access and refresh tokens
+      guard: refresh_token_required
+    - method: POST
+      path: /api/app/auth/logout
+      request: LogoutRequest
+      response: ActionAckResponse
+      purpose: revoke current or selected session
+      guard: authenticated
+  shell:
+    - method: GET
+      path: /api/app/shell/context
+      request: none
+      response: AppShellContextResponse
+      purpose: load current user, organization scope, role keys, and visibility shell
+      guard: authenticated
+  profile_organization:
+    - method: POST
+      path: /api/app/profile/organization/create
+      request: OrganizationCreateRequest
+      response: OrganizationCreateResponse
+      purpose: create organization and bind creator as admin
+      guard: authenticated_without_required_org
+    - method: POST
+      path: /api/app/profile/organization/join-by-code
+      request: OrganizationJoinByCodeRequest
+      response: OrganizationJoinByCodeResponse
+      purpose: request organization join through invite code
+      guard: authenticated
+    - method: POST
+      path: /api/app/profile/organization/switch
+      request: OrganizationSwitchRequest
+      response: AppShellContextResponse
+      purpose: change current organization scope and reload shell context
+      guard: authenticated
+    - method: GET
+      path: /api/app/profile/organization/mine
+      request: none
+      response: MyOrganizationsResponse
+      purpose: list organizations available to current user
+      guard: authenticated
+    - method: GET
+      path: /api/app/profile/organization/members
+      request: OrganizationMembersQuery
+      response: OrganizationMembersResponse
+      purpose: list members of current organization
+      guard: organization_scoped
+    - method: PATCH
+      path: /api/app/profile/organization/members/{memberId}/role
+      request: OrganizationMemberRolePatchRequest
+      response: ActionAckResponse
+      purpose: change member role under current organization
+      guard: organization_admin
+    - method: PATCH
+      path: /api/app/profile/organization/members/{memberId}/disable
+      request: OrganizationMemberDisableRequest
+      response: ActionAckResponse
+      purpose: disable or remove member from current organization
+      guard: organization_admin
+  profile_certification:
+    - method: POST
+      path: /api/app/profile/certification/submit
+      request: CertificationSubmitRequest
+      response: CertificationSubmitResponse
+      purpose: submit organization certification materials
+      guard: organization_admin
+    - method: GET
+      path: /api/app/profile/certification/current
+      request: none
+      response: CertificationCurrentResponse
+      purpose: read current organization certification state
+      guard: organization_scoped
+    - method: POST
+      path: /api/app/profile/certification/resubmit
+      request: CertificationResubmitRequest
+      response: CertificationSubmitResponse
+      purpose: resubmit rejected or expired certification
+      guard: organization_admin
+  profile_security:
+    - method: GET
+      path: /api/app/profile/security/devices
+      request: none
+      response: SecurityDevicesResponse
+      purpose: read current user device list
+      guard: authenticated
+    - method: POST
+      path: /api/app/profile/security/devices/{deviceId}/revoke
+      request: DeviceRevokeRequest
+      response: ActionAckResponse
+      purpose: revoke one device session
+      guard: authenticated
+  profile_membership:
+    - method: GET
+      path: /api/app/profile/membership/current
+      request: none
+      response: MembershipCurrentResponse
+      purpose: read current paid-membership summary for the current organization scope
+      guard: organization_scoped
+    - method: GET
+      path: /api/app/profile/membership/explanation
+      request: none
+      response: MembershipExplanationResponse
+      purpose: read paid-membership explanation and tier notes
+      guard: organization_scoped
+    - method: GET
+      path: /api/app/profile/membership/quota
+      request: none
+      response: MembershipQuotaResponse
+      purpose: read paid-membership quota summary
+      guard: organization_scoped
+    - method: GET
+      path: /api/app/profile/membership/upgrade-guide
+      request: none
+      response: MembershipUpgradeGuideResponse
+      purpose: read paid-membership upgrade guidance
+      guard: organization_scoped
+
+admin_route_groups:
+  organization_review:
+    - method: GET
+      path: /server/admin/reviews/organizations
+      request: OrganizationReviewListQuery
+      response: OrganizationReviewListResponse
+      purpose: list organization certification review tasks
+      guard: platform_reviewer_or_super_admin
+    - method: GET
+      path: /server/admin/reviews/organizations/{organizationId}
+      request: none
+      response: OrganizationReviewDetailResponse
+      purpose: read one organization certification review detail
+      guard: platform_reviewer_or_super_admin
+    - method: POST
+      path: /server/admin/reviews/organizations/{organizationId}/approve
+      request: OrganizationReviewApproveRequest
+      response: ActionAckResponse
+      purpose: approve organization certification
+      guard: platform_reviewer_or_super_admin
+    - method: POST
+      path: /server/admin/reviews/organizations/{organizationId}/reject
+      request: OrganizationReviewRejectRequest
+      response: ActionAckResponse
+      purpose: reject organization certification
+      guard: platform_reviewer_or_super_admin
+  security_review:
+    - method: GET
+      path: /server/admin/security-events
+      request: SecurityEventsQuery
+      response: SecurityEventsResponse
+      purpose: read minimum security and risk events
+      guard: platform_support_or_super_admin
+
+schema_minimums:
+  OtpSendRequest:
+    required: [mobile, scene]
+    fields:
+      mobile: string
+      scene: login_only_for_current_round
+      deviceId: string_optional
+      captchaToken: string_optional
+  OtpSendResponse:
+    required: [cooldownSeconds, traceId]
+    fields:
+      cooldownSeconds: integer
+      traceId: string
+  OtpLoginRequest:
+    required: [mobile, otpCode, deviceId]
+    fields:
+      mobile: string
+      otpCode: string
+      deviceId: string
+      deviceName: string_optional
+      osType: string_optional
+      appVersion: string_optional
+  SessionEstablishResponse:
+    required: [accessToken, refreshToken, expiresInSeconds, shellBootstrapState]
+    fields:
+      accessToken: string
+      refreshToken: string
+      expiresInSeconds: integer
+      shellBootstrapState: authenticated_or_no_organization
+  RefreshSessionRequest:
+    required: [refreshToken]
+    fields:
+      refreshToken: string
+      deviceId: string_optional
+  SessionRefreshResponse:
+    required: [accessToken, refreshToken, expiresInSeconds]
+    fields:
+      accessToken: string
+      refreshToken: string
+      expiresInSeconds: integer
+  LogoutRequest:
+    required: []
+    fields:
+      revokeAllOtherDevices: boolean_optional
+      deviceId: string_optional
+  OrganizationCreateRequest:
+    required: [name, organizationType, provinceCode, cityCode, contactName, contactMobile]
+    fields:
+      name: string
+      organizationType: demand_or_supplier_or_both
+      provinceCode: string
+      cityCode: string
+      contactName: string
+      contactMobile: string
+      uscc: string_optional
+      businessLicenseFileId: uuid_optional
+      intro: string_optional
+  OrganizationJoinByCodeRequest:
+    required: [inviteCode]
+    fields:
+      inviteCode: string
+  OrganizationSwitchRequest:
+    required: [organizationId]
+    fields:
+      organizationId: uuid
+  CertificationSubmitRequest:
+    required: [organizationId, legalName, uscc, licenseFileId]
+    fields:
+      organizationId: uuid
+      legalName: string
+      uscc: string
+      licenseFileId: uuid
+      contactName: string_optional
+      contactMobile: string_optional
+  CertificationResubmitRequest:
+    required: [organizationId, legalName, uscc, licenseFileId]
+    fields:
+      organizationId: uuid
+      legalName: string
+      uscc: string
+      licenseFileId: uuid
+      supplementNote: string_optional
+  DeviceRevokeRequest:
+    required: [deviceId]
+    fields:
+      deviceId: uuid
+  ActionAckResponse:
+    required: [ok, traceId]
+    fields:
+      ok: boolean
+      traceId: string
+  MembershipCurrentResponse:
+    required: [organizationId, paidMembershipTier, entitlementsSummary, quotaSummary]
+    fields:
+      organizationId: uuid_optional
+      paidMembershipTier: string_optional
+      rateBand: string_optional
+      entitlementsSummary: string_array
+      quotaSummary: string_array
+      effectiveAt: datetime_optional
+      expiresAt: datetime_optional
+      nextRefreshAt: datetime_optional
+  MembershipExplanationResponse:
+    required: [tiers, entitlementNotes, quotaNotes, disclaimer]
+    fields:
+      tiers: object_array
+      entitlementNotes: string_array
+      quotaNotes: string_array
+      disclaimer: string
+  MembershipQuotaResponse:
+    required: [items]
+    fields:
+      items: object_array
+      nextRefreshAt: datetime_optional
+  MembershipUpgradeGuideResponse:
+    required: [currentTier, availableTiers, upgradeHighlights, commercialDisclosure]
+    fields:
+      currentTier: string_optional
+      availableTiers: object_array
+      upgradeHighlights: string_array
+      commercialDisclosure: string
+
+guard_semantics:
+  authenticated:
+    meaning: verified current-session context exists under the trusted Server-side verification boundary
+    notes:
+      - raw authorization presence alone is insufficient
+      - x-actor-id and x-user-id are forwarding hints only
+  authenticated_without_required_org:
+    meaning: verified current-session context exists and the current step may proceed because create or join organization does not require an existing organization scope
+  organization_scoped:
+    meaning: verified current-session context exists and current organization scope is verified present
+  organization_admin:
+    meaning: verified current-session context exists and organization-admin permission is derived from DB-backed membership truth under the verified current scope
+  platform_reviewer_or_super_admin:
+    meaning: verified actor identity plus active DB-backed membership truth in a platform organization with role key platform_reviewer or platform_super_admin
+  platform_support_or_super_admin:
+    meaning: verified actor identity plus active DB-backed membership truth in a platform organization with role key platform_support or platform_super_admin
+  action_gate_order:
+    - verified current-session context exists
+    - actor identity derived from verified current-session context
+    - organization scope present when required
+    - role permitted from DB-backed truth
+    - object scope permitted when required
+    - certification approved when required
+    - idempotency and audit checks when required
+
+status_rules:
+  - 200 means successful read or command acknowledgment
+  - 202 may be used only when a command is accepted asynchronously and must not be abused for synchronous success
+  - 400 means payload invalid or minimum required input missing
+  - 401 means session refresh or login recovery is required
+  - 401 also covers the case where a current-session carrier is present but is not verifiable under current truth
+  - 403 means role or object permission is insufficient
+  - 404 means controlled unavailable or not-found when the actor must not discover hidden resources
+  - 409 means state conflict, duplicate join, duplicate certification submit, or invalid transition
+  - 429 means OTP or login abuse limit reached
+  - hidden building access must return a controlled unavailable path, not a client-only hide
+
+audit_and_risk_minimum:
+  must_audit:
+    - otp_send_attempt
+    - login_success
+    - login_failure
+    - session_refresh
+    - logout
+    - organization_create
+    - organization_join_request
+    - organization_switch
+    - member_role_change
+    - member_disable
+    - certification_submit
+    - certification_approve
+    - certification_reject
+  minimum_risk_signals:
+    - same_device_high_frequency_registration
+    - same_uscc_reused_across_multiple_organizations
+    - same_mobile_short_period_multi_organization_join
+    - otp_rate_limit_breach
+
+dispatch_readiness:
+  ready_for_next_freeze:
+    - extend docs/01_contracts/openapi.yaml with the minimum route set above
+    - extend docs/02_backend/db_schema.md with missing identity tables
+    - extend docs/03_bff/bff_routes.md with identity app-facing mapping
+  not_ready_for_code_without_next_freeze:
+    - user and session persistence implementation
+    - OTP transport implementation
+    - organization create or join write implementation
+    - certification write implementation
+    - device revoke implementation
+    - paid membership implementation

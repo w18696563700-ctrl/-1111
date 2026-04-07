@@ -1,0 +1,55 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze authentication, shell context, and authorization transport rules.
+  layer: L2 Contracts
+
+version: 0.1.0
+clients:
+  flutter_app:
+    login_mode: phone_code_plus_org_invite
+    consumes: BFF
+  admin:
+    login_mode: account_password_plus_second_factor
+    consumes: Server admin APIs
+transport_boundary:
+  authorization:
+    role: access_transport_carrier_only
+    rules:
+      - raw authorization may be forwarded by BFF
+      - raw authorization may be received by Server
+      - raw authorization is not verified current-session truth
+      - raw authorization must not be treated as final actor or authorization truth
+  x-request-id:
+    role: trace_audit_attribution_only
+    rules:
+      - used only for request correlation and append-only audit attribution
+      - must not participate in authn or authz decisions
+  x-trace-id:
+    role: trace_audit_attribution_only
+    rules:
+      - used only for cross-layer tracing and audit attribution
+      - must not participate in authn or authz decisions
+ordinary_protected_request:
+  carrier_candidates:
+    - authorization
+  rules:
+    - BFF may forward a raw carrier but must not certify it
+    - Server must verify the carrier before a protected request may succeed
+    - 401 applies when no current-session carrier is present
+    - 401 also applies when a raw carrier is present but is not verifiable under current truth
+shell_context:
+  required_fields:
+    - userId
+    - organizationId
+    - roleKeys
+    - certificationStatus
+    - membershipStatus
+    - visibleBuildings
+    - featureFlagsVersion
+    - unreadSummary
+status_rules:
+  - 401 means session refresh or login recovery is required
+  - 401 also covers the case where a current-session carrier is present but is not verifiable under current truth
+  - 403 means role or object permission is insufficient
+  - hidden building access must return a controlled unavailable path, not a client-only hide

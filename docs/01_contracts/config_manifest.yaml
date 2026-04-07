@@ -1,0 +1,52 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze feature flags, platform capability flags, owners, and rollback paths.
+  layer: L2 Contracts
+
+version: 0.1.0
+owners:
+  platform_visibility: Server.config
+  platform_capability: Server.config
+  upload_policy: Server.config
+  risk_policy: Server.config
+flags:
+  - key: building.exhibition.visible
+    default: true
+    owner: platform_visibility
+    rollback: set false only in emergency maintenance
+  - key: building.messages.visible
+    default: true
+    owner: platform_visibility
+    rollback: set false only in emergency maintenance
+  - key: building.profile.visible
+    default: true
+    owner: platform_visibility
+    rollback: set false only in emergency maintenance
+  - key: building.renovation.visible
+    default: false
+    owner: platform_visibility
+    rollback: force false
+  - key: building.custom_furniture.visible
+    default: false
+    owner: platform_visibility
+    rollback: force false
+  - key: platform.live.enabled
+    default: false
+    owner: platform_capability
+    rollback: force false
+  - key: platform.geo.enabled
+    default: false
+    owner: platform_capability
+    rollback: force false
+  - key: platform.map.gaode.enabled
+    default: false
+    owner: platform_capability
+    rollback: force false
+  - key: upload.direct.enabled
+    default: true
+    owner: upload_policy
+    rollback: force false
+notes:
+  - live, geo, and gaode map are platform capability pre-embeds only in Phase 0
+  - every flag needs an owner, gray path, and rollback path

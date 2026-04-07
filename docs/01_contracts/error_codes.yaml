@@ -1,0 +1,382 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze formal error code namespaces and ownership.
+  layer: L2 Contracts
+
+version: 0.1.0
+generation_input_boundary:
+  phase: first_batch
+  role: formal_input
+  paired_formal_inputs:
+    - docs/01_contracts/openapi.yaml
+    - docs/01_contracts/error_codes.yaml
+  single_generation_entry: pnpm contracts:generate
+  single_drift_check_entry: pnpm contracts:check
+  output_root: packages/contracts
+  first_batch_output_coverage:
+    primary_projection:
+      - error-codes.ts
+      - index.ts
+    shared_manifest_set:
+      - contracts-manifest.json
+      - openapi.bundle.json
+      - app-api.types.ts
+  direct_consumer_binding:
+    - apps/server
+    - apps/bff
+  not_directly_bound_in_first_batch:
+    - apps/mobile
+    - apps/admin
+  idempotency:
+    same_input_same_output_required: true
+    content_identical: true
+    path_set_identical: true
+    export_order_identical: true
+    manifest_hash_identical: true
+    forbidden_nondeterministic_content:
+      - timestamp
+      - machine_path
+      - username
+      - random_value
+  drift_check_failure_conditions:
+    - input_missing
+    - expected_output_missing
+    - output_outside_packages_contracts
+    - dirty_diff_after_regeneration
+    - manifest_hash_mismatch
+    - multiple_generation_entries_present
+namespaces:
+  - AUTH
+  - HOME
+  - LOCATION
+  - ORG
+  - CERTIFICATION
+  - SECURITY
+  - PROJECT
+  - BID
+  - ORDER
+  - CONTRACT
+  - MILESTONE
+  - INSPECTION
+  - RATING
+  - DISPUTE
+  - FORUM
+  - ENTERPRISE_HUB
+  - GOVERNANCE
+  - FILE
+  - REVIEW
+  - ORG_REVIEW
+  - MEMBERSHIP
+  - CONFIG
+  - PLATFORM
+codes:
+  - code: AUTH_SESSION_INVALID
+    owner: Server
+    meaning: Session or refresh context is no longer valid.
+  - code: AUTH_OTP_SEND_INVALID
+    owner: Server
+    meaning: OTP send request is missing required fields or violates the current minimum send boundary.
+  - code: AUTH_OTP_LOGIN_INVALID
+    owner: Server
+    meaning: OTP login request is missing required fields or the submitted OTP login command is not acceptable under the current minimum login boundary.
+  - code: AUTH_REFRESH_INVALID
+    owner: Server
+    meaning: Session refresh request is missing required fields, is replayed, or cannot rotate the current refresh session truth.
+  - code: AUTH_LOGOUT_INVALID
+    owner: Server
+    meaning: Logout request is missing required fields or cannot revoke the targeted current-session scope.
+  - code: AUTH_OTP_RATE_LIMITED
+    owner: Server
+    meaning: OTP send or OTP login is blocked by the current controlled anti-abuse rate limit.
+  - code: AUTH_PERMISSION_INSUFFICIENT
+    owner: Server
+    meaning: The current actor role or object scope is insufficient for the requested identity or profile action.
+  - code: AUTH_RESOURCE_UNAVAILABLE
+    owner: BFF
+    meaning: The current identity or profile resource is controlled-unavailable, hidden, or not materialized for the current actor and route boundary.
+  - code: LOCATION_REQUIRED
+    owner: BFF
+    meaning: Home aggregation cannot determine an effective location from current request, current session, or fallback context.
+  - code: LOCATION_PERMISSION_UNAVAILABLE
+    owner: BFF
+    meaning: Device location permission or device location capability is unavailable for the current home weather request and no equivalent location carrier is available.
+  - code: HOME_WEATHER_UPSTREAM_UNAVAILABLE
+    owner: BFF
+    meaning: The normalized upstream weather provider cannot return a usable weather projection for the current exhibition home request.
+  - code: HOME_REFRESH_TIMEOUT
+    owner: BFF
+    meaning: Exhibition home refresh exceeded the allowed timeout window before the normalized full-home projection was ready.
+  - code: HOME_AGGREGATION_UNAVAILABLE
+    owner: BFF
+    meaning: Exhibition home aggregation cannot return a stable read model for the current actor and effective province context.
+  - code: ORG_CREATE_INVALID
+    owner: Server
+    meaning: Organization create request is missing required fields or violates the minimum organization creation boundary.
+  - code: ORG_JOIN_INVALID
+    owner: Server
+    meaning: Organization join-by-code request is missing required fields or references an invalid current invite boundary.
+  - code: ORG_JOIN_DUPLICATE
+    owner: Server
+    meaning: The current actor already belongs to the target organization or has already consumed the same invite path.
+  - code: ORG_SWITCH_INVALID
+    owner: Server
+    meaning: Organization switch request is missing required fields or targets an organization that is not available to the current actor.
+  - code: ORG_MEMBER_ROLE_INVALID
+    owner: Server
+    meaning: Organization member role change request is missing required fields or violates the current minimum membership role boundary.
+  - code: ORG_MEMBER_DISABLE_INVALID
+    owner: Server
+    meaning: Organization member disable request is missing required fields or violates the current minimum membership disable boundary.
+  - code: CERTIFICATION_SUBMIT_INVALID
+    owner: Server
+    meaning: Certification submit request is missing required fields or violates the current minimum certification submission boundary.
+  - code: CERTIFICATION_RESUBMIT_INVALID
+    owner: Server
+    meaning: Certification resubmit request is missing required fields or violates the current minimum certification resubmission boundary.
+  - code: CERTIFICATION_DUPLICATE_SUBMIT
+    owner: Server
+    meaning: Certification submit or resubmit is rejected because the current certification state does not allow a second equivalent submit command.
+  - code: ORG_REVIEW_RESOURCE_UNAVAILABLE
+    owner: Server
+    meaning: The targeted organization review resource is unavailable, hidden, or does not exist under the current admin scope.
+  - code: ORG_REVIEW_APPROVE_INVALID
+    owner: Server
+    meaning: Organization review approve request is missing required fields or violates the current minimum approve boundary.
+  - code: ORG_REVIEW_REJECT_INVALID
+    owner: Server
+    meaning: Organization review reject request is missing required fields or violates the current minimum reject boundary.
+  - code: ORG_REVIEW_INVALID_STATE
+    owner: Server
+    meaning: The current organization certification review state does not allow the requested approve or reject transition.
+  - code: CERTIFICATION_CURRENT_UNAVAILABLE
+    owner: BFF
+    meaning: The current organization certification projection is controlled-unavailable or hidden for the current actor scope.
+  - code: MEMBERSHIP_CURRENT_UNAVAILABLE
+    owner: BFF
+    meaning: The current paid-membership projection is controlled-unavailable, hidden, or not materialized for the current actor scope.
+  - code: MEMBERSHIP_EXPLANATION_UNAVAILABLE
+    owner: BFF
+    meaning: The paid-membership explanation projection is unavailable or not materialized for the current actor scope.
+  - code: MEMBERSHIP_QUOTA_UNAVAILABLE
+    owner: BFF
+    meaning: The paid-membership quota summary projection is unavailable or not materialized for the current actor scope.
+  - code: MEMBERSHIP_UPGRADE_GUIDE_UNAVAILABLE
+    owner: BFF
+    meaning: The paid-membership upgrade-guide projection is unavailable or not materialized for the current actor scope.
+  - code: MEMBERSHIP_ROUTE_UNAVAILABLE
+    owner: BFF
+    meaning: The current paid-membership route is controlled-unavailable under the present app-facing boundary.
+  - code: SECURITY_EVENTS_UNAVAILABLE
+    owner: Server
+    meaning: The requested minimum security-event list is unavailable for the current admin scope or the targeted event projection is not materialized.
+  - code: SECURITY_DEVICE_UNAVAILABLE
+    owner: BFF
+    meaning: The requested device list or device projection is controlled-unavailable for the current actor scope.
+  - code: SECURITY_DEVICE_REVOKE_INVALID
+    owner: Server
+    meaning: Device revoke request is missing required fields or cannot revoke the targeted device under the current session truth.
+  - code: PROJECT_CREATE_INVALID
+    owner: Server
+    meaning: Project create request is missing required fields or violates minimum constraints.
+  - code: PROJECT_INVALID_STATE
+    owner: Server
+    meaning: Project state transition is not allowed.
+  - code: BID_SUBMIT_INVALID
+    owner: Server
+    meaning: Bid submit request is missing required fields or violates minimum constraints.
+  - code: BID_DUPLICATE_SUBMISSION
+    owner: Server
+    meaning: The same bid command was submitted more than once.
+  - code: ORDER_INVALID_STATE
+    owner: Server
+    meaning: Order creation or activation is not allowed in the current upstream state.
+  - code: CONTRACT_ENTRY_UNAVAILABLE
+    owner: Server
+    meaning: Contract entry truth is not yet materialized or not yet available for the current order state.
+  - code: CONTRACT_CONFIRM_INVALID
+    owner: Server
+    meaning: Contract confirm request is missing required fields for the Phase 2.3 entry action.
+  - code: CONTRACT_INVALID_STATE
+    owner: Server
+    meaning: Contract cannot enter or complete confirmation from the current state.
+  - code: CONTRACT_AMEND_INVALID
+    owner: Server
+    meaning: Contract amend request is missing required minimum amendment fields or violates the minimum amendment input boundary.
+  - code: CONTRACT_AMEND_LIMIT_REACHED
+    owner: Server
+    meaning: Contract may not enter a second amendment round in the first Phase 3 contract workflow.
+  - code: MILESTONE_SUBMIT_INVALID
+    owner: Server
+    meaning: Milestone submit request is missing required fields or violates minimum constraints.
+  - code: MILESTONE_INVALID_STATE
+    owner: Server
+    meaning: Milestone submission is not allowed from the current state.
+  - code: INSPECTION_SUBMIT_INVALID
+    owner: Server
+    meaning: Inspection submit request is missing required entry-state fields.
+  - code: INSPECTION_INVALID_STATE
+    owner: Server
+    meaning: Inspection truth exists, but the current inspection state does not allow the requested submit or recheck transition.
+  - code: INSPECTION_ENTRY_UNAVAILABLE
+    owner: Server
+    meaning: Inspection entry is not yet available for the current milestone state.
+  - code: INSPECTION_DECISION_INVALID_STATE
+    owner: Server
+    meaning: Inspection may not enter the minimum passing transition from the current state.
+  - code: INSPECTION_RECHECK_INVALID
+    owner: Server
+    meaning: Inspection recheck request body is missing required fields or violates the minimum Phase 3 recheck input boundary.
+  - code: INSPECTION_RECHECK_LIMIT_REACHED
+    owner: Server
+    meaning: Inspection may not enter a second rectification or second recheck round in the minimum Phase 3 workflow.
+  - code: MILESTONE_COMPLETE_INVALID_STATE
+    owner: Server
+    meaning: Milestone may not enter completed until its current effective inspection has passed.
+  - code: ORDER_COMPLETE_INVALID_STATE
+    owner: Server
+    meaning: Order may not enter completed until every current effective milestone is completed.
+  - code: RATING_ENTRY_UNAVAILABLE
+    owner: Server
+    meaning: Rating entry is not yet available for the current order state.
+  - code: RATING_SUBMIT_INVALID
+    owner: Server
+    meaning: Rating submit request is missing required minimum fields for the next planned minimum submit action.
+  - code: RATING_INVALID_STATE
+    owner: Server
+    meaning: Rating truth exists, but the current rating state does not allow the requested submit transition.
+  - code: DISPUTE_OPEN_INVALID
+    owner: Server
+    meaning: Dispute open request is missing required entry-state fields.
+  - code: DISPUTE_WITHDRAW_INVALID
+    owner: Server
+    meaning: Dispute withdraw request is missing the minimum required fields or has an invalid minimum request body.
+  - code: DISPUTE_INVALID_STATE
+    owner: Server
+    meaning: Dispute truth is not in a state that allows the requested canonical dispute transition, including open-unavailable and withdraw-unavailable cases.
+  - code: REVIEW_REPORT_INVALID
+    owner: Server
+    meaning: Fake-project report-submit request is missing required minimum fields, uses an unsupported target type, or uses a reason code outside the current bounded exhibition report contract.
+  - code: REVIEW_REPORT_RESOURCE_UNAVAILABLE
+    owner: Server
+    meaning: The targeted exhibition report object or report-case resource is unavailable, hidden, or does not exist under the current actor or admin scope.
+  - code: REVIEW_REPORT_INVALID_STATE
+    owner: Server
+    meaning: The current exhibition report-case state does not allow the requested explanation, decision, or escalation action.
+  - code: REVIEW_REPORT_REQUEST_EXPLANATION_INVALID
+    owner: Server
+    meaning: The exhibition report-case explanation-request command is missing required minimum fields or violates the bounded request-explanation contract.
+  - code: REVIEW_REPORT_DECIDE_INVALID
+    owner: Server
+    meaning: The exhibition report-case adjudication-decision command is missing required minimum fields or violates the bounded decision contract.
+  - code: REVIEW_REPORT_ESCALATE_INVALID
+    owner: Server
+    meaning: The exhibition report-case escalate command is missing required minimum fields or violates the bounded escalation contract.
+  - code: FORUM_TOPIC_UNAVAILABLE
+    owner: Server
+    meaning: Forum topic truth is absent, hidden by visibility or moderation, or otherwise unavailable to the current actor.
+  - code: FORUM_POST_UNAVAILABLE
+    owner: Server
+    meaning: Forum post truth is absent, hidden by visibility or moderation, or otherwise unavailable to the current actor.
+  - code: FORUM_DRAFT_UNAVAILABLE
+    owner: Server
+    meaning: Forum draft truth is absent or not accessible to the current actor.
+  - code: FORUM_PUBLISH_INVALID
+    owner: Server
+    meaning: Forum publish request is missing required minimum fields or references for the current publish handoff.
+  - code: FORUM_PUBLISH_INVALID_STATE
+    owner: Server
+    meaning: Forum draft or topic truth is not in a state that allows the requested publish handoff.
+  - code: FORUM_REPORT_INVALID
+    owner: Server
+    meaning: Forum report-submit request is missing required minimum fields, uses an unsupported target type, or uses a reason code outside the current bounded report contract.
+  - code: FORUM_SEARCH_INVALID
+    owner: Server
+    meaning: Forum search request is missing the minimum required query fields or violates the current search input boundary.
+  - code: ENTERPRISE_HUB_INVALID_BOARD_TYPE
+    owner: BFF
+    meaning: Enterprise hub boardType is missing, unsupported, or outside the current frozen company/factory/supplier boundary.
+  - code: ENTERPRISE_HUB_MISSING_REQUIRED_FIELDS
+    owner: Server
+    meaning: Enterprise hub request body is missing one or more required minimum fields for the current create, update, or submit command.
+  - code: ENTERPRISE_HUB_INVALID_STATE_TRANSITION
+    owner: Server
+    meaning: Enterprise hub application, listing, case, or recommendation slot cannot enter the requested next state from the current truth state.
+  - code: ENTERPRISE_HUB_ENTERPRISE_NOT_FOUND
+    owner: Server
+    meaning: The requested enterprise hub listing truth is absent, hidden, or not available to the current actor and board boundary.
+  - code: ENTERPRISE_HUB_APPLICATION_NOT_FOUND
+    owner: Server
+    meaning: The requested enterprise hub application truth is absent or not available to the current actor scope.
+  - code: ENTERPRISE_HUB_PROFILE_NOT_COMPLETED
+    owner: Server
+    meaning: The required enterprise hub company, factory, or supplier profile has not been completed to the current minimum submit boundary.
+  - code: ENTERPRISE_HUB_CASE_NOT_FOUND
+    owner: Server
+    meaning: The requested enterprise hub case truth is absent or not available to the current actor scope.
+  - code: ENTERPRISE_HUB_CERTIFICATION_NOT_FOUND
+    owner: Server
+    meaning: The required enterprise hub certification snapshot or linked supporting material is absent for the current command boundary.
+  - code: ENTERPRISE_HUB_ENTERPRISE_NOT_APPROVED
+    owner: Server
+    meaning: Enterprise hub listing truth has not reached the current approved boundary required for publish or recommendation placement.
+  - code: ENTERPRISE_HUB_PERMISSION_DENIED
+    owner: Server
+    meaning: The current actor role or organization scope is insufficient for the requested enterprise hub action.
+  - code: ENTERPRISE_HUB_DUPLICATE_RECOMMENDATION_SLOT
+    owner: Server
+    meaning: The requested enterprise hub recommendation slot conflicts with an existing active slot for the same board position and time window.
+  - code: ENTERPRISE_HUB_CERTIFICATION_REQUIRED
+    owner: Server
+    meaning: Enterprise hub submit is blocked until at least one required certification or approved replacement proof is attached.
+  - code: ENTERPRISE_HUB_CONTACT_REQUIRED
+    owner: Server
+    meaning: Enterprise hub submit is blocked until at least one usable contact method is present and allowed to surface under the current boundary.
+  - code: ENTERPRISE_HUB_CASE_REQUIRED
+    owner: Server
+    meaning: Enterprise hub submit is blocked until at least one current case entry is present for the selected primary board type.
+  - code: GOVERNANCE_STATUS_UNAVAILABLE
+    owner: BFF
+    meaning: The current actor governance status projection is unavailable, hidden, or not materialized for the current profile scope.
+  - code: GOVERNANCE_BLOCK_INVALID
+    owner: Server
+    meaning: Block or unblock request is missing required fields, targets self, or violates the minimum Block P0 command boundary.
+  - code: GOVERNANCE_BLOCK_TARGET_UNAVAILABLE
+    owner: Server
+    meaning: The requested Block P0 target user is unavailable, hidden, or outside the current app-facing user boundary.
+  - code: GOVERNANCE_BLOCKED_INTERACTION
+    owner: Server
+    meaning: The requested app-facing interaction is blocked by an active user block relation under the Block P0 boundary.
+  - code: GOVERNANCE_APPEAL_SUBMIT_INVALID
+    owner: Server
+    meaning: Governance appeal submit request is missing required minimum fields or violates the current bounded appeal-submit contract.
+  - code: GOVERNANCE_PENALTY_RESOURCE_UNAVAILABLE
+    owner: Server
+    meaning: The targeted governance penalty resource is unavailable, hidden, or does not exist under the current admin scope.
+  - code: GOVERNANCE_PENALTY_APPLY_INVALID
+    owner: Server
+    meaning: Governance penalty apply request is missing required minimum fields or violates the current bounded penalty-apply contract.
+  - code: GOVERNANCE_APPEAL_RESOURCE_UNAVAILABLE
+    owner: Server
+    meaning: The targeted governance appeal resource is unavailable, hidden, or does not exist under the current actor or admin scope.
+  - code: GOVERNANCE_APPEAL_DECIDE_INVALID
+    owner: Server
+    meaning: Governance appeal decision request is missing required minimum fields or violates the current bounded appeal-decision contract.
+  - code: GOVERNANCE_WHITELIST_GRANT_INVALID
+    owner: Server
+    meaning: Governance whitelist grant request is missing required minimum fields or violates the current bounded whitelist-grant contract.
+  - code: GOVERNANCE_WHITELIST_REVOKE_INVALID
+    owner: Server
+    meaning: Governance whitelist revoke request is missing required minimum fields or violates the current bounded whitelist-revoke contract.
+  - code: GOVERNANCE_PERMANENT_BAN_INVALID
+    owner: Server
+    meaning: Governance permanent-ban apply request is missing required minimum fields or violates the current bounded permanent-ban contract.
+  - code: GOVERNANCE_INVALID_STATE
+    owner: Server
+    meaning: The current governance penalty, appeal, whitelist membership, or permanent-ban truth does not allow the requested canonical transition.
+  - code: FILE_UPLOAD_CONFIRM_REQUIRED
+    owner: BFF
+    meaning: Uploaded object is not yet business-usable until confirm succeeds.
+  - code: PLATFORM_CAPABILITY_DISABLED
+    owner: BFF
+    meaning: Live, geo, or map capability is flag-off in the current environment.

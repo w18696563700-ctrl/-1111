@@ -1,0 +1,64 @@
+{
+  "schemaVersion": 1,
+  "formalInputs": [
+    {
+      "path": "docs/01_contracts/openapi.yaml",
+      "sha256": "1b3c45256d6722c62b76fa08619d744bd743587b97b6673bba3fbb41e717e770"
+    },
+    {
+      "path": "docs/01_contracts/error_codes.yaml",
+      "sha256": "2764b919489f65961db824b8cd910e724731cd2f5661146caacfe3683ffa9dfb"
+    }
+  ],
+  "generationEntry": "pnpm contracts:generate",
+  "driftCheckEntry": "pnpm contracts:check",
+  "outputRoot": "packages/contracts",
+  "outputs": [
+    {
+      "path": "packages/contracts/contracts-manifest.json",
+      "kind": "manifest"
+    },
+    {
+      "path": "packages/contracts/openapi/openapi.bundle.json",
+      "kind": "bundle",
+      "sha256": "852e4710d9cdda89bf58b4a0106be4ef15d114bafd094d4f3a232458b212eba8"
+    },
+    {
+      "path": "packages/contracts/src/generated/app-api.types.ts",
+      "kind": "types",
+      "sha256": "b176deb90cac43d533e2f62cfa7a20d58582070139a12525efcd96d3a000e4a3"
+    },
+    {
+      "path": "packages/contracts/src/generated/error-codes.ts",
+      "kind": "error-codes",
+      "sha256": "f533536f1dddaf7aee0a3a5db144d6bb7351e894ed841b66fa39f834aeef03f3"
+    },
+    {
+      "path": "packages/contracts/src/generated/index.ts",
+      "kind": "barrel",
+      "sha256": "9ae1fb8ee664805a84f8a4d8e5e03a88c1663b7ae48ef9b6289e676551c239c6"
+    }
+  ],
+  "directConsumerBinding": [
+    "apps/server",
+    "apps/bff"
+  ],
+  "notDirectlyBoundInFirstBatch": [
+    "apps/mobile",
+    "apps/admin"
+  ],
+  "idempotency": {
+    "sameInputSameOutputRequired": true,
+    "contentIdentical": true,
+    "pathSetIdentical": true,
+    "exportOrderIdentical": true,
+    "manifestHashIdentical": true,
+    "forbiddenNondeterministicContent": [
+      "timestamp",
+      "machine_path",
+      "username",
+      "random_value"
+    ]
+  },
+  "manifestHash": "95dc9951ec607b7082a387a8213efdd8a7e100f77b83169dfad53d26d9b48f91"
+}

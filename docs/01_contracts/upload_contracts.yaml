@@ -1,0 +1,35 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze the three-step upload contract and file truth policy.
+  layer: L2 Contracts
+
+version: 0.1.0
+flow:
+  - step: init
+    actor: Flutter App
+    via: BFF
+    required_fields:
+      - businessType
+      - businessId
+      - fileKind
+      - mimeType
+      - size
+      - checksum
+  - step: direct_upload
+    actor: Flutter App
+    via: S3-compatible OSS
+    notes:
+      - client may upload directly after signed strategy is returned
+      - client must not use long-lived credentials
+  - step: confirm
+    actor: Flutter App
+    via: BFF -> Server
+    outcome:
+      - create FileAsset
+      - optionally create Evidence binding
+      - enqueue orphan cleanup if confirm fails
+rules:
+  - objectKey is storage location only
+  - FileAsset is business truth
+  - Evidence is workflow truth when attached to milestone or inspection

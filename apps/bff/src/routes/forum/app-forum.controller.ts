@@ -1,0 +1,61 @@
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import type { IncomingHttpHeaders } from 'http';
+import { ForumService } from './forum.service';
+
+@Controller('api/app/forum')
+export class AppForumController {
+  constructor(private readonly forumService: ForumService) {}
+
+  @Get('feed')
+  getFeed(
+    @Headers() headers: IncomingHttpHeaders,
+    @Query('scope') scope?: string,
+    @Query('topicId') topicId?: string,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.forumService.getFeed(headers, scope, topicId, cursor, pageSize);
+  }
+
+  @Get('topic/list')
+  getTopicList(
+    @Headers() headers: IncomingHttpHeaders,
+    @Query('categoryKey') categoryKey?: string,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.forumService.getTopicList(headers, categoryKey, cursor, pageSize);
+  }
+
+  @Get('topic/metadata')
+  getTopicMetadata(@Headers() headers: IncomingHttpHeaders) {
+    return this.forumService.getTopicMetadata(headers);
+  }
+
+  @Get('draft/list')
+  getDraftList(
+    @Headers() headers: IncomingHttpHeaders,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.forumService.getDraftList(headers, cursor, pageSize);
+  }
+
+  @Post('draft/save')
+  @HttpCode(HttpStatus.ACCEPTED)
+  saveDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.forumService.saveDraft(payload, headers);
+  }
+
+  @Post('publish')
+  @HttpCode(HttpStatus.ACCEPTED)
+  publishDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.forumService.publishDraft(payload, headers);
+  }
+
+  @Post('report/submit')
+  @HttpCode(HttpStatus.ACCEPTED)
+  submitReport(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.forumService.submitReport(payload, headers);
+  }
+}

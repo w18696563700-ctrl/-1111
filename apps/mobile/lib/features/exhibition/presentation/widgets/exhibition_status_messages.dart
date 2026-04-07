@@ -1,0 +1,269 @@
+part of '../exhibition_trade_pages.dart';
+
+String _frontStageStateLabel(String state) {
+  return switch (state) {
+    'published' => '已发布',
+    'bidding_closed' => '投标已结束',
+    'awarded' => '已授标',
+    'converted_to_order' => '已转为订单',
+    'submitted' => '已提交',
+    'won' => '已中标',
+    'active' => '进行中',
+    'pending_submission' => '待提交',
+    'pending_confirm' => '待确认',
+    'draft' => '草稿',
+    'opened' => '已开启',
+    'withdrawn' => '已撤回',
+    'amended' => '已改单',
+    'rechecked' => '已复检',
+    _ => state,
+  };
+}
+
+String _frontStageLoadMessage({required String path}) {
+  if (path == ExhibitionCanonicalPaths.myProjectList) {
+    return '我的项目已经加载，可以先看当前组织有哪些项目仍在继续处理，再进入单项目页。';
+  }
+  if (ExhibitionCanonicalPaths.isMyProjectDetail(path)) {
+    return '单项目继续处理信息已经到位，可以先确认公域信息，再看私域进度。';
+  }
+
+  return switch (path) {
+    ExhibitionCanonicalPaths.projectList => '项目池已经加载，可以先判断是继续跟进现有项目，还是发布新项目。',
+    ExhibitionCanonicalPaths.projectDetail => '项目详情已经到位，可以先确认当前项目状态，再继续后续承接。',
+    ExhibitionCanonicalPaths.orderDetail => '订单详情已经到位，可以先判断当前要推进里程碑还是进入后半链路入口。',
+    ExhibitionCanonicalPaths.milestoneList => '里程碑清单已经到位，现在可以选择当前要推进的里程碑。',
+    _ => '当前链路已经进入可继续状态，可以按下方动作继续推进。',
+  };
+}
+
+String _frontStageSuccessMessage({required String path}) {
+  return switch (path) {
+    ExhibitionCanonicalPaths.projectCreate => '项目已经创建完成，下一步可以查看项目详情。',
+    ExhibitionCanonicalPaths.bidSubmit => '投标已经提交完成，下一步可以回看项目详情。',
+    ExhibitionCanonicalPaths.orderCreate => '订单已经承接完成，下一步可以查看订单详情或继续里程碑。',
+    ExhibitionCanonicalPaths.milestoneSubmit => '里程碑已经提交完成，如需补充凭证可继续执行上传。',
+    _ => '当前动作已经完成，可以按下方入口继续当前链路。',
+  };
+}
+
+String _loadStateLabel(AppPageState state) {
+  return switch (state) {
+    AppPageState.content => '内容已准备好',
+    AppPageState.empty => '当前无内容',
+    AppPageState.errorRetryable => '可重试',
+    AppPageState.errorNonRetryable => '当前受控',
+    AppPageState.unauthorized => '待恢复登录',
+    AppPageState.forbidden => '当前未开放',
+    AppPageState.notFound => '暂未承接',
+    AppPageState.loading => '准备中',
+  };
+}
+
+String _loadStateActionHint(ExhibitionLoadResult result) {
+  return switch (result.state) {
+    AppPageState.content => '当前页已经准备好，可以直接看下方内容与动作区，按当前链路继续往下走。',
+    AppPageState.empty => '当前页先停留在空态说明，方便客户理解这里为什么暂时没有内容，以及现在该回到哪一步。',
+    AppPageState.errorRetryable => '当前内容这次没有稳定返回，你可以先重试；如果仍未恢复，再按下方回退入口回到上一步。',
+    AppPageState.errorNonRetryable => '当前页保持受控反馈，不会本地编造内容。先看清提示，再决定是否回到上一步继续。',
+    AppPageState.unauthorized => '当前页需要先恢复登录或授权状态，页面不会继续假装可进入。',
+    AppPageState.forbidden => '当前页先明确告诉你“现在不能做什么”，避免把未开放内容伪装成没做完。',
+    AppPageState.notFound => '当前实例还没有承接到这一页，所以页面会先停在受控提示里，避免误导进入下一步。',
+    AppPageState.loading => '当前内容仍在准备中，请稍候。',
+  };
+}
+
+String _actionFollowUpMessage(ExhibitionActionResult result) {
+  if (result.isSuccess) {
+    return '当前结果已经承接到页面里，你可以继续看下方结果区和下一步入口，不需要回到上一页重新找上下文。';
+  }
+
+  return '当前页会直接告诉你现在能做什么：重试、回到上一步，或停留在这一页继续讲解当前状态。';
+}
+
+String _userFacingUploadTitle(AppUploadState state) {
+  return switch (state) {
+    AppUploadState.localValidating => '正在校验上传信息',
+    AppUploadState.signedReady => '上传信息已准备好',
+    AppUploadState.uploading => '正在上传凭证',
+    AppUploadState.uploadFailedRetryable => '上传暂未完成',
+    AppUploadState.uploadConfirming => '正在确认上传结果',
+    AppUploadState.uploadConfirmFailed => '上传确认暂未完成',
+    AppUploadState.uploadBound => '上传已完成',
+  };
+}
+
+String _userFacingUploadMessage({
+  required AppUploadState state,
+  required String? message,
+  required String? path,
+}) {
+  final normalized = message?.toLowerCase() ?? '';
+  if (normalized.contains('network error') ||
+      normalized.contains('http error') ||
+      normalized.contains('response decoding failed')) {
+    return '当前上传暂时没有成功完成。你可以先重新执行上传；如果仍未恢复，请回到当前里程碑提交页重新开始。';
+  }
+
+  return switch (state) {
+    AppUploadState.localValidating => '正在检查这次补充凭证是否满足当前页面的最小上传条件。',
+    AppUploadState.signedReady => '上传指令已经准备好，可以继续把当前凭证发到后端承接的上传链路。',
+    AppUploadState.uploading => '当前凭证正在上传，请稍候。',
+    AppUploadState.uploadFailedRetryable => '这次上传暂时没有完成，你可以继续执行上传重试。',
+    AppUploadState.uploadConfirming => '文件已经传出，正在确认是否完成当前绑定。',
+    AppUploadState.uploadConfirmFailed => '上传确认暂时没有完成，你可以继续执行上传或稍后重试。',
+    AppUploadState.uploadBound => '当前凭证已经完成上传并承接到当前链路。',
+  };
+}
+
+String _userFacingUploadNextStep(AppUploadState state) {
+  return switch (state) {
+    AppUploadState.localValidating => '现在可以做什么：等待本次校验完成。',
+    AppUploadState.signedReady => '现在可以做什么：继续执行上传，把凭证补充到当前链路。',
+    AppUploadState.uploading => '现在可以做什么：等待上传完成，不需要额外操作。',
+    AppUploadState.uploadFailedRetryable =>
+      '现在可以做什么：继续执行上传重试；如仍失败，再回到当前里程碑提交页重新开始。',
+    AppUploadState.uploadConfirming => '现在可以做什么：等待确认完成；如长时间未恢复，可重新执行上传。',
+    AppUploadState.uploadConfirmFailed =>
+      '现在可以做什么：继续执行上传重试；如仍未恢复，请回到当前里程碑提交页重新开始。',
+    AppUploadState.uploadBound => '现在可以做什么：回到当前里程碑链路，继续后续工作。',
+  };
+}
+
+String _userFacingLoadFailureMessage(ExhibitionLoadResult result) {
+  final rawMessage = result.message;
+
+  if (_isMissingInstanceMessage(rawMessage)) {
+    return _missingInstanceMessageForPath(result.path);
+  }
+
+  if (_isTransportTechnicalMessage(rawMessage)) {
+    return _transportFailureMessageForPath(result.path, isAction: false);
+  }
+
+  return rawMessage ??
+      switch (result.state) {
+        AppPageState.notFound => _missingInstanceMessageForPath(result.path),
+        AppPageState.errorRetryable => _transportFailureMessageForPath(
+          result.path,
+          isAction: false,
+        ),
+        AppPageState.errorNonRetryable =>
+          '当前页面暂时不能继续。你现在可以先${_recoveryHintForPath(result.path)}。',
+        _ => '当前页面暂时不能继续。你现在可以先${_recoveryHintForPath(result.path)}。',
+      };
+}
+
+String _userFacingActionFailureMessage(ExhibitionActionResult result) {
+  final rawMessage = result.message;
+
+  if (_isMissingInstanceMessage(rawMessage)) {
+    return _missingInstanceMessageForPath(result.path);
+  }
+
+  if (_isTransportTechnicalMessage(rawMessage)) {
+    return _transportFailureMessageForPath(result.path, isAction: true);
+  }
+
+  return rawMessage ??
+      '当前动作暂时不能继续。你现在可以先重试；如果仍未恢复，请${_recoveryHintForPath(result.path)}。';
+}
+
+bool _isMissingInstanceMessage(String? message) {
+  if (message == null) {
+    return false;
+  }
+
+  return message.contains('required from route context') ||
+      message.contains('required from route context or page context') ||
+      message.contains('required from contract detail') ||
+      message.contains('required from inspection detail') ||
+      message.contains('before calling BFF');
+}
+
+bool _isTransportTechnicalMessage(String? message) {
+  if (message == null) {
+    return false;
+  }
+
+  final normalized = message.toLowerCase();
+  return normalized.contains('network error') ||
+      normalized.contains('http error') ||
+      normalized.contains('response decoding failed');
+}
+
+String _missingInstanceMessageForPath(String path) {
+  if (ExhibitionCanonicalPaths.isMyProjectDetail(path)) {
+    return '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到我的项目，再从当前组织项目资产重新进入。';
+  }
+
+  return switch (path) {
+    ExhibitionCanonicalPaths.projectDetail ||
+    ExhibitionCanonicalPaths.bidSubmit ||
+    ExhibitionCanonicalPaths.projectCreate =>
+      '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到项目池，再从已承接项目重新进入。',
+    ExhibitionCanonicalPaths.inspectionDetail ||
+    ExhibitionCanonicalPaths.inspectionSubmit ||
+    ExhibitionCanonicalPaths.inspectionRecheck =>
+      '当前入口还没有承接到所需里程碑或验收实例，这一页暂时不能继续。你现在可以先回到展览，再从里程碑链路重新进入。',
+    _ => '当前入口还没有承接到所需实例，这一页暂时不能继续。你现在可以先回到展览，再从已承接主链重新进入。',
+  };
+}
+
+String _transportFailureMessageForPath(String path, {required bool isAction}) {
+  final opening = isAction ? '当前动作暂时没有提交成功。' : '当前内容暂时没有成功返回。';
+  return '$opening 你现在可以先重试；如果仍未恢复，请${_recoveryHintForPath(path)}。';
+}
+
+bool _shouldExposeRawFailureMessage(String path, String message) {
+  return message.contains('before contract entry') ||
+      path == ExhibitionCanonicalPaths.ratingEntry;
+}
+
+String _recoveryHintForPath(String path) {
+  if (path == ExhibitionCanonicalPaths.myProjectList) {
+    return '回到我的楼，稍后再从我的项目重新进入';
+  }
+  if (ExhibitionCanonicalPaths.isMyProjectDetail(path)) {
+    return '回到我的项目，再从当前组织项目资产重新进入';
+  }
+
+  return switch (path) {
+    ExhibitionCanonicalPaths.projectDetail ||
+    ExhibitionCanonicalPaths.bidSubmit ||
+    ExhibitionCanonicalPaths.projectCreate => '回到项目池，再从已承接项目重新进入',
+    _ => '回到展览，再从已承接主链重新进入',
+  };
+}
+
+String _recoveryButtonLabelForPath(String path) {
+  if (path == ExhibitionCanonicalPaths.myProjectList) {
+    return '回到我的楼';
+  }
+  if (ExhibitionCanonicalPaths.isMyProjectDetail(path)) {
+    return '回到我的项目';
+  }
+
+  return switch (path) {
+    ExhibitionCanonicalPaths.projectDetail ||
+    ExhibitionCanonicalPaths.bidSubmit ||
+    ExhibitionCanonicalPaths.projectCreate => '回到项目池',
+    _ => '回到展览',
+  };
+}
+
+String _recoveryRouteForPath(String path) {
+  if (path == ExhibitionCanonicalPaths.myProjectList) {
+    return AppBuilding.profile.routePath;
+  }
+  if (ExhibitionCanonicalPaths.isMyProjectDetail(path)) {
+    return ExhibitionRoutes.myProjectList;
+  }
+
+  return switch (path) {
+    ExhibitionCanonicalPaths.projectDetail ||
+    ExhibitionCanonicalPaths.bidSubmit ||
+    ExhibitionCanonicalPaths.projectCreate => ExhibitionRoutes.projectList,
+    _ => AppBuilding.exhibition.routePath,
+  };
+}

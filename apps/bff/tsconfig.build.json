@@ -1,0 +1,18 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/app.module.ts",
+    "src/main.ts",
+    "src/core/**/*.ts",
+    "src/shared/**/*.ts",
+    "src/routes/routes.module.ts",
+    "src/routes/enterprise_hub/**/*.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "test",
+    "src/routes/forum/**/*.ts",
+    "src/routes/file/**/*.ts"
+  ]
+}

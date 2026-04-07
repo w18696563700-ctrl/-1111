@@ -1,0 +1,13 @@
+{
+  "name": "exhibition-infra-monorepo",
+  "private": true,
+  "packageManager": "pnpm@10.8.0",
+  "scripts": {
+    "contracts:generate": "ruby packages/contracts/scripts/generate_contracts.rb",
+    "contracts:check": "ruby packages/contracts/scripts/check_contracts.rb",
+    "dc:up": "docker compose -f infra/docker-compose.yml --env-file infra/env/.env.example up -d",
+    "dc:down": "docker compose -f infra/docker-compose.yml --env-file infra/env/.env.example down",
+    "smoke:local": "bash infra/scripts/smoke.sh",
+    "tree:phase0": "find apps packages docs infra -maxdepth 3 -type d | sort"
+  }
+}

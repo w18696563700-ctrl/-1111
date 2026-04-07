@@ -1,0 +1,145 @@
+doc_meta:
+  owner: Codex 总控
+  status: draft
+  purpose: Freeze the canonical app-facing response envelope head, common field semantics, and boundary with path-specific payloads.
+  layer: L2 Contracts
+
+version: 0.1.0
+
+scope:
+  applies_to:
+    - canonical app-facing BFF responses under /api/app/**
+  excludes:
+    - /health/live and /health/ready probes
+    - internal Server-to-BFF or Server-to-Server transport
+    - Admin-only responses
+    - logs, audit rows, and database truth rows
+  rules:
+    - This file freezes only the common response-envelope head.
+    - This file does not freeze any business-object payload shape.
+    - This file does not unlock implementation by itself.
+
+canonical_applicability_range:
+  producer_boundary:
+    - BFF is the canonical app-facing envelope shaper.
+    - BFF may normalize transport output into this common envelope head.
+    - BFF must not invent business truth, state semantics, or unfrozen codes while shaping the envelope.
+  consumer_boundary:
+    - Flutter App consumes this envelope as transport-level common semantics only.
+    - Flutter App must not use message text as logic truth.
+  upstream_truth_boundary:
+    - Error-code inventory remains governed by docs/01_contracts/error_codes.yaml.
+    - Path-specific request and response payloads remain governed by docs/01_contracts/openapi.yaml and later path-level contracts.
+
+canonical_envelope_fields:
+  traceId:
+    type: string
+    required_in:
+      - success
+      - error
+    meaning: Request-level correlation identity used to connect app-facing transport evidence with BFF logs, Server logs, audit investigation, and operational verification.
+    rules:
+      - traceId is for correlation only and is not business truth.
+      - traceId must not be replaced by objectId, orderId, or any domain identifier.
+  code:
+    type: string
+    required_in:
+      - success
+      - error
+    meaning: Machine-readable result code for transport and consumer branching.
+    rules:
+      - Error codes must come from docs/01_contracts/error_codes.yaml or a later formal code freeze.
+      - Success codes must be stable success tokens defined by concrete path truth and must not reuse error codes.
+      - Consumers must branch on code, not on message text.
+  message:
+    type: string
+    required_in:
+      - success
+      - error
+    meaning: User-readable transport message.
+    rules:
+      - message is human-readable and must not be the sole machine-branching input.
+      - message must not expose internal exception stacks or internal-only diagnostics.
+  actionHint:
+    type: string
+    required_in: []
+    meaning: Optional generic next-action hint for client guidance at the transport layer.
+    rules:
+      - actionHint is optional in both success and error envelopes.
+      - actionHint defines only a generic hint and must not replace path-specific payload, page-state mapping, or workflow-state truth.
+      - actionHint must not become a hidden deep-link, local route, or second action protocol.
+  retryable:
+    type: boolean
+    required_in:
+      - error
+    meaning: Generic retry posture hint at the transport layer.
+    rules:
+      - retryable is mandatory in the minimum error envelope.
+      - retryable is optional in success and should be omitted unless a later formal contract explicitly requires it.
+      - retryable does not define domain resubmit permission, workflow state, or frontend page state.
+
+success_envelope_minimum_rule:
+  minimum_common_fields:
+    - traceId
+    - code
+    - message
+  optional_common_fields:
+    - actionHint
+    - retryable
+  rules:
+    - Success envelope freezes only the common head fields above.
+    - Any path-specific success payload must be defined by the concrete path contract and must stay outside this common-field freeze.
+    - This file does not freeze a shared payload carrier name or business-field shape.
+    - If retryable appears in success, it must not be used to encode page state or domain retry permission.
+
+error_envelope_minimum_rule:
+  minimum_common_fields:
+    - traceId
+    - code
+    - message
+    - retryable
+  optional_common_fields:
+    - actionHint
+  rules:
+    - Error envelope must expose a formal code and explicit retry posture.
+    - Error envelope must not disguise failure as apparent success.
+    - Error envelope must not carry path-specific success payload semantics.
+    - actionHint may guide the next generic action, but it may not replace page-state mapping or permission truth.
+
+trace_correlation_rule:
+  rules:
+    - Every canonical app-facing success and error response must carry traceId.
+    - traceId must remain correlatable with BFF-side and Server-side operational records.
+    - When the incident is object-specific, trace correlation may be followed by objectNo or objectId lookup into audit and truth evidence.
+    - This trace rule supports observability and investigation, but does not replace the later formal response-body contract for any single business path.
+
+action_hint_retryable_semantic_rule:
+  actionHint:
+    - actionHint is a transport-level generic guidance token only.
+    - actionHint must not define page-state names, local route names, business transitions, or object-specific command parameters.
+  retryable:
+    - retryable indicates only whether retry is generically appropriate at the transport boundary.
+    - retryable=true does not itself authorize repeating a business command when the domain contract forbids it.
+    - retryable=false does not itself choose the frontend page state; frontend mapping remains a separate truth layer.
+
+boundary_with_path_payload_bff_shaping_frontend_state_mapping:
+  path_payload_boundary:
+    - This file freezes only the common response-envelope head fields.
+    - Business-object fields, list items, detail projections, and command success bodies remain path-specific payload truth.
+    - OpenAPI path contracts must freeze payload fields separately and must not silently merge them into the common envelope definition.
+  bff_shaping_boundary:
+    - BFF may normalize traceId, code, message, actionHint, and retryable into the canonical head.
+    - BFF must not rewrite domain truth, invent page states, or swallow unknown critical errors into generic apparent success.
+  frontend_state_mapping_boundary:
+    - Frontend page-state mapping remains governed by docs/04_frontend/ui_state_contract.md.
+    - actionHint and retryable are transport hints only and do not replace frontend page-state mapping.
+    - Frontend may consume code, actionHint, and retryable only within the limits of the separate UI-state truth.
+
+non_goals:
+  - No implementation plan
+  - No SDK or DTO generation rule
+  - No payload schema freeze for specific business paths
+  - No canonical path change
+  - No new app-facing path
+  - No direct modification of openapi.yaml, bff_routes.md, or ui_state_contract.md by this file alone
+  - No implementation unlock by this contract alone
