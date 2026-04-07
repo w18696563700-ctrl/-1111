@@ -190,3 +190,39 @@ Next unique action:
 `Block P0-A result verification rerun`
 
 The rerun must verify active Server runtime/schema, active BFF app-facing surface, local Flutter route consumption, and scope drift controls before any completion filing.
+
+## K. Result Verification Rerun Follow-Up
+
+Result verification rerun returned `NO-GO`.
+
+Accepted pass items:
+
+- active Server runtime and schema: `PASS`
+- direct Server authenticated smoke for status / block / unblock: `PASS`
+- Flutter route consumption: `PASS`
+- legacy `/api/app/relation/block*` route removal from Flutter: `PASS`
+- `CS-019` / Block P0-B scope exclusion: `PASS`
+
+Residual blocker:
+
+- BFF app-facing profile block surface: `NO-GO`
+
+The BFF routes exist and forward to Server, but the BFF read-model / shaping layer still expects the old `ok / traceId / relationStatus / blocked` response shape while the current Server response shape is:
+
+- `targetUserId`
+- `blockedByMe`
+- `canInteract`
+- `effectiveAt` for command responses where applicable
+- `interactionBlockedReason` for blocked status where applicable
+
+Updated decision:
+
+- `CS-018`: not complete; pending one bounded BFF shaping/read-model correction.
+- `CS-019`: remains explicitly deferred to Block P0-B.
+- Block P0-A completion filing remains blocked.
+
+Next unique action:
+
+`Block P0-A BFF shaping/read-model correction`
+
+This correction must be limited to cloud BFF code under `apps/bff/**`, must keep Server as truth owner, must not change Server or Flutter, and must not open Block P0-B, Admin Review P0, P1/P2, AI/OCR/QR, precheck, penalty/appeal, release-prep, or launch approval.
