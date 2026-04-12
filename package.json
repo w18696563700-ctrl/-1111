@@ -7,6 +7,7 @@
     "contracts:check": "ruby packages/contracts/scripts/check_contracts.rb",
     "dc:up": "docker compose -f infra/docker-compose.yml --env-file infra/env/.env.example up -d",
     "dc:down": "docker compose -f infra/docker-compose.yml --env-file infra/env/.env.example down",
+    "legal:sync-mobile": "bash apps/mobile/scripts/sync_legal_docs.sh",
     "smoke:local": "bash infra/scripts/smoke.sh",
     "tree:phase0": "find apps packages docs infra -maxdepth 3 -type d | sort"
   }
