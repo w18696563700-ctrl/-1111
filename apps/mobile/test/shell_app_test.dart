@@ -6,6 +6,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
+import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
@@ -736,20 +737,20 @@ void main() {
     },
   );
 
-  testWidgets('login entry stays public-facing and hides test credential shortcut', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: ProfileIdentityRoutes.login,
-        shellContextConsumer: buildShellContextConsumer(
-          userId: 'user-dev',
-          organizationId: 'org-dev',
+  testWidgets(
+    'login entry stays public-facing and hides test credential shortcut',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: ProfileIdentityRoutes.login,
+          shellContextConsumer: buildShellContextConsumer(
+            userId: 'user-dev',
+            organizationId: 'org-dev',
+          ),
+          sessionStore: AppSessionStore(),
         ),
-        sessionStore: AppSessionStore(),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
       expect(find.text('测试通道直接进入'), findsNothing);
       expect(find.text('开发态测试通道'), findsNothing);
@@ -757,13 +758,55 @@ void main() {
       expect(find.text('填入联调测试账号'), findsNothing);
       expect(find.text('发送验证码'), findsOneWidget);
       expect(find.text('验证码登录 / 注册'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '用户协议'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '隐私政策'), findsOneWidget);
       expect(find.text('请输入可接收验证码的手机号'), findsOneWidget);
+      expect(find.text('当前仍只承接手机号 + 验证码登录，不扩到其他登录方式或第二条认证路径。'), findsOneWidget);
       expect(find.textContaining('未注册手机号首次验证通过后会自动创建账号'), findsWidgets);
+      expect(find.text('Apple'), findsNothing);
+      expect(find.text('微信'), findsNothing);
+      expect(find.text('一键登录'), findsNothing);
+      expect(find.text('password login'), findsNothing);
       expect(AppSessionStore.instance.hasAnySession, isFalse);
-    expect(
-      AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app').effectiveBaseUrl,
-      'http://127.0.0.1:8080/api/app',
+      expect(
+        AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app').effectiveBaseUrl,
+        'http://127.0.0.1:8080/api/app',
+      );
+    },
+  );
+
+  testWidgets('login entry user agreement page renders markdown document', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: ProfileIdentityRoutes.userAgreement,
+        shellContextConsumer: buildShellContextConsumer(),
+        sessionStore: AppSessionStore(),
+      ),
     );
+    await tester.pumpAndSettle();
+
+    expect(find.text('用户协议'), findsWidgets);
+    expect(find.text('展览装修之家用户协议'), findsOneWidget);
+    expect(find.textContaining('当前展示的是仓库内法务草案正文'), findsOneWidget);
+  });
+
+  testWidgets('login entry privacy policy page renders markdown document', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: ProfileIdentityRoutes.privacyPolicy,
+        shellContextConsumer: buildShellContextConsumer(),
+        sessionStore: AppSessionStore(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('隐私政策'), findsWidgets);
+    expect(find.text('展览装修之家隐私政策'), findsOneWidget);
+    expect(find.textContaining('当前展示的是仓库内法务草案正文'), findsOneWidget);
   });
 
   test('bootstrap shell context defaults follow manifest visibility flags', () {
@@ -776,6 +819,31 @@ void main() {
     );
 
     expect(shellContext.visibleBuildings, const <String>['exhibition']);
+  });
+
+  test('no-organization shell still allows exhibition building', () {
+    final controller = AppBootstrapController(
+      bootstrapManifest: AppConfigManifest.bootstrapDefaults(),
+      bootstrapShellContext: AppShellContextData(
+        userId: 'user-1',
+        organizationId: null,
+        visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+      ),
+    );
+
+    controller.applyShellContext(
+      AppShellContextData(
+        userId: 'user-1',
+        organizationId: null,
+        visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+      ),
+    );
+
+    expect(controller.guardBuilding(AppBuilding.exhibition), isNull);
+    expect(
+      controller.guardBuilding(AppBuilding.profile),
+      GlobalShellState.noOrganization,
+    );
   });
 
   testWidgets('first release bottom navigation only shows three buildings', (

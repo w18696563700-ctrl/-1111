@@ -9,4 +9,6 @@ final class ProfileIdentityRoutes {
   static const String certificationSubmit = '/profile/certification/submit';
   static const String certificationResubmit = '/profile/certification/resubmit';
   static const String sessionCenter = '/profile/session';
+  static const String userAgreement = '/profile/legal/user-agreement';
+  static const String privacyPolicy = '/profile/legal/privacy-policy';
 }

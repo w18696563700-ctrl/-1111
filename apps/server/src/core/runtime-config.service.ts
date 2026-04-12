@@ -83,6 +83,38 @@ export class RuntimeConfigService {
     return Number.parseInt(process.env.UPLOAD_SIGNED_URL_EXPIRES_SECONDS ?? '900', 10);
   }
 
+  get aliyunSmsAccessKeyId() {
+    return process.env.ALIYUN_SMS_ACCESS_KEY_ID ?? '';
+  }
+
+  get aliyunSmsAccessKeySecret() {
+    return process.env.ALIYUN_SMS_ACCESS_KEY_SECRET ?? '';
+  }
+
+  get aliyunSmsRegionId() {
+    return process.env.ALIYUN_SMS_REGION_ID ?? 'cn-hangzhou';
+  }
+
+  get aliyunSmsEndpoint() {
+    return process.env.ALIYUN_SMS_ENDPOINT ?? '';
+  }
+
+  get aliyunSmsSignName() {
+    return process.env.ALIYUN_SMS_SIGN_NAME ?? '';
+  }
+
+  get aliyunSmsTemplateCode() {
+    return process.env.ALIYUN_SMS_TEMPLATE_CODE ?? '';
+  }
+
+  get aliyunSmsConnectTimeoutMs() {
+    return Number.parseInt(process.env.ALIYUN_SMS_CONNECT_TIMEOUT_MS ?? '5000', 10);
+  }
+
+  get aliyunSmsReadTimeoutMs() {
+    return Number.parseInt(process.env.ALIYUN_SMS_READ_TIMEOUT_MS ?? '10000', 10);
+  }
+
   get authAccessTokenSecret() {
     return process.env.AUTH_ACCESS_TOKEN_SECRET ?? '';
   }

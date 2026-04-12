@@ -7,6 +7,7 @@ import 'package:mobile/core/auth/otp_send_cooldown_controller.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
+import 'package:mobile/features/profile/presentation/profile_identity_legal_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_member_management_sheet.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
@@ -100,9 +101,7 @@ class _LoginEntryPageState extends State<LoginEntryPage> {
       return;
     }
 
-    final routeName = session.shellBootstrapState == 'no_organization'
-        ? ProfileIdentityRoutes.organizationHandoff
-        : '/';
+    final routeName = '/';
     Navigator.of(
       context,
     ).pushNamedAndRemoveUntil(routeName, (Route<dynamic> route) => false);
@@ -118,7 +117,8 @@ class _LoginEntryPageState extends State<LoginEntryPage> {
       children: <Widget>[
         const _IdentityHeroCard(
           title: '登录入口',
-          summary: '当前入口承接手机号验证码登录。未注册手机号首次验证通过后会自动创建账号；若验证码、会话或壳层未准备好，页面继续保持受控失败，不伪造完整账号中心成功面。',
+          summary:
+              '当前入口承接手机号验证码登录。未注册手机号首次验证通过后会自动创建账号；若验证码、会话或壳层未准备好，页面继续保持受控失败，不伪造完整账号中心成功面。',
         ),
         const SizedBox(height: 16),
         _IdentityFormCard(
@@ -167,15 +167,17 @@ class _LoginEntryPageState extends State<LoginEntryPage> {
                       ),
                       FilledButton.tonal(
                         onPressed: _sending || _loggingIn ? null : _login,
-                    child: Text(_loggingIn ? '登录中' : '验证码登录 / 注册'),
+                        child: Text(_loggingIn ? '登录中' : '验证码登录 / 注册'),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                      '当前只承接手机号 + 验证码登录。未注册手机号首次验证成功后会自动创建账号；登录成功后继续进入首页或公司与组织；若服务暂不可用，页面保持受控失败。',
+                  const SizedBox(height: 12),
+                  const LoginLegalEntryStrip(),
+                  const SizedBox(height: 12),
+                  const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      '当前只承接手机号 + 验证码登录。未注册手机号首次验证成功后会自动创建账号；登录成功后先回展览首页；消息、我的及需要组织上下文的动作仍保持各自受控。',
                       style: TextStyle(fontSize: 12, color: Colors.black54),
                     ),
                   ),

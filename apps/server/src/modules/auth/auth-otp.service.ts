@@ -1,5 +1,5 @@
 import { createHash, randomInt, randomUUID } from 'crypto';
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
@@ -10,10 +10,13 @@ import { AuthAntiAbuseService } from './auth-anti-abuse.service';
 import { AuthCommandParser } from './auth-command.parser';
 import { AuthEventMaterializationService } from './auth-event-materialization.service';
 import { authLoginInvalid, authRateLimited, authUnavailable } from './auth.errors';
+import { AuthOtpSmsDeliveryService } from './auth-otp-sms-delivery.service';
 import { AuthPresenter } from './auth.presenter';
 
 @Injectable()
 export class AuthOtpService {
+  private readonly logger = new Logger(AuthOtpService.name);
+
   constructor(
     @InjectRepository(LoginOtpCodeEntity)
     private readonly otpRepository: Repository<LoginOtpCodeEntity>,
@@ -21,7 +24,8 @@ export class AuthOtpService {
     private readonly presenter: AuthPresenter,
     private readonly config: RuntimeConfigService,
     private readonly antiAbuse: AuthAntiAbuseService,
-    private readonly events: AuthEventMaterializationService
+    private readonly events: AuthEventMaterializationService,
+    private readonly smsDelivery: AuthOtpSmsDeliveryService
   ) {}
 
   async send(payload: Record<string, unknown>, context: RequestContext) {
@@ -41,15 +45,30 @@ export class AuthOtpService {
       sendDeviceId: command.deviceId
     });
     await this.otpRepository.save(entity);
-    await this.events.recordOtpSendAttempt(
-      {
+    try {
+      await this.smsDelivery.sendLoginOtp({
         mobile: command.mobile,
-        scene: command.scene,
-        deviceId: command.deviceId,
-        ip: this.nullable(context.remoteIp)
-      },
-      context
-    );
+        otpCode,
+        traceId: context.traceId
+      });
+    } catch (error) {
+      await this.deleteOtpRecord(entity.id, context.traceId);
+      throw error;
+    }
+    try {
+      await this.events.recordOtpSendAttempt(
+        {
+          mobile: command.mobile,
+          scene: command.scene,
+          deviceId: command.deviceId,
+          ip: this.nullable(context.remoteIp)
+        },
+        context
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`Auth OTP send audit materialization failed traceId=${context.traceId} message=${message}`);
+    }
 
     return this.presenter.toOtpSendAccepted(context.traceId);
   }
@@ -125,5 +144,14 @@ export class AuthOtpService {
   private nullable(value: string) {
     const normalized = value.trim();
     return normalized ? normalized : null;
+  }
+
+  private async deleteOtpRecord(recordId: string, traceId: string) {
+    try {
+      await this.otpRepository.delete({ id: recordId });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.error(`Auth OTP send rollback failed traceId=${traceId} recordId=${recordId} message=${message}`);
+    }
   }
 }

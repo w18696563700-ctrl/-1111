@@ -12,6 +12,7 @@ import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/features/profile/presentation/profile_detail_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_forum_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_identity_access_pages.dart';
+import 'package:mobile/features/profile/presentation/profile_identity_legal_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_pages.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
 import 'package:mobile/shell/presentation/route_unavailable_page.dart';
@@ -459,6 +460,8 @@ class AppRouter {
       ProfileIdentityRoutes.certificationResubmit =>
         const CertificationResubmitPage(),
       ProfileIdentityRoutes.sessionCenter => const SessionCenterPage(),
+      ProfileIdentityRoutes.userAgreement => const UserAgreementPage(),
+      ProfileIdentityRoutes.privacyPolicy => const PrivacyPolicyPage(),
       _ => null,
     };
 
@@ -475,6 +478,8 @@ class AppRouter {
       ProfileIdentityRoutes.certificationSubmit => '提交认证',
       ProfileIdentityRoutes.certificationResubmit => '重新提交认证',
       ProfileIdentityRoutes.sessionCenter => '会话与设备',
+      ProfileIdentityRoutes.userAgreement => '用户协议',
+      ProfileIdentityRoutes.privacyPolicy => '隐私政策',
       _ => '我的',
     };
 

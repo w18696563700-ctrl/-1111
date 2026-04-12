@@ -67,7 +67,13 @@ String authActionFailureMessage<T>(
 }
 
 String authActionSuccessMessageForShell(SessionEnvelope envelope) {
-  return '当前 shellBootstrapState 为 ${envelope.shellBootstrapState ?? 'authenticated'}，页面将继续进入对应壳层承接。';
+  final shellBootstrapState = envelope.shellBootstrapState?.trim();
+  final target = switch (shellBootstrapState) {
+    'no_organization' => '展览首页',
+    'authenticated' || null => '首页',
+    _ => '对应壳层承接页',
+  };
+  return '当前 shellBootstrapState 为 ${shellBootstrapState ?? 'authenticated'}，页面将继续进入$target。';
 }
 
 String authActionSuccessMessageForOtpSend({

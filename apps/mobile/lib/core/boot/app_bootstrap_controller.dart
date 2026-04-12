@@ -96,7 +96,8 @@ class AppBootstrapController extends ChangeNotifier {
 
   GlobalShellState? guardBuilding(AppBuilding building) {
     if (_blockingState case final GlobalShellState blockingState) {
-      if (blockingState == GlobalShellState.unauthenticated &&
+      if ((blockingState == GlobalShellState.unauthenticated ||
+              blockingState == GlobalShellState.noOrganization) &&
           building == AppBuilding.exhibition) {
         return null;
       }
