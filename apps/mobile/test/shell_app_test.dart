@@ -789,7 +789,7 @@ void main() {
 
     expect(find.text('用户协议'), findsWidgets);
     expect(find.text('展览装修之家用户协议'), findsOneWidget);
-    expect(find.textContaining('当前展示的是仓库内法务草案正文'), findsOneWidget);
+    expect(find.textContaining('当前展示的是仓库内可直接使用的法务正文'), findsOneWidget);
   });
 
   testWidgets('login entry privacy policy page renders markdown document', (
@@ -806,7 +806,7 @@ void main() {
 
     expect(find.text('隐私政策'), findsWidgets);
     expect(find.text('展览装修之家隐私政策'), findsOneWidget);
-    expect(find.textContaining('当前展示的是仓库内法务草案正文'), findsOneWidget);
+    expect(find.textContaining('当前展示的是仓库内可直接使用的法务正文'), findsOneWidget);
   });
 
   test('bootstrap shell context defaults follow manifest visibility flags', () {

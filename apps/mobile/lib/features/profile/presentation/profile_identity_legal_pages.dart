@@ -115,8 +115,8 @@ class _LegalDocumentPage extends StatelessWidget {
         }
 
         final content = <String>[
-          '> 当前展示的是仓库内法务草案正文。',
-          '> 正式发布前仍需补齐运营主体、联系方式、争议管辖与注销路径等占位字段。',
+          '> 当前展示的是仓库内可直接使用的法务正文。',
+          '> 正文内容以仓库同步到 App 资产的最新版本为准。',
           '',
           snapshot.data!,
         ].join('\n');
