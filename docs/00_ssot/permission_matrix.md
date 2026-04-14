@@ -1,6 +1,6 @@
 ---
 owner: Codex 总控
-status: draft
+status: active
 purpose: Freeze role and object-permission baseline.
 layer: L1 Domain
 ---
@@ -22,7 +22,7 @@ layer: L1 Domain
 |---|---|---|---|---|---|
 | Create project | allow | scoped | deny | deny | observe/review |
 | View invited project | allow | scoped | allow | scoped | allow |
-| Submit bid | deny | deny | allow | scoped | observe |
+| Submit bid | eligible by org-type + dual-cert | scoped eligible by org-type + dual-cert | eligible by org-type + dual-cert | scoped eligible by org-type + dual-cert | observe |
 | Award order | allow | scoped | deny | deny | observe |
 | Confirm contract | allow | scoped | allow | scoped | observe |
 | Submit milestone | deny | scoped view | allow | scoped | observe/review |
@@ -35,6 +35,27 @@ layer: L1 Domain
 | Consume instance todo routeTarget | allow | scoped | allow | scoped | deny |
 | View registered instance entry | allow | scoped | allow | scoped | deny |
 | Consume registered instance entry | allow | scoped | allow | scoped | deny |
+
+## Bid Submit Gate
+- 旧规则：
+  - `Submit bid` 以前置 `supplier_* roleKey` 作为硬门槛。
+  - 因此即使当前主体已经完成企业认证与我的认证，只要当前成员角色仍显示为 `buyer_*`，也会在入口前被直接拒绝。
+- 新规则：
+  - `Submit bid` 不再以前置 `supplier_* roleKey` 作为入口硬门槛。
+  - 当前 active app-facing membership 只要同时满足以下条件，即可继续进入竞标主链：
+    - `organizationType` 属于 `supplier` 或 `both`
+    - 企业认证 `approved`
+    - 我的认证 `approved`
+    - `qualifiedForCurrentActor = true`
+- 仍然保持不变：
+  - `organizationType` 属于 `buyer` / `demand` / `platform` 时，禁止参与竞标
+  - `owner_relation_not_allowed`
+  - 项目必须处于 `published`
+  - `lockedToOtherActor`
+  - 其他后续真实业务规则
+- 解释边界：
+  - `buyer_admin` / `buyer_member(scoped)` 在 `organizationType=both` 下不再因为角色名本身被前置硬拦截。
+  - 该变化只影响 `Submit bid` 准入主门槛，不改写其他动作的既有 role-gated truth。
 
 ## Internal-only Controlled Actions
 - `InspectionDecisionApplicationService.applyInspectionDecision`

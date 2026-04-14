@@ -116,9 +116,17 @@ layer: L2 Contracts
 ## Current Response-shape Freeze
 - App-facing responses must preserve:
   - explicit organization scope
+  - explicit current `organizationType` in `GET /api/app/shell/context` when scope exists, and `null` when scope is absent
   - explicit membership state
   - explicit certification state
   - controlled nullable fields where scope may be absent
+- `organizationType` in `shell/context` currently serves only:
+  - bid-eligibility guard alignment
+  - frontend handoff copy alignment
+- `organizationType` in `shell/context` must not be interpreted as:
+  - a second organization registry
+  - a second profile summary family
+  - a replacement for `profile/organization/mine`
 - Admin-facing responses must preserve:
   - list versus detail separation
   - organization review current status

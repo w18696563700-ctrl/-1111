@@ -6,9 +6,14 @@ class AppShellContextData {
     this.displayName,
     this.avatarUrl,
     this.organizationId,
+    this.organizationType,
     List<String>? roleKeys,
     this.certificationStatus,
+    this.personalCertificationStatus,
+    this.personalCertificationQualified,
+    this.personalCertificationLockedToOtherActor,
     this.membershipStatus,
+    this.projectCreateEligibility,
     this.paidMembershipTier,
     List<String>? paidMembershipEntitlementsSummary,
     List<String>? paidMembershipQuotaSummary,
@@ -52,9 +57,14 @@ class AppShellContextData {
   final String? displayName;
   final String? avatarUrl;
   final String? organizationId;
+  final String? organizationType;
   final List<String> roleKeys;
   final String? certificationStatus;
+  final String? personalCertificationStatus;
+  final bool? personalCertificationQualified;
+  final bool? personalCertificationLockedToOtherActor;
   final String? membershipStatus;
+  final AppProjectCreateEligibilityData? projectCreateEligibility;
   final String? paidMembershipTier;
   final List<String> paidMembershipEntitlementsSummary;
   final List<String> paidMembershipQuotaSummary;
@@ -102,4 +112,10 @@ class AppShellContextData {
     }
     return null;
   }
+}
+
+class AppProjectCreateEligibilityData {
+  const AppProjectCreateEligibilityData({required this.canCreateProject});
+
+  final bool canCreateProject;
 }

@@ -124,8 +124,10 @@ layer: L3 Backend
   - current actor `User.status = active`
   - current organization scope present
   - current `OrganizationMember.member_status = active`
-  - current actor `role_key` allowed by `permission_matrix.md`
+  - current actor `role_key` allowed by `permission_matrix.md` for actions that remain role-key-gated
+  - current `Organization.organization_type` when the action is explicitly keyed by organization capability instead of member role
   - current `OrganizationCertification.certification_status = approved` when the action requires certification
+  - current personal certification approval and actor match when the action requires dual certification
   - current object-scope permission where the action is instance-bound
 - Current-round hard rules:
   - raw `authorization` must not directly satisfy eligibility inputs
@@ -138,6 +140,26 @@ layer: L3 Backend
   - bid-submit guard
 - Current round must not persist a separate table whose sole purpose is:
   - replacing this derived decision with a duplicated eligibility truth
+
+## 6.1 Bid Submit And Bid Result Participation Freeze
+- 旧规则：
+  - `bid submit` 以前置 `supplier_* roleKey` 作为主门槛。
+  - 因而双重认证已经完成的 `organizationType=both` 主体，只要当前成员角色不是 `supplier_*`，仍会被入口直接拒绝。
+- 新规则：
+  - `bid submit` 与 `bid result` 当前改为由以下 Server truth 派生：
+    - 当前组织类型属于 `supplier` 或 `both`
+    - 企业认证 `approved`
+    - 我的认证 `approved`
+    - `qualifiedForCurrentActor = true`
+- 当前必须继续保留：
+  - `personal_certification_locked`
+  - `project_not_published`
+  - `owner_relation_not_allowed`
+  - 其他对象级真实业务规则
+- 当前明确不允许：
+  - 把 `supplier_* roleKey` 重新写回 `bid submit` 的入口前置硬 deny
+  - 让 demand-only 主体越过 Server truth 直接参与竞标
+  - 仅靠前端 copy 或 BFF alias 伪装新规则已经生效
 
 ## 7. Organization And Certification State Responsibility Freeze
 - `organizations.status` and `organization_certifications.certification_status` remain separate truth fields.

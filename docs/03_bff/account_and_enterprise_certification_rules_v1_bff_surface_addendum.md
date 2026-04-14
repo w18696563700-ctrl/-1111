@@ -135,6 +135,7 @@ layer: L3 BFF
 - `BFF` may shape only the frozen minimum shell field family:
   - `userId`
   - `organizationId`
+  - `organizationType`
   - `roleKeys`
   - `certificationStatus`
   - `membershipStatus`
@@ -213,21 +214,33 @@ layer: L3 BFF
 - `BFF` may shape only bounded user-facing blocked or unavailable explanations such as:
   - 当前需先登录
   - 当前需先完成组织承接
+  - 当前组织类型未开放竞标资格
   - 当前企业认证未完成
-  - 当前认证审核中
+  - 当前我的认证未完成或未匹配当前账号
+  - 当前我的认证已锁定其他账号
   - 当前认证未通过，请按驳回原因补充后重试
+  - 当前项目未处于可竞标状态
+  - 当前组织不能对自己发布的项目继续竞标
   - 当前权限不足
 - `BFF` may not expose:
   - raw reviewer notes beyond already frozen reject-reason projection
   - raw internal security-event detail
   - raw permission-matrix internals
   - internal review-task or ticket-routing semantics
+- `BFF` 当前不得继续输出以下旧阻断口径作为 bid 主门槛：
+  - “当前组织不是供应商角色，暂不具备投标资格。”
+  - 任何把 `supplier_* roleKey` 写成前置唯一 blocker 的 app-facing 中文提示
 
 ## Exhibition-side Consumption Rule
 - `exhibition` may consume only:
   - current shell context fields required by publish and bid gates
   - bounded blocked-state copy
   - current organization and certification summary cues already shaped by `BFF`
+- 对 `bid submit / bid result` 而言，当前 shell-facing 最小判断口径固定为：
+  - `organizationType`
+  - 企业认证状态
+  - 我的认证状态
+  - `qualifiedForCurrentActor`
 - `exhibition` must not receive from `BFF`:
   - a second certification page tree
   - a second organization-truth projection outside `profile`

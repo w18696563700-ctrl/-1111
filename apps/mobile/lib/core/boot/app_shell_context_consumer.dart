@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/protected_app_request.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 
 final class AppShellContextCanonicalPaths {
@@ -29,9 +30,11 @@ class AppShellContextConsumer {
 
   Future<AppShellContextResult> loadResult() async {
     try {
-      final response = await _client
-          .getEndpoint(AppShellContextCanonicalPaths.shellContext)
-          .timeout(
+      final response =
+          await runProtectedAppRequest(
+            () =>
+                _client.getEndpoint(AppShellContextCanonicalPaths.shellContext),
+          ).timeout(
             _shellContextRequestTimeout,
             onTimeout: () =>
                 throw SocketException('shell context request timed out'),
@@ -137,9 +140,24 @@ class AppShellContextConsumer {
       displayName: _readOptionalString(payload['displayName']),
       avatarUrl: _readOptionalString(payload['avatarUrl']),
       organizationId: _readOptionalString(payload['organizationId']),
+      organizationType: _readOptionalString(payload['organizationType']),
       roleKeys: _readStringList(payload['roleKeys']),
       certificationStatus: _readOptionalString(payload['certificationStatus']),
+      personalCertificationStatus: _readOptionalString(
+        payload['personalCertificationStatus'],
+      ),
+      personalCertificationQualified:
+          payload['personalCertificationQualified'] is bool
+          ? payload['personalCertificationQualified'] as bool
+          : null,
+      personalCertificationLockedToOtherActor:
+          payload['personalCertificationLockedToOtherActor'] is bool
+          ? payload['personalCertificationLockedToOtherActor'] as bool
+          : null,
       membershipStatus: _readOptionalString(payload['membershipStatus']),
+      projectCreateEligibility: _readProjectCreateEligibility(
+        payload['projectCreateEligibility'],
+      ),
       paidMembershipTier: _readOptionalString(payload['paidMembershipTier']),
       paidMembershipEntitlementsSummary: _readStringList(
         payload['paidMembershipEntitlementsSummary'],
@@ -191,6 +209,22 @@ class AppShellContextConsumer {
     }
 
     return raw.map((Object? key, Object? value) => MapEntry('$key', value));
+  }
+
+  static AppProjectCreateEligibilityData? _readProjectCreateEligibility(
+    Object? raw,
+  ) {
+    final map = _readObjectMap(raw);
+    if (map == null) {
+      return null;
+    }
+    final value = map['canCreateProject'];
+    if (value is! bool) {
+      throw const FormatException(
+        'shell context projectCreateEligibility.canCreateProject must be boolean',
+      );
+    }
+    return AppProjectCreateEligibilityData(canCreateProject: value);
   }
 }
 
