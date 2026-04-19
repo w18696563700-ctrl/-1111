@@ -296,11 +296,12 @@ schema_minimums:
       cooldownSeconds: integer
       traceId: string
   OtpLoginRequest:
-    required: [mobile, otpCode, deviceId]
+    required: [mobile, otpCode, deviceId, consentAccepted]
     fields:
       mobile: string
       otpCode: string
       deviceId: string
+      consentAccepted: boolean_true_required
       deviceName: string_optional
       osType: string_optional
       appVersion: string_optional

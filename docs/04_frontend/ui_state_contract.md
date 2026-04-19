@@ -109,23 +109,9 @@ layer: L3 Frontend
 - `instance_todo` currently has no unread / read state machine, no grouped
   thread state, and no delivery-channel UI lifecycle.
 - Registered instance entry consumption currently has no:
-  - workbench state
   - governance-console state
   - multi-route orchestration state
   - layout-metadata state
-- Successful `GET /api/app/exhibition/workbench` resolves to controlled
-  `content` rendering from the frozen summary projection only.
-- The workbench summary currently freezes only:
-  - `project_chain`
-  - `order_chain`
-  - `fulfillment_chain`
-  - `extension_boundary`
-- These containers are homepage summary carriers only; Flutter App must not
-  reinterpret them as domain-truth states or a second dashboard state machine.
-- `extension_boundary.ratingEntryState` and
-  `extension_boundary.disputeWithdrawState` are boundary-state carriers only;
-  they do not authorize `rating/submit`, `inspection/recheck`, or
-  `dispute/withdraw` as homepage actions.
 - Successful `rating/submit` resolves to controlled `content` rendering from the
   server-returned projection only; Flutter App must not invent detail, history,
   moderation, or review workflow states.

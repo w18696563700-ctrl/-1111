@@ -226,3 +226,33 @@ Next unique action:
 `Block P0-A BFF shaping/read-model correction`
 
 This correction must be limited to cloud BFF code under `apps/bff/**`, must keep Server as truth owner, must not change Server or Flutter, and must not open Block P0-B, Admin Review P0, P1/P2, AI/OCR/QR, precheck, penalty/appeal, release-prep, or launch approval.
+
+## L. BFF Shaping Correction Follow-Up
+
+After the BFF shaping/read-model correction receipt, Control accepts the BFF correction as `PASS` based on cloud runtime checks:
+
+- BFF execution environment is `/srv/apps/bff/current -> /srv/releases/bff/20260407125632/apps/bff`.
+- active BFF runtime `:3000` is owned by `exhibition-bff.service`.
+- active BFF runtime process cwd is `/srv/releases/bff/20260407125632/apps/bff`.
+- `npm run build` passed in the cloud BFF workspace.
+- BFF profile block shaping now reads `blockedByMe`, `canInteract`, and optional `interactionBlockedReason`.
+- BFF no longer requires old success fields `ok`, `traceId`, `relationStatus`, or `blocked`.
+- app-facing no-auth smoke returns controlled auth errors, not BFF shape `502`.
+- app-facing authenticated smoke for status -> block -> status -> unblock -> status passed with `200` and the frozen minimum response fields.
+- legacy `/api/app/relation/block*` remains a non-formal `404`.
+- `CS-019` / Block P0-B remains unimplemented and deferred.
+
+Updated decision:
+
+- active Server route/schema blocker: closed.
+- Flutter route-surface blocker: closed.
+- BFF shaping/read-model blocker: closed.
+- `Block P0-A` completion filing: still not allowed until result-verification rerun issues `PASS`.
+- `CS-018`: pending result-verification rerun.
+- `CS-019`: remains explicitly deferred to Block P0-B.
+
+Next unique action:
+
+`Block P0-A result verification rerun`
+
+The rerun must re-check Server active runtime/schema, BFF active route shaping, Flutter route consumption, and scope drift before completion filing can be considered.

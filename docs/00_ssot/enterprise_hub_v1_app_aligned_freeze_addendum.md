@@ -7,6 +7,15 @@ layer: L0 Constitution
 
 # Enterprise Hub V1 App-aligned Freeze Addendum
 
+## Current Validity Notice
+- This document remains a historical V1 boundary note.
+- But the following clauses no longer describe current runtime truth as of `2026-04-11`:
+  - `enterprise_listing.organization_id is mandatory and unique`
+  - `V1 must not allow one organization to occupy multiple public lists`
+  - `V1 must not allow one organization to occupy multiple public top slots`
+- These clauses are superseded by:
+  - `docs/00_ssot/enterprise_display_chain_single_source_of_truth_freeze_addendum.md`
+
 ## Scope
 - This addendum freezes the V1 boundary for `展链库`.
 - It applies only to the exhibition building.

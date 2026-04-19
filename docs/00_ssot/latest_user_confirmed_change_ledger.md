@@ -729,6 +729,22 @@ updated_at_local: 2026-04-14
   - 当前总控结论固定为：
     - 这轮 `Go` 不是未核验转述
     - 已完成最小独立 spot-check 与 rerun
+- `2026-04-15` 对 `竞标提交` 页面当前实现状态的扫描结论固定为：
+  - 当前页面已经完成的是：
+    - 最小竞标提交闭环
+    - 最小竞标结果回读
+    - 基于明确 `bidId` 的最小席位状态投影
+    - 基于明确 `bidId` 的最小资料完整度投影
+  - 当前页面没有完成、且按边界本就不应声称完成的是：
+    - 完整竞标工作台
+    - 比较台 / 评分治理
+    - 保证金 / 支付 /签约
+    - 我的竞标列表
+    - 竞标后沟通与申诉
+    - 订单承接与后续履约主链
+  - 当前总控对“是否做完”的正式判断固定为：
+    - 若问题是“最小竞标提交页有没有做完当前冻结范围”，结论是 `已做完`
+    - 若问题是“完整竞标工作台是否已做完”，结论是 `未做，也不属于当前页边界`
 - `2026-04-15` 竞标资格主门槛已按用户确认方向冻结为新规则：
   - 旧规则：
     - `supplier_* roleKey` 是 `bid submit` 的入口前置硬门槛
@@ -755,3 +771,162 @@ updated_at_local: 2026-04-14
   - 后续线程不得再把新规则回退成：
     - “双重认证通过，但仍要求当前成员角色必须是 `supplier_*` 才能进入竞标入口”
     - “只删 Flutter supplier guard，不改 Server/BFF truth”
+
+### 3.10 竞标提交页满分版改造规则
+
+- 当前方案已确认：
+  - `竞标提交页` 首屏改为：
+    - `第一步 核对项目`
+  - 首屏必须直接展示：
+    - 项目完整关键信息
+    - 核心信息
+    - 地点与安排
+  - 当前 submit page 必须隐藏：
+    - 页面总说明卡
+    - 当前展示方式卡
+    - 冗长承接说明
+    - 席位状态
+    - 资料完整度
+    - 结果页大段解释卡
+  - 当前竞标规则改为：
+    - 不设置席位数量限制
+    - 报价自由
+    - 不收报名费
+    - 不收占位费
+  - `bid submit` 当前最小必选项改为：
+    - `quoteAmount`
+    - `proposalSummary`
+    - `项目理解` 上传附件
+    - `报价表` 上传附件
+    - `进度安排` 上传附件
+  - 以上 3 个附件必须走：
+    - `init -> direct upload -> confirm`
+  - 提交时必须引用：
+    - confirmed `FileAsset`
+  - 提交时不得引用：
+    - `objectKey`
+    - 未 confirm 上传会话
+  - 模板下载区固定放在：
+    - `第三步 上传必选文档`
+    - 标题下方
+  - 模板下载区只承接：
+    - 后台管理系统上传的 3 份实例模板
+  - 当前 submit page 不再把 seat / completeness 作为主展示面：
+    - canonical truth 不草率删除
+    - 但本页消费面已退役
+- 相关文件：
+  - `docs/00_ssot/exhibition_bid_submit_full_version_stage_gate_checklist_addendum.md`
+  - `docs/00_ssot/exhibition_bid_submit_full_version_truth_freeze_addendum.md`
+  - `docs/01_contracts/exhibition_bid_submit_full_version_contract_freeze_addendum.md`
+  - `docs/02_backend/exhibition_bid_submit_full_version_backend_truth_addendum.md`
+  - `docs/03_bff/exhibition_bid_submit_full_version_bff_surface_addendum.md`
+  - `docs/04_frontend/exhibition_bid_submit_full_version_frontend_surface_addendum.md`
+
+### 3.11 创建项目第一页地区选择全国省市区对齐
+
+- `2026-04-16` 用户确认：
+  - 展览楼创建项目第一页的地区选择不能继续表现成“样例区县能力”。
+  - 当前要求是：
+    - `省 / 市` 必须覆盖全国标准行政区划
+    - `区/县` 必须按当前所选城市提供全国标准区县列表
+- 当前前端 live truth 已调整为：
+  - 创建页使用全国省市区 asset
+  - 不再依赖少量样例城市硬编码区县
+  - 地区入口文案改为真实能力口径：
+    - `点击选择省 / 市`
+    - `请选择项目所在省 / 市，系统会自动带入对应地区信息。`
+- Anti-revert：
+  - 不得再把创建页退回成“全国省市 + 8 个样例区县”的伪三级联动
+  - 不得用文案掩盖区县数据范围不足
+- 相关文件：
+  - `docs/04_frontend/project_create_round_a_nationwide_region_picker_frontend_truth_note.md`
+## 2026-04-16
+
+- 用户确认本轮要把 `竞标提交` 改成 staged reveal：
+  - 首屏只显示 `第一步 核对项目`
+  - 点击 `继续竞标` 后才显示项目附件、报价说明、必选文档上传
+- 用户确认 `效果图 / 施工图` 应在 `预发布列表` 阶段完成上传，而不是等到 `竞标中` 再补
+- 用户确认当前要检查 `我的项目 -> 我的发布 -> 竞标中` 缺少回到 `预发布列表` 的问题，但本轮不伪造新的 lifecycle transition
+- 用户确认本轮要重做 `公司 / 工厂 / 供应商详情页` 的排列方式：
+  - 借鉴成熟工厂详情页的 `头图 -> 企业名与标签 -> 关键指标 -> 地址/地图 -> 能力模块 -> 图册/案例 -> 联系方式/补充信息` 节奏
+  - 不照抄竞品业务语义
+  - 不把入驻工作台字段顺序原样倒进详情页
+  - 允许新增的唯一增强项是 `地图`
+- `2026-04-16` 当前总控冻结结论：
+  - 本轮 `Go` 的对象是：
+    - 三类企业详情页 IA 重排
+    - 视觉层级升级
+    - 地址与服务区域增强
+    - 地图能力正式判定
+  - 本轮 `No-Go` 的对象是：
+    - 真地图接通
+    - 经纬度/地图外链伪实现
+    - 目标企业正式信息读取扩面
+    - 新业务流和新工作台能力
+- 当前地图正式判定固定为：
+  - 现有 detail read 已有：
+    - `provinceName`
+    - `cityName`
+    - `basicInfo.address`
+    - `serviceAreas`
+  - 现有 detail read 未有：
+    - `latitude`
+    - `longitude`
+    - `mapUrl`
+    - `mapSnapshot`
+  - 因而本轮只能做：
+    - 地址与服务区域卡增强
+    - 地图卡位保留
+  - 不得声称：
+    - 地图已接通
+- 相关文件：
+  - `docs/00_ssot/enterprise_detail_surface_relayout_and_map_minimal_stage_gate_checklist_addendum.md`
+  - `docs/04_frontend/enterprise_detail_surface_relayout_and_map_minimal_frontend_truth_note.md`
+
+- 用户确认当前要把 `企业位置能力` 升级成独立对象，而不是详情页临时地图功能：
+  - 工作台必须同时支持：
+    - `用当前位置填入`
+    - `文字地址填写并解析`
+  - 两条入口必须收口到同一套企业位置真值
+  - 公开企业详情必须消费同一位置真值
+  - 不得做成前端假地图，不得绕开真值链
+- `2026-04-16` 当前总控 docs-first 冻结结论：
+  - 当前现状只有：
+    - 详细地址
+    - 省市级 carrier
+    - 当前位置回填辅助
+  - 当前没有：
+    - `districtCode / districtName`
+    - `latitude / longitude`
+    - `geoSource / geoStatus / lastGeocodedAt`
+    - `publicDisplayAddress`
+    - 企业展示链上的高德 provider adapter
+  - 本轮 `Go` 的对象是：
+    - `enterprise location capability V1` 五层文书冻结
+    - 受控的 Server 真值增量
+    - 受控的 BFF app-facing surface 增量
+    - 工作台双入口与详情页地图卡消费
+  - 本轮 `Conditional Go` 的对象是：
+    - 高德 provider 接通
+    - 真实地图卡上线
+    - 条件是云端存在可用 key/config 与运行态证据
+  - 本轮 `No-Go` 的对象是：
+    - 假地图
+    - 服务区域冒充地理位置
+    - BFF 第二套位置状态机
+    - 未验证 provider gate 就声称高德已接通
+- 当前新增的 formal freeze 文件：
+  - `docs/00_ssot/enterprise_location_capability_v1_stage_gate_checklist_addendum.md`
+  - `docs/00_ssot/enterprise_location_capability_v1_truth_freeze_addendum.md`
+  - `docs/01_contracts/enterprise_location_capability_v1_contract_freeze_addendum.md`
+  - `docs/02_backend/enterprise_location_capability_v1_backend_truth_addendum.md`
+  - `docs/03_bff/enterprise_location_capability_v1_bff_surface_addendum.md`
+  - `docs/04_frontend/enterprise_location_capability_v1_frontend_surface_addendum.md`
+
+- `2026-04-18 11:41 CST` 用户确认：
+  - 公司详情头图企业画册必须持续可用：
+    - 横向滑动切换
+    - 上传顺序展示
+  - 头图标题区与底部信息胶囊不得拦截翻页手势
+  - 桌面模拟器场景必须保留右侧显式翻页按钮，方便非触摸测试
+  - 后续不得把该按钮或可翻页交互静默回退掉

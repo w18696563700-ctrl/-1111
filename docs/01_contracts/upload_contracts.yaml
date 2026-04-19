@@ -28,8 +28,13 @@ flow:
     outcome:
       - create FileAsset
       - optionally create Evidence binding
+      - do not create project attachment business truth by confirm alone
       - enqueue orphan cleanup if confirm fails
 rules:
   - objectKey is storage location only
   - FileAsset is business truth
   - Evidence is workflow truth when attached to milestone or inspection
+  - post-publish project attachment supplement reuses the same three-step upload corridor
+  - for the post-publish project attachment supplement corridor, upload init freezes `businessType=project`, `fileKind=project_attachment`, and concrete `businessId=projectId`
+  - post-publish project attachment supplement allows only `image/png`, `image/jpeg`, `image/webp`, `application/pdf`, `application/msword`, and `application/vnd.openxmlformats-officedocument.wordprocessingml.document`
+  - confirmed FileAsset is still not project attachment business truth; project-owned attachment truth must be created by the dedicated project attachment family

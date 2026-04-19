@@ -110,6 +110,9 @@ based_on:
 6. cases=[] 时显示“暂无公开案例”
 
 【七、回执要求】
+回执必须单独落盘为：
+- docs/00_ssot/factory_detail_optimization_frontend_execution_receipt_addendum_v1_1.md
+
 回执至少包含：
 1. 当前对象
 2. 修改文件清单

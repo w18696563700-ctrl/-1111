@@ -70,6 +70,9 @@ based_on:
 - 地区 / 名称 / 地址输出语义稳定
 
 【七、回执要求】
+回执必须单独落盘为：
+- docs/00_ssot/factory_detail_optimization_bff_execution_receipt_addendum_v1_1.md
+
 回执至少包含：
 1. 当前对象
 2. 修改文件清单

@@ -46,8 +46,6 @@ layer: L3 Frontend
   - province-scoped ordered recommendation sections
   - publish-project and return-to-top actions
 - `/exhibition/showcase` remains the project-display module page under the home.
-- `/exhibition/workbench` remains the private continuation face; it no longer
-  owns home first-screen explanation or public discovery layout.
 - `forum` remains inside `exhibition`, but it is now one of the six fixed home
   module containers rather than a hidden side concept.
 - No new bottom tab is allowed for this override.
@@ -55,8 +53,6 @@ layer: L3 Frontend
   - the project recommendation section may temporarily reuse
     `GET /api/app/project/list`
   - project detail handoff may temporarily reuse `GET /api/app/project/detail`
-  - the private continuation face may continue to reuse
-    `GET /api/app/exhibition/workbench`
   - the current publish route may still bridge through
     `POST /api/app/project/create`
 - Downstream project, bid, order, contract, milestone, inspection, rating, and
@@ -163,10 +159,11 @@ layer: L3 Frontend
 |---|---|---|---|---|---|---|---|
 | `/exhibition` | 展览秩序化首页 | exhibition | Phase 2A override | host the ordered province marketplace home with location and refresh controls, six fixed module containers, ordered recommendation sections, and controlled handoff into publish or take-task flows | minimum ordered marketplace home | current first-batch project recommendation section may temporarily reuse `GET /api/app/project/list`; the other five home containers may remain controlled province-scoped placeholders until dedicated home aggregation contracts freeze | no mixed public-private dashboard, no long publish form on the home page, no national mixed feed, no order or fulfillment control surfaces, no governance console |
 | `/exhibition/showcase` | 项目展示模块页 | exhibition | Phase 2A override | host the dedicated project-display module page and route from project recommendations into project discovery and project detail | minimum public project module consumer | temporary module carrier reuses `GET /api/app/project/list` and `GET /api/app/project/detail` until dedicated showcase contracts freeze | no ownership of the exhibition home first screen, no private workbench continuation, no order truth, no fulfillment dashboard, no governance console |
-| `/exhibition/workbench` | 项目工作台入口 | exhibition | Phase 2A override | host the private continuation face for current project follow-up, my-project context, current create entry, and existing downstream trade or fulfillment continuation | minimum private continuation consumer | `GET /api/app/exhibition/workbench` | no public project display list semantics, no second workbench state machine, no exhibition-home first-screen ownership, no governance console |
 | `/exhibition/projects` | 项目列表 | exhibition | Phase 2A override | consume project list aggregation for the project-display module and its controlled loading, empty, content, and error states | minimum consumer layer | `GET /api/app/project/list` | no invited-project collaboration flow, no second list-only project field model, no reinterpretation as the full exhibition-home aggregation |
 | `/exhibition/projects/create` | 项目发布工作台 | exhibition | Phase 2A transition | host the dedicated five-step publish workbench transition, permission gate, and controlled submit feedback while current preview and commit contracts are still syncing | minimum publish-workbench transition consumer | current create carrier still reuses `POST /api/app/project/create`; file materials continue to bridge through `POST /api/app/file/upload/init` and `POST /api/app/file/upload/confirm` until dedicated preview, payment, and publish-commit contracts freeze | no long form on the home page, no older review-first publish path, no full `Project` success body, no second project publish state machine, no direct order conversion |
+| `/exhibition/projects/edit` | 项目编辑 | exhibition | Phase 2A continuation | host the owner-scoped editable project continuation and the bounded post-publish owner-private materials supplement zone | minimum private continuation consumer | `GET /api/app/project/edit/detail`, `GET /api/app/my/projects/{projectId}/attachments`, `POST /api/app/my/projects/{projectId}/attachments`, `DELETE /api/app/my/projects/{projectId}/attachments/{attachmentId}` | no second project editor truth, no public attachment display, no order/contract/fulfillment console |
 | `/exhibition/projects/detail` | 项目详情 | exhibition | Phase 2A override | consume project detail aggregation, show project materials, and expose the controlled take-task or bid handoff | minimum consumer layer | `GET /api/app/project/detail` | no bid compare, no order conversion flow, no contract details, no second detail-only project field model |
+| `/exhibition/my/projects/detail` | 我的项目详情 | exhibition | Phase 2A continuation | host the owner-private project continuation detail and the formal post-publish attachment zone for the current project | minimum private continuation consumer | `GET /api/app/my/projects/{projectId}`, `GET /api/app/my/projects/{projectId}/attachments`, `POST /api/app/my/projects/{projectId}/attachments`, `DELETE /api/app/my/projects/{projectId}/attachments/{attachmentId}` | no public detail ownership, no public attachment display, no order/contract/fulfillment governance surface |
 | `/exhibition/bids/submit` | 投标提交 | exhibition | Phase 2A | host the minimum bid submission entry and controlled submit feedback | minimum consumer layer and submit placeholder | `POST /api/app/bid/submit` | no full `Bid` success body, no bid compare, no shortlist or win-loss management, no order truth freeze |
 | `/exhibition/orders/detail` | 订单详情 | exhibition | Phase 2A | consume order detail aggregation and use the existing `orderId` only as controlled local continuation context into already frozen canonical entries | minimum consumer layer | `GET /api/app/order/detail` | no acceptance workflow expansion, no `dispute/withdraw` continuation, no rating detail/history, no change-order flow, no second continuation model |
 | `/exhibition/milestones` | 里程碑列表 | exhibition | Phase 2A | consume milestone list aggregation and controlled page states | minimum consumer layer | `GET /api/app/milestone/list` | no inspection or approval workflow implementation |
@@ -221,11 +218,13 @@ layer: L3 Frontend
   - recent private project context
   - open current publish entry
   - open my-project continuation
+  - controlled handoff into the owner-private post-publish materials supplement corridor
   - explicitly hand off to the public project-display module when requested
 - `project_chain` must hide:
   - bid submit from the private summary itself
   - publish or award controls
   - collaboration controls
+  - public attachment display or attachment-truth ownership
   - second project workbench states
 - `order_chain` may expose only:
   - active order context

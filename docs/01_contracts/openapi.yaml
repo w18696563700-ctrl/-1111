@@ -924,6 +924,82 @@ paths:
             Controlled application-create invalid response. `Server` must
             return `ENTERPRISE_HUB_MISSING_REQUIRED_FIELDS` when the minimum
             create boundary is not met.
+  /api/app/exhibition/enterprise-hub/location/resolve:
+    post:
+      tags: [Exhibition]
+      summary: Resolve enterprise location candidate through the bounded app-facing Amap-backed enterprise location capability
+      operationId: resolveAppEnterpriseHubLocation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                resolveMode:
+                  type: string
+                  enum: [device_location, manual_address]
+                addressText:
+                  type: string
+                provinceCode:
+                  type: string
+                provinceName:
+                  type: string
+                cityCode:
+                  type: string
+                cityName:
+                  type: string
+                districtCode:
+                  type: string
+                districtName:
+                  type: string
+                latitude:
+                  type: number
+                longitude:
+                  type: number
+              required: [resolveMode]
+      responses:
+        "200":
+          description: >
+            Resolved enterprise location candidate. `Server` remains the only
+            owner of the enterprise location truth; BFF only forwards and
+            shapes this candidate for the workbench save flow.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                properties:
+                  location:
+                    $ref: '#/components/schemas/EnterpriseHubLocationTruth'
+                  message:
+                    type:
+                      - string
+                      - 'null'
+                required: [location]
+        "400":
+          description: >
+            Controlled invalid resolve response. `BFF` must return
+            `ENTERPRISE_LOCATION_RESOLVE_INVALID` for malformed resolve input;
+            `Server` may return `ENTERPRISE_LOCATION_RESOLVE_FAILED` when the
+            provider returns no usable result and the request cannot be
+            represented as a text-only candidate.
+        "401":
+          description: >
+            Controlled unauthenticated response. `BFF` must return
+            `AUTH_SESSION_INVALID` when current actor session is unavailable.
+        "403":
+          description: >
+            Controlled permission response. `Server` must return
+            `ENTERPRISE_HUB_PERMISSION_DENIED` when the current actor lacks
+            organization scope for enterprise location resolution.
+        "503":
+          description: >
+            Controlled provider response. `Server` must return
+            `ENTERPRISE_LOCATION_PROVIDER_CONFIG_MISSING` or
+            `ENTERPRISE_LOCATION_RESOLVE_PROVIDER_UNAVAILABLE` when Amap cannot
+            be used under the current cloud runtime.
   /api/app/exhibition/enterprise-hub/enterprises/{enterpriseId}/basic:
     put:
       tags: [Exhibition]
@@ -2268,6 +2344,74 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectReadModel'
+  /api/app/project/clarification/list:
+    get:
+      tags: [Project]
+      summary: Trading IM Round A project public clarification list canonical path
+      operationId: getAppProjectClarificationList
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Trading-scoped IM Round A public clarification list for one project
+            only. This path returns bounded project clarification rows and must
+            not become forum comments, a generic chat list, project attachments,
+            or a station inbox.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectClarificationListResponse'
+        "403":
+          description: >
+            Controlled project-clarification forbidden response. Server must
+            return `PROJECT_CLARIFICATION_FORBIDDEN` when the current actor
+            cannot view the targeted project clarification surface.
+        "404":
+          description: >
+            Controlled project-clarification unavailable response. Server or
+            BFF must return `PROJECT_CLARIFICATION_UNAVAILABLE` when the
+            project or clarification surface is unavailable under the current
+            boundary.
+  /api/app/project/clarification/create:
+    post:
+      tags: [Project]
+      summary: Trading IM Round A project public clarification create canonical path
+      operationId: createAppProjectClarification
+      requestBody:
+        required: true
+        description: >
+          Minimum project public clarification create command. Attachments must
+          be confirmed `FileAssetId` values only; raw `objectKey` must not be
+          accepted.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectClarificationCreateRequest'
+      responses:
+        "202":
+          description: >
+            Project clarification create accepted. The response carries only
+            the created clarification read model and must not expand into a
+            generic conversation or forum thread surface.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectClarificationReadModel'
+        "400":
+          description: >
+            Controlled invalid or attachment-invalid response. Server must
+            return `THREAD_ATTACHMENT_INVALID` for unconfirmed or mismatched
+            attachment FileAsset references.
+        "403":
+          description: >
+            Controlled project-clarification forbidden response.
+            `PROJECT_CLARIFICATION_FORBIDDEN` means the current actor cannot
+            create clarification under the targeted project.
   /api/app/my/projects:
     get:
       tags: [Project]
@@ -2350,12 +2494,12 @@ paths:
       responses:
         "200":
           description: >
-            Owner-private project attachment list for the post-publish
-            materials supplement corridor only. This path is admitted only for
-            current owner continuation faces such as create-success handoff,
-            project edit re-entry, and `my/projects` detail; it must not be
-            exposed on public `project/detail` or reused as a second public
-            project materials family.
+            Owner-private project attachment list for the submitted-or-later
+            materials continuation corridor only. This path is admitted only
+            for current owner continuation faces such as create-success
+            handoff, project edit re-entry, and `my/projects` detail; it must
+            not be exposed on public `project/detail` or reused as a second
+            public project materials family.
           content:
             application/json:
               schema:
@@ -2414,6 +2558,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectAttachmentDeleteAcceptedResponse'
+  /api/app/project/bid-materials:
+    get:
+      tags: [Project]
+      summary: Bid-submit project materials read-only canonical path for Flutter App
+      operationId: getAppProjectBidMaterials
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Read-only bid-submit project materials projection for the current
+            published project only. This path returns only effect-image and
+            construction-doc attachments sourced from `project_attachments`;
+            it must not expose owner upload/delete actions, `other_material`,
+            or become a generic public attachment center.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectBidMaterialListResponse'
   /api/app/project/public-resources:
     get:
       tags: [Project]
@@ -2612,6 +2779,112 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BidResultReadModel'
+  /api/app/bid/thread/detail:
+    get:
+      tags: [Bid]
+      summary: Trading IM Round A project-bid private thread detail canonical path
+      operationId: getAppBidThreadDetail
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: bidId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Trading-scoped IM Round A private thread detail for one project-bid
+            relation only. The response may include the bounded message list and
+            confirmation cards but must not become a generic message center,
+            station inbox, order conversation, contract conversation, or dispute
+            conversation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidThreadDetailReadModel'
+        "403":
+          description: >
+            Controlled bid-thread forbidden response. Server must return
+            `BID_THREAD_FORBIDDEN` when the current actor is not a participant.
+        "404":
+          description: >
+            Controlled bid-thread unavailable response. Server or BFF must
+            return `BID_THREAD_UNAVAILABLE` when the project-bid relation or
+            thread surface is unavailable.
+  /api/app/bid/thread/message/send:
+    post:
+      tags: [Bid]
+      summary: Trading IM Round A project-bid private thread message send canonical path
+      operationId: sendAppBidThreadMessage
+      requestBody:
+        required: true
+        description: >
+          Minimum thread message send command. Attachments must be confirmed
+          `FileAssetId` values only; raw `objectKey`, read receipts, typing,
+          and delivery state are outside this contract.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidThreadMessageSendRequest'
+      responses:
+        "202":
+          description: >
+            Thread message send accepted. The response carries only the created
+            message read model and must not expose realtime or delivery-state
+            semantics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidThreadMessageReadModel'
+        "400":
+          description: >
+            Controlled message or attachment invalid response. Server must
+            return `THREAD_MESSAGE_INVALID` for invalid message input and
+            `THREAD_ATTACHMENT_INVALID` for unconfirmed or mismatched
+            attachment FileAsset references.
+        "403":
+          description: >
+            Controlled bid-thread forbidden response. `BID_THREAD_FORBIDDEN`
+            means the current actor is not an admitted thread participant.
+  /api/app/bid/thread/confirmation/create:
+    post:
+      tags: [Bid]
+      summary: Trading IM Round A confirmation card create canonical path
+      operationId: createAppBidThreadConfirmation
+      requestBody:
+        required: true
+        description: >
+          Minimum confirmation-card create command for the current project-bid
+          private thread. The card is a thread child object, not chat body,
+          contract confirmation, or a generic confirmation system.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConfirmationCardCreateRequest'
+      responses:
+        "202":
+          description: >
+            Confirmation card create accepted. The response carries only the
+            created confirmation-card read model and must not open revoke,
+            void, edit, or confirmation-workbench state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmationCardReadModel'
+        "400":
+          description: >
+            Controlled confirmation invalid response. Server must return
+            `THREAD_CONFIRMATION_INVALID` when the requested confirmation type,
+            summary, or source message is invalid.
+        "403":
+          description: >
+            Controlled bid-thread forbidden response. `BID_THREAD_FORBIDDEN`
+            means the current actor is not an admitted thread participant.
   /api/app/order/detail:
     get:
       tags: [Order]
@@ -3478,10 +3751,10 @@ paths:
           description: >
             Internal truth read pair for
             `GET /api/app/my/projects/{projectId}/attachments`. This path
-            returns only the owner-private post-publish attachment list backed
-            by `project_attachments` truth and must not collapse into public
-            `project/detail` or reuse upload-confirm records as business
-            truth.
+            returns only the owner-private submitted-or-later attachment list
+            backed by `project_attachments` truth and must not collapse into
+            public `project/detail` or reuse upload-confirm records as
+            business truth.
           content:
             application/json:
               schema:
@@ -3541,6 +3814,29 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectAttachmentDeleteAcceptedResponse'
+  /server/projects/{projectId}/bid-materials:
+    get:
+      tags: [Project]
+      summary: Internal truth read pair for app-facing bid-submit project materials
+      operationId: getProjectBidMaterials
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Internal truth read pair for `GET /api/app/project/bid-materials`.
+            This path returns only read-only effect-image and construction-doc
+            attachments sourced from `project_attachments` truth; it must not
+            expose owner write controls, `other_material`, or a generic public
+            attachment family.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectBidMaterialListResponse'
   /server/projects/public-resources:
     get:
       tags: [Project]
@@ -4718,13 +5014,17 @@ x-instance-todo-registry:
     first_batch:
       - inspection
       - dispute
+      - project_clarification
+      - bid_thread
   actionKeys:
     first_batch:
       - inspection.submit
       - dispute.open
+      - project_clarification.open
+      - bid_thread.open
   routeTargetBoundary:
     existing_signed_instance_entry_only: true
-    new_app_facing_path_forbidden: true
+    unfrozen_new_app_facing_path_forbidden: true
     arbitrary_deeplink_forbidden: true
 x-unified-instance-entry-registry:
   capability: unified_instance_entry_registration_preembed
@@ -4748,6 +5048,25 @@ x-unified-instance-entry-registry:
         - orderId
       consumerBuilding: messages
       localEntryKey: registered.dispute.open
+      state: enabled
+    - entryKey: project_clarification_open_entry
+      objectType: project_clarification
+      actionKey: project_clarification.open
+      canonicalPath: /api/app/project/clarification/list
+      requiredParams:
+        - projectId
+      consumerBuilding: messages
+      localEntryKey: registered.project_clarification.open
+      state: enabled
+    - entryKey: bid_thread_open_entry
+      objectType: bid_thread
+      actionKey: bid_thread.open
+      canonicalPath: /api/app/bid/thread/detail
+      requiredParams:
+        - projectId
+        - bidId
+      consumerBuilding: messages
+      localEntryKey: registered.bid_thread.open
       state: enabled
 components:
   schemas:
@@ -7423,6 +7742,89 @@ components:
             $ref: '#/components/schemas/ForumInteractionInboxItem'
         page:
           $ref: '#/components/schemas/ForumCursorPageInfo'
+    TradingImActorRole:
+      type: string
+      enum:
+        - project_owner
+        - bidder
+      description: >
+        Trading IM Round A actor role projection only. Server remains the final
+        permission truth owner.
+    ProjectClarificationState:
+      type: string
+      enum:
+        - active
+        - hidden
+        - archived
+      description: >
+        Minimum project clarification lifecycle projection. Round A only
+        implements list/create; hidden and archived are read projections for
+        later governance compatibility, not admitted commands.
+    ProjectClarificationReadModel:
+      type: object
+      required:
+        - clarificationId
+        - projectId
+        - authorRole
+        - body
+        - attachmentFileAssetIds
+        - state
+        - createdAt
+      description: >
+        Trading IM Round A project public clarification row. This model is
+        project-scoped public work clarification only and must not become a
+        forum comment, generic message body, or project attachment truth.
+      properties:
+        clarificationId:
+          type: string
+        projectId:
+          type: string
+        authorRole:
+          $ref: '#/components/schemas/TradingImActorRole'
+        body:
+          type: string
+        attachmentFileAssetIds:
+          type: array
+          items:
+            type: string
+          description: Confirmed FileAsset ids only; objectKey is forbidden.
+        state:
+          $ref: '#/components/schemas/ProjectClarificationState'
+        createdAt:
+          type: string
+          format: date-time
+    ProjectClarificationListResponse:
+      type: object
+      required:
+        - projectId
+        - items
+      description: >
+        Minimum project public clarification list response for one project.
+      properties:
+        projectId:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectClarificationReadModel'
+    ProjectClarificationCreateRequest:
+      type: object
+      required:
+        - projectId
+        - body
+        - attachmentFileAssetIds
+      description: >
+        Minimum project public clarification create request. Attachments must
+        be confirmed FileAsset ids only.
+      properties:
+        projectId:
+          type: string
+        body:
+          type: string
+        attachmentFileAssetIds:
+          type: array
+          items:
+            type: string
     ProjectCreateRequest:
       type: object
       required:
@@ -7713,7 +8115,7 @@ components:
         `fileKind=project_attachment` with concrete `businessId=projectId`;
         current enterprise display workbench additionally allows
         `businessType=enterprise_display` with image-only file kinds for
-        logo / cover / factory showcase / case media. `businessId` remains a
+        logo / album / factory showcase / case media. `businessId` remains a
         carried binding field and may be `null` before project truth is
         accepted, but it must be concrete for post-publish attachment
         supplement.
@@ -8097,6 +8499,208 @@ components:
         decidedAt:
           type: string
           format: date-time
+    BidThreadState:
+      type: string
+      enum:
+        - open
+        - restricted
+        - archived
+      description: >
+        Minimum project-bid private thread lifecycle projection. Round A only
+        implements detail and send-message; restricted and archived are bounded
+        read projections and not admitted commands.
+    BidThreadParticipantRole:
+      type: string
+      enum:
+        - project_owner
+        - bidder
+      description: Server-owned participant role projection for Round A.
+    BidThreadParticipant:
+      type: object
+      required:
+        - participantRole
+        - organizationId
+      properties:
+        participantRole:
+          $ref: '#/components/schemas/BidThreadParticipantRole'
+        organizationId:
+          type: string
+    BidThreadAvailability:
+      type: object
+      required:
+        - canSendMessage
+        - canCreateConfirmation
+        - reason
+      description: >
+        Display-only availability projection. Server remains final permission
+        owner and BFF/Flutter must not treat this as local permission truth.
+      properties:
+        canSendMessage:
+          type: boolean
+        canCreateConfirmation:
+          type: boolean
+        reason:
+          type:
+            - string
+            - 'null'
+    BidThreadMessageReadModel:
+      type: object
+      required:
+        - messageId
+        - threadId
+        - projectId
+        - bidId
+        - senderRole
+        - body
+        - attachmentFileAssetIds
+        - createdAt
+      description: >
+        Minimum Round A thread message read model. This model carries no read
+        receipt, typing, online status, push, delivery state, or realtime
+        transport semantics.
+      properties:
+        messageId:
+          type: string
+        threadId:
+          type: string
+        projectId:
+          type: string
+        bidId:
+          type: string
+        senderRole:
+          $ref: '#/components/schemas/TradingImActorRole'
+        body:
+          type: string
+        attachmentFileAssetIds:
+          type: array
+          items:
+            type: string
+          description: Confirmed FileAsset ids only; objectKey is forbidden.
+        createdAt:
+          type: string
+          format: date-time
+    BidThreadMessageSendRequest:
+      type: object
+      required:
+        - projectId
+        - bidId
+        - body
+        - attachmentFileAssetIds
+      description: >
+        Minimum Round A thread message send request. Attachments must be
+        confirmed FileAsset ids only.
+      properties:
+        projectId:
+          type: string
+        bidId:
+          type: string
+        body:
+          type: string
+        attachmentFileAssetIds:
+          type: array
+          items:
+            type: string
+    ConfirmationCardType:
+      type: string
+      enum:
+        - quote
+        - craft_material
+        - schedule
+      description: Minimum Round A confirmation-card type family.
+    ConfirmationCardReadModel:
+      type: object
+      required:
+        - confirmationId
+        - threadId
+        - projectId
+        - bidId
+        - confirmationType
+        - summary
+        - sourceMessageId
+        - createdAt
+      description: >
+        Minimum confirmation-card read model. A confirmation card is a child
+        object of project-bid private thread and must not become contract
+        confirmation, order confirmation, revoke/void workflow, or generic
+        confirmation system.
+      properties:
+        confirmationId:
+          type: string
+        threadId:
+          type: string
+        projectId:
+          type: string
+        bidId:
+          type: string
+        confirmationType:
+          $ref: '#/components/schemas/ConfirmationCardType'
+        summary:
+          type: string
+        sourceMessageId:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+    ConfirmationCardCreateRequest:
+      type: object
+      required:
+        - projectId
+        - bidId
+        - confirmationType
+        - summary
+        - sourceMessageId
+      description: >
+        Minimum confirmation-card create request for one project-bid private
+        thread.
+      properties:
+        projectId:
+          type: string
+        bidId:
+          type: string
+        confirmationType:
+          $ref: '#/components/schemas/ConfirmationCardType'
+        summary:
+          type: string
+        sourceMessageId:
+          type: string
+    BidThreadDetailReadModel:
+      type: object
+      required:
+        - threadId
+        - projectId
+        - bidId
+        - participants
+        - state
+        - availability
+        - messages
+        - confirmationCards
+      description: >
+        Minimum project-bid private thread detail model for Trading IM Round A.
+        It may carry messages and confirmation cards for the targeted relation
+        only and must not become a generic conversation center.
+      properties:
+        threadId:
+          type: string
+        projectId:
+          type: string
+        bidId:
+          type: string
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/BidThreadParticipant'
+        state:
+          $ref: '#/components/schemas/BidThreadState'
+        availability:
+          $ref: '#/components/schemas/BidThreadAvailability'
+        messages:
+          type: array
+          items:
+            $ref: '#/components/schemas/BidThreadMessageReadModel'
+        confirmationCards:
+          type: array
+          items:
+            $ref: '#/components/schemas/ConfirmationCardReadModel'
     OrderCreateRequest:
       type: object
       required:
@@ -8899,8 +9503,8 @@ components:
         - construction_doc
         - other_material
       description: >
-        Formal owner-private project attachment kind for the post-publish
-        materials supplement corridor only.
+        Formal owner-private project attachment kind for the
+        submitted-or-later materials continuation corridor only.
     ProjectAttachmentVisibility:
       type: string
       enum:
@@ -8922,7 +9526,7 @@ components:
         - createdAt
       description: >
         Formal owner-private project attachment read model for the
-        post-publish materials supplement corridor only. `fileAssetId`
+        submitted-or-later materials continuation corridor only. `fileAssetId`
         references confirmed upload asset truth, while this model itself is
         the project-owned attachment business truth carrier.
       properties:
@@ -8961,8 +9565,8 @@ components:
         - projectId
         - attachments
       description: >
-        Owner-private project attachment list response for the post-publish
-        materials supplement corridor only.
+        Owner-private project attachment list response for the
+        submitted-or-later materials continuation corridor only.
       properties:
         projectId:
           type: string
@@ -8970,6 +9574,67 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ProjectAttachmentReadModel'
+    ProjectBidMaterialKind:
+      type: string
+      enum:
+        - effect_image
+        - construction_doc
+      description: >
+        Read-only bid-submit project material kind. This projection is sourced
+        from `project_attachments` truth and does not authorize owner write
+        operations.
+    ProjectBidMaterialReadModel:
+      type: object
+      required:
+        - attachmentId
+        - projectId
+        - fileAssetId
+        - fileName
+        - attachmentKind
+        - mimeType
+        - sortOrder
+        - createdAt
+      description: >
+        Read-only bid-submit project material projection. This model is
+        limited to effect-image and construction-doc attachments and must not
+        become a second attachment truth family.
+      properties:
+        attachmentId:
+          type: string
+        projectId:
+          type: string
+        fileAssetId:
+          type: string
+        fileName:
+          type: string
+        attachmentKind:
+          $ref: '#/components/schemas/ProjectBidMaterialKind'
+        mimeType:
+          type: string
+          description: >
+            Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx
+            only. `effect_image` may use image MIME only; `construction_doc`
+            may use pdf/doc/docx only.
+        sortOrder:
+          type: integer
+          minimum: 0
+        createdAt:
+          type: string
+          format: date-time
+    ProjectBidMaterialListResponse:
+      type: object
+      required:
+        - projectId
+        - attachments
+      description: >
+        Read-only bid-submit project material list response only.
+      properties:
+        projectId:
+          type: string
+        attachments:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectBidMaterialReadModel'
     ProjectAttachmentCreateRequest:
       type: object
       required:
@@ -10201,11 +10866,159 @@ components:
           type:
             - string
             - 'null'
+    EnterpriseHubLocationGeoSource:
+      type: string
+      enum:
+        - device_location
+        - manual_address_geocode
+        - manual_text_only
+        - unknown
+    EnterpriseHubLocationGeoStatus:
+      type: string
+      enum:
+        - resolved
+        - text_only
+        - failed
+        - not_provided
+    EnterpriseHubLocationTruth:
+      type: object
+      required:
+        - geoSource
+        - geoStatus
+      properties:
+        addressText:
+          type:
+            - string
+            - 'null'
+        publicDisplayAddress:
+          type:
+            - string
+            - 'null'
+        provinceCode:
+          type:
+            - string
+            - 'null'
+        provinceName:
+          type:
+            - string
+            - 'null'
+        cityCode:
+          type:
+            - string
+            - 'null'
+        cityName:
+          type:
+            - string
+            - 'null'
+        districtCode:
+          type:
+            - string
+            - 'null'
+        districtName:
+          type:
+            - string
+            - 'null'
+        latitude:
+          type:
+            - number
+            - 'null'
+        longitude:
+          type:
+            - number
+            - 'null'
+        geoSource:
+          $ref: '#/components/schemas/EnterpriseHubLocationGeoSource'
+        geoStatus:
+          $ref: '#/components/schemas/EnterpriseHubLocationGeoStatus'
+        lastGeocodedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        mapProvider:
+          type:
+            - string
+            - 'null'
+          enum:
+            - amap
+            - null
+        mapPreviewUrl:
+          type:
+            - string
+            - 'null'
+        mapLinkUrl:
+          type:
+            - string
+            - 'null'
+    EnterpriseHubLocationPublic:
+      type: object
+      required:
+        - geoStatus
+      properties:
+        provinceName:
+          type:
+            - string
+            - 'null'
+        cityName:
+          type:
+            - string
+            - 'null'
+        districtName:
+          type:
+            - string
+            - 'null'
+        publicDisplayAddress:
+          type:
+            - string
+            - 'null'
+        latitude:
+          type:
+            - number
+            - 'null'
+        longitude:
+          type:
+            - number
+            - 'null'
+        geoStatus:
+          $ref: '#/components/schemas/EnterpriseHubLocationGeoStatus'
+        mapProvider:
+          type:
+            - string
+            - 'null'
+          enum:
+            - amap
+            - null
+        mapPreviewUrl:
+          type:
+            - string
+            - 'null'
+        mapLinkUrl:
+          type:
+            - string
+            - 'null'
+    EnterpriseHubVisualGallery:
+      type: object
+      required:
+        - albumImageUrls
+        - source
+      properties:
+        albumImageUrls:
+          type: array
+          maxItems: 6
+          items:
+            type: string
+        source:
+          type: string
+          enum:
+            - enterprise_album
+            - empty
     EnterpriseHubDetailResponse:
       type: object
       required:
         - header
+        - visualGallery
         - basicInfo
+        - location
         - boardProfile
         - serviceAreas
         - cases
@@ -10215,8 +11028,12 @@ components:
       properties:
         header:
           $ref: '#/components/schemas/EnterpriseHubHeader'
+        visualGallery:
+          $ref: '#/components/schemas/EnterpriseHubVisualGallery'
         basicInfo:
           $ref: '#/components/schemas/EnterpriseHubBasicInfo'
+        location:
+          $ref: '#/components/schemas/EnterpriseHubLocationPublic'
         boardProfile:
           $ref: '#/components/schemas/EnterpriseHubBoardProfile'
         serviceAreas:
@@ -10297,10 +11114,11 @@ components:
           type:
             - string
             - 'null'
-        coverFileAssetId:
-          type:
-            - string
-            - 'null'
+        albumImageFileAssetIds:
+          type: array
+          maxItems: 6
+          items:
+            type: string
         shortIntro:
           type:
             - string
@@ -10330,6 +11148,8 @@ components:
           type:
             - string
             - 'null'
+        location:
+          $ref: '#/components/schemas/EnterpriseHubLocationTruth'
         foundedAt:
           type:
             - string
@@ -10615,10 +11435,11 @@ components:
           type:
             - string
             - 'null'
-        coverFileAssetId:
-          type:
-            - string
-            - 'null'
+        albumImageFileAssetIds:
+          type: array
+          maxItems: 6
+          items:
+            type: string
         shortIntro:
           type:
             - string
@@ -10648,6 +11469,8 @@ components:
           type:
             - string
             - 'null'
+        location:
+          $ref: '#/components/schemas/EnterpriseHubLocationTruth'
         foundedAt:
           type:
             - string
@@ -11351,6 +12174,8 @@ components:
           enum:
             - inspection
             - dispute
+            - project_clarification
+            - bid_thread
         instanceId:
           type: string
     InstanceTodoRouteTarget:
@@ -11372,6 +12197,8 @@ components:
           enum:
             - /api/app/inspection/detail
             - /api/app/order/detail
+            - /api/app/project/clarification/list
+            - /api/app/bid/thread/detail
           description: App-facing canonical entry reference only.
         localEntryKey:
           type: string
@@ -11383,6 +12210,8 @@ components:
             enum:
               - orderId
               - milestoneId
+              - projectId
+              - bidId
           description: >
             Frozen minimum parameter shape for the selected registered entry.
         state:
@@ -11424,6 +12253,8 @@ components:
           enum:
             - inspection.submit
             - dispute.open
+            - project_clarification.open
+            - bid_thread.open
         title:
           type: string
         summary:
@@ -11459,16 +12290,22 @@ components:
           enum:
             - inspection
             - dispute
+            - project_clarification
+            - bid_thread
         actionKey:
           type: string
           enum:
             - inspection.submit
             - dispute.open
+            - project_clarification.open
+            - bid_thread.open
         canonicalPath:
           type: string
           enum:
             - /api/app/inspection/detail
             - /api/app/order/detail
+            - /api/app/project/clarification/list
+            - /api/app/bid/thread/detail
           description: App-facing canonical entry reference only; not frontend routing detail.
         requiredParams:
           type: array
@@ -11477,6 +12314,8 @@ components:
             enum:
               - orderId
               - milestoneId
+              - projectId
+              - bidId
         consumerBuilding:
           type: string
           enum:

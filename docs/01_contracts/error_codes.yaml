@@ -55,6 +55,7 @@ namespaces:
   - SECURITY
   - PROJECT
   - BID
+  - THREAD
   - ORDER
   - CONTRACT
   - MILESTONE
@@ -80,6 +81,9 @@ codes:
   - code: AUTH_OTP_LOGIN_INVALID
     owner: Server
     meaning: OTP login request is missing required fields or the submitted OTP login command is not acceptable under the current minimum login boundary.
+  - code: AUTH_CONSENT_REQUIRED
+    owner: Server
+    meaning: OTP login is rejected because the current actor has not explicitly confirmed the current user agreement and privacy policy boundary.
   - code: AUTH_REFRESH_INVALID
     owner: Server
     meaning: Session refresh request is missing required fields, is replayed, or cannot rotate the current refresh session truth.
@@ -89,6 +93,9 @@ codes:
   - code: AUTH_OTP_RATE_LIMITED
     owner: Server
     meaning: OTP send or OTP login is blocked by the current controlled anti-abuse rate limit.
+  - code: AUTH_OTP_SEND_LIMIT_REACHED
+    owner: Server
+    meaning: The current mobile has reached the upstream OTP send limit window and must wait for the provider limit to reset before another OTP may be sent.
   - code: AUTH_PERMISSION_INSUFFICIENT
     owner: Server
     meaning: The current actor role or object scope is insufficient for the requested identity or profile action.
@@ -134,6 +141,9 @@ codes:
   - code: CERTIFICATION_RESUBMIT_INVALID
     owner: Server
     meaning: Certification resubmit request is missing required fields or violates the current minimum certification resubmission boundary.
+  - code: CERTIFICATION_REVALIDATE_INVALID
+    owner: Server
+    meaning: Certification revalidate request is missing required fields or violates the current approved-organization certification correction boundary.
   - code: CERTIFICATION_DUPLICATE_SUBMIT
     owner: Server
     meaning: Certification submit or resubmit is rejected because the current certification state does not allow a second equivalent submit command.
@@ -179,15 +189,63 @@ codes:
   - code: PROJECT_CREATE_INVALID
     owner: Server
     meaning: Project create request is missing required fields or violates minimum constraints.
+  - code: PROJECT_WITHDRAW_INVALID
+    owner: Server
+    meaning: Project withdraw request is missing required fields or violates the submitted-to-draft minimum command boundary.
+  - code: PROJECT_ARCHIVE_INVALID
+    owner: Server
+    meaning: Project archive request is missing required fields or violates the submitted-to-archived minimum command boundary.
+  - code: PROJECT_CLOSE_INVALID
+    owner: Server
+    meaning: Project close request is missing required fields or violates the published-to-archived minimum command boundary.
   - code: PROJECT_INVALID_STATE
     owner: Server
     meaning: Project state transition is not allowed.
+  - code: PROJECT_CLARIFICATION_UNAVAILABLE
+    owner: Server
+    meaning: The targeted project public clarification surface is unavailable, hidden, not materialized, or not visible under the current project boundary.
+  - code: PROJECT_CLARIFICATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to view or create project public clarification under the targeted project.
   - code: BID_SUBMIT_INVALID
     owner: Server
     meaning: Bid submit request is missing required fields or violates minimum constraints.
   - code: BID_DUPLICATE_SUBMISSION
     owner: Server
     meaning: The same bid command was submitted more than once.
+  - code: BID_SEAT_INVALID
+    owner: Server
+    meaning: Seat lock, release, or status request is missing required fields or targets a bid seat object outside the bounded Package A contract truth.
+  - code: BID_SEAT_INVALID_STATE
+    owner: Server
+    meaning: The targeted bounded Package A seat object is in a state that does not allow the requested lock or release command.
+  - code: BID_SEAT_CONFLICT
+    owner: Server
+    meaning: The bounded Package A seat command conflicts with an already active seat lock and cannot materialize a second competing seat truth.
+  - code: BID_SEAT_TIMEOUT
+    owner: Server
+    meaning: The targeted bounded Package A seat has already timed out and must be re-evaluated through the canonical seat status truth before another command is accepted.
+  - code: BID_PACKAGE_COMPLETENESS_INVALID
+    owner: Server
+    meaning: The requested Package A bid package completeness evaluation input is missing required fields or does not map to a valid bounded bid comparison candidate.
+  - code: BID_PACKAGE_COMPLETENESS_UNAVAILABLE
+    owner: BFF
+    meaning: The bounded Package A bid package completeness projection is controlled-unavailable, not materialized, or hidden for the current actor and route boundary.
+  - code: BID_THREAD_UNAVAILABLE
+    owner: Server
+    meaning: The targeted project-bid private thread is unavailable, hidden, not materialized, or outside the current project-bid relation boundary.
+  - code: BID_THREAD_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not an admitted participant for the targeted project-bid private thread.
+  - code: THREAD_MESSAGE_INVALID
+    owner: Server
+    meaning: Thread message send request is missing required fields, violates the bounded Round A input contract, or targets a thread that cannot accept messages.
+  - code: THREAD_ATTACHMENT_INVALID
+    owner: Server
+    meaning: Thread or clarification attachment references are missing, unconfirmed, objectKey-based, or do not match the targeted Round A business boundary.
+  - code: THREAD_CONFIRMATION_INVALID
+    owner: Server
+    meaning: Confirmation card create request is missing required fields, uses an unsupported confirmation type, or references a source message outside the targeted project-bid thread.
   - code: ORDER_INVALID_STATE
     owner: Server
     meaning: Order creation or activation is not allowed in the current upstream state.
@@ -335,6 +393,27 @@ codes:
   - code: ENTERPRISE_HUB_CASE_REQUIRED
     owner: Server
     meaning: Enterprise hub submit is blocked until at least one current case entry is present for the selected primary board type.
+  - code: ENTERPRISE_HUB_CHANGE_CORRIDOR_REQUIRED
+    owner: Server
+    meaning: Direct enterprise hub continuation is no longer valid because the target truth has entered the published-governed change corridor and must continue through the formal published-change family.
+  - code: ENTERPRISE_HUB_INVALID_MEDIA_OWNERSHIP
+    owner: Server
+    meaning: Enterprise hub media write or live apply references a FileAsset that does not belong to the current enterprise_display scope, media role, or allowed image boundary.
+  - code: ENTERPRISE_LOCATION_RESOLVE_INVALID
+    owner: BFF
+    meaning: Enterprise location resolve request is missing the required mode-specific input fields or carries unsupported resolve mode values.
+  - code: ENTERPRISE_LOCATION_RESOLVE_PROVIDER_UNAVAILABLE
+    owner: Server
+    meaning: Enterprise location resolve provider is temporarily unavailable under the current runtime boundary.
+  - code: ENTERPRISE_LOCATION_RESOLVE_FAILED
+    owner: Server
+    meaning: Enterprise location resolve provider returned no usable geocode or reverse-geocode result for the supplied enterprise location input.
+  - code: ENTERPRISE_LOCATION_WRITE_INVALID
+    owner: Server
+    meaning: Enterprise location write payload violates persisted truth rules, for example resolved status without both latitude and longitude.
+  - code: ENTERPRISE_LOCATION_PROVIDER_CONFIG_MISSING
+    owner: Server
+    meaning: Enterprise location resolve cannot run because the cloud runtime is missing the required Amap provider configuration.
   - code: GOVERNANCE_STATUS_UNAVAILABLE
     owner: BFF
     meaning: The current actor governance status projection is unavailable, hidden, or not materialized for the current profile scope.
