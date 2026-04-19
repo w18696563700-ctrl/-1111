@@ -12,9 +12,16 @@ export class ShellPresenter {
     avatarUrl: string | null;
     profileIntro: string | null;
     organizationId: string | null;
+    organizationType: string | null;
     roleKeys: string[];
     certificationStatus: string | null;
+    personalCertificationStatus?: string | null;
+    personalCertificationQualified?: boolean | null;
+    personalCertificationLockedToOtherActor?: boolean | null;
     membershipStatus: string | null;
+    projectCreateEligibility: {
+      canCreateProject: boolean;
+    } | null;
     paidMembershipTier: string | null;
     paidMembershipEntitlementsSummary: string[];
     paidMembershipQuotaSummary: string[];
@@ -73,9 +80,20 @@ export class ShellPresenter {
       avatarUrl: input.avatarUrl,
       profileIntro: input.profileIntro,
       organizationId: input.organizationId,
+      organizationType: input.organizationType,
       roleKeys: input.roleKeys,
       certificationStatus: input.certificationStatus,
+      personalCertificationStatus: input.personalCertificationStatus ?? null,
+      personalCertificationQualified:
+        input.personalCertificationQualified == null
+          ? null
+          : input.personalCertificationQualified,
+      personalCertificationLockedToOtherActor:
+        input.personalCertificationLockedToOtherActor == null
+          ? null
+          : input.personalCertificationLockedToOtherActor,
       membershipStatus: input.membershipStatus,
+      projectCreateEligibility: input.projectCreateEligibility,
       paidMembershipTier: input.paidMembershipTier,
       paidMembershipEntitlementsSummary: input.paidMembershipEntitlementsSummary,
       paidMembershipQuotaSummary: input.paidMembershipQuotaSummary,

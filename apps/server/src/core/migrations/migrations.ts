@@ -12,6 +12,7 @@ export const enterpriseHubMigrations = [
         full_intro text,
         logo_file_asset_id varchar(64),
         cover_file_asset_id varchar(64),
+        album_image_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
         province_code varchar(32) NOT NULL DEFAULT '',
         province_name varchar(64) NOT NULL DEFAULT '',
         city_code varchar(32) NOT NULL DEFAULT '',
@@ -176,6 +177,43 @@ export const enterpriseHubMigrations = [
       )`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_enterprise_recommendation_slot_board_position_time
        ON enterprise_recommendation_slot (board_type, slot_position, start_at, end_at)`
+    ]
+  },
+  {
+    key: '20260410_enterprise_display_workbench_media_truth',
+    statements: [
+      `ALTER TABLE enterprise_profile_factory
+       ADD COLUMN IF NOT EXISTS showcase_image_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb`,
+      `ALTER TABLE enterprise_profile_factory
+       ADD COLUMN IF NOT EXISTS factory_name varchar(128)`,
+      `ALTER TABLE enterprise_listing
+       DROP CONSTRAINT IF EXISTS enterprise_listing_organization_id_key`,
+      `DROP INDEX IF EXISTS idx_enterprise_listing_organization_unique`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_enterprise_listing_organization_board_unique
+       ON enterprise_listing (organization_id, primary_board_type)`
+    ]
+  },
+  {
+    key: '20260416_enterprise_location_capability_v1_truth',
+    statements: [
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS district_code varchar(32)`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS district_name varchar(64)`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS public_display_address text`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS latitude double precision`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS longitude double precision`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS geo_source varchar(64)`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS geo_status varchar(32)`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS last_geocoded_at timestamptz`,
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS map_provider varchar(32)`
     ]
   }
 ];
@@ -462,6 +500,16 @@ export const authPublicLoginMigrations = [
   }
 ];
 
+export const currentSessionScopeMigrations = [
+  {
+    key: '20260409_sessions_current_organization_scope_truth',
+    statements: [
+      `ALTER TABLE sessions
+       ADD COLUMN IF NOT EXISTS organization_id varchar(64)`
+    ]
+  }
+];
+
 export const personalMinimalEditMigrations = [
   {
     key: '20260406_personal_minimal_edit_avatar_truth',
@@ -631,6 +679,7 @@ export const forumReportP0Migrations = [
   }
 ];
 
+
 export const blockP0AMigrations = [
   {
     key: '20260407_block_p0a_user_block_relation_truth',
@@ -655,6 +704,720 @@ export const blockP0AMigrations = [
   }
 ];
 
+
+export const governancePenaltyP1AMigrations = [
+  {
+    key: '20260408_governance_penalty_p1a_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS governance_penalties (
+        id varchar(64) PRIMARY KEY,
+        subject_type varchar(32) NOT NULL,
+        subject_id varchar(64) NOT NULL,
+        penalty_type varchar(32) NOT NULL,
+        status varchar(32) NOT NULL,
+        reason_code varchar(64) NOT NULL,
+        reason_summary text,
+        evidence_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        effective_from timestamptz NOT NULL,
+        effective_until timestamptz,
+        created_by varchar(64) NOT NULL,
+        operator_actor_id varchar(64) NOT NULL,
+        operator_user_id varchar(64) NOT NULL,
+        operator_role varchar(64) NOT NULL DEFAULT '',
+        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_penalties_subject_status_created
+       ON governance_penalties (subject_type, subject_id, status, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_penalties_created
+       ON governance_penalties (created_at DESC)`
+    ]
+  }
+];
+
+export const governanceAppealP1AMigrations = [
+  {
+    key: '20260408_governance_appeal_p1a_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS governance_appeal_cases (
+        id varchar(64) PRIMARY KEY,
+        penalty_id varchar(64) NOT NULL,
+        status varchar(32) NOT NULL,
+        reason text NOT NULL,
+        decision varchar(32),
+        decision_note text,
+        evidence_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        submitted_by varchar(64) NOT NULL,
+        submitted_at timestamptz NOT NULL,
+        decided_by varchar(64),
+        decided_at timestamptz,
+        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_appeal_cases_penalty_submitted
+       ON governance_appeal_cases (penalty_id, submitted_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_appeal_cases_status_submitted
+       ON governance_appeal_cases (status, submitted_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_governance_appeal_cases_one_active
+       ON governance_appeal_cases (penalty_id)
+       WHERE status IN ('submitted', 'under_review')`
+    ]
+  }
+];
+
+export const exhibitionReportCaseP0Migrations = [
+  {
+    key: '20260411_exhibition_report_case_p0_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS exhibition_report_cases (
+        id varchar(64) PRIMARY KEY,
+        target_type varchar(32) NOT NULL,
+        target_id varchar(64) NOT NULL,
+        reason_code varchar(64) NOT NULL,
+        reason_detail text,
+        reporter_user_id varchar(64) NOT NULL,
+        reporter_organization_id varchar(64),
+        status varchar(32) NOT NULL DEFAULT 'submitted',
+        temporary_restriction_state varchar(32) NOT NULL DEFAULT 'not_applied',
+        review_task_id varchar(64),
+        governance_ticket_ref varchar(64),
+        evidence_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        explanation_requested_at timestamptz,
+        explanation_due_at timestamptz,
+        explanation_received_at timestamptz,
+        adjudication_result varchar(32),
+        decision_note text,
+        decided_at timestamptz,
+        closed_at timestamptz,
+        metadata jsonb NOT NULL DEFAULT '{}'::jsonb,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_exhibition_report_cases_status_created
+       ON exhibition_report_cases (status, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_exhibition_report_cases_target_created
+       ON exhibition_report_cases (target_type, target_id, created_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_exhibition_report_cases_active_reporter_target_reason
+       ON exhibition_report_cases (reporter_user_id, target_type, target_id, reason_code)
+       WHERE status IN ('submitted', 'under_review', 'explanation_requested', 'escalated')`
+    ]
+  }
+];
+
+export const governanceRescanP2AMigrations = [
+  {
+    key: '20260408_governance_rescan_p2a_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS governance_rescan_jobs (
+        id varchar(64) PRIMARY KEY,
+        scope_type varchar(32) NOT NULL DEFAULT 'forum_content',
+        status varchar(32) NOT NULL DEFAULT 'queued',
+        window_start timestamptz NOT NULL,
+        window_end timestamptz NOT NULL,
+        candidate_count integer NOT NULL DEFAULT 0,
+        flagged_count integer NOT NULL DEFAULT 0,
+        reason text NOT NULL,
+        rule_set_version varchar(64) NOT NULL DEFAULT '',
+        engine_mode varchar(64) NOT NULL DEFAULT '',
+        created_by varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        completed_at timestamptz,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_governance_rescan_jobs_scope_type
+          CHECK (scope_type = 'forum_content'),
+        CONSTRAINT chk_governance_rescan_jobs_status
+          CHECK (status IN ('queued', 'running', 'completed', 'failed', 'cancelled'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_rescan_jobs_scope_status_created
+       ON governance_rescan_jobs (scope_type, status, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_governance_rescan_jobs_created
+       ON governance_rescan_jobs (created_at DESC)`
+    ]
+  }
+];
+
+export const certificationRevalidationMigrations = [
+  {
+    key: '20260410_certification_revalidation_audit_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS organization_certification_revalidation_attempt (
+        id varchar(64) PRIMARY KEY,
+        organization_id varchar(64) NOT NULL,
+        certification_id varchar(64),
+        triggered_by_user_id varchar(64) NOT NULL,
+        triggered_by_actor_id varchar(64) NOT NULL,
+        triggered_by_role varchar(64) NOT NULL DEFAULT '',
+        source_license_file_id varchar(64) NOT NULL,
+        correction_note text,
+        before_status varchar(32) NOT NULL,
+        after_status varchar(32) NOT NULL,
+        command_outcome varchar(32) NOT NULL,
+        old_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+        requested_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+        ocr_snapshot jsonb,
+        outcome_reason text,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_cert_revalidation_attempt_org_created
+       ON organization_certification_revalidation_attempt (organization_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_cert_revalidation_attempt_cert_created
+       ON organization_certification_revalidation_attempt (certification_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_cert_revalidation_attempt_outcome_created
+       ON organization_certification_revalidation_attempt (command_outcome, created_at DESC)`
+    ]
+  }
+];
+
+export const aiReviewGatewayP1AMigrations = [
+  {
+    key: '20260408_ai_review_gateway_p1a_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS ai_review_gateway_requests (
+        id varchar(64) PRIMARY KEY,
+        engine_type varchar(32) NOT NULL,
+        provider_key varchar(64) NOT NULL,
+        review_object_type varchar(64) NOT NULL,
+        object_id varchar(128) NOT NULL,
+        policy_profile varchar(64) NOT NULL,
+        request_payload_ref varchar(128) NOT NULL,
+        trace_id varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_review_gateway_requests_trace_created
+       ON ai_review_gateway_requests (trace_id, created_at DESC)`,
+      `CREATE TABLE IF NOT EXISTS ai_review_gateway_results (
+        id varchar(64) PRIMARY KEY,
+        request_id varchar(64) NOT NULL UNIQUE,
+        decision varchar(32) NOT NULL,
+        risk_score numeric(6,2) NOT NULL DEFAULT 0,
+        risk_labels jsonb NOT NULL DEFAULT '[]'::jsonb,
+        provider_response_ref varchar(128) NOT NULL,
+        status varchar(32) NOT NULL DEFAULT 'queued',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_ai_review_gateway_results_status
+          CHECK (status IN ('queued', 'processing', 'completed', 'failed')),
+        CONSTRAINT fk_ai_review_gateway_results_request_id
+          FOREIGN KEY (request_id) REFERENCES ai_review_gateway_requests (id) ON DELETE CASCADE
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_ai_review_gateway_results_status_created
+       ON ai_review_gateway_results (status, created_at DESC)`
+    ]
+  }
+];
+
+export const projectTransactionSkeletonP0Migrations = [
+  {
+    key: '20260410_bid_submit_p0_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS bids (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        organization_id varchar(64) NOT NULL,
+        actor_id varchar(64),
+        user_id varchar(64),
+        quote_amount numeric(12,2) NOT NULL,
+        proposal_summary text NOT NULL,
+        state varchar(32) NOT NULL DEFAULT 'submitted',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_bids_project_created
+       ON bids (project_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_bids_organization_created
+       ON bids (organization_id, created_at DESC)`
+    ]
+  }
+];
+
+export const bidSubmitQuoteAmountRepairMigrations = [
+  {
+    key: '20260413_bid_quote_amount_numeric_truth_repair',
+    statements: [
+      `DO $$
+       BEGIN
+         IF EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'bids'
+             AND column_name = 'quote_amount'
+             AND data_type IN ('integer', 'smallint', 'bigint')
+         ) THEN
+           ALTER TABLE public.bids
+             ALTER COLUMN quote_amount TYPE numeric(12,2)
+             USING quote_amount::numeric(12,2);
+         END IF;
+       END $$`
+    ]
+  }
+];
+
+export const bidSeatTruthBackfillMigrations = [
+  {
+    key: '20260413_bid_seats_truth_runner_backfill',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS bid_seats (
+        seat_id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        bid_id varchar(64) NOT NULL,
+        state varchar(32) NOT NULL DEFAULT 'locked',
+        locked_at timestamptz NOT NULL,
+        expires_at timestamptz NOT NULL,
+        released_at timestamptz,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_bid_seats_state
+          CHECK (state IN ('locked', 'released', 'timed_out'))
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_bid_seats_project_bid_unique
+       ON bid_seats (project_id, bid_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_bid_seats_project_state_updated
+       ON bid_seats (project_id, state, updated_at DESC)`
+    ]
+  }
+];
+
+export const bidDuplicateSubmitRepairMigrations = [
+  {
+    key: '20260415_bid_duplicate_submission_controlled_repair',
+    statements: [
+      `DO $$
+       BEGIN
+         IF EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'bids'
+             AND column_name = 'bidder_organization_id'
+         ) THEN
+           UPDATE public.bids
+              SET bidder_organization_id = organization_id
+            WHERE (bidder_organization_id IS NULL OR bidder_organization_id = '')
+              AND organization_id IS NOT NULL
+              AND organization_id <> '';
+
+           CREATE UNIQUE INDEX IF NOT EXISTS idx_bids_project_bidder_unique
+             ON public.bids (project_id, bidder_organization_id);
+         END IF;
+       END $$`
+    ]
+  }
+];
+
+export const bidAwardBridgeCompletionMigrations = [
+  {
+    key: '20260412_bid_award_bridge_order_contract_seed_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS orders (
+        id varchar(64) PRIMARY KEY,
+        order_no varchar(64),
+        project_id varchar(64) NOT NULL,
+        bid_id varchar(64),
+        buyer_organization_id varchar(64) NOT NULL,
+        supplier_organization_id varchar(64),
+        title text,
+        total_amount numeric(12,2),
+        state varchar(32) NOT NULL DEFAULT 'active',
+        activated_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS contracts (
+        id varchar(64) PRIMARY KEY,
+        order_id varchar(64) NOT NULL,
+        state varchar(32) NOT NULL DEFAULT 'pending_confirm',
+        summary_text text,
+        confirmed_at timestamptz,
+        amend_count integer,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `DO $$
+       BEGIN
+         IF EXISTS (
+           SELECT 1
+           FROM pg_tables
+           WHERE schemaname = 'public'
+             AND tablename = 'orders'
+             AND tableowner = current_user
+         ) THEN
+           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_orders_project_updated
+                    ON public.orders (project_id, updated_at DESC)';
+           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_orders_buyer_state_updated
+                    ON public.orders (buyer_organization_id, state, updated_at DESC)';
+           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_orders_supplier_state_updated
+                    ON public.orders (supplier_organization_id, state, updated_at DESC)';
+           EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_project_unique
+                    ON public.orders (project_id)';
+           EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_bid_unique
+                    ON public.orders (bid_id)
+                    WHERE bid_id IS NOT NULL';
+         END IF;
+       END $$`,
+      `DO $$
+       BEGIN
+         IF EXISTS (
+           SELECT 1
+           FROM pg_tables
+           WHERE schemaname = 'public'
+             AND tablename = 'contracts'
+             AND tableowner = current_user
+         ) THEN
+           EXECUTE 'CREATE INDEX IF NOT EXISTS idx_contracts_order_updated
+                    ON public.contracts (order_id, updated_at DESC)';
+           EXECUTE 'CREATE UNIQUE INDEX IF NOT EXISTS idx_contracts_order_unique
+                    ON public.contracts (order_id)';
+         END IF;
+       END $$`
+    ]
+  }
+];
+
+export const authWhitelistTestSessionMigrations = [
+  {
+    key: '20260410_auth_whitelist_test_session_truth',
+    statements: [
+      `ALTER TABLE sessions
+       ADD COLUMN IF NOT EXISTS auth_mode varchar(32) NOT NULL DEFAULT 'otp_login'`,
+      `ALTER TABLE sessions
+       ADD COLUMN IF NOT EXISTS issue_reason text`
+    ]
+  }
+];
+
+export const authLoginLegalConsentMigrations = [
+  {
+    key: '20260413_auth_login_legal_consent_truth',
+    statements: [
+      `ALTER TABLE sessions
+       ADD COLUMN IF NOT EXISTS agreement_version varchar(64)`,
+      `ALTER TABLE sessions
+       ADD COLUMN IF NOT EXISTS privacy_version varchar(64)`,
+      `ALTER TABLE sessions
+       ADD COLUMN IF NOT EXISTS agreed_at timestamptz`
+    ]
+  }
+];
+
+export const authPasswordCredentialMigrations = [
+  {
+    key: '20260413_auth_password_credentials_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS password_credentials (
+        user_id varchar(64) PRIMARY KEY,
+        password_hash text NOT NULL,
+        password_algo varchar(64) NOT NULL,
+        password_set_at timestamptz NOT NULL,
+        password_updated_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`
+    ]
+  }
+];
+
+export const projectAttachmentCorridorP1Migrations = [
+  {
+    key: '20260413_project_attachment_owner_private_corridor_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_attachments (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        file_asset_id varchar(64) NOT NULL,
+        file_name text NOT NULL,
+        attachment_kind varchar(32) NOT NULL,
+        mime_type varchar(128) NOT NULL,
+        visibility varchar(32) NOT NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        created_by varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_attachments_visibility
+          CHECK (visibility = 'owner_private'),
+        CONSTRAINT chk_project_attachments_attachment_kind
+          CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'other_material'))
+      )`,
+      `ALTER TABLE public.project_attachments
+       ADD COLUMN IF NOT EXISTS file_name text NOT NULL DEFAULT ''`,
+      `ALTER TABLE public.project_attachments
+       ADD COLUMN IF NOT EXISTS attachment_kind varchar(32) NOT NULL DEFAULT 'other_material'`,
+      `ALTER TABLE public.project_attachments
+       ADD COLUMN IF NOT EXISTS mime_type varchar(128) NOT NULL DEFAULT 'application/octet-stream'`,
+      `ALTER TABLE public.project_attachments
+       ADD COLUMN IF NOT EXISTS visibility varchar(32) NOT NULL DEFAULT 'owner_private'`,
+      `ALTER TABLE public.project_attachments
+       ADD COLUMN IF NOT EXISTS sort_order integer NOT NULL DEFAULT 0`,
+      `ALTER TABLE public.project_attachments
+       ADD COLUMN IF NOT EXISTS created_by varchar(64) NOT NULL DEFAULT ''`,
+      `DO $$
+       BEGIN
+         IF EXISTS (
+           SELECT 1
+           FROM information_schema.columns
+           WHERE table_schema = 'public'
+             AND table_name = 'project_attachments'
+             AND column_name = 'bound_by'
+         ) THEN
+           UPDATE public.project_attachments
+              SET created_by = COALESCE(NULLIF(created_by, ''), bound_by, '')
+            WHERE created_by = '';
+         END IF;
+
+         IF NOT EXISTS (
+           SELECT 1
+           FROM pg_constraint
+           WHERE conname = 'chk_project_attachments_visibility'
+             AND conrelid = 'public.project_attachments'::regclass
+         ) THEN
+           ALTER TABLE public.project_attachments
+             ADD CONSTRAINT chk_project_attachments_visibility
+             CHECK (visibility = 'owner_private');
+         END IF;
+
+         IF NOT EXISTS (
+           SELECT 1
+           FROM pg_constraint
+           WHERE conname = 'chk_project_attachments_attachment_kind'
+             AND conrelid = 'public.project_attachments'::regclass
+         ) THEN
+           ALTER TABLE public.project_attachments
+             ADD CONSTRAINT chk_project_attachments_attachment_kind
+             CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'other_material'));
+         END IF;
+       END $$`,
+      `CREATE INDEX IF NOT EXISTS idx_project_attachments_project_sort_created
+       ON public.project_attachments (project_id, sort_order ASC, created_at ASC)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_attachments_file_asset
+       ON public.project_attachments (file_asset_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_attachments_project_file_asset_unique
+       ON public.project_attachments (project_id, file_asset_id)`
+    ]
+  }
+];
+
+export const projectPublicResourceDownloadZoneMigrations = [
+  {
+    key: '20260414_project_public_resource_download_zone_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_public_resources (
+        resource_id varchar(64) PRIMARY KEY,
+        resource_category varchar(32) NOT NULL,
+        title varchar(128) NOT NULL,
+        summary text,
+        file_asset_id varchar(64) NOT NULL,
+        file_name text NOT NULL,
+        mime_type varchar(128) NOT NULL,
+        visibility varchar(32) NOT NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        published_at timestamptz NOT NULL,
+        published_by varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_public_resources_category
+          CHECK (resource_category IN ('contract_template', 'process_guide', 'other_resource')),
+        CONSTRAINT chk_project_public_resources_visibility
+          CHECK (visibility = 'app_shared'),
+        CONSTRAINT chk_project_public_resources_mime
+          CHECK (
+            mime_type IN (
+              'image/png',
+              'image/jpeg',
+              'image/webp',
+              'application/pdf',
+              'application/msword',
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+            )
+          )
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_public_resources_catalog_order
+       ON public.project_public_resources (visibility, sort_order ASC, published_at DESC, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_public_resources_file_asset
+       ON public.project_public_resources (file_asset_id)`
+    ]
+  }
+];
+
+export const certificationLicenseFieldCollectionMigrations = [
+  {
+    key: '20260410_certification_license_field_collection_truth',
+    statements: [
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS legal_person text`,
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS business_type text`,
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS registered_capital text`,
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS business_term text`,
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS business_scope text`
+    ]
+  }
+];
+
+export const enterpriseDisplayTruthRepairMigrations = [
+  {
+    key: '20260410_enterprise_display_org_and_cert_truth_repair',
+    statements: [
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS address text`,
+      `ALTER TABLE organization_certifications
+       ADD COLUMN IF NOT EXISTS established_at date`,
+      `WITH candidate_rows AS (
+         SELECT
+           o.id AS organization_id,
+           COALESCE(
+             NULLIF(sa.province_code, ''),
+             NULLIF(el.province_code, '')
+           ) AS province_code,
+           COALESCE(
+             NULLIF(sa.city_code, ''),
+             NULLIF(el.city_code, '')
+           ) AS city_code
+         FROM organizations o
+         LEFT JOIN enterprise_listing el
+           ON el.organization_id = o.id
+         LEFT JOIN enterprise_service_area sa
+           ON sa.enterprise_id = el.id
+          AND sa.area_type = 'registered_location'
+         WHERE o.province_code = '000000'
+            OR o.city_code = '000000'
+       ),
+       valid_candidates AS (
+         SELECT
+           organization_id,
+           province_code,
+           city_code
+         FROM candidate_rows
+         WHERE province_code IS NOT NULL
+           AND city_code IS NOT NULL
+           AND province_code <> '000000'
+           AND city_code <> '000000'
+       ),
+       repair_source AS (
+         SELECT
+           organization_id,
+           MIN(province_code) AS province_code,
+           MIN(city_code) AS city_code
+         FROM valid_candidates
+         GROUP BY organization_id
+         HAVING COUNT(DISTINCT province_code || '|' || city_code) = 1
+       )
+       UPDATE organizations o
+          SET province_code = repair_source.province_code,
+              city_code = repair_source.city_code
+         FROM repair_source
+        WHERE o.id = repair_source.organization_id
+          AND (o.province_code = '000000' OR o.city_code = '000000')`
+    ]
+  },
+  {
+    key: '20260417_enterprise_display_album_truth_backfill',
+    statements: [
+      `ALTER TABLE enterprise_listing
+       ADD COLUMN IF NOT EXISTS album_image_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb`
+    ]
+  }
+];
+
+export const personalCertificationDualGateMigrations = [
+  {
+    key: '20260414_personal_certification_dual_gate_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS personal_certifications (
+         id uuid PRIMARY KEY,
+         organization_id uuid NOT NULL UNIQUE,
+         user_id varchar(64) NOT NULL,
+         certification_status varchar(32) NOT NULL,
+         real_name varchar(128),
+         id_number_masked varchar(32),
+         id_card_front_file_id varchar(64),
+         provider_request_id varchar(128),
+         submitted_at timestamptz,
+         reviewed_at timestamptz,
+         reject_reason text,
+         locked_at timestamptz,
+         created_at timestamptz NOT NULL DEFAULT now(),
+         updated_at timestamptz NOT NULL DEFAULT now()
+       )`,
+      `CREATE INDEX IF NOT EXISTS idx_personal_certifications_user
+       ON public.personal_certifications (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_personal_certifications_status
+       ON public.personal_certifications (certification_status)`
+    ]
+  }
+];
+
+
+export const tradingImRoundAMigrations = [
+  {
+    key: '20260416_trading_im_round_a_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_clarifications (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        author_user_id varchar(64),
+        author_actor_id varchar(64),
+        author_organization_id varchar(64) NOT NULL DEFAULT '',
+        author_role varchar(32) NOT NULL,
+        body text NOT NULL,
+        attachment_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        lifecycle_state varchar(32) NOT NULL DEFAULT 'active',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_clarifications_project_created
+       ON project_clarifications (project_id, created_at)`,
+      `CREATE TABLE IF NOT EXISTS bid_private_threads (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        bid_id varchar(64) NOT NULL,
+        project_owner_organization_id varchar(64) NOT NULL,
+        bidder_organization_id varchar(64) NOT NULL,
+        lifecycle_state varchar(32) NOT NULL DEFAULT 'open',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_bid_private_threads_project_bid_unique
+       ON bid_private_threads (project_id, bid_id)`,
+      `CREATE TABLE IF NOT EXISTS bid_thread_messages (
+        id varchar(64) PRIMARY KEY,
+        thread_id varchar(64) NOT NULL,
+        project_id varchar(64) NOT NULL,
+        bid_id varchar(64) NOT NULL,
+        sender_user_id varchar(64),
+        sender_actor_id varchar(64),
+        sender_organization_id varchar(64) NOT NULL,
+        sender_role varchar(32) NOT NULL,
+        body text NOT NULL,
+        attachment_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        message_state varchar(32) NOT NULL DEFAULT 'active',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_bid_thread_messages_thread_created
+       ON bid_thread_messages (thread_id, created_at)`,
+      `CREATE TABLE IF NOT EXISTS bid_thread_confirmation_cards (
+        id varchar(64) PRIMARY KEY,
+        thread_id varchar(64) NOT NULL,
+        project_id varchar(64) NOT NULL,
+        bid_id varchar(64) NOT NULL,
+        confirmation_type varchar(32) NOT NULL,
+        source_message_id varchar(64) NOT NULL,
+        summary text NOT NULL,
+        creator_user_id varchar(64),
+        creator_actor_id varchar(64),
+        creator_organization_id varchar(64) NOT NULL,
+        creator_role varchar(32) NOT NULL,
+        card_state varchar(32) NOT NULL DEFAULT 'active',
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_bid_thread_confirmation_cards_thread_created
+       ON bid_thread_confirmation_cards (thread_id, created_at)`
+    ]
+  }
+];
+
 export const serverMigrations = [
   ...enterpriseHubMigrations,
   ...projectPublishCorridorMigrations,
@@ -662,8 +1425,29 @@ export const serverMigrations = [
   ...creditDepositTransactionGuaranteeMigrations,
   ...paymentBillingMigrations,
   ...authPublicLoginMigrations,
+  ...currentSessionScopeMigrations,
   ...personalMinimalEditMigrations,
   ...profileSafetyP0Migrations,
   ...forumReportP0Migrations,
-  ...blockP0AMigrations
+  ...blockP0AMigrations,
+  ...governancePenaltyP1AMigrations,
+  ...governanceAppealP1AMigrations,
+  ...exhibitionReportCaseP0Migrations,
+  ...governanceRescanP2AMigrations,
+  ...certificationRevalidationMigrations,
+  ...aiReviewGatewayP1AMigrations,
+  ...projectTransactionSkeletonP0Migrations,
+  ...bidSubmitQuoteAmountRepairMigrations,
+  ...bidSeatTruthBackfillMigrations,
+  ...bidDuplicateSubmitRepairMigrations,
+  ...bidAwardBridgeCompletionMigrations,
+  ...authWhitelistTestSessionMigrations,
+  ...authLoginLegalConsentMigrations,
+  ...authPasswordCredentialMigrations,
+  ...projectAttachmentCorridorP1Migrations,
+  ...projectPublicResourceDownloadZoneMigrations,
+  ...certificationLicenseFieldCollectionMigrations,
+  ...enterpriseDisplayTruthRepairMigrations,
+  ...personalCertificationDualGateMigrations,
+  ...tradingImRoundAMigrations
 ];

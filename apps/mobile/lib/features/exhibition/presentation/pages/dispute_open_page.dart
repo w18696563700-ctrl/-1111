@@ -98,19 +98,21 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
     final resultState = _stateFromPayload(_lastResult?.payload);
     final resultSummary = _payloadMap(_lastResult?.payload)?['summary'];
     final currentStateMessage = switch (resultState) {
-      'opened' => '当前状态：争议已经开启完成，这一页保留最小结果承接。',
+      'accepted' => '当前状态：争议开启入口已经受理，这一页继续保留最小结果承接。',
+      'opened' => '当前状态：当前结果来自演示已开启内容，这一页继续保留最小结果承接。',
       _ when routeOrderId != null && _lastResult == null =>
-        '当前状态：已承接订单上下文，正在等待本次争议开启动作。',
-      _ when routeOrderId != null => '当前状态：本次开启结果已返回，是否还能继续以后端结果为准。',
+        '当前状态：已承接订单上下文，正在等待本次争议开启续接受理。',
+      _ when routeOrderId != null => '当前状态：本次续接受理结果已返回，是否还能继续以后端结果为准。',
       _ => '当前状态：缺少 orderId，上下文不足以继续开启争议。',
     };
     final actionMessage = routeOrderId != null
-        ? '当前动作：可以继续开启争议；页面不会本地补做资格、范围或治理判断。'
+        ? '当前动作：可以继续把当前订单上下文交给争议开启入口；页面不会本地补做资格、范围或治理判断。'
         : '当前动作：当前不可继续，请先恢复订单上下文。';
 
     return _SubmissionPageFrame(
       title: '争议开启入口',
-      summary: '这里用于在当前订单下开启争议。页面只做最小开启动作和结果承接，不扩成协商、平台审理或撤回主链。',
+      summary:
+          '这里用于在当前订单下继续争议开启的 shell / handoff。页面只受理当前订单上下文和结果承接，不把本页写成 dispute truth 已创建。',
       canonicalPath: ExhibitionCanonicalPaths.disputeOpen,
       submitting: _submitting,
       lastResult: _lastResult,
@@ -146,10 +148,10 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
     return <Widget>[
       const SizedBox(height: 16),
       _ActionCard(
-        title: '已开启结果',
+        title: '争议开启入口已受理',
         summary: _lastResultOrigin == ExhibitionStageDataOrigin.demo
             ? '当前结果来自演示内容。页面会继续展示争议已开启后的样子，但不代表真实争议链路已经联通。'
-            : '争议已经成功开启。当前页继续保留结果承接，不自动放开撤回链路。',
+            : '争议开启入口已经受理。当前页继续保留结果承接，只补最小撤回续接，不把争议 truth 写成完整工作流。',
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
           _InstanceSummaryLine(title: '当前订单 ID', value: orderId),
@@ -175,23 +177,44 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
           if (resultSummary is Map)
             const _DetailLine(
               label: '当前说明',
-              value: '争议开启结果已经承接完成，当前页继续保留只读结果。',
+              value: '争议开启入口已经受理，当前页继续保留边界续接结果。',
             ),
+          if (_lastResultOrigin == ExhibitionStageDataOrigin.futureReal &&
+              _lastResult?.isSuccess == true) ...<Widget>[
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () {
+                Navigator.of(context).pushNamed(
+                  ExhibitionRoutes.disputeWithdrawWithOrderId(orderId),
+                );
+              },
+              child: const Text('去争议撤回'),
+            ),
+          ],
         ],
       ),
       const SizedBox(height: 16),
-      const _ActionCard(
+      _ActionCard(
         title: '提交后如何继续',
-        summary: '当前首发阶段先把争议开启做成可展示入口，不继续开放撤回主链。',
+        summary: _lastResultOrigin == ExhibitionStageDataOrigin.futureReal &&
+                _lastResult?.isSuccess == true
+            ? '当前首发阶段只补最小撤回续接。撤回后仍停留在边界结果承接，不扩成争议工作台。'
+            : '当前首发阶段先把争议开启做成 shell / handoff 入口，只有在真实受理后才开放最小撤回续接。',
         children: <Widget>[
           _StateMessage(
             title: '当前能做什么',
-            body: '当前页会继续展示已开启结果，帮助客户确认争议已经进入受控承接面。',
+            body: _lastResultOrigin == ExhibitionStageDataOrigin.futureReal &&
+                    _lastResult?.isSuccess == true
+                ? '当前页会继续展示已受理结果，并允许进入最小争议撤回入口。'
+                : '当前页会继续展示已受理结果，帮助客户确认争议开启已经进入受控承接面。',
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           _EmptyNotice(
-            title: '当前冻结',
-            message: '争议撤回、协商、平台审理、升级和裁决当前阶段都不继续开放动作。',
+            title: '当前边界',
+            message: _lastResultOrigin == ExhibitionStageDataOrigin.futureReal &&
+                    _lastResult?.isSuccess == true
+                ? '当前只开放最小争议撤回；协商、平台审理、升级和裁决仍不继续开放。'
+                : '争议撤回、协商、平台审理、升级和裁决当前阶段都不继续开放动作。',
           ),
         ],
       ),
@@ -219,7 +242,7 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
           FilledButton(
             key: const ValueKey<String>('dispute_open_submit_button'),
             onPressed: _submitting ? null : _submit,
-            child: const Text('提交'),
+            child: const Text('继续争议开启'),
           ),
           const SizedBox(height: 8),
           FilledButton.tonal(
@@ -238,7 +261,7 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
       const SizedBox(height: 16),
       _ActionCard(
         title: '开启前先确认',
-        summary: '争议入口只依赖当前订单上下文，不会本地补做资格、范围或治理判断。',
+        summary: '争议入口只依赖当前订单上下文，不会本地补做资格、范围或治理判断，也不在本页创建新的 dispute truth。',
         tone: _ActionCardTone.emphasis,
         eyebrow: '当前边界页',
         children: <Widget>[
@@ -248,7 +271,7 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
           const SizedBox(height: 12),
           const _DetailLine(
             label: '为什么现在允许开',
-            value: '当前订单已经承接到争议入口，所以这一页可以展示开启动作和结果承接。',
+            value: '当前订单已经承接到争议入口，所以这一页可以展示 shell / handoff 动作和结果承接。',
           ),
           if (routeOrderId != null) ...<Widget>[
             const SizedBox(height: 12),
@@ -259,12 +282,12 @@ class _DisputeOpenPageState extends State<DisputeOpenPage> {
       const SizedBox(height: 16),
       const _ActionCard(
         title: '这一步意味着什么',
-        summary: '争议开启后，页面会保留结果承接，帮助客户看清当前边界已经打开，但不会继续扩成治理台。',
+        summary: '争议开启入口受理后，页面会保留结果承接；如有真实受理结果，可继续进入最小撤回入口，但不会继续扩成治理台。',
         eyebrow: '边界说明',
         children: <Widget>[
-          _DetailLine(label: '开完之后能看到什么', value: '可以看到争议已开启结果、当前状态和当前说明。'),
-          _DetailLine(label: '当前不能做什么', value: '撤回、协商、升级、平台审理和历史列表仍保持冻结。'),
-          _DetailLine(label: '下一步怎么继续', value: '演示时停留在已开启结果页，继续说明当前边界即可。'),
+          _DetailLine(label: '受理后能看到什么', value: '可以看到争议开启入口已受理结果、当前状态和当前说明。'),
+          _DetailLine(label: '当前不能做什么', value: '协商、升级、平台审理和历史列表仍保持冻结。'),
+          _DetailLine(label: '下一步怎么继续', value: '真实受理后可以进入最小撤回入口；演示时继续停留在已受理结果页。'),
         ],
       ),
     ];

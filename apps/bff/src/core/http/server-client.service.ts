@@ -33,6 +33,10 @@ export class ServerClientService {
     return this.send<T>('PATCH', path, body, options, this.config.serverPostTimeoutMs);
   }
 
+  async delete<T>(path: string, options: RequestOptions = {}): Promise<T> {
+    return this.send<T>('DELETE', path, undefined, options, this.config.serverPostTimeoutMs);
+  }
+
   private async send<T>(
     method: Method,
     path: string,

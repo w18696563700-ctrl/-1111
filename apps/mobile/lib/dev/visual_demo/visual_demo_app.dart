@@ -43,7 +43,6 @@ ExhibitionMobileApp buildVisualDemoApp({required String initialRoute}) {
 Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
 _exhibitionHandlers() {
   return <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-    'GET /api/app/exhibition/workbench': _handleWorkbench,
     'GET /api/app/project/detail': _handleProjectDetail,
     'POST /api/app/file/upload/init': _handleUploadInit,
     'POST /api/app/file/upload/confirm': _handleUploadConfirm,
@@ -131,45 +130,6 @@ _profileHandlers() {
       );
     },
   };
-}
-
-Future<AppApiResponse> _handleWorkbench(AppApiRequest request) async {
-  return AppApiResponse(
-    statusCode: 200,
-    uri: request.uri,
-    body: <String, Object?>{
-      'project_chain': <String, Object?>{
-        'hasProjects': true,
-        'recentProjectId': 'project-1',
-        'recentProjectTitle': '上海品牌快闪展台',
-        'canCreateProject': true,
-        'canOpenProjectPool': true,
-      },
-      'order_chain': <String, Object?>{
-        'activeOrderId': 'order-1',
-        'activeOrderNo': 'ORD-20260327-01',
-        'activeOrderState': 'active',
-        'canOpenOrderDetail': true,
-        'canOpenContractDetail': true,
-        'canOpenDisputeOpen': true,
-      },
-      'fulfillment_chain': <String, Object?>{
-        'activeMilestoneId': 'milestone-1',
-        'activeMilestoneTitle': '首发展台进场',
-        'inspectionState': 'draft',
-        'canOpenMilestoneList': true,
-        'canOpenMilestoneSubmit': true,
-        'canOpenInspectionDetail': true,
-        'canOpenInspectionSubmit': true,
-      },
-      'extension_boundary': <String, Object?>{
-        'canOpenContractDetail': true,
-        'ratingEntryState': 'extension_only',
-        'canOpenDisputeOpen': true,
-        'disputeWithdrawState': 'frozen',
-      },
-    },
-  );
 }
 
 Future<AppApiResponse> _handleContractDetail(AppApiRequest request) async {

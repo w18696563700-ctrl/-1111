@@ -90,7 +90,6 @@ class _ActionCard extends StatelessWidget {
     this.summary,
     this.tone = _ActionCardTone.standard,
     this.eyebrow,
-    this.footer,
   });
 
   final String title;
@@ -98,7 +97,6 @@ class _ActionCard extends StatelessWidget {
   final String? summary;
   final _ActionCardTone tone;
   final String? eyebrow;
-  final String? footer;
 
   @override
   Widget build(BuildContext context) {
@@ -148,16 +146,6 @@ class _ActionCard extends StatelessWidget {
             ],
             const SizedBox(height: 16),
             ...children,
-            if (footer != null) ...<Widget>[
-              const SizedBox(height: 16),
-              Text(
-                footer!,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.45,
-                ),
-              ),
-            ],
           ],
         ),
       ),
@@ -240,20 +228,22 @@ class _EntityCard extends StatelessWidget {
     required this.description,
     required this.detailLines,
     this.statusLabel,
-    this.tone = _ActionCardTone.standard,
     this.actionLabel,
     this.onPressed,
     this.actionSummary,
+    this.secondaryActionLabel,
+    this.onSecondaryPressed,
   });
 
   final String title;
   final String description;
   final List<Widget> detailLines;
   final String? statusLabel;
-  final _ActionCardTone tone;
   final String? actionLabel;
   final VoidCallback? onPressed;
   final String? actionSummary;
+  final String? secondaryActionLabel;
+  final VoidCallback? onSecondaryPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -284,7 +274,7 @@ class _EntityCard extends StatelessWidget {
                 ),
                 if (statusLabel != null) ...<Widget>[
                   const SizedBox(width: 12),
-                  _StatusPill(label: statusLabel!, tone: tone),
+                  _StatusPill(label: statusLabel!),
                 ],
               ],
             ),
@@ -323,11 +313,26 @@ class _EntityCard extends StatelessWidget {
                 highlight: true,
               ),
             ],
-            if (actionLabel != null && onPressed != null) ...<Widget>[
+            if ((actionLabel != null && onPressed != null) ||
+                (secondaryActionLabel != null &&
+                    onSecondaryPressed != null)) ...<Widget>[
               const SizedBox(height: 12),
-              FilledButton.tonal(
-                onPressed: onPressed,
-                child: Text(actionLabel!),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: <Widget>[
+                  if (actionLabel != null && onPressed != null)
+                    FilledButton.tonal(
+                      onPressed: onPressed,
+                      child: Text(actionLabel!),
+                    ),
+                  if (secondaryActionLabel != null &&
+                      onSecondaryPressed != null)
+                    FilledButton.tonal(
+                      onPressed: onSecondaryPressed,
+                      child: Text(secondaryActionLabel!),
+                    ),
+                ],
               ),
             ],
           ],

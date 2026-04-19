@@ -34,9 +34,21 @@ export class ShellQueryService {
       avatarUrl: await this.readAvatarUrl(user.avatarUrl),
       profileIntro: this.readProfileIntro(user.profileIntro),
       organizationId: scope?.organization.id ?? null,
+      organizationType: scope?.organization.organizationType ?? null,
       roleKeys: scope?.roleKeys ?? [],
       certificationStatus: scope?.certification?.certificationStatus ?? null,
+      personalCertificationStatus:
+        scope?.personalCertification?.certificationStatus ?? null,
+      personalCertificationQualified:
+        scope?.personalCertification?.qualifiedForCurrentActor ?? null,
+      personalCertificationLockedToOtherActor:
+        scope?.personalCertification?.lockedToOtherActor ?? null,
       membershipStatus: scope?.membership.memberStatus ?? null,
+      projectCreateEligibility: scope
+        ? {
+            canCreateProject: this.eligibilityService.canPublishProjectInScope(scope)
+          }
+        : null,
       paidMembershipTier: membershipSummary.paidMembershipTier,
       paidMembershipEntitlementsSummary: membershipSummary.paidMembershipEntitlementsSummary,
       paidMembershipQuotaSummary: membershipSummary.paidMembershipQuotaSummary,

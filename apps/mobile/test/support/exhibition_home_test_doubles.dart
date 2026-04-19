@@ -20,6 +20,12 @@ class FakeDeviceLocationService implements DeviceLocationService {
   int requestCount = 0;
 
   @override
+  bool get supportsDeviceLocation => true;
+
+  @override
+  bool get supportsReverseGeocoding => true;
+
+  @override
   Future<DeviceLocationSnapshot> resolveCurrentPosition() async {
     requestCount += 1;
     return _resolver();
@@ -141,6 +147,7 @@ ExhibitionLoadResult contentHomeResult({
     '建议关注后续天气变化并预留机动时段。',
   ],
   String updatedAt = '2026-03-28T09:30:00Z',
+  List<Object?> recommendationSections = const <Object?>[],
 }) {
   return ExhibitionLoadResult(
     state: AppPageState.content,
@@ -208,7 +215,7 @@ ExhibitionLoadResult contentHomeResult({
       'canExpand': true,
       'refreshable': true,
       'modules': const <Object?>[],
-      'recommendationSections': const <Object?>[],
+      'recommendationSections': recommendationSections,
     },
   );
 }

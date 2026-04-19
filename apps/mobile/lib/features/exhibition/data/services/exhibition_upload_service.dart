@@ -19,9 +19,10 @@ class _ExhibitionUploadService {
           state: AppUploadState.uploadFailedRetryable,
           path: ExhibitionCanonicalPaths.uploadInit,
           controlledState: _mapHttpFailureState(response.statusCode),
-          message: _failureMessage(
-            response.body,
-            'upload init failed with retryable server response',
+          message: _translateUploadInitMessage(
+            businessType: command.businessType,
+            payload: response.body,
+            fallbackMessage: '当前上传初始化暂时失败，请稍后再试。',
           ),
           errorCode: _extractErrorCode(response.body),
         );
@@ -32,7 +33,11 @@ class _ExhibitionUploadService {
           state: AppUploadState.uploadFailedRetryable,
           path: ExhibitionCanonicalPaths.uploadInit,
           controlledState: _mapHttpFailureState(response.statusCode),
-          message: _failureMessage(response.body, 'upload init failed'),
+          message: _translateUploadInitMessage(
+            businessType: command.businessType,
+            payload: response.body,
+            fallbackMessage: '当前上传初始化失败，请稍后再试。',
+          ),
           errorCode: _extractErrorCode(response.body),
         );
       }
@@ -42,8 +47,7 @@ class _ExhibitionUploadService {
         return _uploadFailure(
           state: AppUploadState.uploadFailedRetryable,
           path: ExhibitionCanonicalPaths.uploadInit,
-          message:
-              'upload init response is missing uploadSessionId or direct upload directive',
+          message: '当前上传初始化响应缺少上传会话或直传指令。',
         );
       }
 
@@ -51,8 +55,7 @@ class _ExhibitionUploadService {
         return _uploadFailure(
           state: AppUploadState.uploadFailedRetryable,
           path: ExhibitionCanonicalPaths.uploadInit,
-          message:
-              'upload init response confirm endpoint drifted outside app-facing canonical path',
+          message: '当前上传确认路径异常，请稍后再试。',
         );
       }
 
@@ -61,25 +64,25 @@ class _ExhibitionUploadService {
         method: 'POST',
         path: ExhibitionCanonicalPaths.uploadInit,
         directive: directive,
-        message: 'upload init accepted by canonical BFF path',
+        message: '当前上传初始化已受理。',
       );
     } on SocketException {
       return _uploadFailure(
         state: AppUploadState.uploadFailedRetryable,
         path: ExhibitionCanonicalPaths.uploadInit,
-        message: 'upload init network error',
+        message: '当前上传初始化网络异常，请检查网络后重试。',
       );
     } on HttpException {
       return _uploadFailure(
         state: AppUploadState.uploadFailedRetryable,
         path: ExhibitionCanonicalPaths.uploadInit,
-        message: 'upload init http error',
+        message: '当前上传初始化请求失败，请稍后再试。',
       );
     } on FormatException {
       return _uploadFailure(
         state: AppUploadState.uploadFailedRetryable,
         path: ExhibitionCanonicalPaths.uploadInit,
-        message: 'upload init response decode failed',
+        message: '当前上传初始化响应解析失败，请稍后再试。',
       );
     }
   }
@@ -102,26 +105,26 @@ class _ExhibitionUploadService {
           method: directive.directUploadMethod,
           path: directive.confirmEndpoint,
           directive: directive,
-          message: 'direct upload completed, waiting for confirm',
+          message: '当前文件已直传完成，正在确认绑定。',
         );
       }
 
       return _uploadFailure(
         state: AppUploadState.uploadFailedRetryable,
         path: directive.directUploadUrl,
-        message: 'direct upload failed before confirm',
+        message: '当前文件直传失败，请重新选择后再试。',
       );
     } on SocketException {
       return _uploadFailure(
         state: AppUploadState.uploadFailedRetryable,
         path: directive.directUploadUrl,
-        message: 'direct upload network error',
+        message: '当前文件直传网络异常，请检查网络后重试。',
       );
     } on HttpException {
       return _uploadFailure(
         state: AppUploadState.uploadFailedRetryable,
         path: directive.directUploadUrl,
-        message: 'direct upload http error',
+        message: '当前文件直传请求失败，请稍后再试。',
       );
     }
   }
@@ -144,7 +147,7 @@ class _ExhibitionUploadService {
           method: 'POST',
           path: directive.confirmEndpoint,
           fileAssetId: fileAssetId,
-          message: 'upload confirm succeeded',
+          message: '当前文件已完成上传绑定。',
         );
       }
 
@@ -152,20 +155,23 @@ class _ExhibitionUploadService {
         state: AppUploadState.uploadConfirmFailed,
         path: directive.confirmEndpoint,
         controlledState: _mapHttpFailureState(response.statusCode),
-        message: _failureMessage(response.body, 'upload confirm failed'),
+        message: _translateUploadConfirmMessage(
+          payload: response.body,
+          fallbackMessage: '当前上传确认失败，请稍后再试。',
+        ),
         errorCode: _extractErrorCode(response.body),
       );
     } on SocketException {
       return _uploadFailure(
         state: AppUploadState.uploadConfirmFailed,
         path: directive.confirmEndpoint,
-        message: 'upload confirm network error',
+        message: '当前上传确认网络异常，请检查网络后重试。',
       );
     } on HttpException {
       return _uploadFailure(
         state: AppUploadState.uploadConfirmFailed,
         path: directive.confirmEndpoint,
-        message: 'upload confirm http error',
+        message: '当前上传确认请求失败，请稍后再试。',
       );
     }
   }
@@ -266,5 +272,63 @@ class _ExhibitionUploadService {
       return AppPageState.errorRetryable;
     }
     return AppPageState.errorNonRetryable;
+  }
+
+  String _translateUploadInitMessage({
+    required String businessType,
+    required Object? payload,
+    required String fallbackMessage,
+  }) {
+    final code = _rawErrorCode(payload);
+    final message = _extractMessage(payload);
+    if (code == 'AUTH_SESSION_INVALID') {
+      return '当前登录状态已失效，请重新登录后再试。';
+    }
+    if (code == 'FILE_UPLOAD_INIT_INVALID') {
+      if (businessType == 'enterprise_display') {
+        if (message?.contains('listing id') == true) {
+          return '当前企业展示图片上传缺少企业草稿，请先创建草稿后再试。';
+        }
+        if (message?.contains('owned by the current organization') == true) {
+          return '当前企业展示图片只能绑定到本组织自己的展示草稿。';
+        }
+        if (message?.contains('active organization scope') == true) {
+          return '当前缺少组织上下文，暂时无法上传企业展示图片。';
+        }
+        if (message?.contains('supports project/evidence') == true) {
+          return '当前上传通道还未切到企业展示图片绑定，请先联调最新后端。';
+        }
+        if (message?.contains('image mime types') == true) {
+          return '当前企业展示图片只支持常见图片格式。';
+        }
+        return '当前企业展示图片上传参数无效，请稍后再试。';
+      }
+      if (message?.contains('businessType, businessId') == true) {
+        return '当前上传参数不完整，请稍后再试。';
+      }
+      return '当前上传初始化参数无效，请稍后再试。';
+    }
+    return _failureMessage(payload, fallbackMessage);
+  }
+
+  String _translateUploadConfirmMessage({
+    required Object? payload,
+    required String fallbackMessage,
+  }) {
+    final code = _rawErrorCode(payload);
+    final message = _extractMessage(payload);
+    if (code == 'AUTH_SESSION_INVALID') {
+      return '当前登录状态已失效，请重新登录后再试。';
+    }
+    if (code == 'FILE_UPLOAD_CONFIRM_REQUIRED') {
+      if (message?.contains('uploadSessionId is required') == true) {
+        return '当前上传确认缺少会话参数，请重新上传后再试。';
+      }
+      if (message?.contains('Upload session does not exist') == true) {
+        return '当前上传会话已失效，请重新上传后再试。';
+      }
+      return '当前上传确认尚未完成，请重新上传后再试。';
+    }
+    return _failureMessage(payload, fallbackMessage);
   }
 }

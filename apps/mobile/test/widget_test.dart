@@ -29,45 +29,6 @@ void main() {
                         body: const <String, Object?>{'items': <Object?>[]},
                       );
                     },
-                    'GET /api/app/exhibition/workbench':
-                        (AppApiRequest request) async {
-                          return AppApiResponse(
-                            statusCode: 200,
-                            uri: request.uri,
-                            body: <String, Object?>{
-                              'project_chain': <String, Object?>{
-                                'hasProjects': false,
-                                'recentProjectId': null,
-                                'recentProjectTitle': null,
-                                'canCreateProject': true,
-                                'canOpenProjectPool': true,
-                              },
-                              'order_chain': <String, Object?>{
-                                'activeOrderId': null,
-                                'activeOrderNo': null,
-                                'activeOrderState': null,
-                                'canOpenOrderDetail': false,
-                                'canOpenContractDetail': false,
-                                'canOpenDisputeOpen': false,
-                              },
-                              'fulfillment_chain': <String, Object?>{
-                                'activeMilestoneId': null,
-                                'activeMilestoneTitle': null,
-                                'inspectionState': null,
-                                'canOpenMilestoneList': false,
-                                'canOpenMilestoneSubmit': false,
-                                'canOpenInspectionDetail': false,
-                                'canOpenInspectionSubmit': false,
-                              },
-                              'extension_boundary': <String, Object?>{
-                                'canOpenContractDetail': false,
-                                'ratingEntryState': 'controlled_unavailable',
-                                'canOpenDisputeOpen': false,
-                                'disputeWithdrawState': 'frozen',
-                              },
-                            },
-                          );
-                        },
                   },
             ),
           ),
@@ -104,14 +65,8 @@ void main() {
     expect(homeClient.loadCount, 1);
     expect(homeClient.refreshCount, 0);
     expect(locationService.requestCount, 1);
-    await tester.scrollUntilVisible(
-      find.text('进入项目工作台'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('进入项目工作台'), findsOneWidget);
-    expect(find.text('发布项目'), findsOneWidget);
+    expect(find.text('进入发布项目工作台'), findsNothing);
+    expect(find.text('发布项目'), findsNothing);
     expect(find.text('当前进度'), findsNothing);
     expect(find.text('进入页面'), findsNothing);
   });

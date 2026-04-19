@@ -5,14 +5,8 @@ _SuccessContractValidation _sanitizeAndValidateEntryPayload(
   Object? payload,
 ) {
   return switch (canonicalPath) {
-    ExhibitionCanonicalPaths.contractDetail => _validateContractPayload(
-      canonicalPath,
-      payload,
-    ),
-    ExhibitionCanonicalPaths.contractConfirm => _validateContractPayload(
-      canonicalPath,
-      payload,
-    ),
+    ExhibitionCanonicalPaths.contractDetail ||
+    ExhibitionCanonicalPaths.contractConfirm ||
     ExhibitionCanonicalPaths.contractAmend => _validateContractPayload(
       canonicalPath,
       payload,
@@ -21,11 +15,11 @@ _SuccessContractValidation _sanitizeAndValidateEntryPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.inspectionSubmit => _validateInspectionPayload(
+    ExhibitionCanonicalPaths.inspectionRecheck => _validateInspectionPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.inspectionRecheck => _validateInspectionPayload(
+    ExhibitionCanonicalPaths.inspectionSubmit => _validateInspectionPayload(
       canonicalPath,
       payload,
     ),
@@ -33,15 +27,15 @@ _SuccessContractValidation _sanitizeAndValidateEntryPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.ratingSubmit => _validateRatingSubmitPayload(
+    ExhibitionCanonicalPaths.ratingSubmit => _validateRatingPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.disputeOpen => _validateDisputePayload(
+    ExhibitionCanonicalPaths.disputeOpen => _validateDisputeOpenPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.disputeWithdraw => _validateDisputePayload(
+    ExhibitionCanonicalPaths.disputeWithdraw => _validateDisputeWithdrawPayload(
       canonicalPath,
       payload,
     ),
@@ -105,28 +99,6 @@ _SuccessContractValidation _validateRatingPayload(
   }
 
   final message = _firstValidationError(<String?>[
-    _requireStringField(raw, 'orderId', canonicalPath),
-    _requireStateField(raw, 'state', _stableRatingStates, canonicalPath),
-    _requireMapField(raw, 'summary', canonicalPath),
-  ]);
-  final sanitized = _sanitizeRatingPayload(payload);
-  if (message != null) {
-    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
-  }
-
-  return _SuccessContractValidation(payload: sanitized);
-}
-
-_SuccessContractValidation _validateRatingSubmitPayload(
-  String canonicalPath,
-  Object? payload,
-) {
-  final raw = _asMap(payload);
-  if (raw == null) {
-    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
-  }
-
-  final message = _firstValidationError(<String?>[
     _requireStringField(raw, 'ratingId', canonicalPath),
     _requireStringField(raw, 'orderId', canonicalPath),
     _requireStateField(raw, 'state', _stableRatingStates, canonicalPath),
@@ -140,7 +112,29 @@ _SuccessContractValidation _validateRatingSubmitPayload(
   return _SuccessContractValidation(payload: sanitized);
 }
 
-_SuccessContractValidation _validateDisputePayload(
+_SuccessContractValidation _validateDisputeOpenPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'orderId', canonicalPath),
+    _requireStateField(raw, 'state', _stableDisputeStates, canonicalPath),
+    _requireMapField(raw, 'summary', canonicalPath),
+  ]);
+  final sanitized = _sanitizeDisputePayload(payload);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
+}
+
+_SuccessContractValidation _validateDisputeWithdrawPayload(
   String canonicalPath,
   Object? payload,
 ) {

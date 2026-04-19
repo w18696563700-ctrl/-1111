@@ -20,7 +20,8 @@ List<Widget> _routeOnlyControls({
 String _instanceTitleForLabel(String label) {
   return switch (label) {
     'projectId' => '当前项目 ID',
-    'bidId' => '当前投标 ID',
+    'bidId' => '当前竞标 ID',
+    'bidAwardId' => '当前定标 ID',
     'orderId' => '当前订单 ID',
     'contractId' => '当前合同 ID',
     'milestoneId' => '当前里程碑 ID',
@@ -43,9 +44,9 @@ String? _normalizeId(String? value) {
 String _buildingTypeLabel(String? value) {
   final normalized = _normalizeId(value);
   return switch (normalized) {
-    'exhibition' => '展览装修',
-    'renovation' => '装修施工',
-    'custom_furniture' => '全屋定制',
+    'exhibition' => '会展',
+    'renovation' => '装修',
+    'custom_furniture' => '定制',
     null => '未提供',
     _ => normalized,
   };
@@ -81,12 +82,20 @@ String? _bidIdFromPayload(Object? payload) {
   return _normalizeId(_payloadMap(payload)?['bidId'] as String?);
 }
 
+String? _bidAwardIdFromPayload(Object? payload) {
+  return _normalizeId(_payloadMap(payload)?['bidAwardId'] as String?);
+}
+
 String? _orderIdFromPayload(Object? payload) {
   return _normalizeId(_payloadMap(payload)?['orderId'] as String?);
 }
 
 String? _contractIdFromPayload(Object? payload) {
   return _normalizeId(_payloadMap(payload)?['contractId'] as String?);
+}
+
+String? _resultFromPayload(Object? payload) {
+  return _normalizeId(_payloadMap(payload)?['result'] as String?);
 }
 
 String? _stateFromPayload(Object? payload) {
@@ -97,21 +106,8 @@ String? _inspectionIdFromPayload(Object? payload) {
   return _normalizeId(_payloadMap(payload)?['inspectionId'] as String?);
 }
 
-String? _ratingIdFromPayload(Object? payload) {
-  return _normalizeId(_payloadMap(payload)?['ratingId'] as String?);
-}
-
 String? _disputeIdFromPayload(Object? payload) {
   return _normalizeId(_payloadMap(payload)?['disputeId'] as String?);
-}
-
-String? _firstMilestoneIdFromPayload(Object? payload) {
-  final milestones = _milestonesFromPayload(payload);
-  if (milestones.isEmpty) {
-    return null;
-  }
-
-  return milestones.first.milestoneId;
 }
 
 List<_MilestoneLink> _milestonesFromPayload(Object? payload) {
@@ -136,16 +132,6 @@ List<_MilestoneLink> _milestonesFromPayload(Object? payload) {
       .toList();
 }
 
-int _itemCountFromPayload(Object? payload) {
-  final payloadMap = _payloadMap(payload);
-  final rawItems = payloadMap?['items'];
-  if (rawItems is! List) {
-    return 0;
-  }
-
-  return rawItems.length;
-}
-
 List<Map<String, Object?>> _itemMapsFromPayload(Object? payload) {
   final payloadMap = _payloadMap(payload);
   final rawItems = payloadMap?['items'];
@@ -160,4 +146,34 @@ List<Map<String, Object?>> _itemMapsFromPayload(Object? payload) {
             item.map((Object? key, Object? value) => MapEntry('$key', value)),
       )
       .toList();
+}
+
+String? _projectExhibitionName(Map<String, Object?> item) {
+  return _normalizeId(item['exhibitionName'] as String?);
+}
+
+String? _projectBrandName(Map<String, Object?> item) {
+  return _normalizeId(item['brandName'] as String?);
+}
+
+String _projectDisplayTitle(Map<String, Object?> item) {
+  return _projectExhibitionName(item) ??
+      _normalizeId(item['title'] as String?) ??
+      '未命名项目';
+}
+
+String? _projectDisplayBrandLine(Map<String, Object?> item) {
+  return _projectBrandName(item);
+}
+
+String? _projectDateRangeLabel(Map<String, Object?> item) {
+  final plannedStartAt = _normalizeId(item['plannedStartAt'] as String?);
+  final plannedEndAt = _normalizeId(item['plannedEndAt'] as String?);
+  if (plannedStartAt == null && plannedEndAt == null) {
+    return null;
+  }
+  if (plannedStartAt != null && plannedEndAt != null) {
+    return '$plannedStartAt 至 $plannedEndAt';
+  }
+  return plannedStartAt ?? plannedEndAt;
 }

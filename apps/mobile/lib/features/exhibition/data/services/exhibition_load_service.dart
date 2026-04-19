@@ -10,31 +10,38 @@ class _ExhibitionLoadService {
       <String, Future<ExhibitionLoadResult>>{};
 
   static const Set<String> _sessionCachedPaths = <String>{
-    ExhibitionCanonicalPaths.exhibitionWorkbench,
     ExhibitionCanonicalPaths.projectList,
     ExhibitionCanonicalPaths.myProjectList,
+    ExhibitionCanonicalPaths.projectEditDetail,
     ExhibitionCanonicalPaths.projectDetail,
+    ExhibitionCanonicalPaths.projectBidMaterials,
     ExhibitionCanonicalPaths.orderDetail,
     ExhibitionCanonicalPaths.milestoneList,
     ExhibitionCanonicalPaths.contractDetail,
     ExhibitionCanonicalPaths.inspectionDetail,
     ExhibitionCanonicalPaths.ratingEntry,
+    ExhibitionCanonicalPaths.bidResult,
+    ExhibitionCanonicalPaths.projectPublicResources,
   };
-
-  Future<ExhibitionLoadResult> loadWorkbench({
-    bool forceRefresh = false,
-  }) async {
-    return _loadGet(
-      ExhibitionCanonicalPaths.exhibitionWorkbench,
-      forceRefresh: forceRefresh,
-    );
-  }
 
   Future<ExhibitionLoadResult> loadProjectList({
     bool forceRefresh = false,
+    String? provinceCode,
+    String? cityCode,
+    String? areaBucket,
+    String? budgetBucket,
   }) async {
+    final queryParameters = <String, String>{
+      if (_normalize(provinceCode) case final String value)
+        'provinceCode': value,
+      if (_normalize(cityCode) case final String value) 'cityCode': value,
+      if (_normalize(areaBucket) case final String value) 'areaBucket': value,
+      if (_normalize(budgetBucket) case final String value)
+        'budgetBucket': value,
+    };
     return _loadGet(
       ExhibitionCanonicalPaths.projectList,
+      queryParameters: queryParameters.isEmpty ? null : queryParameters,
       forceRefresh: forceRefresh,
     );
   }
@@ -66,6 +73,25 @@ class _ExhibitionLoadService {
 
     return _loadGet(
       ExhibitionCanonicalPaths.projectDetail,
+      queryParameters: <String, String>{'projectId': normalized},
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectEditDetail({
+    required String? projectId,
+    bool forceRefresh = false,
+  }) async {
+    final normalized = _normalize(projectId);
+    if (normalized == null) {
+      return _missingQueryResult(
+        path: ExhibitionCanonicalPaths.projectEditDetail,
+        queryName: 'projectId',
+      );
+    }
+
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectEditDetail,
       queryParameters: <String, String>{'projectId': normalized},
       forceRefresh: forceRefresh,
     );
@@ -184,6 +210,25 @@ class _ExhibitionLoadService {
     );
   }
 
+  Future<ExhibitionLoadResult> loadBidResult({
+    required String? projectId,
+    bool forceRefresh = false,
+  }) async {
+    final normalized = _normalize(projectId);
+    if (normalized == null) {
+      return _missingQueryResult(
+        path: ExhibitionCanonicalPaths.bidResult,
+        queryName: 'projectId',
+      );
+    }
+
+    return _loadGet(
+      ExhibitionCanonicalPaths.bidResult,
+      queryParameters: <String, String>{'projectId': normalized},
+      forceRefresh: forceRefresh,
+    );
+  }
+
   void invalidateInspectionDetail({required String? milestoneId}) {
     final normalized = _normalize(milestoneId);
     if (normalized == null) {
@@ -248,17 +293,18 @@ class _ExhibitionLoadService {
     Map<String, String>? queryParameters,
   }) async {
     try {
-      final response = await _client.get(
-        canonicalPath,
-        queryParameters: queryParameters,
+      final response = await runProtectedAppRequest(
+        () => _client.get(canonicalPath, queryParameters: queryParameters),
       );
       return _mapLoadResponse(response, canonicalPath);
-    } on SocketException {
+    } on SocketException catch (error) {
       return ExhibitionLoadResult(
         state: AppPageState.errorRetryable,
         method: 'GET',
         path: canonicalPath,
-        message: 'network error while requesting canonical BFF path',
+        message: error.message.toLowerCase().contains('request timed out')
+            ? error.message
+            : 'network error while requesting canonical BFF path',
       );
     } on HttpException {
       return ExhibitionLoadResult(
@@ -351,6 +397,7 @@ class _ExhibitionLoadService {
       );
     }
     final validation = _sanitizeAndValidateSuccessPayload(
+      'GET',
       canonicalPath,
       payload,
     );
@@ -408,7 +455,13 @@ class _ExhibitionLoadService {
     _inFlightLoads.remove(cacheKey);
   }
 
-  static String _cacheKey(
+  String _cacheKey(String canonicalPath, Map<String, String>? queryParameters) {
+    final sessionScopeKey = _sessionScopeKey(canonicalPath);
+    final queryKey = _queryCacheKey(canonicalPath, queryParameters);
+    return sessionScopeKey == null ? queryKey : '$sessionScopeKey::$queryKey';
+  }
+
+  static String _queryCacheKey(
     String canonicalPath,
     Map<String, String>? queryParameters,
   ) {
@@ -429,5 +482,24 @@ class _ExhibitionLoadService {
         )
         .join('&');
     return '$canonicalPath?$query';
+  }
+
+  String? _sessionScopeKey(String canonicalPath) {
+    if (!_isSessionCachedPath(canonicalPath)) {
+      return null;
+    }
+
+    final snapshot = AppSessionStore.instance.snapshot;
+    final accessToken = snapshot.accessToken?.trim();
+    if (accessToken != null && accessToken.isNotEmpty) {
+      return 'access:${accessToken.hashCode}';
+    }
+
+    final refreshToken = snapshot.refreshToken?.trim();
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      return 'refresh:${refreshToken.hashCode}';
+    }
+
+    return 'anonymous';
   }
 }

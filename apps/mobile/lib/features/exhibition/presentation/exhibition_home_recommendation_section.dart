@@ -8,7 +8,7 @@ class _HomeProjectRecommendationSection extends StatelessWidget {
     required this.projectItems,
     required this.onRetry,
     required this.onOpenShowcase,
-    required this.onOpenWorkbench,
+    required this.onOpenMyProjects,
     required this.onOpenProjectCreate,
     required this.onOpenProjectDetail,
   });
@@ -19,7 +19,7 @@ class _HomeProjectRecommendationSection extends StatelessWidget {
   final List<Map<String, Object?>> projectItems;
   final VoidCallback onRetry;
   final VoidCallback onOpenShowcase;
-  final VoidCallback onOpenWorkbench;
+  final VoidCallback onOpenMyProjects;
   final VoidCallback onOpenProjectCreate;
   final ValueChanged<String> onOpenProjectDetail;
 
@@ -80,15 +80,15 @@ class _HomeProjectRecommendationSection extends StatelessWidget {
             else if (state == AppPageState.empty)
               _HomeStateNotice(
                 title: '$areaLabel当前还没有公开项目',
-                message: '可以先发布项目，或回到项目工作台继续当前私域进度。',
+                message: '可以先发布项目，或进入我的项目继续查看当前私域进度。',
                 actions: <Widget>[
                   FilledButton(
                     onPressed: onOpenProjectCreate,
                     child: const Text('去发布项目'),
                   ),
                   FilledButton.tonal(
-                    onPressed: onOpenWorkbench,
-                    child: const Text('回到项目工作台'),
+                    onPressed: onOpenMyProjects,
+                    child: const Text('进入我的项目'),
                   ),
                 ],
               )
@@ -137,7 +137,7 @@ class _HomeProjectRecommendationSection extends StatelessWidget {
           budgetLabel: _homeCurrencyText(item['budgetAmount']),
           stateLabel: _homeFrontStateLabel(state),
           summary: _homeProjectGuidance(state),
-          actionLabel: _homeCanContinueBid(state) ? '进入项目详情' : '查看项目说明',
+          actionLabel: _homeCanContinueBid(state) ? '进入项目详情' : '查看项目详情',
           onPressed: projectId == null
               ? null
               : () => onOpenProjectDetail(projectId),
@@ -167,6 +167,100 @@ class _HomeProjectRecommendationSection extends StatelessWidget {
       AppPageState.notFound => '当前实例还没有稳定承接到这一页，所以页面先停在受控状态。',
       _ => '当前推荐区还在准备中。',
     };
+  }
+}
+
+class _HomeCompanyFactoryRecommendationSection extends StatelessWidget {
+  const _HomeCompanyFactoryRecommendationSection({
+    required this.areaLabel,
+    required this.items,
+    required this.onOpenItem,
+    required this.onRetry,
+    required this.onFallbackPressed,
+  });
+
+  final String areaLabel;
+  final List<_HomeEnterpriseRecommendationItem> items;
+  final ValueChanged<_HomeEnterpriseRecommendationItem> onOpenItem;
+  final VoidCallback onRetry;
+  final VoidCallback onFallbackPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return _HomePlaceholderRecommendationSection(
+        title: '3. 本省优秀公司与工厂',
+        summary: '公司与工厂推荐位持续完善中，当前先提供模块入口说明。',
+        actionLabel: '查看当前说明',
+        onPressed: onFallbackPressed,
+      );
+    }
+
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                _HomePill(
+                  label: '已接通内容',
+                  backgroundColor: colorScheme.primaryContainer,
+                  foregroundColor: colorScheme.onPrimaryContainer,
+                ),
+                _HomePill(
+                  label: '3. 本省优秀公司与工厂',
+                  backgroundColor: colorScheme.surfaceContainerHigh,
+                  foregroundColor: colorScheme.onSurface,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Text(
+              '$areaLabel优秀公司与工厂',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '当前直接消费首页聚合返回的优秀公司与工厂推荐；点击后继续进入既有公域详情或列表承接路径。',
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 16),
+            ...items
+                .take(3)
+                .map(
+                  (_HomeEnterpriseRecommendationItem item) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _HomeEnterpriseRecommendationCard(
+                      title: item.title,
+                      summary: item.summary,
+                      badgeLabel: item.badgeLabel,
+                      actionLabel: _homeEnterpriseRecommendationActionLabel(
+                        item,
+                      ),
+                      onPressed: () => onOpenItem(item),
+                    ),
+                  ),
+                ),
+            const SizedBox(height: 4),
+            OutlinedButton(onPressed: onRetry, child: const Text('刷新首页')),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -206,6 +300,63 @@ class _HomePlaceholderRecommendationSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
+            Text(
+              summary,
+              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+            ),
+            const SizedBox(height: 14),
+            FilledButton.tonal(onPressed: onPressed, child: Text(actionLabel)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeEnterpriseRecommendationCard extends StatelessWidget {
+  const _HomeEnterpriseRecommendationCard({
+    required this.title,
+    required this.summary,
+    required this.badgeLabel,
+    required this.actionLabel,
+    required this.onPressed,
+  });
+
+  final String title;
+  final String summary;
+  final String badgeLabel;
+  final String actionLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHigh,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _HomePill(
+              label: badgeLabel,
+              backgroundColor: colorScheme.secondaryContainer,
+              foregroundColor: colorScheme.onSecondaryContainer,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              title,
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 6),
             Text(
               summary,
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),

@@ -6,6 +6,7 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
+import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
@@ -14,60 +15,12 @@ import 'package:mobile/shell/shell_app.dart';
 
 import 'support/exhibition_home_test_doubles.dart';
 
-Map<String, Object?> _workbenchPayload({
-  Map<String, Object?>? projectChain,
-  Map<String, Object?>? orderChain,
-  Map<String, Object?>? fulfillmentChain,
-  Map<String, Object?>? extensionBoundary,
-}) {
-  return <String, Object?>{
-    'project_chain':
-        projectChain ??
-        <String, Object?>{
-          'hasProjects': true,
-          'recentProjectId': 'project-1',
-          'recentProjectTitle': '首发项目',
-          'canCreateProject': true,
-          'canOpenProjectPool': true,
-        },
-    'order_chain':
-        orderChain ??
-        <String, Object?>{
-          'activeOrderId': 'order-1',
-          'activeOrderNo': 'ORD-1',
-          'activeOrderState': 'active',
-          'canOpenOrderDetail': true,
-          'canOpenContractDetail': true,
-          'canOpenDisputeOpen': true,
-        },
-    'fulfillment_chain':
-        fulfillmentChain ??
-        <String, Object?>{
-          'activeMilestoneId': 'milestone-1',
-          'activeMilestoneTitle': '首期里程碑',
-          'inspectionState': 'draft',
-          'canOpenMilestoneList': true,
-          'canOpenMilestoneSubmit': true,
-          'canOpenInspectionDetail': true,
-          'canOpenInspectionSubmit': true,
-        },
-    'extension_boundary':
-        extensionBoundary ??
-        <String, Object?>{
-          'canOpenContractDetail': true,
-          'ratingEntryState': 'extension_only',
-          'canOpenDisputeOpen': true,
-          'disputeWithdrawState': 'frozen',
-        },
-  };
-}
-
 ExhibitionMobileApp _buildApp({
   required ExhibitionConsumerLayer exhibitionConsumerLayer,
   ForumConsumerLayer? forumConsumerLayer,
   ExhibitionHomeAggregationClient? exhibitionHomeAggregationClient,
   DeviceLocationService? deviceLocationService,
-  String initialRoute = ExhibitionRoutes.workbench,
+  String initialRoute = '/',
 }) {
   return ExhibitionMobileApp(
     initialRoute: initialRoute,
@@ -187,7 +140,33 @@ ForumConsumerLayer _forumConsumer() {
   );
 }
 
+ExhibitionConsumerLayer _projectListConsumer({
+  List<Object?> items = const <Object?>[],
+}) {
+  return ExhibitionConsumerLayer(
+    client: AppApiClient(
+      config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+      transport: FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/project/list': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{'items': items},
+                );
+              },
+            },
+      ),
+    ),
+  );
+}
+
 void main() {
+  tearDown(() {
+    EnterpriseHubConsumerLayer.reset();
+  });
+
   testWidgets(
     'exhibition home reads province project recommendations from cloud list and refreshes in place',
     (WidgetTester tester) async {
@@ -265,6 +244,260 @@ void main() {
       await _scrollTo(tester, find.text('重庆春季展台项目（刷新）'));
       expect(find.text('重庆春季展台项目（刷新）'), findsOneWidget);
       expect(find.text('查看全部项目展示'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'exhibition home renders real company factory recommendation items from aggregation section',
+    (WidgetTester tester) async {
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(
+          recommendationSections: const <Object?>[
+            <String, Object?>{
+              'sectionKey': 'company_factory_recommendations',
+              'items': <Object?>[
+                <String, Object?>{
+                  'itemType': 'factory',
+                  'entityId': 'bf5ff83a-26e7-4138-8157-042fb38a5f46',
+                  'title': '重庆坤特工厂样本',
+                  'summary': '展台制作与木作工厂样本',
+                  'badgeLabel': '优秀工厂',
+                },
+              ],
+            },
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.text('重庆坤特工厂样本'));
+      expect(find.text('3. 本省优秀公司与工厂'), findsOneWidget);
+      expect(find.text('重庆坤特工厂样本'), findsOneWidget);
+      expect(find.text('展台制作与木作工厂样本'), findsOneWidget);
+      expect(find.text('优秀工厂'), findsOneWidget);
+      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'exhibition home automatic location handoff carries province scope into default home load',
+    (WidgetTester tester) async {
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) {
+          final hasProvinceScope =
+              locationContext?.provinceCode == '500000' &&
+              locationContext?.provinceName == '重庆市';
+          return contentHomeResult(
+            provinceName: locationContext?.provinceName ?? '重庆市',
+            recommendationSections: <Object?>[
+              <String, Object?>{
+                'sectionKey': 'company_factory_recommendations',
+                'items': hasProvinceScope
+                    ? <Object?>[
+                        const <String, Object?>{
+                          'itemType': 'factory',
+                          'entityId': 'bf5ff83a-26e7-4138-8157-042fb38a5f46',
+                          'title': '重庆坤特工厂样本',
+                          'summary': '展台制作与木作工厂样本',
+                          'badgeLabel': '优秀工厂',
+                        },
+                      ]
+                    : <Object?>[],
+              },
+            ],
+          );
+        },
+      );
+      final locationService = FakeDeviceLocationService(
+        resolver: () => const DeviceLocationSnapshot(
+          permissionState: DeviceLocationPermissionState.granted,
+          latitude: 29.5630,
+          longitude: 106.5516,
+          provinceCode: '500000',
+          provinceName: '重庆市',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+          deviceLocationService: locationService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(homeClient.lastLoadLocationContext?.provinceCode, '500000');
+      expect(homeClient.lastLoadLocationContext?.provinceName, '重庆市');
+      await _scrollTo(tester, find.text('重庆坤特工厂样本'));
+      expect(find.text('重庆坤特工厂样本'), findsOneWidget);
+      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'exhibition home keeps controlled placeholder when company factory recommendation items are empty',
+    (WidgetTester tester) async {
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(
+          recommendationSections: const <Object?>[
+            <String, Object?>{
+              'sectionKey': 'company_factory_recommendations',
+              'items': <Object?>[],
+            },
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.text('3. 本省优秀公司与工厂'));
+      expect(find.text('3. 本省优秀公司与工厂'), findsOneWidget);
+      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsOneWidget);
+      expect(find.text('重庆坤特工厂样本'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'exhibition home keeps controlled placeholder when automatic location has no province scope',
+    (WidgetTester tester) async {
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          recommendationSections: const <Object?>[
+            <String, Object?>{
+              'sectionKey': 'company_factory_recommendations',
+              'items': <Object?>[],
+            },
+          ],
+        ),
+      );
+      final locationService = FakeDeviceLocationService(
+        resolver: () => const DeviceLocationSnapshot(
+          permissionState: DeviceLocationPermissionState.granted,
+          latitude: 29.5630,
+          longitude: 106.5516,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+          deviceLocationService: locationService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(homeClient.lastLoadLocationContext?.provinceCode, isNull);
+      expect(homeClient.lastLoadLocationContext?.provinceName, isNull);
+      await _scrollTo(tester, find.text('3. 本省优秀公司与工厂'));
+      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsOneWidget);
+      expect(find.text('重庆坤特工厂样本'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'exhibition home company factory recommendation item opens existing enterprise detail route',
+    (WidgetTester tester) async {
+      EnterpriseHubConsumerLayer.install(
+        EnterpriseHubConsumerLayer(
+          client: AppApiClient(
+            transport: FakeAppApiTransport(
+              handlers:
+                  <
+                    String,
+                    Future<AppApiResponse> Function(AppApiRequest request)
+                  >{
+                    'GET /api/app/exhibition/enterprise-hub/enterprises/bf5ff83a-26e7-4138-8157-042fb38a5f46':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'header': <String, Object?>{
+                                'enterpriseId':
+                                    'bf5ff83a-26e7-4138-8157-042fb38a5f46',
+                                'name': '重庆坤特工厂样本',
+                                'primaryBoardType': 'factory',
+                                'shortIntro': '展台制作与木作工厂样本',
+                                'provinceName': '重庆',
+                                'cityName': '重庆',
+                              },
+                              'basicInfo': <String, Object?>{
+                                'fullIntro': '工厂详情已接通',
+                              },
+                              'boardProfile': <String, Object?>{
+                                'factoryName': '重庆坤特工厂样本',
+                              },
+                              'serviceAreas': <Object?>[],
+                              'cases': <Object?>[],
+                              'certifications': <Object?>[],
+                              'contacts': <Object?>[],
+                            },
+                          );
+                        },
+                  },
+            ),
+          ),
+        ),
+      );
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(
+          recommendationSections: const <Object?>[
+            <String, Object?>{
+              'sectionKey': 'company_factory_recommendations',
+              'items': <Object?>[
+                <String, Object?>{
+                  'itemType': 'factory',
+                  'entityId': 'bf5ff83a-26e7-4138-8157-042fb38a5f46',
+                  'title': '重庆坤特工厂样本',
+                  'summary': '展台制作与木作工厂样本',
+                  'badgeLabel': '优秀工厂',
+                },
+              ],
+            },
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.text('重庆坤特工厂样本'));
+      await tester.tap(find.widgetWithText(FilledButton, '查看工厂详情'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('header'), findsNothing);
+      expect(find.text('重庆坤特工厂样本'), findsWidgets);
+      expect(find.text('工厂详情已接通'), findsOneWidget);
     },
   );
 
@@ -355,229 +588,20 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('项目展示'), findsWidgets);
-      await _scrollTo(tester, find.text('项目工作台'));
-      expect(find.text('项目工作台'), findsWidgets);
-      expect(find.text('刷新列表'), findsOneWidget);
+      expect(find.text('发布项目工作台'), findsNothing);
+      expect(find.text('筛选条件'), findsNothing);
+      expect(find.text('城市'), findsWidgets);
+      expect(find.text('面积'), findsWidgets);
+      expect(find.text('金额'), findsWidgets);
+      expect(find.text('跟随城市'), findsWidgets);
+      expect(find.text('不限面积'), findsWidgets);
+      expect(find.text('不限金额'), findsWidgets);
+      expect(find.text('刷新当前结果'), findsNothing);
+      expect(find.text('恢复默认筛选'), findsNothing);
       expect(find.text('去创建项目'), findsNothing);
-      expect(find.text('公开项目'), findsOneWidget);
       expect(find.textContaining('这里是项目展示正式面'), findsNothing);
       expect(find.textContaining('项目展示 -> 展示详情 -> 按项目状态导流继续竞标'), findsNothing);
       expect(find.text('展示正式面'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'exhibition workbench renders four private containers and controlled handoff',
-    (WidgetTester tester) async {
-      final consumer = ExhibitionConsumerLayer(
-        client: AppApiClient(
-          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-          transport: FakeAppApiTransport(
-            handlers:
-                <
-                  String,
-                  Future<AppApiResponse> Function(AppApiRequest request)
-                >{
-                  'GET /api/app/exhibition/workbench':
-                      (AppApiRequest request) async {
-                        return AppApiResponse(
-                          statusCode: 200,
-                          uri: request.uri,
-                          body: _workbenchPayload(),
-                        );
-                      },
-                },
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionConsumerLayer: consumer,
-          forumConsumerLayer: _forumConsumer(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('展览首页'), findsNothing);
-      expect(find.text('私域入口'), findsOneWidget);
-      expect(find.text('项目工作台'), findsWidgets);
-      await _scrollTo(tester, find.text('project_chain'));
-      expect(find.text('project_chain'), findsOneWidget);
-      expect(find.text('order_chain'), findsOneWidget);
-      expect(find.text('fulfillment_chain'), findsOneWidget);
-      expect(find.text('extension_boundary'), findsOneWidget);
-      expect(find.text('content'), findsWidgets);
-      expect(find.widgetWithText(FilledButton, '创建项目'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '订单详情'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '合同详情'), findsWidgets);
-      expect(find.widgetWithText(FilledButton, '里程碑列表'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '里程碑提交'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '验收详情'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '验收提交'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '争议开启'), findsWidgets);
-
-      expect(find.text('继续当前工作'), findsNothing);
-      expect(find.text('打开论坛'), findsNothing);
-      expect(find.text('打开项目展示'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '评价提交'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '争议撤回'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '验收复检'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'exhibition workbench shows empty state when continuable carriers are missing',
-    (WidgetTester tester) async {
-      final consumer = ExhibitionConsumerLayer(
-        client: AppApiClient(
-          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-          transport: FakeAppApiTransport(
-            handlers:
-                <
-                  String,
-                  Future<AppApiResponse> Function(AppApiRequest request)
-                >{
-                  'GET /api/app/exhibition/workbench':
-                      (AppApiRequest request) async {
-                        return AppApiResponse(
-                          statusCode: 200,
-                          uri: request.uri,
-                          body: _workbenchPayload(
-                            projectChain: <String, Object?>{
-                              'hasProjects': false,
-                              'recentProjectId': null,
-                              'recentProjectTitle': null,
-                              'canCreateProject': false,
-                              'canOpenProjectPool': false,
-                            },
-                            orderChain: <String, Object?>{
-                              'activeOrderId': null,
-                              'activeOrderNo': null,
-                              'activeOrderState': null,
-                              'canOpenOrderDetail': false,
-                              'canOpenContractDetail': false,
-                              'canOpenDisputeOpen': false,
-                            },
-                            fulfillmentChain: <String, Object?>{
-                              'activeMilestoneId': null,
-                              'activeMilestoneTitle': null,
-                              'inspectionState': null,
-                              'canOpenMilestoneList': false,
-                              'canOpenMilestoneSubmit': false,
-                              'canOpenInspectionDetail': false,
-                              'canOpenInspectionSubmit': false,
-                            },
-                            extensionBoundary: <String, Object?>{
-                              'canOpenContractDetail': false,
-                              'ratingEntryState': 'controlled_unavailable',
-                              'canOpenDisputeOpen': false,
-                              'disputeWithdrawState': 'frozen',
-                            },
-                          ),
-                        );
-                      },
-                },
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionConsumerLayer: consumer,
-          forumConsumerLayer: _forumConsumer(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await _scrollTo(tester, find.text('project_chain'));
-      expect(find.text('project_chain'), findsOneWidget);
-      expect(find.text('order_chain'), findsOneWidget);
-      expect(find.text('fulfillment_chain'), findsOneWidget);
-      expect(find.text('extension_boundary'), findsOneWidget);
-      expect(find.text('empty'), findsWidgets);
-      expect(find.widgetWithText(FilledButton, '创建项目'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '订单详情'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '合同详情'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '里程碑列表'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '里程碑提交'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '验收详情'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '验收提交'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '争议开启'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'exhibition workbench keeps real error state on network failure',
-    (WidgetTester tester) async {
-      final consumer = ExhibitionConsumerLayer(
-        client: AppApiClient(
-          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-          transport: FakeAppApiTransport(
-            handlers:
-                <
-                  String,
-                  Future<AppApiResponse> Function(AppApiRequest request)
-                >{
-                  'GET /api/app/exhibition/workbench':
-                      (AppApiRequest request) async {
-                        throw SocketException('offline');
-                      },
-                },
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionConsumerLayer: consumer,
-          forumConsumerLayer: _forumConsumer(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('工作台数据：待重试'), findsOneWidget);
-      await _scrollTo(tester, find.text('项目工作台暂时没有刷新成功'));
-      expect(find.text('项目工作台暂时没有刷新成功'), findsOneWidget);
-      expect(find.text('工作台当前先按演示内容承接'), findsNothing);
-      await _scrollTo(tester, find.text('project_chain'));
-      expect(find.text('controlled_failure'), findsWidgets);
-      expect(find.widgetWithText(OutlinedButton, '刷新当前容器'), findsWidgets);
-    },
-  );
-
-  testWidgets(
-    'exhibition workbench falls back to demo source when fake transport misses canonical summary',
-    (WidgetTester tester) async {
-      final consumer = ExhibitionConsumerLayer(
-        client: AppApiClient(
-          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-          transport: FakeAppApiTransport(
-            handlers:
-                <
-                  String,
-                  Future<AppApiResponse> Function(AppApiRequest request)
-                >{},
-          ),
-        ),
-      );
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionConsumerLayer: consumer,
-          forumConsumerLayer: _forumConsumer(),
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      expect(find.text('工作台数据：演示承接'), findsOneWidget);
-      await _scrollTo(tester, find.text('工作台当前先按演示内容承接'));
-      expect(find.text('工作台当前先按演示内容承接'), findsOneWidget);
-      await _scrollTo(tester, find.text('project_chain'));
-      expect(find.text('project_chain'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '创建项目'), findsOneWidget);
-      expect(find.text('content'), findsWidgets);
-      expect(find.text('empty'), findsWidgets);
     },
   );
 }

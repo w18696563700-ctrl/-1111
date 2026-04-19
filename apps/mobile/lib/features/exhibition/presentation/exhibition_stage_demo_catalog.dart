@@ -63,6 +63,34 @@ final class ExhibitionStageDemoCatalog {
         'ongoingProjects': <Object?>[
           _myProjectItem(
             publicProject: _projectItem(
+              projectId: 'project-demo-draft',
+              projectNo: 'EXH-2026-DRAFT',
+              title: '春季新品展台草稿',
+              budgetAmount: 86000,
+              state: 'draft',
+            ),
+            privateProgress: _myProjectPrivateProgress(
+              hasAcceptedOrder: false,
+              formalCompletionStatus: 'not_formally_completed',
+              evaluationStatus: 'not_eligible',
+            ),
+          ),
+          _myProjectItem(
+            publicProject: _projectItem(
+              projectId: 'project-demo-submitted',
+              projectNo: 'EXH-2026-SUBMIT',
+              title: '快闪活动项目发布前核对',
+              budgetAmount: 118000,
+              state: 'submitted',
+            ),
+            privateProgress: _myProjectPrivateProgress(
+              hasAcceptedOrder: false,
+              formalCompletionStatus: 'not_formally_completed',
+              evaluationStatus: 'not_eligible',
+            ),
+          ),
+          _myProjectItem(
+            publicProject: _projectItem(
               projectId: demoProjectId,
               projectNo: 'EXH-2026-001',
               title: '春季品牌展岛台升级',
@@ -96,6 +124,25 @@ final class ExhibitionStageDemoCatalog {
               evaluationStatus: 'submitted',
             ),
           ),
+          _myProjectItem(
+            publicProject: <String, Object?>{
+              ..._projectItem(
+                projectId: 'project-demo-2026-archived',
+                projectNo: 'EXH-2026-ARCHIVE',
+                title: '已归档演示项目',
+                budgetAmount: 93000,
+                state: 'archived',
+              ),
+              'areaSqm': 260,
+              'provinceName': '浙江',
+              'cityName': '杭州',
+            },
+            privateProgress: _myProjectPrivateProgress(
+              hasAcceptedOrder: false,
+              formalCompletionStatus: 'not_formally_completed',
+              evaluationStatus: 'not_eligible',
+            ),
+          ),
         ],
       },
     );
@@ -103,6 +150,7 @@ final class ExhibitionStageDemoCatalog {
 
   static ExhibitionLoadResult myProjectDetail({String? projectId}) {
     final currentProjectId = _idOrFallback(projectId, demoProjectId);
+    final currentState = _demoMyProjectState(currentProjectId);
     return ExhibitionLoadResult(
       state: AppPageState.content,
       method: 'GET',
@@ -114,7 +162,7 @@ final class ExhibitionStageDemoCatalog {
             projectNo: 'EXH-2026-001',
             title: '春季品牌展岛台升级',
             budgetAmount: 186000,
-            state: 'published',
+            state: currentState,
           ),
           'buildingTypeRemark': '医疗器械展区主舞台与灯光联动搭建',
           'areaSqm': 350.5,
@@ -127,14 +175,35 @@ final class ExhibitionStageDemoCatalog {
           'plannedEndAt': '2026-04-18',
           'scheduleDetail': '4 月 10 日晚进场，4 月 18 日撤场',
           'description': '当前项目仍按最小私域基线承接，不补造更丰富后链路。',
+          'viewerProjectRelation': 'owner',
         },
         'privateProgress': _myProjectPrivateProgress(
-          hasAcceptedOrder: false,
-          formalCompletionStatus: 'not_formally_completed',
-          evaluationStatus: 'not_eligible',
+          hasAcceptedOrder: currentState == 'converted_to_order',
+          formalCompletionStatus: currentState == 'archived'
+              ? 'formally_completed'
+              : 'not_formally_completed',
+          evaluationStatus: currentState == 'archived'
+              ? 'submitted'
+              : 'not_eligible',
         ),
       },
     );
+  }
+
+  static String _demoMyProjectState(String projectId) {
+    if (projectId.contains('draft')) {
+      return 'draft';
+    }
+    if (projectId.contains('submit')) {
+      return 'submitted';
+    }
+    if (projectId.contains('archive')) {
+      return 'archived';
+    }
+    if (projectId.contains('order')) {
+      return 'converted_to_order';
+    }
+    return 'published';
   }
 
   static ExhibitionLoadResult orderDetail({
@@ -265,68 +334,6 @@ final class ExhibitionStageDemoCatalog {
         'projectId': _idOrFallback(projectId, demoProjectId),
         'state': 'submitted',
         'summary': _summary('bid-submit-demo'),
-      },
-      controlledState: AppPageState.content,
-      message: '当前结果来自演示内容。',
-    );
-  }
-
-  static ExhibitionActionResult createOrder({required String bidId}) {
-    return ExhibitionActionResult(
-      method: 'POST',
-      path: ExhibitionCanonicalPaths.orderCreate,
-      isSuccess: true,
-      payload: <String, Object?>{
-        'orderId': demoOrderId,
-        'bidId': bidId,
-        'state': 'active',
-        'summary': _summary('order-create-demo'),
-        'milestones': <Object?>[
-          const <String, Object?>{'milestoneId': demoMilestoneId},
-        ],
-      },
-      controlledState: AppPageState.content,
-      message: '当前结果来自演示内容。',
-    );
-  }
-
-  static ExhibitionActionResult contractConfirm({
-    required String contractId,
-    required String orderId,
-  }) {
-    return ExhibitionActionResult(
-      method: 'POST',
-      path: ExhibitionCanonicalPaths.contractConfirm,
-      isSuccess: true,
-      payload: <String, Object?>{
-        'contractId': _idOrFallback(contractId, demoContractId),
-        'orderId': _idOrFallback(orderId, demoOrderId),
-        'state': 'active',
-        'summary': _summary('contract-confirm-demo'),
-      },
-      controlledState: AppPageState.content,
-      message: '当前结果来自演示内容。',
-    );
-  }
-
-  static ExhibitionActionResult contractAmend({
-    required String contractId,
-    required String orderId,
-    required String amendmentSummary,
-  }) {
-    return ExhibitionActionResult(
-      method: 'POST',
-      path: ExhibitionCanonicalPaths.contractAmend,
-      isSuccess: true,
-      payload: <String, Object?>{
-        'contractId': _idOrFallback(contractId, demoContractId),
-        'orderId': _idOrFallback(orderId, demoOrderId),
-        'state': 'amended',
-        'summary': _summary(
-          amendmentSummary.trim().isEmpty
-              ? 'contract-amend-demo'
-              : amendmentSummary.trim(),
-        ),
       },
       controlledState: AppPageState.content,
       message: '当前结果来自演示内容。',

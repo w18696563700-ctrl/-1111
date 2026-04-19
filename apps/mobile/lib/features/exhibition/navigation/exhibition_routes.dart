@@ -3,12 +3,15 @@ final class ExhibitionRoutes {
 
   static const String showcaseSurface = 'showcase';
   static const String showcase = '/exhibition/showcase';
-  static const String workbench = '/exhibition/workbench';
   static const String projectList = '/exhibition/projects';
   static const String myProjectList = '/exhibition/my/projects';
   static const String projectCreate = '/exhibition/projects/create';
+  static const String projectEdit = '/exhibition/projects/edit';
   static const String projectDetail = '/exhibition/projects/detail';
   static const String myProjectDetail = '/exhibition/my/projects/detail';
+  static const String projectClarification =
+      '/exhibition/projects/clarification';
+  static const String bidThread = '/exhibition/bids/thread';
   static const String forum = '/exhibition/forum';
   static const String forumSquare = '/exhibition/forum/square';
   static const String forumLocal = '/exhibition/forum/local';
@@ -24,6 +27,7 @@ final class ExhibitionRoutes {
   static const String forumMeComments = '/exhibition/forum/me/comments';
   static const String forumMeBookmarks = '/exhibition/forum/me/bookmarks';
   static const String forumMeFollows = '/exhibition/forum/me/follows';
+  static const String forumMeReports = '/exhibition/forum/me/reports';
   static const String companies = '/exhibition/companies';
   static const String factories = '/exhibition/factories';
   static const String suppliers = '/exhibition/suppliers';
@@ -31,20 +35,36 @@ final class ExhibitionRoutes {
   static const String factoryDetail = '/exhibition/factories/detail';
   static const String supplierDetail = '/exhibition/suppliers/detail';
   static const String enterpriseApply = '/exhibition/enterprise/apply';
+  static const String enterpriseCaseEditor =
+      '/exhibition/enterprise/cases/editor';
   static const String enterpriseApplicationStatus =
       '/exhibition/enterprise/application-status';
+  static const String companyDisplayWorkbench =
+      '/exhibition/company-display/workbench';
+  static const String factoryDisplayWorkbench =
+      '/exhibition/factory-display/workbench';
+  static const String supplierDisplayWorkbench =
+      '/exhibition/supplier-display/workbench';
+  static const String companyDisplayCaseEditor =
+      '/exhibition/company-display/cases/editor';
+  static const String factoryDisplayCaseEditor =
+      '/exhibition/factory-display/cases/editor';
+  static const String supplierDisplayCaseEditor =
+      '/exhibition/supplier-display/cases/editor';
+  static const String companyDisplayStatus =
+      '/exhibition/company-display/status';
+  static const String factoryDisplayStatus =
+      '/exhibition/factory-display/status';
+  static const String supplierDisplayStatus =
+      '/exhibition/supplier-display/status';
   static const String bidSubmit = '/exhibition/bids/submit';
   static const String orderDetail = '/exhibition/orders/detail';
   static const String contractDetail = '/exhibition/contracts/detail';
-  static const String contractConfirm = '/exhibition/contracts/confirm';
-  static const String contractAmend = '/exhibition/contracts/amend';
   static const String milestoneList = '/exhibition/milestones';
   static const String milestoneSubmit = '/exhibition/milestones/submit';
   static const String inspectionDetail = '/exhibition/inspections/detail';
   static const String inspectionSubmit = '/exhibition/inspections/submit';
-  static const String inspectionRecheck = '/exhibition/inspections/recheck';
   static const String ratingEntry = '/exhibition/ratings/entry';
-  static const String ratingSubmit = '/exhibition/ratings/submit';
   static const String disputeOpen = '/exhibition/disputes/open';
   static const String disputeWithdraw = '/exhibition/disputes/withdraw';
 
@@ -52,15 +72,33 @@ final class ExhibitionRoutes {
     String projectId, {
     String? surface,
   }) {
-    return _withQuery(projectDetail, <String, String>{
-      'projectId': projectId,
-      if (surface != null && surface.trim().isNotEmpty) 'surface': surface,
-    });
+    // Public project detail no longer branches by query-carried surface.
+    return _withQuery(projectDetail, <String, String>{'projectId': projectId});
+  }
+
+  static String projectEditWithProjectId(String projectId) {
+    return _withQuery(projectEdit, <String, String>{'projectId': projectId});
   }
 
   static String myProjectDetailWithProjectId(String projectId) {
     return _withQuery(myProjectDetail, <String, String>{
       'projectId': projectId,
+    });
+  }
+
+  static String projectClarificationWithProjectId(String projectId) {
+    return _withQuery(projectClarification, <String, String>{
+      'projectId': projectId,
+    });
+  }
+
+  static String bidThreadWithIds({
+    required String projectId,
+    required String bidId,
+  }) {
+    return _withQuery(bidThread, <String, String>{
+      'projectId': projectId,
+      'bidId': bidId,
     });
   }
 
@@ -78,6 +116,10 @@ final class ExhibitionRoutes {
 
   static String forumAuthorWithAuthorId(String authorId) {
     return '$forumAuthors/${Uri.encodeComponent(authorId)}';
+  }
+
+  static String forumMeReportDetailWithTicketId(String ticketId) {
+    return '$forumMeReports/${Uri.encodeComponent(ticketId)}';
   }
 
   static String forumCommentsWithPostId(String postId) {
@@ -116,19 +158,126 @@ final class ExhibitionRoutes {
     });
   }
 
+  static String enterpriseWorkbenchForBoard(String boardType) {
+    return switch (boardType.trim().toLowerCase()) {
+      'company' => companyDisplayWorkbench,
+      'factory' => factoryDisplayWorkbench,
+      'supplier' => supplierDisplayWorkbench,
+      _ => enterpriseApplyWithBoardType(boardType),
+    };
+  }
+
+  static String enterprisePublishedChangeWorkbenchWithEnterpriseId(
+    String enterpriseId, {
+    required String boardType,
+  }) {
+    return _withQuery(enterpriseWorkbenchForBoard(boardType), <String, String>{
+      'enterpriseId': enterpriseId,
+      'mode': 'published_change',
+    });
+  }
+
+  static String enterpriseCaseEditorWithBoardType(
+    String boardType, {
+    String? enterpriseId,
+    String? caseId,
+    bool publishedChange = false,
+  }) {
+    return _withQuery(enterpriseCaseEditorForBoard(boardType), <String, String>{
+      if (enterpriseId != null && enterpriseId.trim().isNotEmpty)
+        'enterpriseId': enterpriseId,
+      if (caseId != null && caseId.trim().isNotEmpty) 'caseId': caseId,
+      if (publishedChange) 'mode': 'published_change',
+    });
+  }
+
+  static String enterpriseCaseEditorForBoard(String boardType) {
+    return switch (boardType.trim().toLowerCase()) {
+      'company' => companyDisplayCaseEditor,
+      'factory' => factoryDisplayCaseEditor,
+      'supplier' => supplierDisplayCaseEditor,
+      _ => enterpriseCaseEditor,
+    };
+  }
+
   static String enterpriseApplicationStatusWithId(
     String applicationId, {
     String? boardType,
   }) {
-    return _withQuery(enterpriseApplicationStatus, <String, String>{
+    final targetPath = boardType == null || boardType.trim().isEmpty
+        ? enterpriseApplicationStatus
+        : enterpriseStatusForBoard(boardType);
+    return _withQuery(targetPath, <String, String>{
       'applicationId': applicationId,
       if (boardType != null && boardType.trim().isNotEmpty)
         'boardType': boardType,
     });
   }
 
-  static String bidSubmitWithProjectId(String projectId) {
-    return _withQuery(bidSubmit, <String, String>{'projectId': projectId});
+  static String enterpriseStatusForBoard(String boardType) {
+    return switch (boardType.trim().toLowerCase()) {
+      'company' => companyDisplayStatus,
+      'factory' => factoryDisplayStatus,
+      'supplier' => supplierDisplayStatus,
+      _ => enterpriseApplicationStatus,
+    };
+  }
+
+  static String enterprisePublishedChangeStatusWithEnterpriseId(
+    String enterpriseId, {
+    required String boardType,
+  }) {
+    return _withQuery(enterpriseStatusForBoard(boardType), <String, String>{
+      'enterpriseId': enterpriseId,
+      'mode': 'published_change',
+    });
+  }
+
+  static String? enterpriseBoardTypeFromPrivatePath(String path) {
+    return switch (path) {
+      companyDisplayWorkbench ||
+      companyDisplayCaseEditor ||
+      companyDisplayStatus => 'company',
+      factoryDisplayWorkbench ||
+      factoryDisplayCaseEditor ||
+      factoryDisplayStatus => 'factory',
+      supplierDisplayWorkbench ||
+      supplierDisplayCaseEditor ||
+      supplierDisplayStatus => 'supplier',
+      _ => null,
+    };
+  }
+
+  static bool isEnterpriseWorkbenchPath(String path) {
+    return path == enterpriseApply ||
+        path == companyDisplayWorkbench ||
+        path == factoryDisplayWorkbench ||
+        path == supplierDisplayWorkbench;
+  }
+
+  static bool isEnterpriseCaseEditorPath(String path) {
+    return path == enterpriseCaseEditor ||
+        path == companyDisplayCaseEditor ||
+        path == factoryDisplayCaseEditor ||
+        path == supplierDisplayCaseEditor;
+  }
+
+  static bool isEnterpriseStatusPath(String path) {
+    return path == enterpriseApplicationStatus ||
+        path == companyDisplayStatus ||
+        path == factoryDisplayStatus ||
+        path == supplierDisplayStatus;
+  }
+
+  static String bidSubmitWithProjectId(String projectId, {String? mode}) {
+    return _withQuery(bidSubmit, <String, String>{
+      'projectId': projectId,
+      if (mode != null && mode.trim().isNotEmpty) 'mode': mode,
+    });
+  }
+
+  static String bidResultWithProjectId(String projectId) {
+    return bidSubmitWithProjectId(projectId, mode: 'result');
   }
 
   static String orderDetailWithOrderId(String orderId) {
@@ -137,14 +286,6 @@ final class ExhibitionRoutes {
 
   static String contractDetailWithOrderId(String orderId) {
     return _withQuery(contractDetail, <String, String>{'orderId': orderId});
-  }
-
-  static String contractConfirmWithOrderId(String orderId) {
-    return _withQuery(contractConfirm, <String, String>{'orderId': orderId});
-  }
-
-  static String contractAmendWithOrderId(String orderId) {
-    return _withQuery(contractAmend, <String, String>{'orderId': orderId});
   }
 
   static String milestoneListWithOrderId(String orderId) {
@@ -169,32 +310,16 @@ final class ExhibitionRoutes {
     });
   }
 
-  static String inspectionRecheckWithMilestoneId(String milestoneId) {
-    return _withQuery(inspectionRecheck, <String, String>{
-      'milestoneId': milestoneId,
-    });
+  static String disputeOpenWithOrderId(String orderId) {
+    return _withQuery(disputeOpen, <String, String>{'orderId': orderId});
   }
 
   static String ratingEntryWithOrderId(String orderId) {
     return _withQuery(ratingEntry, <String, String>{'orderId': orderId});
   }
 
-  static String ratingSubmitWithOrderId(String orderId) {
-    return _withQuery(ratingSubmit, <String, String>{'orderId': orderId});
-  }
-
-  static String disputeOpenWithOrderId(String orderId) {
-    return _withQuery(disputeOpen, <String, String>{'orderId': orderId});
-  }
-
-  static String disputeWithdrawWithDisputeId(
-    String disputeId, {
-    String? orderId,
-  }) {
-    return _withQuery(disputeWithdraw, <String, String>{
-      'disputeId': disputeId,
-      if (orderId != null && orderId.trim().isNotEmpty) 'orderId': orderId,
-    });
+  static String disputeWithdrawWithOrderId(String orderId) {
+    return _withQuery(disputeWithdraw, <String, String>{'orderId': orderId});
   }
 
   static String _withQuery(String path, Map<String, String> queryParameters) {

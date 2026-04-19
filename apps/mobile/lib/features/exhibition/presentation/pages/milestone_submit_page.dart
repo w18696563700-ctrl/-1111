@@ -205,12 +205,13 @@ class _MilestoneSubmitPageState extends State<MilestoneSubmitPage> {
 
     return _SubmissionPageFrame(
       title: '里程碑提交',
-      summary: '这里处理当前里程碑的提交动作。页面会把节点说明、提交结果和补充凭证整理成完整履约界面，不再像测试表单。',
+      summary:
+          '这里承接当前里程碑提交的 shell / handoff 入口。页面只受理当前里程碑上下文，并在 accepted 后继续 handoff 到验收详情，不把本页写成里程碑 truth 已推进。',
       canonicalPath: ExhibitionCanonicalPaths.milestoneSubmit,
       submitting: _submitting,
       lastResult: _lastResult,
       onSubmitPressed: _submit,
-      submitButtonLabel: '提交里程碑',
+      submitButtonLabel: '继续里程碑提交',
       sourceLabel: '当前展示方式：优先显示已接通内容',
       sourceMessage: '默认优先展示已接通结果；如需不中断演示，也可以切换到演示内容继续讲解。',
       showConnectionInfo: false,
@@ -236,10 +237,10 @@ class _MilestoneSubmitPageState extends State<MilestoneSubmitPage> {
     return <Widget>[
       const SizedBox(height: 16),
       _ActionCard(
-        title: '里程碑已提交',
+        title: '里程碑提交入口已受理',
         summary: _lastResultOrigin == ExhibitionStageDataOrigin.demo
             ? '当前结果来自演示内容。后续仍可继续讲解验收详情和验收提交，但不代表真实提交链路已通。'
-            : '当前里程碑已经进入下一步承接面，后续可以继续查看当前验收详情。',
+            : '当前里程碑提交入口已经受理，后续可以继续查看当前验收详情；这不代表里程碑 truth 已由本页推进。',
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
           if (_lastResultOrigin == ExhibitionStageDataOrigin.demo) ...<Widget>[
@@ -251,7 +252,7 @@ class _MilestoneSubmitPageState extends State<MilestoneSubmitPage> {
           ],
           const _StateMessage(
             title: '提交后如何继续',
-            body: '后续验收入口会继续沿用当前里程碑上下文，不需要重新承接实例。',
+            body: '后续验收入口会继续沿用当前里程碑上下文，不需要重新承接实例；当前页只保留 shell accepted continuation。',
           ),
           const SizedBox(height: 12),
           FilledButton(
@@ -273,7 +274,8 @@ class _MilestoneSubmitPageState extends State<MilestoneSubmitPage> {
     return <Widget>[
       _ActionCard(
         title: '提交前先确认',
-        summary: '先确认当前里程碑上下文，再完成本次提交。里程碑提交成功后，这条链路会自然继续到验收详情。',
+        summary:
+            '先确认当前里程碑上下文，再继续本次提交承接。accepted 之后，这条链路会自然 handoff 到验收详情，但不把里程碑 truth 写成已在本页推进。',
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
           if (routeMilestoneId != null)

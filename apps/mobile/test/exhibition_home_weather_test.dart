@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
@@ -379,8 +380,12 @@ void main() {
     'manual location selection calls canonical select path and updates home',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(
+          displayName: '重庆市',
+          provinceName: '重庆',
+        ),
         onSelectLocation: (selection) => contentHomeResult(
-          displayName: '${selection.provinceName}市',
+          displayName: selection.cityName ?? selection.provinceName,
           provinceName: selection.provinceName,
           selectionScope: 'request_only',
           selectionNotice: '当前选择仅用于当前首页聚合',
@@ -412,8 +417,10 @@ void main() {
       await tester.tap(find.widgetWithText(FilledButton, '手动选择地区'));
       await tester.pumpAndSettle();
 
-      expect(find.text('手动选择地区'), findsWidgets);
-      await tester.tap(find.widgetWithText(FilledButton, '重庆'));
+      expect(find.text('选择城市', skipOffstage: false), findsOneWidget);
+      await tester.tap(
+        find.widgetWithText(CupertinoButton, '确定', skipOffstage: false),
+      );
       await tester.pumpAndSettle();
 
       expect(homeClient.selectLocationCount, 1);

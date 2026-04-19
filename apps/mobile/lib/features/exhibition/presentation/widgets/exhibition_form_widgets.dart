@@ -15,6 +15,7 @@ class _InputField extends StatelessWidget {
     this.errorText,
     this.required = false,
     this.readOnly = false,
+    this.enabled = true,
     this.onTap,
     this.onChanged,
   });
@@ -32,6 +33,7 @@ class _InputField extends StatelessWidget {
   final String? errorText;
   final bool required;
   final bool readOnly;
+  final bool enabled;
   final VoidCallback? onTap;
   final ValueChanged<String>? onChanged;
 
@@ -45,6 +47,7 @@ class _InputField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
+        enabled: enabled,
         readOnly: readOnly,
         onTap: onTap,
         onChanged: onChanged,

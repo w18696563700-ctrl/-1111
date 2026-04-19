@@ -2,6 +2,7 @@ part of 'exhibition_home_page.dart';
 
 class _HomeModuleCard extends StatelessWidget {
   const _HomeModuleCard({
+    super.key,
     required this.title,
     required this.description,
     required this.statusLabel,

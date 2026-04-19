@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/auth_consumer_layer.dart';
 import 'package:mobile/core/boot/app_bootstrap_controller.dart';
@@ -9,8 +10,11 @@ import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/trading_im_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_governance_appeal_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_governance_status_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shared/theme/app_theme.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
@@ -26,9 +30,12 @@ class ExhibitionMobileApp extends StatefulWidget {
     this.exhibitionConsumerLayer,
     this.exhibitionHomeAggregationClient,
     this.forumConsumerLayer,
+    this.tradingImConsumerLayer,
     this.authConsumerLayer,
     this.messagesConsumerLayer,
     this.profileConsumerLayer,
+    this.profileGovernanceAppealConsumerLayer,
+    this.profileGovernanceStatusConsumerLayer,
     this.profileIdentityConsumerLayer,
     this.deviceLocationService,
     this.sessionStore,
@@ -41,9 +48,14 @@ class ExhibitionMobileApp extends StatefulWidget {
   final ExhibitionConsumerLayer? exhibitionConsumerLayer;
   final ExhibitionHomeAggregationClient? exhibitionHomeAggregationClient;
   final ForumConsumerLayer? forumConsumerLayer;
+  final TradingImConsumerLayer? tradingImConsumerLayer;
   final AuthConsumerLayer? authConsumerLayer;
   final MessagesConsumerLayer? messagesConsumerLayer;
   final ProfileConsumerLayer? profileConsumerLayer;
+  final ProfileGovernanceAppealConsumerLayer?
+  profileGovernanceAppealConsumerLayer;
+  final ProfileGovernanceStatusConsumerLayer?
+  profileGovernanceStatusConsumerLayer;
   final ProfileIdentityConsumerLayer? profileIdentityConsumerLayer;
   final DeviceLocationService? deviceLocationService;
   final AppSessionStore? sessionStore;
@@ -79,11 +91,22 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     ForumConsumerLayer.install(
       widget.forumConsumerLayer ?? ForumConsumerLayer(),
     );
+    TradingImConsumerLayer.install(
+      widget.tradingImConsumerLayer ?? TradingImConsumerLayer(),
+    );
     MessagesConsumerLayer.install(
       widget.messagesConsumerLayer ?? MessagesConsumerLayer(),
     );
     ProfileConsumerLayer.install(
       widget.profileConsumerLayer ?? ProfileConsumerLayer(),
+    );
+    ProfileGovernanceAppealConsumerLayer.install(
+      widget.profileGovernanceAppealConsumerLayer ??
+          ProfileGovernanceAppealConsumerLayer(),
+    );
+    ProfileGovernanceStatusConsumerLayer.install(
+      widget.profileGovernanceStatusConsumerLayer ??
+          ProfileGovernanceStatusConsumerLayer(),
     );
     ProfileIdentityConsumerLayer.install(
       widget.profileIdentityConsumerLayer ?? ProfileIdentityConsumerLayer(),
@@ -98,8 +121,11 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     ExhibitionHomeAggregationClient.reset();
     DeviceLocationService.reset();
     ForumConsumerLayer.reset();
+    TradingImConsumerLayer.reset();
     MessagesConsumerLayer.reset();
     ProfileConsumerLayer.reset();
+    ProfileGovernanceAppealConsumerLayer.reset();
+    ProfileGovernanceStatusConsumerLayer.reset();
     ProfileIdentityConsumerLayer.reset();
     _controller.dispose();
     super.dispose();
@@ -112,6 +138,13 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
       child: MaterialApp(
         title: '展览装修之家',
         debugShowCheckedModeBanner: false,
+        locale: const Locale('zh', 'CN'),
+        supportedLocales: const <Locale>[Locale('zh', 'CN')],
+        localizationsDelegates: const <LocalizationsDelegate<dynamic>>[
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         theme: AppTheme.light(),
         initialRoute: widget.initialRoute,
         onGenerateInitialRoutes: (String initialRoute) {

@@ -25,9 +25,16 @@ type ShellContextViewModel = {
   displayName: string;
   avatarUrl: string | null;
   organizationId: string | null;
+  organizationType: string | null;
   roleKeys: string[];
   certificationStatus: CertificationStatus | null;
+  personalCertificationStatus?: CertificationStatus | null;
+  personalCertificationQualified?: boolean | null;
+  personalCertificationLockedToOtherActor?: boolean | null;
   membershipStatus: MembershipStatus | null;
+  projectCreateEligibility: {
+    canCreateProject: boolean;
+  } | null;
   visibleBuildings: string[];
   featureFlagsVersion: string;
   unreadSummary: Record<string, unknown>;
@@ -162,9 +169,23 @@ export class ShellService {
       displayName,
       avatarUrl: this.asNullableString(result.avatarUrl),
       organizationId,
+      organizationType: this.asNullableString(result.organizationType),
       roleKeys: this.asStringArray(result.roleKeys),
       certificationStatus,
+      personalCertificationStatus: readNullableCertificationStatus(
+        result.personalCertificationStatus ?? null,
+        'Shell context response is missing a valid personalCertificationStatus.',
+      ),
+      personalCertificationQualified:
+        typeof result.personalCertificationQualified === 'boolean'
+          ? result.personalCertificationQualified
+          : null,
+      personalCertificationLockedToOtherActor:
+        typeof result.personalCertificationLockedToOtherActor === 'boolean'
+          ? result.personalCertificationLockedToOtherActor
+          : null,
       membershipStatus,
+      projectCreateEligibility: this.readProjectCreateEligibility(result.projectCreateEligibility),
       visibleBuildings: this.asStringArray(result.visibleBuildings),
       featureFlagsVersion,
       unreadSummary,
@@ -215,6 +236,19 @@ export class ShellService {
       return null;
     }
     return this.asString(value) || null;
+  }
+
+  private readProjectCreateEligibility(value: unknown) {
+    if (value == null) {
+      return null;
+    }
+    const record = this.asOptionalRecord(value);
+    if (!record || typeof record.canCreateProject !== 'boolean') {
+      throw new Error('Shell context response is missing a valid projectCreateEligibility.');
+    }
+    return {
+      canCreateProject: record.canCreateProject,
+    };
   }
 
   private normalizeShellCode(code: string, originalMessage: string) {

@@ -18,6 +18,7 @@ typedef _EntityValidation =
     String? Function(Map<String, Object?> raw, String context);
 
 _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
+  String requestMethod,
   String canonicalPath,
   Object? payload,
 ) {
@@ -25,12 +26,42 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
     return _validateMyProjectListPayload(canonicalPath, payload);
   }
   if (ExhibitionCanonicalPaths.isMyProjectDetail(canonicalPath)) {
-    return _validateMyProjectDetailPayload(canonicalPath, payload);
+    return requestMethod == 'DELETE'
+        ? _validateProjectDeleteAcceptedPayload(canonicalPath, payload)
+        : _validateMyProjectDetailPayload(canonicalPath, payload);
+  }
+  if (ExhibitionCanonicalPaths.isMyProjectAttachmentDelete(canonicalPath)) {
+    return _validateProjectAttachmentDeleteAcceptedPayload(
+      canonicalPath,
+      payload,
+    );
+  }
+  if (canonicalPath == ExhibitionCanonicalPaths.projectPublicResources) {
+    return _validateProjectPublicResourceListPayload(canonicalPath, payload);
+  }
+  if (canonicalPath == ExhibitionCanonicalPaths.projectBidMaterials) {
+    return _validateProjectBidMaterialListPayload(canonicalPath, payload);
+  }
+  if (ExhibitionCanonicalPaths.isMyProjectAttachments(canonicalPath)) {
+    return requestMethod == 'GET'
+        ? _validateProjectAttachmentListPayload(canonicalPath, payload)
+        : _validateProjectAttachmentPayload(canonicalPath, payload);
+  }
+
+  if (canonicalPath == _bidSeatLockPath) {
+    return _validateBidSeatLockAcceptedPayload(canonicalPath, payload);
+  }
+  if (canonicalPath == _bidSeatReleasePath) {
+    return _validateBidSeatReleaseAcceptedPayload(canonicalPath, payload);
+  }
+  if (canonicalPath == _bidSeatStatusPath) {
+    return _validateBidSeatStatusPayload(canonicalPath, payload);
+  }
+  if (canonicalPath == _bidPackageCompletenessPath) {
+    return _validateBidPackageCompletenessPayload(canonicalPath, payload);
   }
 
   return switch (canonicalPath) {
-    ExhibitionCanonicalPaths.exhibitionWorkbench =>
-      _validateWorkbenchSummaryPayload(canonicalPath, payload),
     ExhibitionCanonicalPaths.projectList => _validateProjectListPayload(
       canonicalPath,
       payload,
@@ -39,7 +70,19 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
+    ExhibitionCanonicalPaths.projectSave ||
+    ExhibitionCanonicalPaths.projectSubmit ||
+    ExhibitionCanonicalPaths.projectPublish ||
+    ExhibitionCanonicalPaths.projectWithdraw ||
+    ExhibitionCanonicalPaths.projectArchive ||
+    ExhibitionCanonicalPaths.projectClose =>
+      _validateProjectLifecycleAcceptedPayload(canonicalPath, payload),
+    ExhibitionCanonicalPaths.projectEditDetail ||
     ExhibitionCanonicalPaths.projectDetail => _validateProjectPayload(
+      canonicalPath,
+      payload,
+    ),
+    ExhibitionCanonicalPaths.bidAward => _validateBidAwardAcceptedPayload(
       canonicalPath,
       payload,
     ),
@@ -47,11 +90,16 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.orderCreate => _validateOrderCreatePayload(
+    ExhibitionCanonicalPaths.bidResult => _validateBidResultPayload(
       canonicalPath,
       payload,
     ),
     ExhibitionCanonicalPaths.orderDetail => _validateOrderPayload(
+      canonicalPath,
+      payload,
+    ),
+    ExhibitionCanonicalPaths.ratingEntry ||
+    ExhibitionCanonicalPaths.ratingSubmit => _sanitizeAndValidateEntryPayload(
       canonicalPath,
       payload,
     ),
@@ -63,19 +111,38 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.contractDetail ||
     ExhibitionCanonicalPaths.contractConfirm ||
     ExhibitionCanonicalPaths.contractAmend ||
+    ExhibitionCanonicalPaths.contractDetail ||
     ExhibitionCanonicalPaths.inspectionDetail ||
+    ExhibitionCanonicalPaths.inspectionRecheck ||
     ExhibitionCanonicalPaths.inspectionSubmit ||
-    ExhibitionCanonicalPaths.ratingEntry ||
-    ExhibitionCanonicalPaths.ratingSubmit ||
-    ExhibitionCanonicalPaths.disputeOpen => _sanitizeAndValidateEntryPayload(
-      canonicalPath,
-      payload,
-    ),
+    ExhibitionCanonicalPaths.disputeOpen ||
+    ExhibitionCanonicalPaths.disputeWithdraw =>
+      _sanitizeAndValidateEntryPayload(canonicalPath, payload),
     _ => _SuccessContractValidation(payload: payload),
   };
+}
+
+_SuccessContractValidation _validateProjectDeleteAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  final sanitized = _sanitizeProjectDeleteAcceptedPayload(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'projectId', canonicalPath),
+    _requireStateField(raw, 'state', _stableDeleteStates, canonicalPath),
+  ]);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
 }
 
 _SuccessContractValidation _validateProjectListPayload(
@@ -99,13 +166,23 @@ _SuccessContractValidation _validateProjectPayload(
   validator: _validateProjectEntity,
 );
 
+_SuccessContractValidation _validateProjectLifecycleAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateRequiredFieldsPayload(
+  canonicalPath,
+  payload,
+  fields: const <String>['projectId', 'state'],
+  sanitizedPayload: _sanitizeProjectLifecycleAcceptedPayload(payload),
+);
+
 _SuccessContractValidation _validateProjectCreatePayload(
   String canonicalPath,
   Object? payload,
-) => _validateSingleRequiredFieldPayload(
+) => _validateRequiredFieldsPayload(
   canonicalPath,
   payload,
-  field: 'projectId',
+  fields: const <String>['projectId', 'state'],
   sanitizedPayload: _sanitizeProjectCreatePayload(payload),
 );
 
@@ -119,6 +196,97 @@ _SuccessContractValidation _validateBidSubmitPayload(
   sanitizedPayload: _sanitizeBidSubmitPayload(payload),
 );
 
+_SuccessContractValidation _validateBidAwardAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  final sanitized = _sanitizeBidAwardPayload(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'bidAwardId', canonicalPath),
+    _requireStringField(raw, 'projectId', canonicalPath),
+    _requireStringField(raw, 'winningBidId', canonicalPath),
+    _requireNullableStringField(raw, 'orderId', canonicalPath),
+    _requireNullableStringField(raw, 'contractId', canonicalPath),
+    _requireStateField(raw, 'state', _stableBidAwardStates, canonicalPath),
+  ]);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
+}
+
+_SuccessContractValidation _validateBidResultPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  final sanitized = _sanitizeBidResultPayload(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'bidId', canonicalPath),
+    _requireStringField(raw, 'projectId', canonicalPath),
+    _requireStateField(raw, 'state', _stableBidResultStates, canonicalPath),
+    _requireStateField(raw, 'result', _stableBidResultOutcomes, canonicalPath),
+    _requireStringField(raw, 'reasonCode', canonicalPath),
+    _requireStringField(raw, 'reasonText', canonicalPath),
+    _requireStringField(raw, 'decidedAt', canonicalPath),
+  ]);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
+}
+
+_SuccessContractValidation _validateBidSeatLockAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateEntityPayload(
+  canonicalPath,
+  payload,
+  sanitizedPayload: _sanitizeBidSeatPayload(payload),
+  validator: _validateBidSeatLockAcceptedEntity,
+);
+
+_SuccessContractValidation _validateBidSeatReleaseAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateEntityPayload(
+  canonicalPath,
+  payload,
+  sanitizedPayload: _sanitizeBidSeatPayload(payload),
+  validator: _validateBidSeatReleaseAcceptedEntity,
+);
+
+_SuccessContractValidation _validateBidSeatStatusPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateEntityPayload(
+  canonicalPath,
+  payload,
+  sanitizedPayload: _sanitizeBidSeatStatusPayload(payload),
+  validator: _validateBidSeatStatusEntity,
+);
+
+_SuccessContractValidation _validateBidPackageCompletenessPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateEntityPayload(
+  canonicalPath,
+  payload,
+  sanitizedPayload: _sanitizeBidPackageCompletenessPayload(payload),
+  validator: _validateBidPackageCompletenessEntity,
+);
+
 _SuccessContractValidation _validateOrderPayload(
   String canonicalPath,
   Object? payload,
@@ -128,61 +296,6 @@ _SuccessContractValidation _validateOrderPayload(
   sanitizedPayload: _sanitizeOrderPayload(payload),
   validator: _validateOrderEntity,
 );
-
-_SuccessContractValidation _validateOrderCreatePayload(
-  String canonicalPath,
-  Object? payload,
-) {
-  final raw = _asMap(payload);
-  if (raw == null) {
-    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
-  }
-
-  final sanitized = _sanitizeOrderCreatePayload(payload);
-  final orderIdMessage = _requireStringField(raw, 'orderId', canonicalPath);
-  if (orderIdMessage != null) {
-    return _invalidSuccessPayload(
-      canonicalPath,
-      orderIdMessage,
-      payload: sanitized,
-    );
-  }
-
-  final rawMilestones = raw['milestones'];
-  if (rawMilestones == null) {
-    return _SuccessContractValidation(payload: sanitized);
-  }
-  if (rawMilestones is! List) {
-    return _invalidSuccessPayload(
-      canonicalPath,
-      'missing required field "milestones"',
-      payload: sanitized,
-    );
-  }
-  if (rawMilestones.isEmpty) {
-    return _SuccessContractValidation(payload: sanitized);
-  }
-
-  final firstMilestone = rawMilestones.first;
-  if (firstMilestone is! Map) {
-    return _invalidSuccessPayload(
-      canonicalPath,
-      'milestones[0] must be an object',
-      payload: sanitized,
-    );
-  }
-
-  final message = _requireStringField(
-    firstMilestone.map((Object? key, Object? value) => MapEntry('$key', value)),
-    'milestoneId',
-    '$canonicalPath milestones[0]',
-  );
-  if (message != null) {
-    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
-  }
-
-  return _SuccessContractValidation(payload: sanitized);
-}
 
 _SuccessContractValidation _validateMilestoneListPayload(
   String canonicalPath,
@@ -280,18 +393,36 @@ _SuccessContractValidation _validateSingleRequiredFieldPayload(
   required String field,
   required Object? sanitizedPayload,
 }) {
+  return _validateRequiredFieldsPayload(
+    canonicalPath,
+    payload,
+    fields: <String>[field],
+    sanitizedPayload: sanitizedPayload,
+  );
+}
+
+_SuccessContractValidation _validateRequiredFieldsPayload(
+  String canonicalPath,
+  Object? payload, {
+  required List<String> fields,
+  required Object? sanitizedPayload,
+}) {
   final raw = _asMap(payload);
   if (raw == null) {
     return _invalidSuccessPayload(canonicalPath, 'response must be an object');
   }
 
-  final message = _requireStringField(raw, field, canonicalPath);
-  if (message != null) {
-    return _invalidSuccessPayload(
-      canonicalPath,
-      message,
-      payload: sanitizedPayload,
-    );
+  for (final field in fields) {
+    final message = field == 'state'
+        ? _requireStateField(raw, field, _stableProjectStates, canonicalPath)
+        : _requireStringField(raw, field, canonicalPath);
+    if (message != null) {
+      return _invalidSuccessPayload(
+        canonicalPath,
+        message,
+        payload: sanitizedPayload,
+      );
+    }
   }
 
   return _SuccessContractValidation(payload: sanitizedPayload);
@@ -306,6 +437,77 @@ String? _validateProjectEntity(Map<String, Object?> raw, String context) {
     _requireNumberField(raw, 'budgetAmount', context),
     _requireStateField(raw, 'state', _stableProjectStates, context),
     _requireMapField(raw, 'summary', context),
+  ]);
+}
+
+String? _validateBidSeatLockAcceptedEntity(
+  Map<String, Object?> raw,
+  String context,
+) {
+  return _firstValidationError(<String?>[
+    _requireStringField(raw, 'seatId', context),
+    _requireStringField(raw, 'projectId', context),
+    _requireStringField(raw, 'bidId', context),
+    _requireStateField(raw, 'state', _stableBidSeatStates, context),
+    _requireNullableStringField(raw, 'expiresAt', context),
+  ]);
+}
+
+String? _validateBidSeatReleaseAcceptedEntity(
+  Map<String, Object?> raw,
+  String context,
+) {
+  return _firstValidationError(<String?>[
+    _requireStringField(raw, 'seatId', context),
+    _requireStringField(raw, 'projectId', context),
+    _requireStringField(raw, 'bidId', context),
+    _requireStateField(raw, 'state', _stableBidSeatStates, context),
+    _requireNullableStringField(raw, 'releasedAt', context),
+  ]);
+}
+
+String? _validateBidSeatStatusEntity(Map<String, Object?> raw, String context) {
+  final state = raw['state'] as String?;
+  final seatIdMessage = state == 'available'
+      ? _requireNullableStringField(raw, 'seatId', context)
+      : _requireStringField(raw, 'seatId', context);
+  return _firstValidationError(<String?>[
+    seatIdMessage,
+    _requireStringField(raw, 'projectId', context),
+    _requireStringField(raw, 'bidId', context),
+    _requireStateField(raw, 'state', _stableBidSeatStates, context),
+    _requireNullableStringField(raw, 'expiresAt', context),
+    _requireNullableStringField(raw, 'releasedAt', context),
+  ]);
+}
+
+String? _validateBidPackageCompletenessEntity(
+  Map<String, Object?> raw,
+  String context,
+) {
+  final itemsMessage = _requireListField(raw, 'missingItems', context);
+  if (itemsMessage != null) {
+    return itemsMessage;
+  }
+
+  final missingItems = raw['missingItems']! as List;
+  for (var index = 0; index < missingItems.length; index += 1) {
+    if (missingItems[index] is! String) {
+      return 'contract drift at $context: missingItems[$index] must be a string';
+    }
+  }
+
+  return _firstValidationError(<String?>[
+    _requireStringField(raw, 'bidId', context),
+    _requireStringField(raw, 'projectId', context),
+    _requireStateField(
+      raw,
+      'state',
+      _stableBidPackageCompletenessStates,
+      context,
+    ),
+    _requireBooleanField(raw, 'quoteAmountReady', context),
+    _requireBooleanField(raw, 'proposalSummaryReady', context),
   ]);
 }
 

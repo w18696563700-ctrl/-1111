@@ -52,54 +52,6 @@ Map<String, Object?> _projectPayload({
   };
 }
 
-Map<String, Object?> _workbenchPayload({
-  Map<String, Object?>? projectChain,
-  Map<String, Object?>? orderChain,
-  Map<String, Object?>? fulfillmentChain,
-  Map<String, Object?>? extensionBoundary,
-}) {
-  return <String, Object?>{
-    'project_chain':
-        projectChain ??
-        <String, Object?>{
-          'hasProjects': false,
-          'recentProjectId': null,
-          'recentProjectTitle': null,
-          'canCreateProject': true,
-          'canOpenProjectPool': true,
-        },
-    'order_chain':
-        orderChain ??
-        <String, Object?>{
-          'activeOrderId': null,
-          'activeOrderNo': null,
-          'activeOrderState': null,
-          'canOpenOrderDetail': false,
-          'canOpenContractDetail': false,
-          'canOpenDisputeOpen': false,
-        },
-    'fulfillment_chain':
-        fulfillmentChain ??
-        <String, Object?>{
-          'activeMilestoneId': null,
-          'activeMilestoneTitle': null,
-          'inspectionState': null,
-          'canOpenMilestoneList': false,
-          'canOpenMilestoneSubmit': false,
-          'canOpenInspectionDetail': false,
-          'canOpenInspectionSubmit': false,
-        },
-    'extension_boundary':
-        extensionBoundary ??
-        <String, Object?>{
-          'canOpenContractDetail': false,
-          'ratingEntryState': 'controlled_unavailable',
-          'canOpenDisputeOpen': false,
-          'disputeWithdrawState': 'frozen',
-        },
-  };
-}
-
 ExhibitionMobileApp _buildApp({
   String initialRoute = '/',
   required FakeAppApiTransport transport,
@@ -161,6 +113,11 @@ AppShellContextConsumer _buildShellContextConsumer({
   String? organizationId = 'org-1',
   List<String> roleKeys = const <String>['supplier_admin'],
   String? certificationStatus = 'verified',
+  String? personalCertificationStatus = 'approved',
+  bool? personalCertificationQualified = true,
+  bool? personalCertificationLockedToOtherActor = false,
+  bool? canCreateProject = true,
+  Future<AppApiResponse> Function(AppApiRequest request)? shellContextHandler,
 }) {
   return AppShellContextConsumer(
     client: AppApiClient(
@@ -168,26 +125,38 @@ AppShellContextConsumer _buildShellContextConsumer({
       transport: FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/shell/context': (AppApiRequest request) async {
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: <String, Object?>{
-                    'userId': 'mainline-user-1',
-                    'organizationId': organizationId,
-                    'roleKeys': roleKeys,
-                    'certificationStatus': certificationStatus,
-                    'membershipStatus': 'active',
-                    'visibleBuildings': const <String>[
-                      'exhibition',
-                      'messages',
-                      'profile',
-                    ],
-                    'featureFlagsVersion': 'ffv-20260328',
-                    'unreadSummary': const <String, Object?>{},
+              'GET /api/app/shell/context':
+                  shellContextHandler ??
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'userId': 'mainline-user-1',
+                        'organizationId': organizationId,
+                        'roleKeys': roleKeys,
+                        'certificationStatus': certificationStatus,
+                        'personalCertificationStatus':
+                            personalCertificationStatus,
+                        'personalCertificationQualified':
+                            personalCertificationQualified,
+                        'personalCertificationLockedToOtherActor':
+                            personalCertificationLockedToOtherActor,
+                        'membershipStatus': 'active',
+                        if (canCreateProject case final bool value)
+                          'projectCreateEligibility': <String, Object?>{
+                            'canCreateProject': value,
+                          },
+                        'visibleBuildings': const <String>[
+                          'exhibition',
+                          'messages',
+                          'profile',
+                        ],
+                        'featureFlagsVersion': 'ffv-20260328',
+                        'unreadSummary': const <String, Object?>{},
+                      },
+                    );
                   },
-                );
-              },
             },
       ),
     ),
@@ -216,8 +185,11 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 Finder _projectCreateField(String label) {
   final key = switch (label) {
     '项目名称' => 'project-create-title',
+    '品牌' => 'project-create-brand-name',
     '项目类型' => 'project-create-building-type',
+    '类型备注（选填）' => 'project-create-building-type-remark',
     '预算金额' => 'project-create-budget-amount',
+    '项目面积' => 'project-create-area-sqm',
     '省' => 'project-create-province',
     '市' => 'project-create-city',
     '区/县' => 'project-create-district',
@@ -233,10 +205,13 @@ Finder _projectCreateField(String label) {
 
 Map<String, Object?> _expectedProjectCreateBody({
   required String title,
+  required String brandName,
   required double budgetAmount,
 }) {
   return <String, Object?>{
-    'title': title,
+    'title': '$title - $brandName',
+    'exhibitionName': title,
+    'brandName': brandName,
     'buildingType': 'exhibition',
     'budgetAmount': budgetAmount,
     'provinceCode': '510000',
@@ -259,13 +234,6 @@ void main() {
     final transport = FakeAppApiTransport(
       handlers:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/exhibition/workbench': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _workbenchPayload(),
-              );
-            },
             'GET /api/app/project/list': (AppApiRequest request) async {
               return AppApiResponse(
                 statusCode: 200,
@@ -276,7 +244,11 @@ void main() {
             'POST /api/app/project/create': (AppApiRequest request) async {
               expect(
                 request.body,
-                _expectedProjectCreateBody(title: '首发演示项目', budgetAmount: 1800),
+                _expectedProjectCreateBody(
+                  title: '首发演示项目',
+                  brandName: '迈德瑞',
+                  budgetAmount: 1800,
+                ),
               );
               return AppApiResponse(
                 statusCode: 202,
@@ -305,17 +277,13 @@ void main() {
 
     await tester.pumpWidget(
       _buildApp(
+        initialRoute: ExhibitionRoutes.projectCreate,
         transport: transport,
         sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-1'),
         shellContextConsumer: _buildShellContextConsumer(),
       ),
     );
     await tester.pumpAndSettle();
-
-    expect(find.text('天气与定位'), findsOneWidget);
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '项目工作台'));
-    expect(find.text('项目工作台'), findsWidgets);
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '创建项目'));
 
     expect(find.text('创建项目'), findsWidgets);
     expect(find.text('基础信息'), findsOneWidget);
@@ -337,6 +305,7 @@ void main() {
     expect(_projectCreateField('区/县'), findsOneWidget);
     expect(_projectCreateField('详细地址'), findsOneWidget);
     expect(_projectCreateField('范围说明'), findsOneWidget);
+    expect(find.text('添加范围说明'), findsOneWidget);
     await tester.scrollUntilVisible(
       _projectCreateField('计划结束日期'),
       200,
@@ -358,95 +327,95 @@ void main() {
     expect(find.text('资料补充'), findsOneWidget);
   });
 
-  testWidgets(
-    'project create success prioritizes publish success and preview',
-    (WidgetTester tester) async {
+  test(
+    'project create success keeps my-project continuation payload ready',
+    () async {
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/workbench':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: _workbenchPayload(),
-                    );
-                  },
               'POST /api/app/project/create': (AppApiRequest request) async {
                 return AppApiResponse(
                   statusCode: 202,
                   uri: request.uri,
-                  body: const <String, Object?>{'projectId': 'project-created'},
+                  body: const <String, Object?>{
+                    'projectId': 'project-created',
+                    'state': 'draft',
+                  },
+                );
+              },
+              'GET /api/app/my/projects': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'ongoingProjects': <Object?>[
+                      <String, Object?>{
+                        'publicProject': <String, Object?>{
+                          'projectId': 'project-created',
+                          'projectNo': 'MY-NEW-1',
+                          'title': '发布成功项目',
+                          'buildingType': 'exhibition',
+                          'budgetAmount': 2600,
+                          'state': 'draft',
+                          'summary': _summary('已回流到我的项目'),
+                        },
+                        'privateSummary': <String, Object?>{
+                          'hasAcceptedOrder': false,
+                          'orderStatus': null,
+                          'contractStatus': null,
+                          'fulfillmentStatus': null,
+                          'acceptanceStatus': null,
+                          'afterSalesOrDisputeStatus': null,
+                          'formalCompletionStatus': 'not_formally_completed',
+                          'evaluationStatus': 'not_eligible',
+                        },
+                      },
+                    ],
+                    'historicalProjects': <Object?>[],
+                  },
                 );
               },
             },
       );
-
-      await tester.pumpWidget(
-        _buildApp(
-          initialRoute: ExhibitionRoutes.projectCreate,
+      final consumer = ExhibitionConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
           transport: transport,
-          sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-3'),
-          shellContextConsumer: _buildShellContextConsumer(),
         ),
       );
-      await tester.pumpAndSettle();
 
-      await tester.enterText(_projectCreateField('项目名称'), '发布成功项目');
-      await _tapVisible(tester, _projectCreateField('项目类型'));
-      await tester.tap(find.text('会展').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('预算金额'), '2600');
-      await tester.scrollUntilVisible(
-        _projectCreateField('省'),
-        200,
-        scrollable: find.byType(Scrollable).first,
+      final createResult = await consumer.createProject(
+        ProjectCreateCommand(
+          title: '发布成功项目 - 迈德瑞',
+          exhibitionName: '发布成功项目',
+          brandName: '迈德瑞',
+          buildingType: 'exhibition',
+          budgetAmount: 2600,
+          provinceCode: '510000',
+          provinceName: '四川',
+          cityCode: '510100',
+          cityName: '成都',
+          detailAddress: '世纪城新国际会展中心 6 号馆西门',
+          scopeSummary: '主舞台、医疗器械展区与灯光联动区进场搭建',
+        ),
       );
-      await tester.pumpAndSettle();
-      await _tapVisible(tester, _projectCreateField('省'));
-      await tester.tap(find.text('四川 / 成都').last);
-      await tester.pumpAndSettle();
-      await _tapVisible(tester, _projectCreateField('区/县'));
-      await tester.tap(find.text('武侯区').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('详细地址'), '世纪城新国际会展中心 6 号馆西门');
-      await tester.enterText(
-        _projectCreateField('范围说明'),
-        '主舞台、医疗器械展区与灯光联动区进场搭建',
-      );
-      await tester.scrollUntilVisible(
-        _projectCreateField('计划结束日期'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('计划开始日期'), '2026年4月10日');
-      await tester.enterText(_projectCreateField('计划结束日期'), '2026年4月18日');
-      await tester.scrollUntilVisible(
-        _projectCreateField('补充说明'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('补充说明'), '现场先完成基础施工与设备进场。');
 
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '发布项目'));
+      expect(createResult.isSuccess, isTrue);
 
-      expect(find.text('已成功发布'), findsOneWidget);
-      expect(find.text('已发布项目预览'), findsOneWidget);
-      expect(find.text('当前项目：发布成功项目'), findsOneWidget);
-      expect(find.text('项目地点：四川 / 成都 / 武侯区'), findsOneWidget);
-      expect(find.text('预算金额：¥2600'), findsWidgets);
-      expect(find.text('范围说明：主舞台、医疗器械展区与灯光联动区进场搭建'), findsOneWidget);
-      expect(find.text('计划开始日期：2026年4月10日'), findsOneWidget);
-      expect(find.text('计划结束日期：2026年4月18日'), findsOneWidget);
-      expect(find.text('结果反馈'), findsNothing);
+      final myProjects = await consumer.loadMyProjectList(forceRefresh: true);
+      expect(myProjects.state, AppPageState.content);
+      final payload = myProjects.payload as Map<String, Object?>;
+      final ongoing = payload['ongoingProjects'] as List<Object?>;
+      final first = ongoing.first as Map<String, Object?>;
+      final publicProject = first['publicProject'] as Map<String, Object?>;
+      expect(publicProject['title'], '发布成功项目');
+      expect(publicProject['state'], 'draft');
     },
   );
 
-  testWidgets(
+  test(
     'project create success invalidates cached my project list for same-session backflow',
-    (WidgetTester tester) async {
+    () async {
       var myProjectListRequests = 0;
 
       Map<String, Object?> myProjectItem({
@@ -485,14 +454,6 @@ void main() {
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/workbench':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: _workbenchPayload(),
-                    );
-                  },
               'GET /api/app/my/projects': (AppApiRequest request) async {
                 myProjectListRequests += 1;
                 return AppApiResponse(
@@ -520,7 +481,10 @@ void main() {
                 return AppApiResponse(
                   statusCode: 202,
                   uri: request.uri,
-                  body: const <String, Object?>{'projectId': 'project-created'},
+                  body: const <String, Object?>{
+                    'projectId': 'project-created',
+                    'state': 'draft',
+                  },
                 );
               },
             },
@@ -537,72 +501,34 @@ void main() {
       expect(cachedMyProjects.state, AppPageState.content);
       expect(myProjectListRequests, 1);
 
-      await tester.pumpWidget(
-        _buildApp(
-          initialRoute: ExhibitionRoutes.projectCreate,
-          transport: transport,
-          exhibitionConsumerLayer: exhibitionConsumerLayer,
-          sessionStore: _buildAuthenticatedSessionStore(
-            deviceId: 'mainline-backflow',
-          ),
-          shellContextConsumer: _buildShellContextConsumer(),
+      final createResult = await exhibitionConsumerLayer.createProject(
+        ProjectCreateCommand(
+          title: '新回流项目 - 迈德瑞',
+          exhibitionName: '新回流项目',
+          brandName: '迈德瑞',
+          buildingType: 'exhibition',
+          budgetAmount: 2600,
+          provinceCode: '510000',
+          provinceName: '四川',
+          cityCode: '510100',
+          cityName: '成都',
+          detailAddress: '世纪城新国际会展中心 6 号馆西门',
+          scopeSummary: '主舞台、医疗器械展区与灯光联动区进场搭建',
         ),
       );
-      await tester.pumpAndSettle();
+      expect(createResult.isSuccess, isTrue);
 
-      await tester.enterText(_projectCreateField('项目名称'), '新回流项目');
-      await _tapVisible(tester, _projectCreateField('项目类型'));
-      await tester.tap(find.text('会展').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('预算金额'), '2600');
-      await tester.scrollUntilVisible(
-        _projectCreateField('省'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await _tapVisible(tester, _projectCreateField('省'));
-      await tester.tap(find.text('四川 / 成都').last);
-      await tester.pumpAndSettle();
-      await _tapVisible(tester, _projectCreateField('区/县'));
-      await tester.tap(find.text('武侯区').last);
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('详细地址'), '世纪城新国际会展中心 6 号馆西门');
-      await tester.enterText(
-        _projectCreateField('范围说明'),
-        '主舞台、医疗器械展区与灯光联动区进场搭建',
-      );
-      await tester.scrollUntilVisible(
-        _projectCreateField('计划结束日期'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('计划开始日期'), '2026年4月10日');
-      await tester.enterText(_projectCreateField('计划结束日期'), '2026年4月18日');
-      await tester.scrollUntilVisible(
-        _projectCreateField('补充说明'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      await tester.enterText(_projectCreateField('补充说明'), '现场先完成基础施工与设备进场。');
-
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '发布项目'));
-
-      expect(find.text('已成功发布'), findsOneWidget);
-      expect(myProjectListRequests, 1);
-
-      Navigator.of(
-        tester.element(find.text('已成功发布')),
-      ).pushNamed(ExhibitionRoutes.myProjectList);
-      await tester.pumpAndSettle();
-
+      exhibitionConsumerLayer.invalidateMyProjectList();
+      final refreshedMyProjects = await exhibitionConsumerLayer
+          .loadMyProjectList(forceRefresh: true);
       expect(myProjectListRequests, 2);
-      expect(find.text('新回流项目'), findsWidgets);
-      expect(find.text('缓存旧项目'), findsNothing);
-      expect(find.text('尚未正式完结'), findsWidgets);
-      expect(find.text('暂不可评价'), findsWidgets);
+      expect(refreshedMyProjects.state, AppPageState.content);
+      final payload = refreshedMyProjects.payload as Map<String, Object?>;
+      final ongoing = payload['ongoingProjects'] as List<Object?>;
+      final first = ongoing.first as Map<String, Object?>;
+      final publicProject = first['publicProject'] as Map<String, Object?>;
+      expect(publicProject['title'], '新回流项目');
+      expect(publicProject['projectNo'], 'MY-NEW-1');
     },
   );
 
@@ -656,28 +582,43 @@ void main() {
     expect(find.widgetWithText(FilledButton, '去完善组织'), findsOneWidget);
   });
 
-  testWidgets('project create failure says canCreateProject reason exactly', (
+  testWidgets('project create failure says certification reason exactly', (
     WidgetTester tester,
   ) async {
     final transport = FakeAppApiTransport(
       handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/exhibition/workbench': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _workbenchPayload(
-                  projectChain: <String, Object?>{
-                    'hasProjects': true,
-                    'recentProjectId': 'project-1',
-                    'recentProjectTitle': '首发项目',
-                    'canCreateProject': false,
-                    'canOpenProjectPool': true,
-                  },
-                ),
-              );
-            },
-          },
+          const <
+            String,
+            Future<AppApiResponse> Function(AppApiRequest request)
+          >{},
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        initialRoute: ExhibitionRoutes.projectCreate,
+        transport: transport,
+        sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-4b'),
+        shellContextConsumer: _buildShellContextConsumer(
+          certificationStatus: 'pending_review',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前认证未通过'), findsOneWidget);
+    expect(find.text('当前组织认证尚未通过，需先完成并通过认证后再创建项目。'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '查看认证状态'), findsOneWidget);
+  });
+
+  testWidgets('project create failure says role reason exactly', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          const <
+            String,
+            Future<AppApiResponse> Function(AppApiRequest request)
+          >{},
     );
 
     await tester.pumpWidget(
@@ -685,17 +626,20 @@ void main() {
         initialRoute: ExhibitionRoutes.projectCreate,
         transport: transport,
         sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-5'),
-        shellContextConsumer: _buildShellContextConsumer(),
+        shellContextConsumer: _buildShellContextConsumer(
+          roleKeys: const <String>['buyer_member(scoped)'],
+          canCreateProject: false,
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前暂不可创建项目'), findsOneWidget);
+    expect(find.text('当前角色不允许创建项目'), findsOneWidget);
     expect(
-      find.text('项目工作台显示当前账号暂不具备创建项目条件，请先回到项目工作台查看可执行入口。'),
+      find.text('当前组织角色暂不允许创建项目；最终是否可继续仍以当前创建资格返回结果为准，请先返回我的项目查看当前可继续入口。'),
       findsOneWidget,
     );
-    expect(find.widgetWithText(FilledButton, '回到项目工作台'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '返回我的项目'), findsOneWidget);
   });
 
   testWidgets('project create failure says network reason exactly', (
@@ -703,11 +647,10 @@ void main() {
   ) async {
     final transport = FakeAppApiTransport(
       handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/exhibition/workbench': (AppApiRequest request) async {
-              throw const SocketException('offline');
-            },
-          },
+          const <
+            String,
+            Future<AppApiResponse> Function(AppApiRequest request)
+          >{},
     );
 
     await tester.pumpWidget(
@@ -715,14 +658,19 @@ void main() {
         initialRoute: ExhibitionRoutes.projectCreate,
         transport: transport,
         sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-6'),
-        shellContextConsumer: _buildShellContextConsumer(),
+        shellContextConsumer: _buildShellContextConsumer(
+          shellContextHandler: (AppApiRequest request) async {
+            throw const SocketException('offline');
+          },
+          canCreateProject: null,
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('网络暂时不可用'), findsOneWidget);
-    expect(find.text('当前无法从项目工作台确认是否可创建项目，请检查网络后再试。'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '回到项目工作台'), findsOneWidget);
+    expect(find.text('当前暂时无法确认创建条件'), findsOneWidget);
+    expect(find.text('当前无法确认当前创建资格，请稍后再试。'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '返回我的项目'), findsOneWidget);
   });
 
   testWidgets('project list stays dense while keeping core project fields', (
@@ -763,11 +711,19 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('当前展示：已接通内容'), findsNothing);
+    expect(find.text('筛选条件'), findsNothing);
+    expect(find.text('城市'), findsWidgets);
+    expect(find.text('面积'), findsWidgets);
+    expect(find.text('金额'), findsWidgets);
+    expect(find.text('跟随城市'), findsWidgets);
+    expect(find.text('不限面积'), findsWidgets);
+    expect(find.text('不限金额'), findsWidgets);
+    expect(find.text('刷新当前结果'), findsNothing);
     expect(find.text('高密度展示项目'), findsOneWidget);
-    expect(find.text('核心摘要'), findsOneWidget);
-    expect(find.text('四川 / 成都'), findsWidgets);
-    expect(find.text('320 ㎡'), findsWidgets);
-    expect(find.text('预算金额：¥188000'), findsOneWidget);
+    expect(find.textContaining('金额：', skipOffstage: false), findsWidgets);
+    expect(find.textContaining('面积：', skipOffstage: false), findsWidgets);
+    expect(find.textContaining('地点：', skipOffstage: false), findsWidgets);
     expect(find.text('讲解建议'), findsNothing);
     expect(find.text('项目编号：PROJ-LIST-1'), findsNothing);
     expect(find.text('下一步动作'), findsNothing);
@@ -811,7 +767,6 @@ void main() {
         _buildApp(
           initialRoute: ExhibitionRoutes.projectDetailWithProjectId(
             'project-showcase-1',
-            surface: ExhibitionRoutes.showcaseSurface,
           ),
           transport: transport,
           sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-8'),
@@ -820,23 +775,18 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('项目概览'), findsOneWidget);
-      expect(find.text('地点与范围'), findsOneWidget);
+      expect(find.text('当前展示：已接通内容'), findsNothing);
+      expect(find.text('核心信息'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('项目说明'),
+        find.text('地点与安排'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('项目说明'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('项目资料'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('项目资料'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '继续竞标'), findsOneWidget);
+      expect(find.text('地点与安排'), findsOneWidget);
+      expect(find.text('公开项目说明'), findsNothing);
+      expect(find.text('公开资料边界'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
       expect(find.text('附件展示承接'), findsNothing);
       expect(find.text('展示边界'), findsNothing);
       expect(find.text('当前展示来源'), findsNothing);
@@ -845,7 +795,7 @@ void main() {
   );
 
   testWidgets(
-    'owner project detail swaps bid CTA into local manage-current sheet shell',
+    'owner project detail hands off to private continuation surfaces',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(
         handlers:
@@ -897,7 +847,6 @@ void main() {
         _buildApp(
           initialRoute: ExhibitionRoutes.projectDetailWithProjectId(
             'project-owner-1',
-            surface: ExhibitionRoutes.showcaseSurface,
           ),
           transport: transport,
           exhibitionConsumerLayer: exhibitionConsumerLayer,
@@ -905,38 +854,23 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('项目概览'), findsOneWidget);
+      expect(find.text('核心信息'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, '管理当前'),
+        find.widgetWithText(FilledButton, '进入我的项目'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
 
-      expect(find.widgetWithText(FilledButton, '管理当前'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '继续竞标'), findsNothing);
-
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '管理当前'));
-
-      expect(find.text('推广此项目'), findsOneWidget);
-      expect(find.text('编辑'), findsOneWidget);
-      expect(find.text('下架'), findsOneWidget);
-      expect(find.text('删除此项目'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '进入我的项目'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '打开发布项目工作台'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
       expect(
         transport.requests
             .map((AppApiRequest request) => request.canonicalPath)
             .toList(),
         <String>[ExhibitionCanonicalPaths.projectDetail],
       );
-
-      await tester.tapAt(const Offset(24, 24));
-      await tester.pumpAndSettle();
-
-      expect(find.text('推广此项目'), findsNothing);
-      expect(find.text('编辑'), findsNothing);
-      expect(find.text('下架'), findsNothing);
-      expect(find.text('删除此项目'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '管理当前'), findsOneWidget);
     },
   );
 
@@ -946,14 +880,6 @@ void main() {
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/workbench':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: _workbenchPayload(),
-                    );
-                  },
               'GET /api/app/project/list': (AppApiRequest request) async {
                 return AppApiResponse(
                   statusCode: 200,
@@ -1014,15 +940,15 @@ void main() {
       await _tapVisible(tester, find.widgetWithText(FilledButton, '查看详情'));
 
       expect(find.text('项目详情'), findsWidgets);
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '继续竞标'));
+      await _tapVisible(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
 
-      expect(find.text('投标提交'), findsWidgets);
-      await tester.enterText(find.widgetWithText(TextField, '投标报价'), '1200');
+      expect(find.text('竞标提交'), findsWidgets);
+      await tester.enterText(find.widgetWithText(TextField, '竞标报价'), '1200');
       await tester.enterText(find.widgetWithText(TextField, '方案说明'), '首发主链投标');
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '提交投标'));
+      await _tapVisible(tester, find.widgetWithText(FilledButton, '提交竞标'));
 
       expect(find.text('竞标已提交'), findsOneWidget);
-      expect(find.text('投标 ID：bid-1'), findsOneWidget);
+      expect(find.text('竞标 ID：bid-1'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '继续创建订单'), findsNothing);
       expect(find.widgetWithText(FilledButton, '查看订单详情'), findsNothing);
 

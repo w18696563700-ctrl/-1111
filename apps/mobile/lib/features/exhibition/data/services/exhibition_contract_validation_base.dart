@@ -107,29 +107,6 @@ String? _requireStateField(
   return null;
 }
 
-String? _requireNullableStateField(
-  Map<String, Object?> raw,
-  String field,
-  Set<String> allowed,
-  String context,
-) {
-  if (!raw.containsKey(field)) {
-    return 'contract drift at $context: missing required field "$field"';
-  }
-
-  final value = raw[field];
-  if (value == null) {
-    return null;
-  }
-  if (value is! String || value.trim().isEmpty) {
-    return 'contract drift at $context: field "$field" must be string or null';
-  }
-  if (!allowed.contains(value)) {
-    return 'contract drift at $context: unsupported state "$value" for current workbench summary';
-  }
-  return null;
-}
-
 _SuccessContractValidation _invalidSuccessPayload(
   String canonicalPath,
   String detail, {

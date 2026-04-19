@@ -84,6 +84,22 @@ class _HomeModuleProjection {
   final bool placeholder;
 }
 
+class _HomeEnterpriseRecommendationItem {
+  const _HomeEnterpriseRecommendationItem({
+    required this.itemType,
+    required this.title,
+    required this.summary,
+    required this.badgeLabel,
+    this.entityId,
+  });
+
+  final String itemType;
+  final String title;
+  final String summary;
+  final String badgeLabel;
+  final String? entityId;
+}
+
 ExhibitionHomeLocationContextRequest? _homeLocationContextFromSnapshot(
   DeviceLocationSnapshot? snapshot,
 ) {
@@ -94,6 +110,8 @@ ExhibitionHomeLocationContextRequest? _homeLocationContextFromSnapshot(
   return ExhibitionHomeLocationContextRequest(
     latitude: snapshot.latitude,
     longitude: snapshot.longitude,
+    provinceCode: snapshot.provinceCode,
+    provinceName: snapshot.provinceName,
     locationPermissionState: snapshot.permissionState.contractName,
   );
 }
@@ -353,6 +371,98 @@ List<Map<String, Object?>> _homeProjectItemsFromPayload(Object? payload) {
       .toList();
 }
 
+List<_HomeEnterpriseRecommendationItem>
+_homeCompanyFactoryRecommendationItemsFromPayload(Object? payload) {
+  final root = _homeMap(payload);
+  final sections = root?['recommendationSections'];
+  if (sections is! List) {
+    return const <_HomeEnterpriseRecommendationItem>[];
+  }
+
+  for (final rawSection in sections.whereType<Map>()) {
+    final section = rawSection.map(
+      (Object? key, Object? value) => MapEntry('$key', value),
+    );
+    if (_homeTrimmedString(section['sectionKey']) !=
+        'company_factory_recommendations') {
+      continue;
+    }
+
+    final rawItems = section['items'];
+    if (rawItems is! List) {
+      return const <_HomeEnterpriseRecommendationItem>[];
+    }
+
+    return rawItems
+        .whereType<Map>()
+        .map<_HomeEnterpriseRecommendationItem?>(
+          (Map rawItem) => _homeEnterpriseRecommendationItemFromMap(
+            rawItem.map(
+              (Object? key, Object? value) => MapEntry('$key', value),
+            ),
+          ),
+        )
+        .whereType<_HomeEnterpriseRecommendationItem>()
+        .toList(growable: false);
+  }
+
+  return const <_HomeEnterpriseRecommendationItem>[];
+}
+
+_HomeEnterpriseRecommendationItem? _homeEnterpriseRecommendationItemFromMap(
+  Map<String, Object?> item,
+) {
+  final itemType = _homeTrimmedString(item['itemType']);
+  final title = _homeTrimmedString(item['title']);
+  if (itemType == null || title == null) {
+    return null;
+  }
+  if (itemType != 'company' && itemType != 'factory') {
+    return null;
+  }
+
+  return _HomeEnterpriseRecommendationItem(
+    itemType: itemType,
+    entityId: _homeTrimmedString(item['entityId']),
+    title: title,
+    summary: _homeTrimmedString(item['summary']) ?? '当前实体已进入首页推荐区。',
+    badgeLabel:
+        _homeTrimmedString(item['badgeLabel']) ??
+        _homeEnterpriseRecommendationBadge(itemType),
+  );
+}
+
+String _homeEnterpriseRecommendationBadge(String itemType) =>
+    switch (itemType) {
+      'company' => '优秀公司',
+      'factory' => '优秀工厂',
+      _ => '推荐实体',
+    };
+
+String _homeEnterpriseRecommendationActionLabel(
+  _HomeEnterpriseRecommendationItem item,
+) => switch (item.itemType) {
+  'company' => item.entityId == null ? '查看优秀公司' : '查看公司详情',
+  'factory' => item.entityId == null ? '查看优秀工厂' : '查看工厂详情',
+  _ => '查看详情',
+};
+
+String? _homeEnterpriseRecommendationRoute(
+  _HomeEnterpriseRecommendationItem item,
+) {
+  return switch (item.itemType) {
+    'company' =>
+      item.entityId == null
+          ? ExhibitionRoutes.companies
+          : ExhibitionRoutes.companyDetailWithEnterpriseId(item.entityId!),
+    'factory' =>
+      item.entityId == null
+          ? ExhibitionRoutes.factories
+          : ExhibitionRoutes.factoryDetailWithEnterpriseId(item.entityId!),
+    _ => null,
+  };
+}
+
 Map<String, Object?>? _homeMap(Object? payload) {
   if (payload is! Map) {
     return null;
@@ -426,10 +536,10 @@ String _homeCurrencyText(Object? value) {
 }
 
 String _homeFrontStateLabel(String? state) => switch (state) {
-  'published' => '已发布',
+  'published' => '竞标中',
   'bidding_closed' => '投标已结束',
   'awarded' => '已授标',
-  'converted_to_order' => '已转为订单',
+  'converted_to_order' => '已被承接',
   null => '状态待确认',
   _ => state,
 };
@@ -438,10 +548,10 @@ bool _homeCanContinueBid(String? state) => state == 'published';
 
 String _homeProjectGuidance(String? state) {
   return switch (state) {
-    'published' => '当前项目仍在公开展示阶段，适合先进入详情，再判断是否继续竞标。',
-    'bidding_closed' => '当前项目投标窗口已结束，首页保留只读说明，不在这里继续竞标。',
-    'awarded' => '当前项目已经授标，后续私域推进回到项目工作台继续。',
-    'converted_to_order' => '当前项目已经进入订单链路，首页只保留公开说明，不混入后续履约动作。',
+    'published' => '当前项目仍处于竞标中，适合先进入详情，再判断是否立即参与竞标。',
+    'bidding_closed' => '当前项目投标窗口已结束，首页保留只读说明，不在这里开放参与竞标。',
+    'awarded' => '当前项目已经授标，后续私域推进回到我的项目继续。',
+    'converted_to_order' => '当前项目已被承接，首页只保留公开说明，不混入后续履约动作。',
     null => '当前项目已经进入推荐区，可先查看详情，再确认下一步。',
     _ => '当前项目处于 ${_homeFrontStateLabel(state)}，先看清详情，再决定后续承接。',
   };

@@ -12,13 +12,125 @@ class _ExhibitionActionService {
     );
   }
 
+  Future<ExhibitionActionResult> saveProject(ProjectSaveCommand command) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectSave,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> submitProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectSubmit,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> publishProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectPublish,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> withdrawProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectWithdraw,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> archiveProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectArchive,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> closeProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectClose,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> deleteMyProject({
+    required String projectId,
+  }) async {
+    final canonicalPath = ExhibitionCanonicalPaths.myProjectDetail(projectId);
+    try {
+      final response = await runProtectedAppRequest(
+        () => _client.delete(canonicalPath),
+      );
+      return _mapActionResponse(
+        response,
+        canonicalPath,
+        requestMethod: 'DELETE',
+      );
+    } on SocketException {
+      return ExhibitionActionResult(
+        method: 'DELETE',
+        path: canonicalPath,
+        isSuccess: false,
+        controlledState: AppPageState.errorRetryable,
+        message: 'network error while submitting to canonical BFF path',
+      );
+    } on HttpException {
+      return ExhibitionActionResult(
+        method: 'DELETE',
+        path: canonicalPath,
+        isSuccess: false,
+        controlledState: AppPageState.errorRetryable,
+        message: 'http error while submitting to canonical BFF path',
+      );
+    } on FormatException {
+      return ExhibitionActionResult(
+        method: 'DELETE',
+        path: canonicalPath,
+        isSuccess: false,
+        controlledState: AppPageState.errorNonRetryable,
+        message: 'response decoding failed for canonical BFF path',
+      );
+    }
+  }
+
   Future<ExhibitionActionResult> submitBid(BidSubmitCommand command) {
     return _submit(ExhibitionCanonicalPaths.bidSubmit, body: command.toJson());
   }
 
-  Future<ExhibitionActionResult> createOrder(OrderCreateCommand command) {
-    return _submit(
-      ExhibitionCanonicalPaths.orderCreate,
+  Future<ExhibitionActionResult> lockBidSeat({
+    required String projectId,
+    required String bidId,
+  }) {
+    return _submitProtected(
+      _bidSeatLockPath,
+      body: <String, Object?>{'projectId': projectId, 'bidId': bidId},
+    );
+  }
+
+  Future<ExhibitionActionResult> releaseBidSeat({
+    required String projectId,
+    required String bidId,
+  }) {
+    return _submitProtected(
+      _bidSeatReleasePath,
+      body: <String, Object?>{'projectId': projectId, 'bidId': bidId},
+    );
+  }
+
+  Future<ExhibitionActionResult> awardBid(BidAwardCommand command) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.bidAward,
       body: command.toJson(),
     );
   }
@@ -26,14 +138,14 @@ class _ExhibitionActionService {
   Future<ExhibitionActionResult> confirmContract(
     ContractConfirmCommand command,
   ) {
-    return _submit(
+    return _submitProtected(
       ExhibitionCanonicalPaths.contractConfirm,
       body: command.toJson(),
     );
   }
 
   Future<ExhibitionActionResult> amendContract(ContractAmendCommand command) {
-    return _submit(
+    return _submitProtected(
       ExhibitionCanonicalPaths.contractAmend,
       body: command.toJson(),
     );
@@ -60,15 +172,8 @@ class _ExhibitionActionService {
   Future<ExhibitionActionResult> recheckInspection(
     InspectionRecheckCommand command,
   ) {
-    return _submit(
+    return _submitProtected(
       ExhibitionCanonicalPaths.inspectionRecheck,
-      body: command.toJson(),
-    );
-  }
-
-  Future<ExhibitionActionResult> submitRating(RatingSubmitCommand command) {
-    return _submit(
-      ExhibitionCanonicalPaths.ratingSubmit,
       body: command.toJson(),
     );
   }
@@ -80,10 +185,17 @@ class _ExhibitionActionService {
     );
   }
 
+  Future<ExhibitionActionResult> submitRating(RatingSubmitCommand command) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.ratingSubmit,
+      body: command.toJson(),
+    );
+  }
+
   Future<ExhibitionActionResult> withdrawDispute(
     DisputeWithdrawCommand command,
   ) {
-    return _submit(
+    return _submitProtected(
       ExhibitionCanonicalPaths.disputeWithdraw,
       body: command.toJson(),
     );
@@ -95,7 +207,7 @@ class _ExhibitionActionService {
   }) async {
     try {
       final response = await _client.post(canonicalPath, body: body);
-      return _mapActionResponse(response, canonicalPath);
+      return _mapActionResponse(response, canonicalPath, requestMethod: 'POST');
     } on SocketException {
       return ExhibitionActionResult(
         method: 'POST',
@@ -131,7 +243,7 @@ class _ExhibitionActionService {
       final response = await runProtectedAppRequest(
         () => _client.post(canonicalPath, body: body),
       );
-      return _mapActionResponse(response, canonicalPath);
+      return _mapActionResponse(response, canonicalPath, requestMethod: 'POST');
     } on SocketException {
       return ExhibitionActionResult(
         method: 'POST',
@@ -161,18 +273,30 @@ class _ExhibitionActionService {
 
   ExhibitionActionResult _mapActionResponse(
     AppApiResponse response,
-    String canonicalPath,
-  ) {
+    String canonicalPath, {
+    required String requestMethod,
+  }) {
     final payload = response.body;
+    final payloadPreview = switch (payload) {
+      null => 'null',
+      final Object value => jsonEncode(value),
+    };
+    print(
+      '[exhibition-action] $requestMethod $canonicalPath status=${response.statusCode} payload=${payloadPreview.length > 600 ? '${payloadPreview.substring(0, 600)}...(truncated)' : payloadPreview}',
+    );
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
-      final validation =
-          canonicalPath == ExhibitionCanonicalPaths.inspectionRecheck
-              ? _sanitizeAndValidateEntryPayload(canonicalPath, payload)
-              : _sanitizeAndValidateSuccessPayload(canonicalPath, payload);
+      final validation = _sanitizeAndValidateSuccessPayload(
+        requestMethod,
+        canonicalPath,
+        payload,
+      );
       if (!validation.isValid) {
+        print(
+          '[exhibition-action] validation failed path=$canonicalPath message="${validation.message}" payload=${validation.payload}',
+        );
         return ExhibitionActionResult(
-          method: 'POST',
+          method: requestMethod,
           path: canonicalPath,
           isSuccess: false,
           controlledState: AppPageState.errorNonRetryable,
@@ -182,7 +306,7 @@ class _ExhibitionActionService {
       }
 
       return ExhibitionActionResult(
-        method: 'POST',
+        method: requestMethod,
         path: canonicalPath,
         isSuccess: true,
         payload: validation.payload,
@@ -191,9 +315,12 @@ class _ExhibitionActionService {
     }
 
     final failurePayload = _sanitizeFailurePayload(payload);
+    print(
+      '[exhibition-action] request failed path=$canonicalPath state=${_mapHttpFailureState(response.statusCode)} errorCode=${_extractErrorCode(failurePayload)}',
+    );
 
     return ExhibitionActionResult(
-      method: 'POST',
+      method: requestMethod,
       path: canonicalPath,
       isSuccess: false,
       controlledState: _mapHttpFailureState(response.statusCode),

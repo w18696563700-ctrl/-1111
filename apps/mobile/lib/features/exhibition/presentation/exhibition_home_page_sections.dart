@@ -53,6 +53,23 @@ class _HomeModuleGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final enterpriseModules = <_HomeEnterpriseModuleCardConfig>[
+      _HomeEnterpriseModuleCardConfig(
+        moduleKey: 'excellent_company',
+        projection: companyModule,
+        onPressed: onCompanyPressed,
+      ),
+      _HomeEnterpriseModuleCardConfig(
+        moduleKey: 'excellent_factory',
+        projection: factoryModule,
+        onPressed: onFactoryPressed,
+      ),
+      _HomeEnterpriseModuleCardConfig(
+        moduleKey: 'excellent_supplier',
+        projection: supplierModule,
+        onPressed: onSupplierPressed,
+      ),
+    ];
     return GridView.count(
       shrinkWrap: true,
       crossAxisCount: 3,
@@ -63,32 +80,21 @@ class _HomeModuleGrid extends StatelessWidget {
       children: <Widget>[
         _HomeModuleCard(
           title: '项目展示',
-          description: '先看本省项目推荐，再进入详情判断是否继续竞标。',
+          description: '先看本省项目推荐，再进入详情判断是否立即参与竞标。',
           statusLabel: '已接通',
           actionLabel: '进入模块',
           onPressed: onShowcasePressed,
           highlighted: true,
         ),
-        _HomeModuleCard(
-          title: companyModule.title,
-          description: companyModule.summary,
-          statusLabel: companyModule.statusLabel,
-          actionLabel: companyModule.actionLabel,
-          onPressed: onCompanyPressed,
-        ),
-        _HomeModuleCard(
-          title: factoryModule.title,
-          description: factoryModule.summary,
-          statusLabel: factoryModule.statusLabel,
-          actionLabel: factoryModule.actionLabel,
-          onPressed: onFactoryPressed,
-        ),
-        _HomeModuleCard(
-          title: supplierModule.title,
-          description: supplierModule.summary,
-          statusLabel: supplierModule.statusLabel,
-          actionLabel: supplierModule.actionLabel,
-          onPressed: onSupplierPressed,
+        ...enterpriseModules.map(
+          (_HomeEnterpriseModuleCardConfig item) => _HomeModuleCard(
+            key: ValueKey<String>('home-module-${item.moduleKey}'),
+            title: item.projection.title,
+            description: item.projection.summary,
+            statusLabel: item.projection.statusLabel,
+            actionLabel: item.projection.actionLabel,
+            onPressed: item.onPressed,
+          ),
         ),
         _HomeModuleCard(
           title: '展览论坛',
@@ -109,112 +115,14 @@ class _HomeModuleGrid extends StatelessWidget {
   }
 }
 
-class _HomePrivateEntryCard extends StatelessWidget {
-  const _HomePrivateEntryCard({
-    required this.onWorkbenchPressed,
-    required this.onPublishPressed,
+class _HomeEnterpriseModuleCardConfig {
+  const _HomeEnterpriseModuleCardConfig({
+    required this.moduleKey,
+    required this.projection,
+    required this.onPressed,
   });
 
-  static const ValueKey<String> workbenchButtonKey = ValueKey<String>(
-    'home-private-entry-workbench',
-  );
-  static const ValueKey<String> publishButtonKey = ValueKey<String>(
-    'home-private-entry-publish',
-  );
-
-  final VoidCallback onWorkbenchPressed;
-  final VoidCallback onPublishPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _HomePill(
-              label: '私域入口',
-              backgroundColor: colorScheme.onSecondaryContainer.withValues(
-                alpha: 0.12,
-              ),
-              foregroundColor: colorScheme.onSecondaryContainer,
-            ),
-            const SizedBox(height: 12),
-            Text(
-              '项目工作台',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: colorScheme.onSecondaryContainer,
-              ),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '查看当前项目摘要与下一步入口；需要新发项目时，直接进入创建项目。',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                height: 1.45,
-                color: colorScheme.onSecondaryContainer,
-              ),
-            ),
-            const SizedBox(height: 16),
-            LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final viewport = MediaQuery.sizeOf(context);
-                final useCompactLayout =
-                    viewport.width < 880 || viewport.height < 760;
-                final workbenchButton = FilledButton(
-                  key: workbenchButtonKey,
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                  onPressed: onWorkbenchPressed,
-                  child: const Text('项目工作台'),
-                );
-                final publishButton = FilledButton.tonal(
-                  key: publishButtonKey,
-                  style: FilledButton.styleFrom(minimumSize: const Size(0, 52)),
-                  onPressed: onPublishPressed,
-                  child: const Text('创建项目'),
-                );
-
-                if (useCompactLayout) {
-                  final compactButtonMaxWidth = constraints.maxWidth < 320
-                      ? constraints.maxWidth
-                      : 320.0;
-                  return Align(
-                    alignment: Alignment.centerLeft,
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(
-                        maxWidth: compactButtonMaxWidth,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: <Widget>[
-                          workbenchButton,
-                          const SizedBox(height: 12),
-                          publishButton,
-                        ],
-                      ),
-                    ),
-                  );
-                }
-
-                return Wrap(
-                  spacing: 12,
-                  runSpacing: 12,
-                  children: <Widget>[workbenchButton, publishButton],
-                );
-              },
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  final String moduleKey;
+  final _HomeModuleProjection projection;
+  final VoidCallback onPressed;
 }

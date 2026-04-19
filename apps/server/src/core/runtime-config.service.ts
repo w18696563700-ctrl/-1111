@@ -83,6 +83,82 @@ export class RuntimeConfigService {
     return Number.parseInt(process.env.UPLOAD_SIGNED_URL_EXPIRES_SECONDS ?? '900', 10);
   }
 
+  get amapWebServiceEnabled() {
+    return this.readBoolean(process.env.AMAP_WEB_SERVICE_ENABLED);
+  }
+
+  get amapWebServiceKey() {
+    return process.env.AMAP_WEB_SERVICE_KEY ?? '';
+  }
+
+  get amapWebServiceBaseUrl() {
+    return process.env.AMAP_WEB_SERVICE_BASE_URL ?? 'https://restapi.amap.com';
+  }
+
+  get amapWebServiceTimeoutMs() {
+    return Number.parseInt(process.env.AMAP_WEB_SERVICE_TIMEOUT_MS ?? '5000', 10);
+  }
+
+  get aliyunOcrEnabled() {
+    return this.readBoolean(process.env.ALIYUN_OCR_ENABLED);
+  }
+
+  get aliyunOcrAccessKeyId() {
+    return process.env.ALIYUN_OCR_ACCESS_KEY_ID ?? '';
+  }
+
+  get aliyunOcrAccessKeySecret() {
+    return process.env.ALIYUN_OCR_ACCESS_KEY_SECRET ?? '';
+  }
+
+  get aliyunOcrRegionId() {
+    return process.env.ALIYUN_OCR_REGION_ID ?? 'cn-hangzhou';
+  }
+
+  get aliyunOcrEndpoint() {
+    return process.env.ALIYUN_OCR_ENDPOINT ?? 'ocr-api.cn-hangzhou.aliyuncs.com';
+  }
+
+  get aliyunOcrConnectTimeoutMs() {
+    return Number.parseInt(process.env.ALIYUN_OCR_CONNECT_TIMEOUT_MS ?? '5000', 10);
+  }
+
+  get aliyunOcrReadTimeoutMs() {
+    return Number.parseInt(process.env.ALIYUN_OCR_READ_TIMEOUT_MS ?? '10000', 10);
+  }
+
+  get aliyunSmsAccessKeyId() {
+    return process.env.ALIYUN_SMS_ACCESS_KEY_ID ?? '';
+  }
+
+  get aliyunSmsAccessKeySecret() {
+    return process.env.ALIYUN_SMS_ACCESS_KEY_SECRET ?? '';
+  }
+
+  get aliyunSmsRegionId() {
+    return process.env.ALIYUN_SMS_REGION_ID ?? 'cn-hangzhou';
+  }
+
+  get aliyunSmsEndpoint() {
+    return process.env.ALIYUN_SMS_ENDPOINT ?? '';
+  }
+
+  get aliyunSmsSignName() {
+    return process.env.ALIYUN_SMS_SIGN_NAME ?? '';
+  }
+
+  get aliyunSmsTemplateCode() {
+    return process.env.ALIYUN_SMS_TEMPLATE_CODE ?? '';
+  }
+
+  get aliyunSmsConnectTimeoutMs() {
+    return Number.parseInt(process.env.ALIYUN_SMS_CONNECT_TIMEOUT_MS ?? '5000', 10);
+  }
+
+  get aliyunSmsReadTimeoutMs() {
+    return Number.parseInt(process.env.ALIYUN_SMS_READ_TIMEOUT_MS ?? '10000', 10);
+  }
+
   get authAccessTokenSecret() {
     return process.env.AUTH_ACCESS_TOKEN_SECRET ?? '';
   }
@@ -137,6 +213,26 @@ export class RuntimeConfigService {
 
   get authPublicOtpSendEnabled() {
     return this.readBoolean(process.env.AUTH_PUBLIC_OTP_SEND_ENABLED);
+  }
+
+  get authUserAgreementVersion() {
+    return process.env.AUTH_USER_AGREEMENT_VERSION ?? 'v0.1-draft';
+  }
+
+  get authPrivacyPolicyVersion() {
+    return process.env.AUTH_PRIVACY_POLICY_VERSION ?? 'v0.1-draft';
+  }
+
+  get authPasswordPepper() {
+    return process.env.AUTH_PASSWORD_PEPPER ?? '';
+  }
+
+  get authWhitelistTestSessionEnabled() {
+    return this.allowsIsolatedAuthWhitelist && this.readBoolean(process.env.AUTH_WHITELIST_TEST_SESSION_ENABLED);
+  }
+
+  get authWhitelistTestSessionMobiles() {
+    return this.readCsv(process.env.AUTH_WHITELIST_TEST_SESSION_MOBILES);
   }
 
   private readBoolean(value: string | undefined) {

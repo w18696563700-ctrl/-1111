@@ -115,18 +115,16 @@ void main() {
           transport: transport,
           initialRoute: ExhibitionRoutes.projectDetailWithProjectId(
             'project-1',
-            surface: ExhibitionRoutes.showcaseSurface,
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('项目资料'));
-      expect(find.text('项目资料'), findsOneWidget);
+      await _scrollTo(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
+      expect(find.text('公开资料边界'), findsNothing);
       expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
       expect(find.text('上传当前附件', skipOffstage: false), findsNothing);
-      expect(find.widgetWithText(FilledButton, '继续竞标'), findsOneWidget);
-      expect(find.textContaining('当前公开详情暂未提供正式附件'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
     },
   );
 
@@ -183,11 +181,14 @@ void main() {
 
       await _tapVisible(tester, find.widgetWithText(FilledButton, '查看详情'));
 
-      await _scrollTo(tester, find.text('项目资料'));
-      expect(find.text('项目资料'), findsOneWidget);
+      await _scrollTo(tester, find.textContaining('当前项目已被承接'));
+      expect(find.text('公开资料边界'), findsNothing);
       expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
-      expect(find.widgetWithText(FilledButton, '继续竞标'), findsNothing);
-      expect(find.textContaining('当前项目已进入订单链路，公开详情不继续后续私域动作。'), findsWidgets);
+      expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
+      expect(
+        find.textContaining('当前项目已被承接；如你属于竞标方，可继续读取最小竞标结果。'),
+        findsWidgets,
+      );
     },
   );
 }

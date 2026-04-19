@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
@@ -26,6 +27,8 @@ class AppShellScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppShellScope.of(context);
     final shellContext = controller.snapshot.shellContext;
+    final canPop =
+        ModalRoute.of(context)?.canPop ?? Navigator.of(context).canPop();
     final visibleBottomBuildings = bottomNavigationBuildings
         .where(controller.snapshot.isBuildingVisible)
         .toList();
@@ -58,6 +61,12 @@ class AppShellScaffold extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: canPop,
+        leading: canPop
+            ? CupertinoNavigationBarBackButton(
+                onPressed: () => Navigator.of(context).maybePop(),
+              )
+            : null,
         title: Text(titleOverride ?? currentBuilding.label),
         actions: appBarActions.isEmpty ? null : appBarActions,
       ),

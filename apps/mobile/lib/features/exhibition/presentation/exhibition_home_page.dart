@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/boot/app_bootstrap_controller.dart';
+import 'package:mobile/core/location/china_region_catalog.dart';
+import 'package:mobile/core/location/china_region_picker.dart';
 import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
@@ -137,13 +139,6 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
     );
   }
 
-  void _openWorkbench() {
-    if (_redirectToLoginForPrivateAction(actionLabel: '项目工作台')) {
-      return;
-    }
-    Navigator.of(context).pushNamed(ExhibitionRoutes.workbench);
-  }
-
   void _openProjectCreate() {
     if (_redirectToLoginForPrivateAction(actionLabel: '发布项目')) {
       return;
@@ -155,13 +150,27 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
     Navigator.of(context).pushNamed(ExhibitionRoutes.showcase);
   }
 
+  void _openMyProjects() {
+    if (_redirectToLoginForPrivateAction(actionLabel: '进入我的项目')) {
+      return;
+    }
+    Navigator.of(context).pushNamed(ExhibitionRoutes.myProjectList);
+  }
+
   void _openProjectDetail(String projectId) {
-    Navigator.of(context).pushNamed(
-      ExhibitionRoutes.projectDetailWithProjectId(
-        projectId,
-        surface: ExhibitionRoutes.showcaseSurface,
-      ),
-    );
+    Navigator.of(
+      context,
+    ).pushNamed(ExhibitionRoutes.projectDetailWithProjectId(projectId));
+  }
+
+  void _openEnterpriseRecommendationItem(
+    _HomeEnterpriseRecommendationItem item,
+  ) {
+    final routeName = _homeEnterpriseRecommendationRoute(item);
+    if (routeName == null) {
+      return;
+    }
+    Navigator.of(context).pushNamed(routeName);
   }
 
   void _openEnterpriseBoard(EnterpriseBoardType boardType) {
@@ -187,71 +196,27 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
   }
 
   Future<void> _openManualLocationSelect() async {
-    final selected =
-        await showModalBottomSheet<ExhibitionHomeLocationSelectRequest>(
-          context: context,
-          isScrollControlled: true,
-          builder: (BuildContext context) {
-            final theme = Theme.of(context);
-            return FractionallySizedBox(
-              heightFactor: 0.78,
-              child: SafeArea(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        '手动选择地区',
-                        style: theme.textTheme.titleLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '选择后会更新当前首页天气与推荐内容。',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          height: 1.45,
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-                      Expanded(
-                        child: SingleChildScrollView(
-                          child: Wrap(
-                            spacing: 10,
-                            runSpacing: 10,
-                            children: _manualLocationSelectOptions
-                                .map(
-                                  (option) => FilledButton.tonal(
-                                    onPressed: () => Navigator.of(context).pop(
-                                      ExhibitionHomeLocationSelectRequest(
-                                        provinceCode: option.provinceCode,
-                                        provinceName: option.provinceName,
-                                        cityName: option.cityName,
-                                        displayName: option.displayName,
-                                      ),
-                                    ),
-                                    child: Text(option.displayName),
-                                  ),
-                                )
-                                .toList(growable: false),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      Text(
-                        '地区选择仅作用于当前使用过程，后续可随时重新调整。',
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          height: 1.45,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
+    final catalog = await ChinaRegionCatalogLoader.load();
+    if (!mounted) {
+      return;
+    }
+    final currentLocation = _homeWeatherProjectionFromResult(_homeResult);
+    final currentCity = catalog.cityByName(currentLocation?.displayName);
+    final picked = await showChinaCityPicker(
+      context: context,
+      catalog: catalog,
+      title: '选择城市',
+      initialProvinceCode: currentCity?.provinceCode,
+      initialCityCode: currentCity?.cityCode,
+    );
+    final selected = picked == null
+        ? null
+        : ExhibitionHomeLocationSelectRequest(
+            provinceCode: picked.provinceCode,
+            provinceName: picked.provinceName,
+            cityName: picked.cityName,
+            displayName: picked.shortCityName,
+          );
 
     if (!mounted || selected == null) {
       return;
@@ -348,28 +313,30 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
     final projectItems = _homeProjectItemsFromPayload(_projectResult?.payload);
     final weatherProjection = _homeWeatherProjectionFromResult(_homeResult);
     final areaLabel = _homeRecommendationAreaLabel(weatherProjection);
+    final companyFactoryRecommendationItems =
+        _homeCompanyFactoryRecommendationItemsFromPayload(_homeResult?.payload);
     final companyModule = _homeModuleProjectionFromPayload(
       _homeResult?.payload,
       'excellent_company',
       fallbackTitle: '优秀公司',
-      fallbackSummary: '本省优质展览公司入口已接入，首页只展示轻摘要并进入公司列表。',
-      fallbackStatusLabel: '已接通',
+      fallbackSummary: '首页当前先保留公司入口承接；真实企业列表与详情以进入后的 app-facing 返回为准。',
+      fallbackStatusLabel: '入口承接',
       fallbackActionLabel: '进入列表',
     );
     final factoryModule = _homeModuleProjectionFromPayload(
       _homeResult?.payload,
       'excellent_factory',
       fallbackTitle: '优秀工厂',
-      fallbackSummary: '本省优质工厂入口已接入，首页只展示轻摘要并进入工厂列表。',
-      fallbackStatusLabel: '已接通',
+      fallbackSummary: '首页当前先保留工厂入口承接；真实企业列表与详情以进入后的 app-facing 返回为准。',
+      fallbackStatusLabel: '入口承接',
       fallbackActionLabel: '进入列表',
     );
     final supplierModule = _homeModuleProjectionFromPayload(
       _homeResult?.payload,
       'excellent_supplier',
       fallbackTitle: '优秀供应商',
-      fallbackSummary: '本省优质供应商入口已接入，首页只展示轻摘要并进入供应商列表。',
-      fallbackStatusLabel: '已接通',
+      fallbackSummary: '首页当前先保留供应商入口承接；真实企业列表与详情以进入后的 app-facing 返回为准。',
+      fallbackStatusLabel: '入口承接',
       fallbackActionLabel: '进入列表',
     );
 
@@ -421,11 +388,6 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
               },
             ),
             const SizedBox(height: 16),
-            _HomePrivateEntryCard(
-              onWorkbenchPressed: _openWorkbench,
-              onPublishPressed: _openProjectCreate,
-            ),
-            const SizedBox(height: 16),
             const _HomeSectionHeader(
               title: '本省推荐',
               summary: '结合当前地区展示项目推荐，支持手动刷新获取最新公开内容。',
@@ -438,7 +400,7 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
               projectItems: projectItems,
               onRetry: () => _refreshWholePage(useRefreshPath: true),
               onOpenShowcase: _openShowcase,
-              onOpenWorkbench: _openWorkbench,
+              onOpenMyProjects: _openMyProjects,
               onOpenProjectCreate: _openProjectCreate,
               onOpenProjectDetail: _openProjectDetail,
             ),
@@ -451,11 +413,12 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
                   Navigator.of(context).pushNamed(ExhibitionRoutes.forum),
             ),
             const SizedBox(height: 12),
-            _HomePlaceholderRecommendationSection(
-              title: '3. 本省优秀公司与工厂',
-              summary: '公司与工厂推荐位持续完善中，当前先提供模块入口说明。',
-              actionLabel: '查看当前说明',
-              onPressed: _openManualSelectionPlaceholder,
+            _HomeCompanyFactoryRecommendationSection(
+              areaLabel: areaLabel,
+              items: companyFactoryRecommendationItems,
+              onOpenItem: _openEnterpriseRecommendationItem,
+              onRetry: () => _refreshWholePage(useRefreshPath: true),
+              onFallbackPressed: _openManualSelectionPlaceholder,
             ),
             const SizedBox(height: 12),
             _HomePlaceholderRecommendationSection(

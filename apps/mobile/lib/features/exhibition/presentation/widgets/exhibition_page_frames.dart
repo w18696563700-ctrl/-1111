@@ -12,8 +12,6 @@ class _LoadPageFrame extends StatelessWidget {
     this.showTechnicalDisclosure = false,
     this.showPageSummaryCard = true,
     this.showContentStateCard = true,
-    this.showSourceNotice = true,
-    this.showFallbackNotice = true,
     this.sourceLabel,
     this.sourceMessage,
     this.fallbackTitle,
@@ -33,8 +31,6 @@ class _LoadPageFrame extends StatelessWidget {
   final bool showTechnicalDisclosure;
   final bool showPageSummaryCard;
   final bool showContentStateCard;
-  final bool showSourceNotice;
-  final bool showFallbackNotice;
   final String? sourceLabel;
   final String? sourceMessage;
   final String? fallbackTitle;
@@ -58,9 +54,7 @@ class _LoadPageFrame extends StatelessWidget {
             highlights: <String>[loading ? '准备中' : '已更新'],
             footnote: '受控状态、重试和回退入口会保留在这一页。',
           ),
-        if (showSourceNotice &&
-            sourceLabel != null &&
-            sourceMessage != null) ...<Widget>[
+        if (sourceLabel != null && sourceMessage != null) ...<Widget>[
           if (showPageSummaryCard) const SizedBox(height: 16),
           _StageNoticeCard(
             title: sourceLabel!,
@@ -68,10 +62,8 @@ class _LoadPageFrame extends StatelessWidget {
             tone: _ActionCardTone.muted,
           ),
         ],
-        if (showFallbackNotice &&
-            fallbackTitle != null &&
-            fallbackMessage != null) ...<Widget>[
-          if (showPageSummaryCard || showSourceNotice)
+        if (fallbackTitle != null && fallbackMessage != null) ...<Widget>[
+          if (showPageSummaryCard || sourceLabel != null)
             const SizedBox(height: 16),
           _StageNoticeCard(
             title: fallbackTitle!,
@@ -80,7 +72,9 @@ class _LoadPageFrame extends StatelessWidget {
           ),
         ],
         if (controls.isNotEmpty) ...<Widget>[
-          if (showPageSummaryCard || showSourceNotice || showFallbackNotice)
+          if (showPageSummaryCard ||
+              sourceLabel != null ||
+              fallbackTitle != null)
             const SizedBox(height: 16),
           _ActionCard(
             title: '页面操作',
@@ -90,8 +84,8 @@ class _LoadPageFrame extends StatelessWidget {
           ),
         ],
         if (showPageSummaryCard ||
-            showSourceNotice ||
-            showFallbackNotice ||
+            sourceLabel != null ||
+            fallbackTitle != null ||
             controls.isNotEmpty)
           const SizedBox(height: 16),
         if (loading)
@@ -122,8 +116,9 @@ class _SubmissionPageFrame extends StatelessWidget {
     required this.onSubmitPressed,
     required this.body,
     this.submitButtonLabel = '提交',
-    this.submitButtonKey,
     this.showSubmitButton = true,
+    this.submitEnabled = true,
+    this.submitDisabledMessage,
     this.showConnectionInfo = false,
     this.showTechnicalDisclosure = false,
     this.showPageSummaryCard = true,
@@ -143,8 +138,9 @@ class _SubmissionPageFrame extends StatelessWidget {
   final VoidCallback onSubmitPressed;
   final List<Widget> body;
   final String submitButtonLabel;
-  final Key? submitButtonKey;
   final bool showSubmitButton;
+  final bool submitEnabled;
+  final String? submitDisabledMessage;
   final bool showConnectionInfo;
   final bool showTechnicalDisclosure;
   final bool showPageSummaryCard;
@@ -163,10 +159,15 @@ class _SubmissionPageFrame extends StatelessWidget {
       if (showSubmitButton) ...<Widget>[
         const SizedBox(height: 18),
         FilledButton(
-          key: submitButtonKey,
-          onPressed: submitting ? null : onSubmitPressed,
+          onPressed: submitting || !submitEnabled ? null : onSubmitPressed,
           child: Text(submitButtonLabel),
         ),
+        if (!submitEnabled &&
+            submitDisabledMessage != null &&
+            submitDisabledMessage!.trim().isNotEmpty) ...<Widget>[
+          const SizedBox(height: 10),
+          _StateMessage(title: '提交条件未完成', body: submitDisabledMessage!),
+        ],
         const SizedBox(height: 16),
       ],
       if (submitting)

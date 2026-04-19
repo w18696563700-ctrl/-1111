@@ -56,7 +56,7 @@ class _MilestoneListPageState extends State<MilestoneListPage> {
 
     return _LoadPageFrame(
       title: '里程碑列表',
-      summary: '这里集中查看当前订单下的里程碑。页面会把每个节点的金额、状态和下一步动作整理成可连续讲解的履约面。',
+      summary: '这里集中读取当前订单下的里程碑。页面只展示金额、状态和可继续查看的验收详情，不放开里程碑提交、验收提交或复检动作。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -98,7 +98,7 @@ class _MilestoneListPageState extends State<MilestoneListPage> {
         title: '当前订单下的里程碑',
         summary: items.isEmpty
             ? '当前订单下还没有可继续推进的里程碑，页面先保留在只读空态。'
-            : '每个里程碑都按当前状态给出可继续动作，帮助你判断先推进哪一个节点。',
+            : '每个里程碑都只保留状态读取和验收详情续接，当前页不再伪装成履约推进台。',
         tone: _ActionCardTone.emphasis,
         eyebrow: '履约节奏',
         children: _buildMilestoneChildren(context, snapshot, items, milestones),
@@ -106,11 +106,11 @@ class _MilestoneListPageState extends State<MilestoneListPage> {
       const SizedBox(height: 16),
       const _ActionCard(
         title: '讲解建议',
-        summary: '先讲清楚每个节点各自负责什么，再带客户进入其中一个节点做提交，演示会更完整。',
+        summary: '先讲清楚每个节点当前状态，再进入对应验收详情看真值，不要把当前页讲成提交台。',
         eyebrow: '讲解节奏',
         children: <Widget>[
-          _DetailLine(label: '推荐顺序', value: '里程碑列表 -> 里程碑提交 -> 验收详情'),
-          _DetailLine(label: '当前边界', value: '验收复检不是当前首发必走链，这里只保留冻结表达。'),
+          _DetailLine(label: '推荐顺序', value: '订单详情 -> 里程碑列表 -> 验收详情'),
+          _DetailLine(label: '当前边界', value: '提交、复检和争议动作当前不从这里放开。'),
         ],
       ),
     ];
@@ -152,10 +152,10 @@ class _MilestoneListPageState extends State<MilestoneListPage> {
             child: _EntityCard(
               title: title ?? '当前里程碑',
               description: state == null
-                  ? '当前里程碑已经承接完成，可以继续提交。'
-                  : '当前节点处于 ${_frontStageStateLabel(state)}，建议先完成该里程碑提交，再继续验收链。',
+                  ? '当前里程碑已进入只读承接面，可继续查看对应验收详情。'
+                  : '当前节点处于 ${_frontStageStateLabel(state)}，当前页只保留状态读取与验收详情续接。',
               statusLabel: state == null
-                  ? '可继续提交'
+                  ? '可查看详情'
                   : _frontStageStateLabel(state),
               detailLines: <Widget>[
                 if (milestoneId != null)
@@ -175,18 +175,18 @@ class _MilestoneListPageState extends State<MilestoneListPage> {
                 if (summary is Map)
                   const _DetailLine(
                     label: '下一步动作',
-                    value: '先完成里程碑提交，再继续进入验收详情。',
+                    value: '继续查看当前里程碑对应的验收详情。',
                   ),
               ],
               actionSummary: state == null
-                  ? '当前建议先进入提交页，把这个节点的完成动作讲清楚。'
-                  : '当前建议先处理这个节点，再顺势进入验收详情或验收提交。',
-              actionLabel: title == null ? '去提交里程碑' : '去提交 $title',
+                  ? '当前建议先查看这个节点对应的验收详情，确认当前验收真值。'
+                  : '当前建议先查看这个节点对应的验收详情，提交和复检动作继续保持冻结。',
+              actionLabel: title == null ? '查看验收详情' : '查看 $title 验收详情',
               onPressed: milestone == null
                   ? null
                   : () {
                       Navigator.of(context).pushNamed(
-                        ExhibitionRoutes.milestoneSubmitWithMilestoneId(
+                        ExhibitionRoutes.inspectionDetailWithMilestoneId(
                           milestone.milestoneId,
                         ),
                       );

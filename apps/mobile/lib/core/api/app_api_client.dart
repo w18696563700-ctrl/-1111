@@ -3,10 +3,12 @@ import 'dart:io';
 
 import 'package:mobile/core/auth/app_session_store.dart';
 
-enum AppApiMethod { get, post, put }
+enum AppApiMethod { get, post, put, delete }
 
 class AppApiConfig {
-  static const String defaultBaseUrl = 'http://127.0.0.1:8080/api/app';
+  static const String cloudRuntimeBaseUrl = 'http://47.108.180.198/api/app';
+  static const String tunnelBaseUrl = 'http://127.0.0.1:8080/api/app';
+  static const String defaultBaseUrl = tunnelBaseUrl;
   static String? _runtimeBaseUrlOverride;
 
   AppApiConfig({
@@ -387,6 +389,17 @@ class AppApiClient {
         canonicalPath: canonicalPath,
         uri: config.resolveCanonicalPath(canonicalPath),
         body: body,
+        headers: _resolvedHeaders(),
+      ),
+    );
+  }
+
+  Future<AppApiResponse> delete(String canonicalPath) {
+    return _sendWithTimeout(
+      AppApiRequest(
+        method: AppApiMethod.delete,
+        canonicalPath: canonicalPath,
+        uri: config.resolveCanonicalPath(canonicalPath),
         headers: _resolvedHeaders(),
       ),
     );

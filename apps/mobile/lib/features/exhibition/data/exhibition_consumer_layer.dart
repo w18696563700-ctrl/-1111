@@ -3,9 +3,11 @@ import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/protected_app_request.dart';
 
 part 'commands/bid_submit_command.dart';
+part 'commands/bid_award_command.dart';
 part 'commands/contract_amend_command.dart';
 part 'commands/contract_confirm_command.dart';
 part 'commands/dispute_open_command.dart';
@@ -13,26 +15,54 @@ part 'commands/dispute_withdraw_command.dart';
 part 'commands/inspection_recheck_command.dart';
 part 'commands/inspection_submit_command.dart';
 part 'commands/milestone_submit_command.dart';
-part 'commands/order_create_command.dart';
+part 'commands/project_attachment_bind_command.dart';
 part 'commands/project_create_command.dart';
+part 'commands/project_lifecycle_action_command.dart';
+part 'commands/project_save_command.dart';
 part 'commands/rating_submit_command.dart';
 part 'commands/upload_init_command.dart';
 part 'models/exhibition_action_result.dart';
 part 'models/exhibition_load_result.dart';
+part 'models/project_attachment_read_models.dart';
+part 'models/project_bid_material_read_models.dart';
+part 'models/project_public_resource_read_models.dart';
 part 'models/upload_directive.dart';
 part 'models/upload_flow_result.dart';
 part 'services/exhibition_action_service.dart';
 part 'services/exhibition_canonical_paths.dart';
 part 'services/exhibition_contract_mapper.dart';
 part 'services/my_project_contract_mapper.dart';
-part 'services/exhibition_workbench_contract_mapper.dart';
 part 'services/exhibition_entry_contract_validation.dart';
 part 'services/exhibition_contract_validation.dart';
 part 'services/my_project_contract_validation.dart';
-part 'services/exhibition_workbench_contract_validation.dart';
 part 'services/exhibition_contract_validation_base.dart';
 part 'services/exhibition_load_service.dart';
 part 'services/exhibition_upload_service.dart';
+part 'services/project_attachment_action_service.dart';
+part 'services/project_attachment_contract_mapper.dart';
+part 'services/project_attachment_contract_validation.dart';
+part 'services/project_attachment_load_service.dart';
+part 'services/project_bid_material_contract_mapper.dart';
+part 'services/project_bid_material_contract_validation.dart';
+part 'services/project_bid_material_load_service.dart';
+part 'services/project_public_resource_action_service.dart';
+part 'services/project_public_resource_contract_mapper.dart';
+part 'services/project_public_resource_contract_validation.dart';
+part 'services/project_public_resource_load_service.dart';
+
+const String _bidSeatLockPath = '/api/app/bid/seat/lock';
+const String _bidSeatReleasePath = '/api/app/bid/seat/release';
+const String _bidSeatStatusPath = '/api/app/bid/seat/status';
+const String _bidPackageCompletenessPath = '/api/app/bid/package-completeness';
+
+String? _normalizeId(String? value) {
+  if (value == null) {
+    return null;
+  }
+
+  final trimmed = value.trim();
+  return trimmed.isEmpty ? null : trimmed;
+}
 
 class ExhibitionConsumerLayer {
   ExhibitionConsumerLayer._(this._client)
@@ -69,12 +99,20 @@ class ExhibitionConsumerLayer {
 
   void dispose() {}
 
-  Future<ExhibitionLoadResult> loadWorkbench({bool forceRefresh = false}) {
-    return _loadService.loadWorkbench(forceRefresh: forceRefresh);
-  }
-
-  Future<ExhibitionLoadResult> loadProjectList({bool forceRefresh = false}) {
-    return _loadService.loadProjectList(forceRefresh: forceRefresh);
+  Future<ExhibitionLoadResult> loadProjectList({
+    bool forceRefresh = false,
+    String? provinceCode,
+    String? cityCode,
+    String? areaBucket,
+    String? budgetBucket,
+  }) {
+    return _loadService.loadProjectList(
+      forceRefresh: forceRefresh,
+      provinceCode: provinceCode,
+      cityCode: cityCode,
+      areaBucket: areaBucket,
+      budgetBucket: budgetBucket,
+    );
   }
 
   Future<ExhibitionLoadResult> loadMyProjectList({bool forceRefresh = false}) {
@@ -95,6 +133,16 @@ class ExhibitionConsumerLayer {
     );
   }
 
+  Future<ExhibitionLoadResult> loadProjectEditDetail({
+    required String? projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectEditDetail(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
   Future<ExhibitionLoadResult> loadMyProjectDetail({
     required String? projectId,
     bool forceRefresh = false,
@@ -103,6 +151,62 @@ class ExhibitionConsumerLayer {
       projectId: projectId,
       forceRefresh: forceRefresh,
     );
+  }
+
+  Future<ExhibitionActionResult> deleteMyProject({required String? projectId}) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return Future<ExhibitionActionResult>.value(
+        ExhibitionActionResult(
+          method: 'DELETE',
+          path: ExhibitionCanonicalPaths.myProjectDetailPattern,
+          isSuccess: false,
+          controlledState: AppPageState.notFound,
+          errorCode: 'AUTH_RESOURCE_UNAVAILABLE',
+          message: '当前项目不可用。',
+        ),
+      );
+    }
+
+    return _actionService.deleteMyProject(projectId: normalizedProjectId);
+  }
+
+  Future<ExhibitionLoadResult> loadProjectAttachments({
+    required String? projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectAttachments(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  void invalidateProjectAttachments({required String? projectId}) {
+    _loadService.invalidateProjectAttachments(projectId: projectId);
+  }
+
+  Future<ExhibitionLoadResult> loadProjectPublicResources({
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectPublicResources(forceRefresh: forceRefresh);
+  }
+
+  void invalidateProjectPublicResources() {
+    _loadService.invalidateProjectPublicResources();
+  }
+
+  Future<ExhibitionLoadResult> loadProjectBidMaterials({
+    required String? projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectBidMaterials(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  void invalidateProjectBidMaterials({required String? projectId}) {
+    _loadService.invalidateProjectBidMaterials(projectId: projectId);
   }
 
   Future<ExhibitionLoadResult> loadOrderDetail({
@@ -145,6 +249,10 @@ class ExhibitionConsumerLayer {
     );
   }
 
+  void invalidateInspectionDetail({required String? milestoneId}) {
+    _loadService.invalidateInspectionDetail(milestoneId: milestoneId);
+  }
+
   Future<ExhibitionLoadResult> loadRatingEntry({
     required String? orderId,
     bool forceRefresh = false,
@@ -155,20 +263,142 @@ class ExhibitionConsumerLayer {
     );
   }
 
-  void invalidateInspectionDetail({required String? milestoneId}) {
-    _loadService.invalidateInspectionDetail(milestoneId: milestoneId);
+  Future<ExhibitionLoadResult> loadBidResult({
+    required String? projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadBidResult(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadBidSeatStatus({
+    required String? projectId,
+    required String? bidId,
+    bool forceRefresh = false,
+  }) {
+    return _loadBidProjection(
+      _bidSeatStatusPath,
+      projectId: projectId,
+      bidId: bidId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadBidPackageCompleteness({
+    required String? projectId,
+    required String? bidId,
+    bool forceRefresh = false,
+  }) {
+    return _loadBidProjection(
+      _bidPackageCompletenessPath,
+      projectId: projectId,
+      bidId: bidId,
+      forceRefresh: forceRefresh,
+    );
   }
 
   Future<ExhibitionActionResult> createProject(ProjectCreateCommand command) {
     return _actionService.createProject(command);
   }
 
+  Future<ExhibitionActionResult> saveProject(ProjectSaveCommand command) {
+    return _actionService.saveProject(command);
+  }
+
+  Future<ExhibitionActionResult> submitProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _actionService.submitProject(command);
+  }
+
+  Future<ExhibitionActionResult> publishProject(
+    ProjectLifecycleActionCommand command,
+  ) {
+    return _actionService.publishProject(command);
+  }
+
+  Future<ExhibitionActionResult> withdrawProject({required String? projectId}) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return Future<ExhibitionActionResult>.value(
+        ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.projectWithdraw,
+          isSuccess: false,
+          controlledState: AppPageState.notFound,
+          errorCode: 'AUTH_RESOURCE_UNAVAILABLE',
+          message: '当前项目不可用。',
+        ),
+      );
+    }
+
+    return _actionService.withdrawProject(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> archiveProject({required String? projectId}) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return Future<ExhibitionActionResult>.value(
+        ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.projectArchive,
+          isSuccess: false,
+          controlledState: AppPageState.notFound,
+          errorCode: 'AUTH_RESOURCE_UNAVAILABLE',
+          message: '当前项目不可用。',
+        ),
+      );
+    }
+
+    return _actionService.archiveProject(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> closeProject({required String? projectId}) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return Future<ExhibitionActionResult>.value(
+        ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.projectClose,
+          isSuccess: false,
+          controlledState: AppPageState.notFound,
+          errorCode: 'AUTH_RESOURCE_UNAVAILABLE',
+          message: '当前项目不可用。',
+        ),
+      );
+    }
+
+    return _actionService.closeProject(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
   Future<ExhibitionActionResult> submitBid(BidSubmitCommand command) {
     return _actionService.submitBid(command);
   }
 
-  Future<ExhibitionActionResult> createOrder(OrderCreateCommand command) {
-    return _actionService.createOrder(command);
+  Future<ExhibitionActionResult> lockBidSeat({
+    required String projectId,
+    required String bidId,
+  }) {
+    return _actionService.lockBidSeat(projectId: projectId, bidId: bidId);
+  }
+
+  Future<ExhibitionActionResult> releaseBidSeat({
+    required String projectId,
+    required String bidId,
+  }) {
+    return _actionService.releaseBidSeat(projectId: projectId, bidId: bidId);
+  }
+
+  Future<ExhibitionActionResult> awardBid(BidAwardCommand command) {
+    return _actionService.awardBid(command);
   }
 
   Future<ExhibitionActionResult> confirmContract(
@@ -199,10 +429,6 @@ class ExhibitionConsumerLayer {
     return _actionService.recheckInspection(command);
   }
 
-  Future<ExhibitionActionResult> submitRating(RatingSubmitCommand command) {
-    return _actionService.submitRating(command);
-  }
-
   Future<ExhibitionActionResult> openDispute(DisputeOpenCommand command) {
     return _actionService.openDispute(command);
   }
@@ -211,6 +437,48 @@ class ExhibitionConsumerLayer {
     DisputeWithdrawCommand command,
   ) {
     return _actionService.withdrawDispute(command);
+  }
+
+  Future<ExhibitionActionResult> submitRating(RatingSubmitCommand command) {
+    return _actionService.submitRating(command);
+  }
+
+  Future<ExhibitionActionResult> bindProjectAttachment({
+    required String? projectId,
+    required ProjectAttachmentBindCommand command,
+  }) {
+    return _actionService.bindProjectAttachment(
+      projectId: projectId,
+      command: command,
+    );
+  }
+
+  Future<ExhibitionActionResult> deleteProjectAttachment({
+    required String? projectId,
+    required String? attachmentId,
+  }) {
+    return _actionService.deleteProjectAttachment(
+      projectId: projectId,
+      attachmentId: attachmentId,
+    );
+  }
+
+  Future<ExhibitionActionResult> requestProjectAttachmentAccess({
+    required String? fileAssetId,
+    required String mode,
+  }) {
+    return _actionService.requestProjectAttachmentAccess(
+      fileAssetId: fileAssetId,
+      mode: mode,
+    );
+  }
+
+  Future<ExhibitionActionResult> requestProjectPublicResourceDownload({
+    required String? fileAssetId,
+  }) {
+    return _actionService.requestProjectPublicResourceDownload(
+      fileAssetId: fileAssetId,
+    );
   }
 
   Future<UploadFlowResult> uploadInit(UploadInitCommand command) {
@@ -229,6 +497,177 @@ class ExhibitionConsumerLayer {
 
   Future<UploadFlowResult> uploadConfirm({required UploadDirective directive}) {
     return _uploadService.uploadConfirm(directive: directive);
+  }
+
+  Future<ExhibitionLoadResult> _loadBidProjection(
+    String canonicalPath, {
+    required String? projectId,
+    required String? bidId,
+    bool forceRefresh = false,
+  }) async {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return ExhibitionLoadResult(
+        state: AppPageState.notFound,
+        method: 'GET',
+        path: canonicalPath,
+        message:
+            'projectId is required from route context or page context before calling BFF',
+      );
+    }
+
+    final normalizedBidId = _normalizeId(bidId);
+    if (normalizedBidId == null) {
+      return ExhibitionLoadResult(
+        state: AppPageState.empty,
+        method: 'GET',
+        path: canonicalPath,
+        payload: <String, Object?>{
+          'surfaceState': 'not_visible',
+          'projectId': normalizedProjectId,
+        },
+      );
+    }
+
+    try {
+      final response = await runProtectedAppRequest(
+        () => _client.get(
+          canonicalPath,
+          queryParameters: <String, String>{
+            'projectId': normalizedProjectId,
+            'bidId': normalizedBidId,
+          },
+        ),
+      );
+      return _mapBidProjectionResponse(response, canonicalPath);
+    } on SocketException {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        message: 'network error while requesting canonical BFF path',
+      );
+    } on HttpException {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        message: 'http error while requesting canonical BFF path',
+      );
+    } on StateError {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        message: 'current fake transport did not provide this canonical path',
+      );
+    } on FormatException {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorNonRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        message: 'response decoding failed for canonical BFF path',
+      );
+    }
+  }
+
+  ExhibitionLoadResult _mapBidProjectionResponse(
+    AppApiResponse response,
+    String canonicalPath,
+  ) {
+    final payload = response.body;
+    final failurePayload = _sanitizeFailurePayload(payload);
+    final failureCode = _extractErrorCode(failurePayload);
+    final failureMessage = _failureMessage(
+      payload,
+      'canonical BFF request failed',
+    );
+
+    if (response.statusCode == 401) {
+      return ExhibitionLoadResult(
+        state: AppPageState.unauthorized,
+        method: 'GET',
+        path: canonicalPath,
+        payload: failurePayload,
+        errorCode: failureCode,
+        message: failureMessage,
+      );
+    }
+
+    if (response.statusCode == 403) {
+      return ExhibitionLoadResult(
+        state: AppPageState.forbidden,
+        method: 'GET',
+        path: canonicalPath,
+        payload: failurePayload,
+        errorCode: failureCode,
+        message: failureMessage,
+      );
+    }
+
+    if (response.statusCode == 404) {
+      return ExhibitionLoadResult(
+        state: AppPageState.notFound,
+        method: 'GET',
+        path: canonicalPath,
+        payload: failurePayload,
+        errorCode: failureCode,
+        message: failureMessage,
+      );
+    }
+
+    if (response.statusCode >= 500) {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        payload: failurePayload,
+        errorCode: failureCode,
+        message: failureMessage,
+      );
+    }
+
+    if (response.statusCode >= 400) {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorNonRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        payload: failurePayload,
+        errorCode: failureCode,
+        message: failureMessage,
+      );
+    }
+
+    final validation = _sanitizeAndValidateSuccessPayload(
+      'GET',
+      canonicalPath,
+      payload,
+    );
+    if (!validation.isValid) {
+      return ExhibitionLoadResult(
+        state: AppPageState.errorNonRetryable,
+        method: 'GET',
+        path: canonicalPath,
+        payload: validation.payload,
+        message: validation.message,
+      );
+    }
+
+    if (_isEmptyPayload(validation.payload)) {
+      return ExhibitionLoadResult(
+        state: AppPageState.empty,
+        method: 'GET',
+        path: canonicalPath,
+        payload: validation.payload,
+      );
+    }
+
+    return ExhibitionLoadResult(
+      state: AppPageState.content,
+      method: 'GET',
+      path: canonicalPath,
+      payload: validation.payload,
+    );
   }
 
   String prettyPayload(Object? payload) {

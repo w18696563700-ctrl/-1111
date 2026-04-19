@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
-import 'package:mobile/features/exhibition/presentation/enterprise_hub_apply_pages.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_detail_pages.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_list_controls.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_list_pages.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_workbench_pages.dart';
 import 'package:mobile/features/exhibition/presentation/forum/forum_pages.dart';
-import 'package:mobile/features/exhibition/presentation/exhibition_page.dart';
 import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/features/profile/presentation/profile_detail_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_forum_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_identity_access_pages.dart';
+import 'package:mobile/features/profile/presentation/profile_identity_legal_pages.dart';
+import 'package:mobile/features/profile/presentation/profile_identity_password_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_pages.dart';
+import 'package:mobile/features/profile/presentation/profile_organization_switch_page.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
 import 'package:mobile/shell/presentation/route_unavailable_page.dart';
 import 'package:mobile/shell/presentation/app_shell_scaffold.dart';
@@ -85,6 +88,10 @@ class AppRouter {
     final topicId = _matchPrefixedId(routeUri, ExhibitionRoutes.forumTopics);
     final postId = _matchPrefixedId(routeUri, ExhibitionRoutes.forumPosts);
     final authorId = _matchPrefixedId(routeUri, ExhibitionRoutes.forumAuthors);
+    final reportTicketId = _matchPrefixedId(
+      routeUri,
+      ExhibitionRoutes.forumMeReports,
+    );
     final commentPostId = routeUri.queryParameters['postId'];
     final initialFeedTopicId = routeUri.queryParameters['topicId'];
 
@@ -128,6 +135,10 @@ class AppRouter {
       ExhibitionRoutes.forumMeFollows => const ForumMeCollectionPage(
         scope: ForumMeScope.follows,
       ),
+      ExhibitionRoutes.forumMeReports => const ForumMyReportListPage(),
+      _ when reportTicketId != null => ForumMyReportDetailPage(
+        ticketId: reportTicketId,
+      ),
       _ when topicId != null => ForumTopicDetailPage(topicId: topicId),
       _ when postId != null => ForumPostDetailPage(postId: postId),
       _ => null,
@@ -152,6 +163,8 @@ class AppRouter {
       ExhibitionRoutes.forumMeComments => '我的评论',
       ExhibitionRoutes.forumMeBookmarks => '我的收藏',
       ExhibitionRoutes.forumMeFollows => '我的关注',
+      ExhibitionRoutes.forumMeReports => '我的举报记录',
+      _ when reportTicketId != null => '举报详情',
       _ when topicId != null => '话题详情',
       _ when postId != null => '帖子详情',
       _ => '论坛',
@@ -223,16 +236,20 @@ class AppRouter {
 
     final routeUri = _routeUri(routeName);
     final routePath = routeUri.path;
+    final boardListActionController = EnterpriseBoardListActionController();
 
     final Widget? child = switch (routePath) {
-      ExhibitionRoutes.companies => const EnterpriseBoardListPage(
+      ExhibitionRoutes.companies => EnterpriseBoardListPage(
         boardType: EnterpriseBoardType.company,
+        actionController: boardListActionController,
       ),
-      ExhibitionRoutes.factories => const EnterpriseBoardListPage(
+      ExhibitionRoutes.factories => EnterpriseBoardListPage(
         boardType: EnterpriseBoardType.factory,
+        actionController: boardListActionController,
       ),
-      ExhibitionRoutes.suppliers => const EnterpriseBoardListPage(
+      ExhibitionRoutes.suppliers => EnterpriseBoardListPage(
         boardType: EnterpriseBoardType.supplier,
+        actionController: boardListActionController,
       ),
       ExhibitionRoutes.companyDetail => EnterpriseDetailPage(
         boardType: EnterpriseBoardType.company,
@@ -251,6 +268,35 @@ class AppRouter {
           routeUri.queryParameters['boardType'],
         ),
       ),
+      ExhibitionRoutes.companyDisplayWorkbench =>
+        const EnterpriseApplicationPage(
+          initialBoardType: EnterpriseBoardType.company,
+        ),
+      ExhibitionRoutes.factoryDisplayWorkbench =>
+        const EnterpriseApplicationPage(
+          initialBoardType: EnterpriseBoardType.factory,
+        ),
+      ExhibitionRoutes.supplierDisplayWorkbench =>
+        const EnterpriseApplicationPage(
+          initialBoardType: EnterpriseBoardType.supplier,
+        ),
+      ExhibitionRoutes.enterpriseCaseEditor => EnterpriseApplicationPage(
+        initialBoardType: EnterpriseBoardType.fromRaw(
+          routeUri.queryParameters['boardType'],
+        ),
+      ),
+      ExhibitionRoutes.companyDisplayCaseEditor =>
+        const EnterpriseApplicationPage(
+          initialBoardType: EnterpriseBoardType.company,
+        ),
+      ExhibitionRoutes.factoryDisplayCaseEditor =>
+        const EnterpriseApplicationPage(
+          initialBoardType: EnterpriseBoardType.factory,
+        ),
+      ExhibitionRoutes.supplierDisplayCaseEditor =>
+        const EnterpriseApplicationPage(
+          initialBoardType: EnterpriseBoardType.supplier,
+        ),
       ExhibitionRoutes.enterpriseApplicationStatus =>
         EnterpriseApplicationStatusPage(
           applicationId: routeUri.queryParameters['applicationId'],
@@ -258,6 +304,18 @@ class AppRouter {
             routeUri.queryParameters['boardType'],
           ),
         ),
+      ExhibitionRoutes.companyDisplayStatus => EnterpriseApplicationStatusPage(
+        applicationId: routeUri.queryParameters['applicationId'],
+        boardType: EnterpriseBoardType.company,
+      ),
+      ExhibitionRoutes.factoryDisplayStatus => EnterpriseApplicationStatusPage(
+        applicationId: routeUri.queryParameters['applicationId'],
+        boardType: EnterpriseBoardType.factory,
+      ),
+      ExhibitionRoutes.supplierDisplayStatus => EnterpriseApplicationStatusPage(
+        applicationId: routeUri.queryParameters['applicationId'],
+        boardType: EnterpriseBoardType.supplier,
+      ),
       _ => null,
     };
 
@@ -272,9 +330,35 @@ class AppRouter {
       ExhibitionRoutes.companyDetail => '公司详情',
       ExhibitionRoutes.factoryDetail => '工厂详情',
       ExhibitionRoutes.supplierDetail => '供应商详情',
-      ExhibitionRoutes.enterpriseApply => '企业入驻',
-      ExhibitionRoutes.enterpriseApplicationStatus => '入驻状态',
+      ExhibitionRoutes.enterpriseApply ||
+      ExhibitionRoutes.companyDisplayWorkbench ||
+      ExhibitionRoutes.factoryDisplayWorkbench ||
+      ExhibitionRoutes.supplierDisplayWorkbench =>
+        _enterpriseWorkbenchRouteTitle(routeUri),
+      ExhibitionRoutes.enterpriseCaseEditor ||
+      ExhibitionRoutes.companyDisplayCaseEditor ||
+      ExhibitionRoutes.factoryDisplayCaseEditor ||
+      ExhibitionRoutes.supplierDisplayCaseEditor =>
+        _enterpriseCaseEditorRouteTitle(routeUri),
+      ExhibitionRoutes.enterpriseApplicationStatus ||
+      ExhibitionRoutes.companyDisplayStatus ||
+      ExhibitionRoutes.factoryDisplayStatus ||
+      ExhibitionRoutes.supplierDisplayStatus => _enterpriseStatusRouteTitle(
+        routeUri,
+      ),
       _ => '展览',
+    };
+
+    final appBarActions = switch (routePath) {
+      ExhibitionRoutes.companies ||
+      ExhibitionRoutes.factories ||
+      ExhibitionRoutes.suppliers => <Widget>[
+        IconButton(
+          onPressed: boardListActionController.triggerSearch,
+          icon: const Icon(Icons.search_rounded),
+        ),
+      ],
+      _ => const <Widget>[],
     };
 
     return MaterialPageRoute<void>(
@@ -282,6 +366,7 @@ class AppRouter {
       builder: (_) => AppShellScaffold(
         currentBuilding: AppBuilding.exhibition,
         titleOverride: title,
+        appBarActions: appBarActions,
         child: child,
       ),
     );
@@ -300,34 +385,33 @@ class AppRouter {
       ExhibitionRoutes.showcase => const ProjectListPage(
         surface: ProjectListSurface.showcase,
       ),
-      ExhibitionRoutes.workbench => const ExhibitionPage(),
       ExhibitionRoutes.projectList => const ProjectListPage(),
       ExhibitionRoutes.myProjectList => const MyProjectListPage(),
       ExhibitionRoutes.projectCreate => const ProjectCreatePage(),
+      ExhibitionRoutes.projectEdit => ProjectCreatePage(
+        projectId: routeUri.queryParameters['projectId'],
+      ),
       ExhibitionRoutes.projectDetail => ProjectDetailPage(
         projectId: routeUri.queryParameters['projectId'],
-        surface:
-            routeUri.queryParameters['surface'] ==
-                ExhibitionRoutes.showcaseSurface
-            ? ProjectDetailSurface.showcase
-            : ProjectDetailSurface.standard,
       ),
       ExhibitionRoutes.myProjectDetail => MyProjectDetailPage(
         projectId: routeUri.queryParameters['projectId'],
       ),
+      ExhibitionRoutes.projectClarification => ProjectClarificationPage(
+        projectId: routeUri.queryParameters['projectId'],
+      ),
+      ExhibitionRoutes.bidThread => BidThreadPage(
+        projectId: routeUri.queryParameters['projectId'],
+        bidId: routeUri.queryParameters['bidId'],
+      ),
       ExhibitionRoutes.bidSubmit => BidSubmitPage(
         projectId: routeUri.queryParameters['projectId'],
+        mode: routeUri.queryParameters['mode'],
       ),
       ExhibitionRoutes.orderDetail => OrderDetailPage(
         orderId: routeUri.queryParameters['orderId'],
       ),
       ExhibitionRoutes.contractDetail => ContractDetailPage(
-        orderId: routeUri.queryParameters['orderId'],
-      ),
-      ExhibitionRoutes.contractConfirm => ContractConfirmPage(
-        orderId: routeUri.queryParameters['orderId'],
-      ),
-      ExhibitionRoutes.contractAmend => ContractAmendPage(
         orderId: routeUri.queryParameters['orderId'],
       ),
       ExhibitionRoutes.milestoneList => MilestoneListPage(
@@ -342,20 +426,13 @@ class AppRouter {
       ExhibitionRoutes.inspectionSubmit => InspectionSubmitPage(
         milestoneId: routeUri.queryParameters['milestoneId'],
       ),
-      ExhibitionRoutes.inspectionRecheck => InspectionRecheckPage(
-        milestoneId: routeUri.queryParameters['milestoneId'],
-      ),
       ExhibitionRoutes.ratingEntry => RatingEntryPage(
-        orderId: routeUri.queryParameters['orderId'],
-      ),
-      ExhibitionRoutes.ratingSubmit => RatingSubmitPage(
         orderId: routeUri.queryParameters['orderId'],
       ),
       ExhibitionRoutes.disputeOpen => DisputeOpenPage(
         orderId: routeUri.queryParameters['orderId'],
       ),
       ExhibitionRoutes.disputeWithdraw => DisputeWithdrawPage(
-        disputeId: routeUri.queryParameters['disputeId'],
         orderId: routeUri.queryParameters['orderId'],
       ),
       _ => null,
@@ -367,24 +444,23 @@ class AppRouter {
 
     final title = switch (routePath) {
       ExhibitionRoutes.showcase => '项目展示',
-      ExhibitionRoutes.workbench => '项目工作台',
       ExhibitionRoutes.projectList => '项目列表',
       ExhibitionRoutes.myProjectList => '我的项目',
       ExhibitionRoutes.projectCreate => '创建项目',
+      ExhibitionRoutes.projectEdit => '编辑项目',
       ExhibitionRoutes.projectDetail => '项目详情',
       ExhibitionRoutes.myProjectDetail => '我的项目详情',
-      ExhibitionRoutes.bidSubmit => '投标提交',
+      ExhibitionRoutes.projectClarification => '项目澄清',
+      ExhibitionRoutes.bidThread => '沟通与投标',
+      ExhibitionRoutes.bidSubmit =>
+        routeUri.queryParameters['mode'] == 'result' ? '竞标结果' : '竞标提交',
       ExhibitionRoutes.orderDetail => '订单详情',
       ExhibitionRoutes.contractDetail => '合同详情',
-      ExhibitionRoutes.contractConfirm => '合同确认',
-      ExhibitionRoutes.contractAmend => '合同改单提交',
       ExhibitionRoutes.milestoneList => '里程碑列表',
       ExhibitionRoutes.milestoneSubmit => '里程碑提交',
       ExhibitionRoutes.inspectionDetail => '验收详情',
       ExhibitionRoutes.inspectionSubmit => '验收提交',
-      ExhibitionRoutes.inspectionRecheck => '验收复检提交',
       ExhibitionRoutes.ratingEntry => '评价入口',
-      ExhibitionRoutes.ratingSubmit => '评价提交',
       ExhibitionRoutes.disputeOpen => '争议开启入口',
       ExhibitionRoutes.disputeWithdraw => '争议撤回入口',
       _ => '展览',
@@ -406,11 +482,27 @@ class AppRouter {
       return null;
     }
 
-    final routePath = _routeUri(routeName).path;
+    final routeUri = _routeUri(routeName);
+    final routePath = routeUri.path;
+    final appealCaseId = _matchPrefixedId(
+      routeUri,
+      ProfileRoutes.governanceAppeals,
+    );
     final Widget? child = switch (routePath) {
       ProfileRoutes.personal => const ProfilePersonalPage(),
       ProfileRoutes.company => const ProfileCompanyPage(),
+      ProfileRoutes.organizationCreditScoring =>
+        const ProfileOrganizationCreditScoringStatusPage(),
+      ProfileRoutes.organizationCreditScoringExplanation =>
+        const ProfileOrganizationCreditScoringExplanationPage(),
+      ProfileRoutes.organizationCreditScoringHandoff =>
+        const ProfileOrganizationCreditScoringHandoffPage(),
       ProfileRoutes.forum => const ProfileForumPage(),
+      ProfileRoutes.governanceAppeals =>
+        const ProfileGovernanceAppealListPage(),
+      _ when appealCaseId != null => ProfileGovernanceAppealDetailPage(
+        appealCaseId: appealCaseId,
+      ),
       ProfileRoutes.settings => const ProfileSettingsPage(),
       _ => null,
     };
@@ -422,7 +514,12 @@ class AppRouter {
     final title = switch (routePath) {
       ProfileRoutes.personal => '个人资料',
       ProfileRoutes.company => '我的公司',
+      ProfileRoutes.organizationCreditScoring => '组织信用评分 reserve',
+      ProfileRoutes.organizationCreditScoringExplanation => '组织信用评分说明',
+      ProfileRoutes.organizationCreditScoringHandoff => '组织信用评分衔接',
       ProfileRoutes.forum => '我的论坛',
+      ProfileRoutes.governanceAppeals => '我的申诉记录',
+      _ when appealCaseId != null => '申诉详情',
       ProfileRoutes.settings => '设置',
       _ => '我的',
     };
@@ -449,6 +546,8 @@ class AppRouter {
       ProfileIdentityRoutes.login => const LoginEntryPage(),
       ProfileIdentityRoutes.organizationHandoff =>
         const OrganizationHandoffPage(),
+      ProfileIdentityRoutes.organizationSwitch =>
+        const OrganizationSwitchPage(),
       ProfileIdentityRoutes.organizationCreate =>
         const OrganizationCreatePage(),
       ProfileIdentityRoutes.organizationJoin => const OrganizationJoinPage(),
@@ -456,9 +555,17 @@ class AppRouter {
         const CertificationStatusPage(),
       ProfileIdentityRoutes.certificationSubmit =>
         const CertificationSubmitPage(),
+      ProfileIdentityRoutes.personalCertificationSubmit =>
+        const PersonalCertificationSubmitPage(),
+      ProfileIdentityRoutes.certificationRevalidate =>
+        const CertificationRevalidatePage(),
       ProfileIdentityRoutes.certificationResubmit =>
         const CertificationResubmitPage(),
       ProfileIdentityRoutes.sessionCenter => const SessionCenterPage(),
+      ProfileIdentityRoutes.userAgreement => const UserAgreementPage(),
+      ProfileIdentityRoutes.privacyPolicy => const PrivacyPolicyPage(),
+      ProfileIdentityRoutes.passwordReset => const PasswordResetPage(),
+      ProfileIdentityRoutes.passwordSet => const SetPasswordPage(),
       _ => null,
     };
 
@@ -469,12 +576,19 @@ class AppRouter {
     final title = switch (routePath) {
       ProfileIdentityRoutes.login => '登录入口',
       ProfileIdentityRoutes.organizationHandoff => '公司与组织',
-      ProfileIdentityRoutes.organizationCreate => '创建组织',
+      ProfileIdentityRoutes.organizationSwitch => '切换当前公司/组织',
+      ProfileIdentityRoutes.organizationCreate => '组织资料',
       ProfileIdentityRoutes.organizationJoin => '加入组织',
       ProfileIdentityRoutes.certificationCurrent => '公司认证与我的身份',
       ProfileIdentityRoutes.certificationSubmit => '提交认证',
+      ProfileIdentityRoutes.personalCertificationSubmit => '提交我的认证',
+      ProfileIdentityRoutes.certificationRevalidate => '更正认证资料',
       ProfileIdentityRoutes.certificationResubmit => '重新提交认证',
       ProfileIdentityRoutes.sessionCenter => '会话与设备',
+      ProfileIdentityRoutes.userAgreement => '用户协议',
+      ProfileIdentityRoutes.privacyPolicy => '隐私政策',
+      ProfileIdentityRoutes.passwordReset => '重置密码',
+      ProfileIdentityRoutes.passwordSet => '设置登录密码',
       _ => '我的',
     };
 
@@ -491,6 +605,48 @@ class AppRouter {
   Uri _routeUri(String? routeName) {
     final rawRoute = routeName == null || routeName.isEmpty ? '/' : routeName;
     return Uri.parse(rawRoute);
+  }
+
+  String _enterpriseWorkbenchRouteTitle(Uri routeUri) {
+    final boardType =
+        EnterpriseBoardType.fromRaw(
+          ExhibitionRoutes.enterpriseBoardTypeFromPrivatePath(routeUri.path),
+        ) ??
+        EnterpriseBoardType.fromRaw(routeUri.queryParameters['boardType']);
+    return switch (boardType) {
+      EnterpriseBoardType.company => '公司展示工作台',
+      EnterpriseBoardType.factory => '工厂展示工作台',
+      EnterpriseBoardType.supplier => '供应商展示工作台',
+      null => '企业展示工作台',
+    };
+  }
+
+  String _enterpriseCaseEditorRouteTitle(Uri routeUri) {
+    final boardType =
+        EnterpriseBoardType.fromRaw(
+          ExhibitionRoutes.enterpriseBoardTypeFromPrivatePath(routeUri.path),
+        ) ??
+        EnterpriseBoardType.fromRaw(routeUri.queryParameters['boardType']);
+    return switch (boardType) {
+      EnterpriseBoardType.company => '公司案例编辑工作台',
+      EnterpriseBoardType.factory => '工厂案例编辑工作台',
+      EnterpriseBoardType.supplier => '供应商案例编辑工作台',
+      null => '案例编辑工作台',
+    };
+  }
+
+  String _enterpriseStatusRouteTitle(Uri routeUri) {
+    final boardType =
+        EnterpriseBoardType.fromRaw(
+          ExhibitionRoutes.enterpriseBoardTypeFromPrivatePath(routeUri.path),
+        ) ??
+        EnterpriseBoardType.fromRaw(routeUri.queryParameters['boardType']);
+    return switch (boardType) {
+      EnterpriseBoardType.company => '公司展示状态',
+      EnterpriseBoardType.factory => '工厂展示状态',
+      EnterpriseBoardType.supplier => '供应商展示状态',
+      null => '入驻状态',
+    };
   }
 
   String? _matchPrefixedId(Uri routeUri, String prefix) {

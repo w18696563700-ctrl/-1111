@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -27,6 +28,36 @@ import 'support/exhibition_home_test_doubles.dart';
 
 Map<String, Object?> _summary([String heading = 'summary']) {
   return <String, Object?>{'heading': heading};
+}
+
+Map<String, Object?> _publicResourceItem({
+  required String resourceId,
+  required String resourceCategory,
+  required String title,
+  required String fileAssetId,
+  required String fileName,
+  required String mimeType,
+  required int sortOrder,
+  String? summary,
+}) {
+  return <String, Object?>{
+    'resourceId': resourceId,
+    'resourceCategory': resourceCategory,
+    'title': title,
+    'summary': summary,
+    'fileAssetId': fileAssetId,
+    'fileName': fileName,
+    'mimeType': mimeType,
+    'visibility': 'app_shared',
+    'sortOrder': sortOrder,
+    'publishedAt': '2026-04-14T09:30:00Z',
+  };
+}
+
+Map<String, Object?> _publicResourceListResponse(
+  List<Map<String, Object?>> resources,
+) {
+  return <String, Object?>{'resources': resources};
 }
 
 Map<String, Object?> _projectPayload({
@@ -151,6 +182,54 @@ Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Finder _textFieldByLabel(String label) {
+  return find.byWidgetPredicate(
+    (Widget widget) =>
+        widget is TextField && widget.decoration?.labelText == label,
+  );
+}
+
+Future<void> _enterVisibleTextField(
+  WidgetTester tester, {
+  required String label,
+  required String value,
+}) async {
+  await tester.scrollUntilVisible(
+    find.text(label),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.enterText(_textFieldByLabel(label), value);
+}
+
+Future<void> _expectVisibleText(WidgetTester tester, String text) async {
+  await tester.scrollUntilVisible(
+    find.text(text),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  expect(find.text(text), findsOneWidget);
+}
+
+Future<void> _expectVisibleTextContaining(
+  WidgetTester tester,
+  String text,
+) async {
+  await tester.scrollUntilVisible(
+    find.textContaining(text),
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  expect(find.textContaining(text), findsOneWidget);
+}
+
+Future<void> _uploadBidAttachment(WidgetTester tester, String label) async {
+  await _scrollAndTap(tester, find.widgetWithText(FilledButton, '上传$label'));
+}
+
 Finder _projectCreateField(String label) {
   final key = switch (label) {
     '项目名称' => 'project-create-title',
@@ -216,10 +295,14 @@ Map<String, Object?> _projectCreateAddressRangeBody({
 void main() {
   setUp(() {
     ProjectAttachmentDebugOverrides.reset();
+    ProjectPublicResourceDebugOverrides.reset();
+    BidSubmitAttachmentDebugOverrides.reset();
     AppApiConfig.resetRuntimeBaseUrlOverride();
   });
   tearDown(() {
     ProjectAttachmentDebugOverrides.reset();
+    ProjectPublicResourceDebugOverrides.reset();
+    BidSubmitAttachmentDebugOverrides.reset();
     AppApiConfig.resetRuntimeBaseUrlOverride();
   });
 
@@ -231,6 +314,13 @@ void main() {
           statusCode: 200,
           uri: request.uri,
           body: <String, Object?>{'items': <Object?>[]},
+        );
+      },
+      'GET /api/app/project/public-resources': (AppApiRequest request) async {
+        return AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: _publicResourceListResponse(const <Map<String, Object?>>[]),
         );
       },
     };
@@ -434,8 +524,7 @@ void main() {
                     body: _shellContextPayload(
                       userId: userId,
                       organizationId: organizationId,
-                      organizationType:
-                          organizationId == null
+                      organizationType: organizationId == null
                           ? null
                           : (organizationType ?? 'supplier'),
                       roleKeys: roleKeys,
@@ -2637,6 +2726,14 @@ void main() {
                   ),
                 );
               },
+              'GET /api/app/project/public-resources':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{'resources': <Object?>[]},
+                    );
+                  },
             },
       );
 
@@ -2774,133 +2871,134 @@ void main() {
     },
   );
 
-  testWidgets('bid submit blocks missing personal certification with dual-cert handoff', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
-        shellContextConsumer: buildShellContextConsumer(
-          organizationId: 'org-1',
-          roleKeys: const <String>['supplier_admin'],
-          certificationStatus: 'approved',
-          personalCertificationStatus: 'not_submitted',
-          personalCertificationQualified: false,
+  testWidgets(
+    'bid submit blocks missing personal certification with dual-cert handoff',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'approved',
+            personalCertificationStatus: 'not_submitted',
+            personalCertificationQualified: false,
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-personal-cert-missing',
+          ),
         ),
-        sessionStore: buildAuthenticatedSessionStore(
-          deviceId: 'device-bid-personal-cert-missing',
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('当前我的认证未通过'), findsOneWidget);
+      expect(find.textContaining('企业认证和我的认证同时通过'), findsWidgets);
+      expect(find.widgetWithText(FilledButton, '前往公司认证与我的身份'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'bid submit blocks personal certification locked to another actor',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'approved',
+            personalCertificationStatus: 'approved',
+            personalCertificationQualified: false,
+            personalCertificationLockedToOtherActor: true,
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-personal-cert-locked',
+          ),
         ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('当前我的认证未通过'), findsOneWidget);
-    expect(
-      find.textContaining('企业认证和我的认证同时通过'),
-      findsWidgets,
-    );
-    expect(find.widgetWithText(FilledButton, '前往公司认证与我的身份'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
-  });
+      expect(find.text('当前我的认证已锁定其他账号'), findsOneWidget);
+      expect(find.textContaining('不支持换人'), findsWidgets);
+      expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
+    },
+  );
 
-  testWidgets('bid submit blocks personal certification locked to another actor', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
-        shellContextConsumer: buildShellContextConsumer(
-          organizationId: 'org-1',
-          roleKeys: const <String>['supplier_admin'],
-          certificationStatus: 'approved',
-          personalCertificationStatus: 'approved',
-          personalCertificationQualified: false,
-          personalCertificationLockedToOtherActor: true,
-        ),
-        sessionStore: buildAuthenticatedSessionStore(
-          deviceId: 'device-bid-personal-cert-locked',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    expect(find.text('当前我的认证已锁定其他账号'), findsOneWidget);
-    expect(find.textContaining('不支持换人'), findsWidgets);
-    expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
-  });
-
-  testWidgets('bid submit allows both organization with buyer role after dual certification passes', (
-    WidgetTester tester,
-  ) async {
-    final transport = FakeAppApiTransport(
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            ...defaultHandlers(),
-            'GET /api/app/project/detail': (AppApiRequest request) async {
-              expect(request.uri.queryParameters['projectId'], 'proj-1');
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _projectPayload(
-                  projectId: 'proj-1',
-                  projectNo: 'PROJ-1',
-                  title: '展览项目 1',
-                  buildingType: 'exhibition',
-                  budgetAmount: 1888,
-                  state: 'published',
-                  viewerProjectRelation: 'public_viewer',
-                ),
-              );
+  testWidgets(
+    'bid submit allows both organization with buyer role after dual certification passes',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/project/detail': (AppApiRequest request) async {
+                expect(request.uri.queryParameters['projectId'], 'proj-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectPayload(
+                    projectId: 'proj-1',
+                    projectNo: 'PROJ-1',
+                    title: '展览项目 1',
+                    buildingType: 'exhibition',
+                    budgetAmount: 1888,
+                    state: 'published',
+                    viewerProjectRelation: 'public_viewer',
+                  ),
+                );
+              },
             },
-          },
-    );
+      );
 
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
-        transport: transport,
-        shellContextConsumer: buildShellContextConsumer(
-          organizationId: 'org-1',
-          organizationType: 'both',
-          roleKeys: const <String>['buyer_admin'],
-          certificationStatus: 'approved',
-          personalCertificationStatus: 'approved',
-          personalCertificationQualified: true,
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          transport: transport,
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            organizationType: 'both',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            personalCertificationStatus: 'approved',
+            personalCertificationQualified: true,
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-both-buyer-admin',
+          ),
         ),
-        sessionStore: buildAuthenticatedSessionStore(
-          deviceId: 'device-bid-both-buyer-admin',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, '提交竞标'), findsOneWidget);
-    expect(find.text('当前组织类型未开放竞标资格'), findsNothing);
-  });
+      await _expectVisibleText(tester, '提交竞标');
+      expect(find.text('当前组织类型未开放竞标资格'), findsNothing);
+    },
+  );
 
-  testWidgets('bid submit blocks demand-only organization with controlled handoff', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
-        shellContextConsumer: buildShellContextConsumer(
-          organizationId: 'org-1',
-          organizationType: 'demand',
-          roleKeys: const <String>['buyer_admin'],
-          certificationStatus: 'verified',
+  testWidgets(
+    'bid submit blocks demand-only organization with controlled handoff',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            organizationType: 'demand',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'verified',
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-role-guard',
+          ),
         ),
-        sessionStore: buildAuthenticatedSessionStore(
-          deviceId: 'device-bid-role-guard',
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('当前组织类型未开放竞标资格'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '前往公司与组织'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
-  });
+      expect(find.text('当前组织类型未开放竞标资格'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '前往公司与组织'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
+    },
+  );
 
   testWidgets('bid submit blocks owner route from executable mainline', (
     WidgetTester tester,
@@ -2943,7 +3041,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前项目属于你方发布'), findsOneWidget);
+    await _expectVisibleText(tester, '当前项目属于你方发布');
     expect(find.widgetWithText(FilledButton, '进入我的项目'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
   });
@@ -2989,8 +3087,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前项目暂不可参与竞标'), findsOneWidget);
-    expect(find.text('当前项目投标已结束，暂时不能继续提交竞标。'), findsOneWidget);
+    await _expectVisibleText(tester, '当前项目暂不可参与竞标');
+    await _expectVisibleText(tester, '当前项目投标已结束，暂时不能继续提交竞标。');
     expect(find.widgetWithText(FilledButton, '回到项目详情'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
   });
@@ -3556,7 +3654,28 @@ void main() {
   testWidgets('bid submit success stays in minimum bid continuation only', (
     WidgetTester tester,
   ) async {
+    final uploadedKinds = <String>[];
+    final previewPngBytes = base64Decode(
+      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
+      'AAAADUlEQVR42mP8z8BQDwAFgwJ/lOSv0wAAAABJRU5ErkJggg==',
+    );
+    BidSubmitAttachmentDebugOverrides.installPicker(() async {
+      final nextFile = switch (uploadedKinds.length) {
+        0 => 'project-understanding.png',
+        1 => 'quote-sheet.xlsx',
+        _ => 'schedule-plan.docx',
+      };
+      return BidSubmitAttachmentDraft(
+        fileName: nextFile,
+        bytes: nextFile.endsWith('.png')
+            ? previewPngBytes
+            : utf8.encode('mock-$nextFile'),
+      );
+    });
     final transport = FakeAppApiTransport(
+      uploadHandler: (AppApiUploadRequest request) async {
+        return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+      },
       handlers:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
             ...defaultHandlers(),
@@ -3577,11 +3696,55 @@ void main() {
                 ),
               );
             },
+            'GET /api/app/project/public-resources':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: <String, Object?>{'resources': <Object?>[]},
+                  );
+                },
+            'POST /api/app/file/upload/init': (AppApiRequest request) async {
+              final body = request.body as Map<String, Object?>;
+              final fileKind = '${body['fileKind']}';
+              uploadedKinds.add(fileKind);
+              expect(body['businessType'], 'project');
+              expect(body['businessId'], 'proj-1');
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'uploadSessionId': 'session-$fileKind',
+                  'directUpload': <String, Object?>{
+                    'url': 'https://upload.test/$fileKind',
+                    'method': 'PUT',
+                    'headers': <String, Object?>{},
+                  },
+                  'confirm': <String, Object?>{
+                    'endpoint': '/api/app/file/upload/confirm',
+                  },
+                },
+              );
+            },
+            'POST /api/app/file/upload/confirm': (AppApiRequest request) async {
+              final body = request.body as Map<String, Object?>;
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'fileAssetId': 'fa-${body['uploadSessionId']}',
+                },
+              );
+            },
             'POST /api/app/bid/submit': (AppApiRequest request) async {
               expect(request.body, <String, Object?>{
                 'projectId': 'proj-1',
                 'quoteAmount': 1200.0,
                 'proposalSummary': 'phase 2.1 bid',
+                'projectUnderstandingFileAssetId':
+                    'fa-session-bid_project_understanding',
+                'quoteSheetFileAssetId': 'fa-session-bid_quote_sheet',
+                'schedulePlanFileAssetId': 'fa-session-bid_schedule_plan',
               });
               return AppApiResponse(
                 statusCode: 202,
@@ -3606,11 +3769,18 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.widgetWithText(TextField, '竞标报价'), '1200');
-    await tester.enterText(
-      find.widgetWithText(TextField, '方案说明'),
-      'phase 2.1 bid',
+    await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
+    await _enterVisibleTextField(tester, label: '方案说明', value: 'phase 2.1 bid');
+    await _uploadBidAttachment(tester, '项目理解');
+    await _scrollAndTap(
+      tester,
+      find.widgetWithText(TextButton, '预览检查已上传附件').first,
     );
+    expect(find.text('图片预览'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+    await _uploadBidAttachment(tester, '报价表');
+    await _uploadBidAttachment(tester, '进度安排');
     final submitButton = find.widgetWithText(FilledButton, '提交竞标');
     await _scrollAndTap(tester, submitButton);
 
@@ -3841,6 +4011,313 @@ void main() {
   testWidgets(
     'bid submit default content no longer exposes technical disclosure copy',
     (WidgetTester tester) async {
+      final resources = <Map<String, Object?>>[
+        _publicResourceItem(
+          resourceId: 'resource-contract-1',
+          resourceCategory: 'contract_template',
+          title: '标准合同模板',
+          summary: '用于统一合同模板口径。',
+          fileAssetId: 'file-resource-contract-1',
+          fileName: 'standard-contract-template.pdf',
+          mimeType: 'application/pdf',
+          sortOrder: 0,
+        ),
+        _publicResourceItem(
+          resourceId: 'resource-process-1',
+          resourceCategory: 'process_guide',
+          title: '发布流程图与说明',
+          summary: '用于核对提交流程。',
+          fileAssetId: 'file-resource-process-1',
+          fileName: 'publish-process-guide.pdf',
+          mimeType: 'application/pdf',
+          sortOrder: 1,
+        ),
+        _publicResourceItem(
+          resourceId: 'resource-other-1',
+          resourceCategory: 'other_resource',
+          title: '公共资料汇编',
+          summary: '用于补充共享资料。',
+          fileAssetId: 'file-resource-other-1',
+          fileName: 'public-resource-bundle.docx',
+          mimeType:
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          sortOrder: 2,
+        ),
+      ];
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/project/detail': (AppApiRequest request) async {
+                expect(request.uri.queryParameters['projectId'], 'proj-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectPayload(
+                    projectId: 'proj-1',
+                    projectNo: 'PROJ-1',
+                    title: '展览项目 1',
+                    buildingType: 'exhibition',
+                    budgetAmount: 1888,
+                    state: 'published',
+                    viewerProjectRelation: 'public_viewer',
+                    summaryHeading: 'project',
+                  ),
+                );
+              },
+              'GET /api/app/project/public-resources':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _publicResourceListResponse(resources),
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          transport: transport,
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'verified',
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-content',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('竞标提交'), findsWidgets);
+      expect(find.text('第一步 核对项目'), findsOneWidget);
+      await _expectVisibleText(tester, '核心信息');
+      await _expectVisibleText(tester, '地点与安排');
+      await _expectVisibleText(tester, '第二步 填写报价与方案说明');
+      await _expectVisibleText(tester, '第三步 上传必选文档');
+      await _expectVisibleText(tester, '模板下载区');
+      await _expectVisibleText(tester, '合同模板');
+      await _expectVisibleText(tester, '流程图与说明');
+      await _expectVisibleText(tester, '公共资料');
+      await _expectVisibleText(tester, '项目理解');
+      await _expectVisibleText(tester, '报价表');
+      await _expectVisibleText(tester, '进度安排');
+      expect(find.text('当前说明'), findsNothing);
+      expect(find.text('资料分类'), findsNothing);
+      expect(find.text('当前公共资源目录暂不可用，请稍后再试。'), findsNothing);
+      expect(find.text('席位状态'), findsNothing);
+      expect(find.text('资料完整度'), findsNothing);
+      expect(find.textContaining('BFF base URL'), findsNothing);
+      expect(find.text('当前连接信息（次级）'), findsNothing);
+      expect(find.text('协议承接信息（次级）'), findsNothing);
+      expect(find.text('payload snapshot'), findsNothing);
+    },
+  );
+
+  testWidgets('bid submit keeps compact template download actions available', (
+    WidgetTester tester,
+  ) async {
+    Uri? openedUri;
+    ProjectPublicResourceDebugOverrides.installExternalUrlOpener((
+      Uri uri,
+    ) async {
+      openedUri = uri;
+      return true;
+    });
+
+    final resources = <Map<String, Object?>>[
+      _publicResourceItem(
+        resourceId: 'resource-contract-1',
+        resourceCategory: 'contract_template',
+        title: '标准合同模板',
+        summary: '用于统一合同模板口径。',
+        fileAssetId: 'file-resource-contract-1',
+        fileName: 'standard-contract-template.pdf',
+        mimeType: 'application/pdf',
+        sortOrder: 0,
+      ),
+      _publicResourceItem(
+        resourceId: 'resource-process-1',
+        resourceCategory: 'process_guide',
+        title: '发布流程图与说明',
+        summary: '用于核对提交流程。',
+        fileAssetId: 'file-resource-process-1',
+        fileName: 'publish-process-guide.pdf',
+        mimeType: 'application/pdf',
+        sortOrder: 1,
+      ),
+      _publicResourceItem(
+        resourceId: 'resource-other-1',
+        resourceCategory: 'other_resource',
+        title: '公共资料汇编',
+        summary: '用于补充共享资料。',
+        fileAssetId: 'file-resource-other-1',
+        fileName: 'public-resource-bundle.docx',
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sortOrder: 2,
+      ),
+    ];
+    final transport = FakeAppApiTransport(
+      handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+        ...defaultHandlers(),
+        'GET /api/app/project/detail': (AppApiRequest request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _projectPayload(
+              projectId: 'proj-1',
+              projectNo: 'PROJ-1',
+              title: '展览项目 1',
+              buildingType: 'exhibition',
+              budgetAmount: 1888,
+              state: 'published',
+              viewerProjectRelation: 'public_viewer',
+              summaryHeading: 'project',
+            ),
+          );
+        },
+        'GET /api/app/project/public-resources': (AppApiRequest request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _publicResourceListResponse(resources),
+          );
+        },
+        'GET /api/app/file/access': (AppApiRequest request) async {
+          expect(
+            request.uri.queryParameters['fileAssetId'],
+            'file-resource-contract-1',
+          );
+          expect(request.uri.queryParameters['mode'], 'download');
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'accessUrl':
+                  'https://files.example.com/public-resource-contract-1.pdf',
+              'fileAssetId': 'file-resource-contract-1',
+              'mode': 'download',
+              'fileName': 'standard-contract-template.pdf',
+              'mimeType': 'application/pdf',
+            },
+          );
+        },
+      },
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+        transport: transport,
+        shellContextConsumer: buildShellContextConsumer(
+          organizationId: 'org-1',
+          roleKeys: const <String>['supplier_admin'],
+          certificationStatus: 'verified',
+        ),
+        sessionStore: buildAuthenticatedSessionStore(
+          deviceId: 'device-bid-template-download',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _expectVisibleText(tester, '模板下载区');
+    await _expectVisibleText(tester, '合同模板');
+    await _expectVisibleText(tester, '流程图与说明');
+    await _expectVisibleText(tester, '公共资料');
+    await _scrollAndTap(
+      tester,
+      find.byKey(
+        const ValueKey<String>(
+          'bid-submit-template-download-contract_template',
+        ),
+      ),
+    );
+
+    expect(
+      openedUri?.toString(),
+      'https://files.example.com/public-resource-contract-1.pdf',
+    );
+    expect(find.text('已开始下载资料。'), findsOneWidget);
+  });
+
+  testWidgets(
+    'bid submit rejects project understanding spreadsheet before upload init',
+    (WidgetTester tester) async {
+      var uploadInitCalled = false;
+      BidSubmitAttachmentDebugOverrides.installPicker(() async {
+        return BidSubmitAttachmentDraft(
+          fileName: 'project-understanding.xlsx',
+          bytes: utf8.encode('project-understanding-xlsx'),
+        );
+      });
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/project/detail': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectPayload(
+                    projectId: 'proj-1',
+                    projectNo: 'PROJ-1',
+                    title: '展览项目 1',
+                    buildingType: 'exhibition',
+                    budgetAmount: 1888,
+                    state: 'published',
+                    viewerProjectRelation: 'public_viewer',
+                    summaryHeading: 'project',
+                  ),
+                );
+              },
+              'POST /api/app/file/upload/init': (AppApiRequest request) async {
+                uploadInitCalled = true;
+                return AppApiResponse(
+                  statusCode: 400,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'code': 'FILE_UPLOAD_INIT_INVALID',
+                  },
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          transport: transport,
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'verified',
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-project-understanding-xlsx',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _uploadBidAttachment(tester, '项目理解');
+
+      expect(uploadInitCalled, isFalse);
+      await _expectVisibleText(tester, '项目理解只支持图片、PDF、DOC、DOCX 文件。');
+    },
+  );
+
+  testWidgets(
+    'bid submit attachment slots switch to three columns on wide viewport',
+    (WidgetTester tester) async {
+      await tester.binding.setSurfaceSize(const Size(900, 1200));
+      addTearDown(() => tester.binding.setSurfaceSize(null));
+
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
@@ -3875,21 +4352,43 @@ void main() {
             certificationStatus: 'verified',
           ),
           sessionStore: buildAuthenticatedSessionStore(
-            deviceId: 'device-bid-content',
+            deviceId: 'device-bid-layout',
           ),
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('竞标提交'), findsWidgets);
-      expect(find.text('当前项目 ID：proj-1'), findsOneWidget);
-      expect(find.text('第一步 承接当前项目'), findsOneWidget);
-      expect(find.text('第二步 补齐最小竞标信息'), findsOneWidget);
-      expect(find.text('第三步 提交继续'), findsOneWidget);
-      expect(find.textContaining('BFF base URL'), findsNothing);
-      expect(find.text('当前连接信息（次级）'), findsNothing);
-      expect(find.text('协议承接信息（次级）'), findsNothing);
-      expect(find.text('payload snapshot'), findsNothing);
+      final projectUnderstandingCard = find.byKey(
+        const ValueKey<String>(
+          'bid-submit-attachment-card-project-understanding',
+        ),
+      );
+      final quoteSheetCard = find.byKey(
+        const ValueKey<String>('bid-submit-attachment-card-quote-sheet'),
+      );
+      final schedulePlanCard = find.byKey(
+        const ValueKey<String>('bid-submit-attachment-card-schedule-plan'),
+      );
+
+      await tester.scrollUntilVisible(
+        projectUnderstandingCard,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+
+      final projectRect = tester.getRect(projectUnderstandingCard);
+      final quoteRect = tester.getRect(quoteSheetCard);
+      final scheduleRect = tester.getRect(schedulePlanCard);
+
+      expect((projectRect.top - quoteRect.top).abs(), lessThan(1));
+      expect((quoteRect.top - scheduleRect.top).abs(), lessThan(1));
+      expect(projectRect.left, lessThan(quoteRect.left));
+      expect(quoteRect.left, lessThan(scheduleRect.left));
+      expect((projectRect.width - quoteRect.width).abs(), lessThan(2));
+      expect((quoteRect.width - scheduleRect.width).abs(), lessThan(2));
+      expect((projectRect.height - quoteRect.height).abs(), lessThan(2));
+      expect((quoteRect.height - scheduleRect.height).abs(), lessThan(2));
     },
   );
 
@@ -3924,6 +4423,9 @@ void main() {
         projectId: 'project-1',
         quoteAmount: 1200,
         proposalSummary: 'phase 2.1 bid',
+        projectUnderstandingFileAssetId: 'fa-1',
+        quoteSheetFileAssetId: 'fa-2',
+        schedulePlanFileAssetId: 'fa-3',
       ),
     );
 
@@ -3931,6 +4433,130 @@ void main() {
     expect(result.controlledState, isNull);
     expect(result.payload, <String, Object?>{'bidId': 'bid-1'});
   });
+
+  testWidgets(
+    'bid submit blocks submission when any required attachment is missing',
+    (WidgetTester tester) async {
+      final uploadedKinds = <String>[];
+      BidSubmitAttachmentDebugOverrides.installPicker(() async {
+        final nextFile = switch (uploadedKinds.length) {
+          0 => 'project-understanding.pdf',
+          _ => 'quote-sheet.xlsx',
+        };
+        return BidSubmitAttachmentDraft(
+          fileName: nextFile,
+          bytes: utf8.encode('mock-$nextFile'),
+        );
+      });
+
+      final transport = FakeAppApiTransport(
+        uploadHandler: (AppApiUploadRequest request) async {
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          ...defaultHandlers(),
+          'GET /api/app/project/detail': (AppApiRequest request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: _projectPayload(
+                projectId: 'proj-1',
+                projectNo: 'PROJ-1',
+                title: '展览项目 1',
+                buildingType: 'exhibition',
+                budgetAmount: 1888,
+                state: 'published',
+                viewerProjectRelation: 'public_viewer',
+                summaryHeading: 'project',
+              ),
+            );
+          },
+          'GET /api/app/project/public-resources':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{'resources': <Object?>[]},
+                );
+              },
+          'POST /api/app/file/upload/init': (AppApiRequest request) async {
+            final body = request.body as Map<String, Object?>;
+            final fileKind = '${body['fileKind']}';
+            uploadedKinds.add(fileKind);
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: <String, Object?>{
+                'uploadSessionId': 'session-$fileKind',
+                'directUpload': <String, Object?>{
+                  'url': 'https://upload.test/$fileKind',
+                  'method': 'PUT',
+                  'headers': <String, Object?>{},
+                },
+                'confirm': <String, Object?>{
+                  'endpoint': '/api/app/file/upload/confirm',
+                },
+              },
+            );
+          },
+          'POST /api/app/file/upload/confirm': (AppApiRequest request) async {
+            final body = request.body as Map<String, Object?>;
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: <String, Object?>{
+                'fileAssetId': 'fa-${body['uploadSessionId']}',
+              },
+            );
+          },
+          'POST /api/app/bid/submit': (AppApiRequest request) async {
+            fail(
+              'submit should be blocked until all required attachments confirm',
+            );
+          },
+        },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          transport: transport,
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'verified',
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-bid-miss',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
+      await _enterVisibleTextField(
+        tester,
+        label: '方案说明',
+        value: 'phase 2.1 bid',
+      );
+      await _uploadBidAttachment(tester, '项目理解');
+      await _uploadBidAttachment(tester, '报价表');
+      await _expectVisibleTextContaining(tester, '请先完成并确认附件');
+      final submitButton = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, '提交竞标'),
+      );
+      expect(submitButton.onPressed, isNull);
+      expect(
+        transport.requests
+            .where(
+              (AppApiRequest request) =>
+                  request.canonicalPath == ExhibitionCanonicalPaths.bidSubmit,
+            )
+            .isEmpty,
+        isTrue,
+      );
+    },
+  );
 
   testWidgets(
     'milestone submit default content no longer exposes technical disclosure copy',
@@ -4322,10 +4948,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.enterText(find.widgetWithText(TextField, '竞标报价'), '1200');
-    await tester.enterText(
-      find.widgetWithText(TextField, '方案说明'),
-      'phase 2.2 duplicate bid',
+    await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
+    await _enterVisibleTextField(
+      tester,
+      label: '方案说明',
+      value: 'phase 2.2 duplicate bid',
     );
     final submitButton = find.widgetWithText(FilledButton, '提交竞标');
     await _scrollAndTap(tester, submitButton);

@@ -2,20 +2,30 @@ part of '../exhibition_trade_pages.dart';
 
 String _frontStageStateLabel(String state) {
   return switch (state) {
-    'published' => '已发布',
+    'published' => '竞标中',
     'bidding_closed' => '投标已结束',
     'awarded' => '已授标',
-    'converted_to_order' => '已转为订单',
-    'submitted' => '已提交',
+    'converted_to_order' => '已被承接',
+    'available' => '可锁定',
+    'locked' => '已锁定',
+    'released' => '已释放',
+    'timed_out' => '已超时',
+    'submitted' => '预发布列表',
+    'archived' => '已归档',
     'won' => '已中标',
     'active' => '进行中',
     'pending_submission' => '待提交',
     'pending_confirm' => '待确认',
     'draft' => '草稿',
+    'accepted' => '已受理',
     'opened' => '已开启',
     'withdrawn' => '已撤回',
     'amended' => '已改单',
     'rechecked' => '已复检',
+    'eligible' => '待评价',
+    'complete' => '资料完整',
+    'incomplete' => '资料不完整',
+    'lost' => '未中标',
     _ => state,
   };
 }
@@ -30,19 +40,48 @@ String _frontStageLoadMessage({required String path}) {
 
   return switch (path) {
     ExhibitionCanonicalPaths.projectList => '项目池已经加载，可以先判断是继续跟进现有项目，还是发布新项目。',
+    ExhibitionCanonicalPaths.projectEditDetail =>
+      '项目编辑资料已经到位，可以继续核对当前内容，并决定是仅保存草稿还是进入预发布列表。',
     ExhibitionCanonicalPaths.projectDetail => '项目详情已经到位，可以先确认当前项目状态，再继续后续承接。',
+    ExhibitionCanonicalPaths.bidResult =>
+      '竞标结果已经到位，可以先确认当前项目下的最小结果回读，再决定是否回到项目详情继续。',
     ExhibitionCanonicalPaths.orderDetail => '订单详情已经到位，可以先判断当前要推进里程碑还是进入后半链路入口。',
     ExhibitionCanonicalPaths.milestoneList => '里程碑清单已经到位，现在可以选择当前要推进的里程碑。',
+    ExhibitionCanonicalPaths.ratingEntry =>
+      '评价入口已经到位，可以先确认当前订单是否已承接评价锚点，再决定是否提交。',
     _ => '当前链路已经进入可继续状态，可以按下方动作继续推进。',
   };
 }
 
 String _frontStageSuccessMessage({required String path}) {
   return switch (path) {
-    ExhibitionCanonicalPaths.projectCreate => '项目已经创建完成，下一步可以查看项目详情。',
-    ExhibitionCanonicalPaths.bidSubmit => '投标已经提交完成，下一步可以回看项目详情。',
-    ExhibitionCanonicalPaths.orderCreate => '订单已经承接完成，下一步可以查看订单详情或继续里程碑。',
-    ExhibitionCanonicalPaths.milestoneSubmit => '里程碑已经提交完成，如需补充凭证可继续执行上传。',
+    ExhibitionCanonicalPaths.projectCreate =>
+      '项目已创建，基本信息已保存；下一步先进入我的项目详情，确认信息后再决定继续编辑或保存到预发布列表。',
+    ExhibitionCanonicalPaths.projectSave => '已仅保存草稿，可继续编辑当前项目。',
+    ExhibitionCanonicalPaths.projectSubmit => '已保存到预发布列表，请先检查无误后再正式发布。',
+    ExhibitionCanonicalPaths.projectPublish => '已正式发布，可继续查看公域详情或补充资料。',
+    ExhibitionCanonicalPaths.projectWithdraw => '项目已经撤回到草稿，下一步可以继续编辑。',
+    ExhibitionCanonicalPaths.projectArchive => '项目已经作废归档，后续只保留归档查看入口。',
+    ExhibitionCanonicalPaths.projectClose => '项目已经下架关闭，后续只保留归档查看入口。',
+    ExhibitionCanonicalPaths.bidAward =>
+      '当前定标桥接已受理，页面会同步刷新项目详情与我的项目，并继续保留最小结果承接。',
+    ExhibitionCanonicalPaths.contractConfirm =>
+      '合同确认已受理，页面会继续回显最新合同状态，并同步刷新我的项目与项目工作台。',
+    ExhibitionCanonicalPaths.contractAmend =>
+      '合同改单已受理，页面会继续回显最新合同状态，并同步刷新我的项目与项目工作台。',
+    ExhibitionCanonicalPaths.bidSubmit => '竞标已经提交完成，下一步可以回看项目详情。',
+    ExhibitionCanonicalPaths.milestoneSubmit =>
+      '当前里程碑提交入口已受理，后续可以继续查看验收详情；这不代表里程碑 truth 已在本页推进。',
+    ExhibitionCanonicalPaths.inspectionSubmit =>
+      '当前验收提交入口已受理，后续仍以验收详情真值为准；这不代表验收状态已在本页推进。',
+    ExhibitionCanonicalPaths.inspectionRecheck =>
+      '当前验收复检入口已受理，页面会继续回显最新验收状态，并同步刷新项目工作台。',
+    ExhibitionCanonicalPaths.ratingSubmit =>
+      '当前评价提交入口已受理，页面会同步刷新我的项目与项目工作台，并继续保留最小结果承接。',
+    ExhibitionCanonicalPaths.disputeOpen =>
+      '当前争议开启入口已受理，后续仍停留在边界续接；这不代表争议 truth 已创建。',
+    ExhibitionCanonicalPaths.disputeWithdraw =>
+      '当前争议撤回入口已受理，页面会同步刷新我的项目与项目工作台，并继续保留最小结果承接。',
     _ => '当前动作已经完成，可以按下方入口继续当前链路。',
   };
 }
@@ -61,6 +100,11 @@ String _loadStateLabel(AppPageState state) {
 }
 
 String _loadStateActionHint(ExhibitionLoadResult result) {
+  if (result.path == ExhibitionCanonicalPaths.projectDetail &&
+      result.errorCode == 'AUTH_RESOURCE_UNAVAILABLE') {
+    return '当前页只读承接公域展示退出；这不代表项目不存在，也不代表 owner 私域不可见。你可以回到项目展示继续查看其他公开项目。';
+  }
+
   return switch (result.state) {
     AppPageState.content => '当前页已经准备好，可以直接看下方内容与动作区，按当前链路继续往下走。',
     AppPageState.empty => '当前页先停留在空态说明，方便客户理解这里为什么暂时没有内容，以及现在该回到哪一步。',
@@ -75,6 +119,9 @@ String _loadStateActionHint(ExhibitionLoadResult result) {
 
 String _actionFollowUpMessage(ExhibitionActionResult result) {
   if (result.isSuccess) {
+    if (result.path == ExhibitionCanonicalPaths.projectCreate) {
+      return '当前页会继续给出草稿回显和下一步入口，不需要回到上一页重新找项目详情或编辑入口。';
+    }
     return '当前结果已经承接到页面里，你可以继续看下方结果区和下一步入口，不需要回到上一页重新找上下文。';
   }
 
@@ -133,12 +180,28 @@ String _userFacingUploadNextStep(AppUploadState state) {
 String _userFacingLoadFailureMessage(ExhibitionLoadResult result) {
   final rawMessage = result.message;
 
+  if (result.path == ExhibitionCanonicalPaths.projectDetail &&
+      result.errorCode == 'AUTH_RESOURCE_UNAVAILABLE') {
+    return '当前项目已退出公域展示，公开详情先停在不可用承接；这不等于项目不存在，也不等于 owner 私域不可见。';
+  }
+
   if (_isMissingInstanceMessage(rawMessage)) {
     return _missingInstanceMessageForPath(result.path);
   }
 
   if (_isTransportTechnicalMessage(rawMessage)) {
     return _transportFailureMessageForPath(result.path, isAction: false);
+  }
+
+  if (_isNormalizedChineseBusinessMessage(rawMessage)) {
+    return rawMessage!;
+  }
+
+  final controlledMessage = _controlledBusinessFailureMessage(
+    errorCode: result.errorCode,
+  );
+  if (controlledMessage != null) {
+    return controlledMessage;
   }
 
   return rawMessage ??
@@ -165,8 +228,36 @@ String _userFacingActionFailureMessage(ExhibitionActionResult result) {
     return _transportFailureMessageForPath(result.path, isAction: true);
   }
 
+  if (_isNormalizedChineseBusinessMessage(rawMessage)) {
+    return rawMessage!;
+  }
+
+  final controlledMessage = _controlledBusinessFailureMessage(
+    errorCode: result.errorCode,
+  );
+  if (controlledMessage != null) {
+    return controlledMessage;
+  }
+
   return rawMessage ??
       '当前动作暂时不能继续。你现在可以先重试；如果仍未恢复，请${_recoveryHintForPath(result.path)}。';
+}
+
+String? _controlledBusinessFailureMessage({required String? errorCode}) {
+  return switch (errorCode) {
+    'PROJECT_WITHDRAW_INVALID' => '当前项目尚未提交，暂不支持撤回到草稿。',
+    'PROJECT_ARCHIVE_INVALID' => '当前项目尚未提交，暂不支持作废归档。',
+    'PROJECT_CLOSE_INVALID' => '当前项目状态暂不支持下架关闭。',
+    'BID_AWARD_INVALID' => '当前定标参数未通过校验。请回到我的项目详情确认中标投标 ID 与定标原因后再试。',
+    'BID_AWARD_INVALID_STATE' => '当前项目状态暂时不能继续定标。请先回到我的项目详情确认项目是否已进入后续链路。',
+    'BID_AWARD_DUPLICATE' => '当前项目已经处理过定标，本页不再重复提交。你可以先查看项目详情或我的项目中的最新状态。',
+    'BID_AWARD_CONCURRENT_CONFLICT' => '当前项目的定标正在被其他操作处理。请稍后重新读取项目状态，再决定是否继续。',
+    'ORDER_CONVERSION_FAILED' => '当前定标已受理，但订单承接暂未完成。请稍后重新读取项目详情或我的项目。',
+    'CONTRACT_SEED_FAILED' => '当前定标已受理，但合同承接暂未完成。请稍后重新读取项目详情或我的项目。',
+    'BID_RESULT_INVALID' => '当前项目暂时不能读取竞标结果。请先确认是否从有效项目继续进入。',
+    'BID_RESULT_UNAVAILABLE' => '当前竞标结果暂未开放读取。请稍后再试，或先回到项目详情确认当前状态。',
+    _ => null,
+  };
 }
 
 bool _isMissingInstanceMessage(String? message) {
@@ -192,6 +283,19 @@ bool _isTransportTechnicalMessage(String? message) {
       normalized.contains('response decoding failed');
 }
 
+bool _isNormalizedChineseBusinessMessage(String? message) {
+  if (message == null) {
+    return false;
+  }
+
+  if (_isMissingInstanceMessage(message) ||
+      _isTransportTechnicalMessage(message)) {
+    return false;
+  }
+
+  return RegExp(r'[\u4e00-\u9fff]').hasMatch(message);
+}
+
 String _missingInstanceMessageForPath(String path) {
   if (ExhibitionCanonicalPaths.isMyProjectDetail(path)) {
     return '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到我的项目，再从当前组织项目资产重新进入。';
@@ -199,12 +303,34 @@ String _missingInstanceMessageForPath(String path) {
 
   return switch (path) {
     ExhibitionCanonicalPaths.projectDetail ||
-    ExhibitionCanonicalPaths.bidSubmit ||
-    ExhibitionCanonicalPaths.projectCreate =>
+    ExhibitionCanonicalPaths.bidSubmit =>
+      '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到项目展示，再从已承接项目重新进入。',
+    ExhibitionCanonicalPaths.projectCreate ||
+    ExhibitionCanonicalPaths.projectEditDetail ||
+    ExhibitionCanonicalPaths.projectSave ||
+    ExhibitionCanonicalPaths.projectSubmit ||
+    ExhibitionCanonicalPaths.projectPublish ||
+    ExhibitionCanonicalPaths.projectWithdraw ||
+    ExhibitionCanonicalPaths.projectArchive ||
+    ExhibitionCanonicalPaths.projectClose =>
       '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到项目池，再从已承接项目重新进入。',
-    ExhibitionCanonicalPaths.inspectionDetail ||
-    ExhibitionCanonicalPaths.inspectionSubmit ||
+    ExhibitionCanonicalPaths.contractConfirm =>
+      '当前入口还没有承接到所需订单与合同，这一页暂时不能继续。你现在可以先回到订单或合同详情，再从已承接订单重新进入。',
+    ExhibitionCanonicalPaths.contractAmend =>
+      '当前入口还没有承接到所需订单与合同，这一页暂时不能继续。你现在可以先回到订单或合同详情，再从已承接订单重新进入。',
     ExhibitionCanonicalPaths.inspectionRecheck =>
+      '当前入口还没有承接到所需里程碑或验收实例，这一页暂时不能继续。你现在可以先回到里程碑或验收详情，再从已承接里程碑重新进入。',
+    ExhibitionCanonicalPaths.ratingEntry ||
+    ExhibitionCanonicalPaths.ratingSubmit =>
+      '当前入口还没有承接到所需订单或评价锚点，这一页暂时不能继续。你现在可以先回到订单详情，再从已承接订单重新进入。',
+    ExhibitionCanonicalPaths.bidAward =>
+      '当前入口还没有承接到所需项目或定标参数，这一页暂时不能继续。你现在可以先回到我的项目详情，再从当前项目重新进入。',
+    ExhibitionCanonicalPaths.bidResult =>
+      '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到项目详情，再从当前项目重新进入。',
+    ExhibitionCanonicalPaths.disputeWithdraw =>
+      '当前入口还没有承接到所需订单或争议锚点，这一页暂时不能继续。你现在可以先回到争议开启入口，再从已承接订单重新进入。',
+    ExhibitionCanonicalPaths.inspectionDetail ||
+    ExhibitionCanonicalPaths.inspectionSubmit =>
       '当前入口还没有承接到所需里程碑或验收实例，这一页暂时不能继续。你现在可以先回到展览，再从里程碑链路重新进入。',
     _ => '当前入口还没有承接到所需实例，这一页暂时不能继续。你现在可以先回到展览，再从已承接主链重新进入。',
   };
@@ -216,8 +342,7 @@ String _transportFailureMessageForPath(String path, {required bool isAction}) {
 }
 
 bool _shouldExposeRawFailureMessage(String path, String message) {
-  return message.contains('before contract entry') ||
-      path == ExhibitionCanonicalPaths.ratingEntry;
+  return message.contains('before contract entry');
 }
 
 String _recoveryHintForPath(String path) {
@@ -230,8 +355,21 @@ String _recoveryHintForPath(String path) {
 
   return switch (path) {
     ExhibitionCanonicalPaths.projectDetail ||
-    ExhibitionCanonicalPaths.bidSubmit ||
+    ExhibitionCanonicalPaths.bidResult ||
+    ExhibitionCanonicalPaths.bidSubmit => '回到项目展示，再从已承接项目重新进入',
     ExhibitionCanonicalPaths.projectCreate => '回到项目池，再从已承接项目重新进入',
+    ExhibitionCanonicalPaths.projectWithdraw ||
+    ExhibitionCanonicalPaths.projectArchive ||
+    ExhibitionCanonicalPaths.projectClose => '回到我的项目，再从当前组织项目资产重新进入',
+    ExhibitionCanonicalPaths.bidAward => '回到我的项目详情，再从当前项目重新进入',
+    ExhibitionCanonicalPaths.projectEditDetail ||
+    ExhibitionCanonicalPaths.projectSave ||
+    ExhibitionCanonicalPaths.projectSubmit ||
+    ExhibitionCanonicalPaths.projectPublish => '回到我的项目，再从当前项目重新进入',
+    ExhibitionCanonicalPaths.contractConfirm => '回到订单详情或合同详情，再从当前订单重新进入',
+    ExhibitionCanonicalPaths.contractAmend => '回到订单详情或合同详情，再从当前订单重新进入',
+    ExhibitionCanonicalPaths.inspectionRecheck => '回到里程碑或验收详情，再从当前里程碑重新进入',
+    ExhibitionCanonicalPaths.disputeWithdraw => '回到争议开启入口，再从当前订单重新进入',
     _ => '回到展览，再从已承接主链重新进入',
   };
 }
@@ -246,8 +384,15 @@ String _recoveryButtonLabelForPath(String path) {
 
   return switch (path) {
     ExhibitionCanonicalPaths.projectDetail ||
-    ExhibitionCanonicalPaths.bidSubmit ||
+    ExhibitionCanonicalPaths.bidResult ||
+    ExhibitionCanonicalPaths.bidSubmit => '回到项目展示',
     ExhibitionCanonicalPaths.projectCreate => '回到项目池',
+    ExhibitionCanonicalPaths.bidAward => '回到我的项目',
+    ExhibitionCanonicalPaths.projectEditDetail ||
+    ExhibitionCanonicalPaths.projectSave ||
+    ExhibitionCanonicalPaths.projectSubmit ||
+    ExhibitionCanonicalPaths.projectPublish => '回到我的项目',
+    ExhibitionCanonicalPaths.disputeWithdraw => '回到争议开启',
     _ => '回到展览',
   };
 }
@@ -262,8 +407,15 @@ String _recoveryRouteForPath(String path) {
 
   return switch (path) {
     ExhibitionCanonicalPaths.projectDetail ||
+    ExhibitionCanonicalPaths.bidResult ||
     ExhibitionCanonicalPaths.bidSubmit ||
     ExhibitionCanonicalPaths.projectCreate => ExhibitionRoutes.projectList,
+    ExhibitionCanonicalPaths.bidAward => ExhibitionRoutes.myProjectList,
+    ExhibitionCanonicalPaths.projectEditDetail ||
+    ExhibitionCanonicalPaths.projectSave ||
+    ExhibitionCanonicalPaths.projectSubmit ||
+    ExhibitionCanonicalPaths.projectPublish => ExhibitionRoutes.myProjectList,
+    ExhibitionCanonicalPaths.disputeWithdraw => ExhibitionRoutes.disputeOpen,
     _ => AppBuilding.exhibition.routePath,
   };
 }

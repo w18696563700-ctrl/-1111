@@ -1,7 +1,10 @@
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:geolocator/geolocator.dart';
+
+import 'china_region_catalog.dart';
 
 enum DeviceLocationPermissionState { unknown, granted, denied, unavailable }
 
@@ -19,12 +22,16 @@ class DeviceLocationSnapshot {
     required this.permissionState,
     this.latitude,
     this.longitude,
+    this.provinceCode,
+    this.provinceName,
     this.errorMessage,
   });
 
   final DeviceLocationPermissionState permissionState;
   final double? latitude;
   final double? longitude;
+  final String? provinceCode;
+  final String? provinceName;
   final String? errorMessage;
 
   bool get hasCoordinates => latitude != null && longitude != null;
@@ -53,13 +60,23 @@ abstract class DeviceLocationService {
     _instance = GeolocatorDeviceLocationService();
   }
 
+  bool get supportsDeviceLocation => false;
+
+  bool get supportsReverseGeocoding => false;
+
   Future<DeviceLocationSnapshot> resolveCurrentPosition();
 }
 
 class GeolocatorDeviceLocationService implements DeviceLocationService {
   @override
+  bool get supportsDeviceLocation => _supportsDeviceLocation();
+
+  @override
+  bool get supportsReverseGeocoding => _supportsReverseGeocoding();
+
+  @override
   Future<DeviceLocationSnapshot> resolveCurrentPosition() async {
-    if (!_supportsDeviceLocation()) {
+    if (!supportsDeviceLocation) {
       return const DeviceLocationSnapshot(
         permissionState: DeviceLocationPermissionState.unavailable,
         errorMessage: '当前平台暂不支持设备定位。',
@@ -95,11 +112,17 @@ class GeolocatorDeviceLocationService implements DeviceLocationService {
           accuracy: LocationAccuracy.medium,
         ),
       );
+      final provinceScope = await _resolveProvinceScope(
+        latitude: position.latitude,
+        longitude: position.longitude,
+      );
 
       return DeviceLocationSnapshot(
         permissionState: DeviceLocationPermissionState.granted,
         latitude: position.latitude,
         longitude: position.longitude,
+        provinceCode: provinceScope?.provinceCode,
+        provinceName: provinceScope?.provinceName,
       );
     } on MissingPluginException {
       return const DeviceLocationSnapshot(
@@ -123,6 +146,10 @@ class GeolocatorDeviceLocationService implements DeviceLocationService {
     return Platform.isAndroid || Platform.isIOS || Platform.isMacOS;
   }
 
+  bool _supportsReverseGeocoding() {
+    return Platform.isAndroid || Platform.isIOS;
+  }
+
   DeviceLocationPermissionState _mapPermissionState(
     LocationPermission permission,
   ) {
@@ -136,4 +163,100 @@ class GeolocatorDeviceLocationService implements DeviceLocationService {
         DeviceLocationPermissionState.unknown,
     };
   }
+
+  Future<_DeviceProvinceScope?> _resolveProvinceScope({
+    required double latitude,
+    required double longitude,
+  }) async {
+    if (!supportsReverseGeocoding) {
+      return null;
+    }
+
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      return _provinceScopeFromPlacemarks(placemarks);
+    } on Object {
+      return null;
+    }
+  }
+
+  Future<_DeviceProvinceScope?> _provinceScopeFromPlacemarks(
+    List<Placemark> placemarks,
+  ) async {
+    if (placemarks.isEmpty) {
+      return null;
+    }
+
+    final catalog = await ChinaRegionCatalogLoader.load();
+    for (final placemark in placemarks) {
+      final city =
+          catalog.cityByName(placemark.locality) ??
+          catalog.cityByName(placemark.subAdministrativeArea) ??
+          catalog.cityByName(placemark.subLocality);
+      if (city != null) {
+        return _DeviceProvinceScope(
+          provinceCode: city.provinceCode,
+          provinceName: city.provinceName,
+        );
+      }
+
+      final province = _matchProvinceByName(
+        catalog,
+        placemark.administrativeArea,
+      );
+      if (province != null) {
+        return _DeviceProvinceScope(
+          provinceCode: province.provinceCode,
+          provinceName: province.provinceName,
+        );
+      }
+
+      final administrativeArea = _normalizedRegionName(
+        placemark.administrativeArea,
+      );
+      if (administrativeArea != null) {
+        return _DeviceProvinceScope(provinceName: administrativeArea);
+      }
+    }
+
+    return null;
+  }
+
+  ChinaProvinceOption? _matchProvinceByName(
+    ChinaRegionCatalog catalog,
+    String? rawProvinceName,
+  ) {
+    final normalized = _normalizedRegionName(rawProvinceName);
+    if (normalized == null) {
+      return null;
+    }
+
+    for (final province in catalog.provinces) {
+      if (_normalizedRegionName(province.provinceName) == normalized ||
+          _normalizedRegionName(chinaRegionShortName(province.provinceName)) ==
+              normalized) {
+        return province;
+      }
+    }
+    return null;
+  }
+
+  String? _normalizedRegionName(String? value) {
+    if (value == null) {
+      return null;
+    }
+
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) {
+      return null;
+    }
+    return trimmed.replaceAll(' ', '');
+  }
+}
+
+class _DeviceProvinceScope {
+  const _DeviceProvinceScope({this.provinceCode, this.provinceName});
+
+  final String? provinceCode;
+  final String? provinceName;
 }
