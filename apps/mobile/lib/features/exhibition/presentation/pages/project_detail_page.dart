@@ -277,8 +277,63 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               ],
             ],
           ),
+          const SizedBox(height: 16),
+          _buildTradingImEntryCard(
+            projectId: projectId,
+            bidId: _normalizeId(payload?['bidId'] as String?),
+            canStartBid:
+                !_isOwnerSurface(viewerProjectRelation) &&
+                _canContinueBidFromState(state),
+          ),
         ];
       },
+    );
+  }
+
+  Widget _buildTradingImEntryCard({
+    required String projectId,
+    required String? bidId,
+    required bool canStartBid,
+  }) {
+    return _ActionCard(
+      title: '项目沟通',
+      children: <Widget>[
+        const _StateMessage(
+          title: '当前对象',
+          body: '项目澄清面向当前项目；沟通与投标需要承接具体 bidId。',
+        ),
+        const SizedBox(height: 12),
+        Wrap(
+          spacing: 12,
+          runSpacing: 12,
+          children: <Widget>[
+            FilledButton.tonalIcon(
+              onPressed: () => Navigator.of(context).pushNamed(
+                ExhibitionRoutes.projectClarificationWithProjectId(projectId),
+              ),
+              icon: const Icon(Icons.forum_rounded),
+              label: const Text('项目澄清'),
+            ),
+            if (bidId != null)
+              FilledButton.tonalIcon(
+                onPressed: () => Navigator.of(context).pushNamed(
+                  ExhibitionRoutes.bidThreadWithIds(
+                    projectId: projectId,
+                    bidId: bidId,
+                  ),
+                ),
+                icon: const Icon(Icons.handshake_rounded),
+                label: const Text('沟通与投标'),
+              )
+            else if (canStartBid)
+              OutlinedButton.icon(
+                onPressed: () => _continueBidWithGuard(projectId),
+                icon: const Icon(Icons.handshake_rounded),
+                label: const Text('先参与竞标'),
+              ),
+          ],
+        ),
+      ],
     );
   }
 

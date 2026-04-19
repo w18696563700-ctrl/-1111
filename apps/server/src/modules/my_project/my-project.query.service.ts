@@ -57,6 +57,21 @@ type RatingTruthRow = {
 
 type ProjectViewerRelation = 'owner' | 'non_owner';
 
+type LegacyProjectTruthRow = {
+  id: string;
+  projectNo: string;
+  ownerOrganizationId: string;
+  createdBy: string | null;
+  buildingType: string | null;
+  title: string | null;
+  description: string | null;
+  budgetAmount: string | number | null;
+  state: string | null;
+  publishedAt: string | null;
+  createdAt: string | null;
+  updatedAt: string | null;
+};
+
 @Injectable()
 export class MyProjectQueryService {
   constructor(
@@ -78,10 +93,7 @@ export class MyProjectQueryService {
       return this.presenter.toListResponse([], new Map());
     }
 
-    const projects = await this.projectRepository.find({
-      where: { organizationId: scope.organization.id },
-      order: { publishedAt: 'DESC', createdAt: 'DESC' }
-    });
+    const projects = await this.loadOwnedProjects(scope.organization.id);
     const privateProgressByProjectId = await this.loadPrivateProgressByProjectId(projects);
     return this.presenter.toListResponse(
       projects,
@@ -105,10 +117,7 @@ export class MyProjectQueryService {
       throw projectUnavailable('Current project is unavailable.');
     }
 
-    const project = await this.projectRepository.findOneBy({
-      id: normalizedProjectId,
-      organizationId: scope.organization.id
-    });
+    const project = await this.findOwnedProjectById(normalizedProjectId, scope.organization.id);
     if (!project) {
       throw projectUnavailable('Current project is unavailable.');
     }
@@ -143,15 +152,17 @@ export class MyProjectQueryService {
       return privateProgressByProjectId;
     }
 
-    const [contractRows, milestoneRows, disputeRows, ratingRows] = await Promise.all([
+    const [contractRows, milestoneRows] = await Promise.all([
       this.fetchContractRows(latestOrderIds),
-      this.fetchMilestoneRows(latestOrderIds),
-      this.fetchDisputeRows(latestOrderIds),
-      this.fetchRatingRows(latestOrderIds)
+      this.fetchMilestoneRows(latestOrderIds)
     ]);
 
     const latestContractByOrderId = this.pickFirstRowByKey(contractRows, (row) => row.orderId);
     const currentMilestoneByOrderId = this.pickFirstRowByKey(milestoneRows, (row) => row.orderId);
+    const [disputeRows, ratingRows] = await Promise.all([
+      this.fetchDisputeRows(latestOrderIds),
+      this.fetchRatingRows(latestOrderIds)
+    ]);
     const latestDisputeByOrderId = this.pickFirstRowByKey(disputeRows, (row) => row.orderId);
     const latestRatingByOrderId = this.pickFirstRowByKey(ratingRows, (row) => row.orderId);
 
@@ -179,6 +190,29 @@ export class MyProjectQueryService {
     }
 
     return privateProgressByProjectId;
+  }
+
+  private async loadOwnedProjects(organizationId: string) {
+    const [projects, legacyProjects] = await Promise.all([
+      this.projectRepository.find({
+        where: { organizationId },
+        order: { publishedAt: 'DESC', createdAt: 'DESC' }
+      }),
+      this.fetchLegacyOwnedProjects(organizationId)
+    ]);
+
+    return this.mergeProjects(projects, legacyProjects);
+  }
+
+  private async findOwnedProjectById(projectId: string, organizationId: string) {
+    const project = await this.projectRepository.findOneBy({
+      id: projectId,
+      organizationId
+    });
+    if (project) {
+      return project;
+    }
+    return this.fetchLegacyProjectById(projectId, organizationId);
   }
 
   private ensurePrivateProgressByProjectId(
@@ -296,6 +330,111 @@ export class MyProjectQueryService {
     ) as Promise<RatingTruthRow[]>;
   }
 
+  private async fetchLegacyOwnedProjects(organizationId: string) {
+    const rows = (await this.projectRepository.query(
+      `
+        select
+          projects.id as id,
+          projects.project_no as "projectNo",
+          projects.owner_organization_id as "ownerOrganizationId",
+          projects.created_by as "createdBy",
+          projects.building_type as "buildingType",
+          projects.title as title,
+          projects.description as description,
+          projects.budget_amount as "budgetAmount",
+          projects.state as state,
+          projects.published_at as "publishedAt",
+          projects.created_at as "createdAt",
+          projects.updated_at as "updatedAt"
+        from public.projects
+        where projects.owner_organization_id = $1
+        order by projects.published_at desc nulls last, projects.created_at desc nulls last, projects.id desc
+      `,
+      [organizationId]
+    )) as LegacyProjectTruthRow[];
+
+    return rows.map((row) => this.mapLegacyProjectRow(row));
+  }
+
+  private async fetchLegacyProjectById(projectId: string, organizationId: string) {
+    const rows = (await this.projectRepository.query(
+      `
+        select
+          projects.id as id,
+          projects.project_no as "projectNo",
+          projects.owner_organization_id as "ownerOrganizationId",
+          projects.created_by as "createdBy",
+          projects.building_type as "buildingType",
+          projects.title as title,
+          projects.description as description,
+          projects.budget_amount as "budgetAmount",
+          projects.state as state,
+          projects.published_at as "publishedAt",
+          projects.created_at as "createdAt",
+          projects.updated_at as "updatedAt"
+        from public.projects
+        where projects.id = $1
+          and projects.owner_organization_id = $2
+        limit 1
+      `,
+      [projectId, organizationId]
+    )) as LegacyProjectTruthRow[];
+
+    const row = rows[0];
+    return row ? this.mapLegacyProjectRow(row) : null;
+  }
+
+  private mapLegacyProjectRow(row: LegacyProjectTruthRow) {
+    return {
+      id: row.id,
+      projectNo: row.projectNo,
+      organizationId: row.ownerOrganizationId,
+      creatorUserId: row.createdBy,
+      creatorActorId: row.createdBy,
+      title: row.title ?? '历史项目',
+      exhibitionName: null,
+      brandName: null,
+      buildingType: row.buildingType ?? 'exhibition',
+      budgetAmount: row.budgetAmount ?? 0,
+      areaSqm: null,
+      buildingTypeRemark: null,
+      provinceCode: null,
+      provinceName: null,
+      cityCode: null,
+      cityName: null,
+      districtCode: null,
+      districtName: null,
+      detailAddress: null,
+      scopeSummary: null,
+      plannedStartAt: null,
+      plannedEndAt: null,
+      scheduleDetail: null,
+      description: row.description,
+      state: row.state ?? 'published',
+      summary: {},
+      publishedAt: this.toDateOrNull(row.publishedAt),
+      createdAt: this.toDateOrNow(row.createdAt),
+      updatedAt: this.toDateOrNow(row.updatedAt)
+    } satisfies ProjectEntity;
+  }
+
+  private mergeProjects(primary: ProjectEntity[], legacy: ProjectEntity[]) {
+    const merged = new Map<string, ProjectEntity>();
+    for (const project of [...primary, ...legacy]) {
+      if (!merged.has(project.id)) {
+        merged.set(project.id, project);
+      }
+    }
+    return Array.from(merged.values()).sort((left, right) => {
+      const leftPublished = left.publishedAt?.getTime() ?? 0;
+      const rightPublished = right.publishedAt?.getTime() ?? 0;
+      if (leftPublished !== rightPublished) {
+        return rightPublished - leftPublished;
+      }
+      return right.createdAt.getTime() - left.createdAt.getTime();
+    });
+  }
+
   private pickFirstRowByKey<T>(rows: T[], readKey: (row: T) => string) {
     const byKey = new Map<string, T>();
     for (const row of rows) {
@@ -314,6 +453,18 @@ export class MyProjectQueryService {
     }
     const normalized = value.trim();
     return normalized ? normalized : null;
+  }
+
+  private toDateOrNull(value: string | null) {
+    if (!value) {
+      return null;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private toDateOrNow(value: string | null) {
+    return this.toDateOrNull(value) ?? new Date(0);
   }
 
   private resolveViewerProjectRelation(

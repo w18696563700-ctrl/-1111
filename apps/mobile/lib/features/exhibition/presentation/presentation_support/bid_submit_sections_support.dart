@@ -4,7 +4,6 @@ List<Widget> _buildBidSubmitResultSections({
   required BuildContext context,
   required ExhibitionActionResult result,
   required String? projectId,
-  required ExhibitionStageDataOrigin? lastResultOrigin,
 }) {
   final bidId = _bidIdFromPayload(result.payload);
   if (!result.isSuccess || bidId == null) {
@@ -15,24 +14,10 @@ List<Widget> _buildBidSubmitResultSections({
     const SizedBox(height: 16),
     _ActionCard(
       title: '竞标已提交',
-      summary: lastResultOrigin == ExhibitionStageDataOrigin.demo
-          ? '当前竞标结果来自演示内容，仅用于继续讲解当前页面，不代表真实链路已成功提交。'
-          : '当前竞标已经完成最小提交。此轮成功走廊到 bidId 为止，不继续扩展订单或后续链路。',
+      summary: '当前竞标已经完成提交，页面只保留最小结果回执与返回入口。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         _InstanceSummaryLine(title: '竞标 ID', value: bidId),
-        if (lastResultOrigin == ExhibitionStageDataOrigin.demo) ...<Widget>[
-          const SizedBox(height: 12),
-          const _EmptyNotice(
-            title: '当前展示：演示内容',
-            message: '当前提交结果来自演示内容，真实竞标链路恢复后会自动切回已接通内容。',
-          ),
-        ],
-        const SizedBox(height: 12),
-        const _StateMessage(
-          title: '当前结果',
-          body: '竞标最小提交已经完成。当前页面只保留 bid 提交结果反馈。',
-        ),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -46,6 +31,19 @@ List<Widget> _buildBidSubmitResultSections({
                   );
                 },
                 child: const Text('回到项目详情'),
+              ),
+            if (projectId != null)
+              FilledButton.tonalIcon(
+                onPressed: () {
+                  Navigator.of(context).pushNamed(
+                    ExhibitionRoutes.bidThreadWithIds(
+                      projectId: projectId,
+                      bidId: bidId,
+                    ),
+                  );
+                },
+                icon: const Icon(Icons.handshake_rounded),
+                label: const Text('沟通与投标'),
               ),
             FilledButton.tonal(
               onPressed: () {
@@ -105,24 +103,42 @@ List<Widget> _buildBidSubmitBody({
   required String? routeProjectId,
   required bool guardLoading,
   required _BidAccessGuard? accessGuard,
-  required String? bidId,
-  required ExhibitionLoadResult? seatResult,
-  required ExhibitionLoadResult? completenessResult,
-  required bool showSeatActions,
-  required VoidCallback? onLockSeat,
-  required VoidCallback? onReleaseSeat,
+  required bool flowExpanded,
+  required bool showContinueBidFlowAction,
+  required bool canContinueBidFlow,
+  required Future<void> Function() onContinueBidFlow,
+  required ExhibitionLoadResult? projectDetailResult,
+  required ExhibitionLoadResult? bidMaterialResult,
   required TextEditingController quoteAmountController,
   required TextEditingController proposalSummaryController,
   required bool submitting,
-  required VoidCallback onApplyDemoBidResult,
+  required List<_BidSubmitAttachmentSlotState> attachmentSlots,
+  required Set<String> openingBidMaterialIds,
   required GlobalKey quoteAmountFieldKey,
   required GlobalKey proposalSummaryFieldKey,
-  required VoidCallback onFocusQuoteAmount,
-  required VoidCallback onFocusProposalSummary,
-  required VoidCallback onRetryBidProjection,
+  required Future<void> Function(ProjectBidMaterialReadModel attachment)
+  onPreviewBidMaterial,
+  required VoidCallback onRetryBidMaterials,
+  required Future<void> Function(_BidSubmitAttachmentSlotState slot)
+  onUploadAttachment,
+  required Future<void> Function(_BidSubmitAttachmentSlotState slot)
+  onPreviewAttachment,
 }) {
-  return <Widget>[
-    if (guardLoading)
+  final sections = <Widget>[
+    _buildBidSubmitProjectOverviewSection(
+      context: context,
+      routeProjectId: routeProjectId,
+      projectDetailResult: projectDetailResult,
+      flowExpanded: flowExpanded,
+      showContinueBidFlowAction: showContinueBidFlowAction,
+      canContinueBidFlow: canContinueBidFlow,
+      onContinueBidFlow: onContinueBidFlow,
+    ),
+  ];
+
+  if (guardLoading) {
+    sections.add(const SizedBox(height: 16));
+    sections.add(
       const _ActionCard(
         title: '正在核对竞标守卫',
         summary: '正在检查当前登录、组织类型、双重认证和项目状态，请稍候。',
@@ -131,7 +147,12 @@ List<Widget> _buildBidSubmitBody({
           _DetailLine(label: '当前状态', value: '守卫状态读取中，当前先不开放竞标提交。'),
         ],
       ),
-    if (!guardLoading && accessGuard != null)
+    );
+  }
+
+  if (!guardLoading && accessGuard != null) {
+    sections.add(const SizedBox(height: 16));
+    sections.add(
       _ActionCard(
         title: accessGuard.title,
         summary: accessGuard.message,
@@ -150,45 +171,25 @@ List<Widget> _buildBidSubmitBody({
           ),
         ],
       ),
-    if (guardLoading || accessGuard != null) const SizedBox(height: 16),
-    _ActionCard(
-      title: '第一步 承接当前项目',
-      summary: '最小竞标继续面会直接挂在当前项目下继续推进，所以这一步必须先承接到真实项目。',
-      tone: _ActionCardTone.emphasis,
-      children: <Widget>[
-        if (routeProjectId != null)
-          _InstanceSummaryLine(title: '当前项目 ID', value: routeProjectId),
-        if (routeProjectId != null) const SizedBox(height: 12),
-        const _StateMessage(title: '当前目标', body: '完成本次最小竞标提交并确认 bidId 结果。'),
-        if (routeProjectId == null) ...<Widget>[
-          const SizedBox(height: 12),
-          const _EmptyNotice(
-            title: '当前不可继续',
-            message: '当前没有承接到真实项目时，暂时不能继续真实竞标；如需演示，可直接使用演示结果继续讲解。',
-          ),
-        ],
-      ],
-    ),
+    );
+  }
+
+  if (!flowExpanded) {
+    return sections;
+  }
+
+  sections.addAll(<Widget>[
     const SizedBox(height: 16),
-    ..._buildBidSeatAndCompletenessSections(
-      context: context,
-      projectId: routeProjectId,
-      bidId: bidId,
-      seatResult: seatResult,
-      completenessResult: completenessResult,
-      showSeatActions: showSeatActions,
-      onLockSeat: onLockSeat,
-      onReleaseSeat: onReleaseSeat,
-      onRetrySeat: onRetryBidProjection,
-      showCompletenessActions: true,
-      onFocusQuoteAmount: onFocusQuoteAmount,
-      onFocusProposalSummary: onFocusProposalSummary,
-      onRetryCompleteness: onRetryBidProjection,
+    _buildBidSubmitMaterialSection(
+      bidMaterialResult: bidMaterialResult,
+      openingAttachmentIds: openingBidMaterialIds,
+      onPreview: onPreviewBidMaterial,
+      onRetry: onRetryBidMaterials,
     ),
     const SizedBox(height: 16),
     _ActionCard(
-      title: '第二步 补齐最小竞标信息',
-      summary: '把本次报价和方案说明补充完整，当前最小竞标提交仅消费这两项输入。',
+      title: '第二步 填写报价与方案说明',
+      summary: '补齐本次竞标的报价与方案说明，然后继续上传必选文档。',
       children: <Widget>[
         _InputField(
           controller: quoteAmountController,
@@ -210,24 +211,306 @@ List<Widget> _buildBidSubmitBody({
     ),
     const SizedBox(height: 16),
     _ActionCard(
-      title: '第三步 提交继续',
-      summary: '当前页只保留现有提交动作和受控结果反馈，不扩成独立竞标工作台，也不提前放开后续链路。',
+      title: '第三步 上传必选文档',
+      summary: '项目理解、报价表和进度安排均为必传附件，三项都确认完成后才可提交。',
       children: <Widget>[
-        const _DetailLine(label: '提交后承接', value: '成功后仅返回最小 bidId 结果。'),
-        const _DetailLine(
-          label: '当前边界',
-          value: '本轮不扩比较台、结果披露、我的竞标、订单承接与后续履约链路。',
-        ),
-        const SizedBox(height: 8),
-        FilledButton.tonal(
-          onPressed: (submitting || guardLoading || accessGuard != null)
-              ? null
-              : onApplyDemoBidResult,
-          child: const Text('使用演示竞标继续讲解'),
+        const _BidSubmitTemplateDownloadSection(),
+        const SizedBox(height: 16),
+        _buildBidSubmitAttachmentGrid(
+          context: context,
+          attachmentSlots: attachmentSlots,
+          submitting: submitting,
+          onUploadAttachment: onUploadAttachment,
+          onPreviewAttachment: onPreviewAttachment,
         ),
       ],
     ),
-  ];
+  ]);
+
+  return sections;
+}
+
+Widget _buildBidSubmitProjectOverviewSection({
+  required BuildContext context,
+  required String? routeProjectId,
+  required ExhibitionLoadResult? projectDetailResult,
+  required bool flowExpanded,
+  required bool showContinueBidFlowAction,
+  required bool canContinueBidFlow,
+  required Future<void> Function() onContinueBidFlow,
+}) {
+  final result = projectDetailResult;
+  if (routeProjectId == null) {
+    return const _ActionCard(
+      title: '第一步 核对项目',
+      summary: '进入竞标前先确认当前要处理的项目。',
+      tone: _ActionCardTone.emphasis,
+      children: <Widget>[
+        _EmptyNotice(title: '当前还没有承接到项目', message: '请先从项目详情进入当前项目，再继续提交竞标。'),
+      ],
+    );
+  }
+
+  if (result == null || result.state == AppPageState.loading) {
+    return _ActionCard(
+      title: '第一步 核对项目',
+      summary: '进入竞标前先确认当前要处理的项目。',
+      tone: _ActionCardTone.emphasis,
+      children: <Widget>[
+        _InstanceSummaryLine(title: '当前项目 ID', value: routeProjectId),
+        const SizedBox(height: 12),
+        const _StateMessage(title: '正在读取项目详情', body: '正在同步当前项目的核心信息与地点安排。'),
+      ],
+    );
+  }
+
+  if (result.state != AppPageState.content) {
+    return _ActionCard(
+      title: '第一步 核对项目',
+      summary: '进入竞标前先确认当前要处理的项目。',
+      tone: _ActionCardTone.emphasis,
+      children: <Widget>[
+        _InstanceSummaryLine(title: '当前项目 ID', value: routeProjectId),
+        const SizedBox(height: 12),
+        _StateMessage(
+          title: '项目详情暂不可读',
+          body: result.message ?? '当前项目详情暂不可读，请稍后重试。',
+        ),
+      ],
+    );
+  }
+
+  final payload = _payloadMap(result.payload) ?? const <String, Object?>{};
+  final projectNo = _normalizeId(payload['projectNo'] as String?);
+  final exhibitionName = _projectExhibitionName(payload);
+  final brandName = _projectBrandName(payload);
+  final title = _projectDisplayTitle(payload);
+  final state = _stateFromPayload(result.payload);
+  final buildingType = _normalizeId(payload['buildingType'] as String?);
+  final budgetAmount = payload['budgetAmount'];
+  final areaSqm = payload['areaSqm'] as num?;
+  final buildingTypeRemark = _normalizeId(
+    payload['buildingTypeRemark'] as String?,
+  );
+  final summaryMap = _payloadMap(payload['summary']);
+  final summaryHeading = _normalizeId(summaryMap?['heading'] as String?);
+  final description = _normalizeId(payload['description'] as String?);
+  final provinceName = _normalizeId(payload['provinceName'] as String?);
+  final cityName = _normalizeId(payload['cityName'] as String?);
+  final districtName = _normalizeId(payload['districtName'] as String?);
+  final detailAddress = _normalizeId(payload['detailAddress'] as String?);
+  final scopeSummary = _normalizeId(payload['scopeSummary'] as String?);
+  final plannedStartAt = _normalizeId(payload['plannedStartAt'] as String?);
+  final plannedEndAt = _normalizeId(payload['plannedEndAt'] as String?);
+  final scheduleDetail = _normalizeId(payload['scheduleDetail'] as String?);
+  final headline = exhibitionName ?? title;
+  final secondaryHeadline = exhibitionName != null
+      ? brandName ?? _compatibilityTitle(headline: exhibitionName, title: title)
+      : brandName;
+  final locationSummary = _locationSummary(
+    provinceName: provinceName,
+    cityName: cityName,
+    districtName: districtName,
+    detailAddress: detailAddress,
+  );
+  final scheduleRange = _scheduleRangeSummary(
+    plannedStartAt: plannedStartAt,
+    plannedEndAt: plannedEndAt,
+  );
+  final arrangementMissing =
+      _bidSubmitAddressRangeFullyMissing(
+        provinceName: provinceName,
+        cityName: cityName,
+        districtName: districtName,
+        detailAddress: detailAddress,
+        scopeSummary: scopeSummary,
+        plannedStartAt: plannedStartAt,
+        plannedEndAt: plannedEndAt,
+        scheduleDetail: scheduleDetail,
+      ) &&
+      description == null;
+
+  return _ActionCard(
+    title: '第一步 核对项目',
+    summary: flowExpanded
+        ? '先确认当前参与竞标的项目无误，再继续填写报价和上传文档。'
+        : '先确认当前参与竞标的项目无误；点击“继续竞标”后再查看项目附件、填写报价和上传文档。',
+    tone: _ActionCardTone.emphasis,
+    children: <Widget>[
+      _ActionCard(
+        title: '核心信息',
+        tone: _ActionCardTone.emphasis,
+        children: <Widget>[
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      headline,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    if (secondaryHeadline != null) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text(
+                        secondaryHeadline,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              if (state != null)
+                _StatusPill(
+                  label: _frontStageStateLabel(state),
+                  tone: _ActionCardTone.muted,
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _ProjectDetailCompactMetaGrid(
+            items: <_ProjectDetailCompactMetaItemData>[
+              _ProjectDetailCompactMetaItemData(
+                label: '项目编号',
+                value: projectNo ?? '未提供',
+                fullWidth: true,
+              ),
+              _ProjectDetailCompactMetaItemData(
+                label: '项目类型',
+                value: _buildingTypeLabel(buildingType),
+              ),
+              _ProjectDetailCompactMetaItemData(
+                label: '预算金额',
+                value: _currencyText(budgetAmount),
+                highlight: true,
+              ),
+              _ProjectDetailCompactMetaItemData(
+                label: '项目面积',
+                value: _areaSqmOrUnavailable(areaSqm),
+              ),
+            ],
+          ),
+          if (buildingTypeRemark != null) ...<Widget>[
+            const SizedBox(height: 12),
+            _DetailLine(label: '类型备注', value: buildingTypeRemark),
+          ],
+          if (summaryHeading != null) ...<Widget>[
+            const SizedBox(height: 4),
+            _DetailLine(label: '项目摘要', value: summaryHeading),
+          ],
+        ],
+      ),
+      const SizedBox(height: 16),
+      _ActionCard(
+        title: '地点与安排',
+        children: <Widget>[
+          if (arrangementMissing)
+            const _EmptyNotice(
+              title: '当前暂无地点与安排信息',
+              message: '当前项目暂未提供地点、范围、说明或时间安排。',
+            ),
+          if (locationSummary != null)
+            _DetailLine(label: '项目地点', value: locationSummary),
+          if (scopeSummary != null)
+            _DetailLine(label: '范围说明', value: scopeSummary),
+          if (scheduleRange != null)
+            _DetailLine(label: '计划时间', value: scheduleRange),
+          if (scheduleDetail != null)
+            _DetailLine(label: '时间说明', value: scheduleDetail),
+          if (description != null)
+            _DetailLine(label: '补充说明', value: description),
+        ],
+      ),
+      if (showContinueBidFlowAction) ...<Widget>[
+        const SizedBox(height: 16),
+        FilledButton(
+          onPressed: canContinueBidFlow ? onContinueBidFlow : null,
+          child: const Text('继续竞标'),
+        ),
+        if (!canContinueBidFlow) ...<Widget>[
+          const SizedBox(height: 8),
+          const Text('项目核对完成后，当前按钮才会开放。'),
+        ],
+      ],
+    ],
+  );
+}
+
+String _bidSubmitFieldOrUnavailable(String? value) {
+  return value ?? '当前项目暂未提供';
+}
+
+bool _bidSubmitAddressRangeFullyMissing({
+  required String? provinceName,
+  required String? cityName,
+  required String? districtName,
+  required String? detailAddress,
+  required String? scopeSummary,
+  required String? plannedStartAt,
+  required String? plannedEndAt,
+  required String? scheduleDetail,
+}) {
+  return provinceName == null &&
+      cityName == null &&
+      districtName == null &&
+      detailAddress == null &&
+      scopeSummary == null &&
+      plannedStartAt == null &&
+      plannedEndAt == null &&
+      scheduleDetail == null;
+}
+
+String _areaSqmOrUnavailable(num? value) {
+  if (value == null) {
+    return '当前项目暂未提供';
+  }
+
+  final normalized = value
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'\.?0+$'), '');
+  return '$normalized ㎡';
+}
+
+String? _compatibilityTitle({required String headline, required String title}) {
+  return headline == title ? null : title;
+}
+
+String? _locationSummary({
+  required String? provinceName,
+  required String? cityName,
+  required String? districtName,
+  required String? detailAddress,
+}) {
+  final regionParts = <String?>[
+    provinceName,
+    cityName,
+    districtName,
+  ].nonNulls.toList(growable: false);
+  final regionLabel = regionParts.isEmpty ? null : regionParts.join(' / ');
+  if (regionLabel == null && detailAddress == null) {
+    return null;
+  }
+  if (regionLabel != null && detailAddress != null) {
+    return '$regionLabel · $detailAddress';
+  }
+  return regionLabel ?? detailAddress;
+}
+
+String? _scheduleRangeSummary({
+  required String? plannedStartAt,
+  required String? plannedEndAt,
+}) {
+  if (plannedStartAt == null && plannedEndAt == null) {
+    return null;
+  }
+  return '${_bidSubmitFieldOrUnavailable(plannedStartAt)} 至 ${_bidSubmitFieldOrUnavailable(plannedEndAt)}';
 }
 
 Widget _buildBidSeatSection({

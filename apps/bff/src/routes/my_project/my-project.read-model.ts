@@ -6,6 +6,8 @@ export type ProjectShowcaseListItemReadModel = {
   projectId: string;
   projectNo: string;
   title: string;
+  exhibitionName: string | null;
+  brandName: string | null;
   buildingType: string;
   budgetAmount: number;
   areaSqm: number | null;
@@ -13,6 +15,8 @@ export type ProjectShowcaseListItemReadModel = {
   provinceName: string | null;
   cityCode: string | null;
   cityName: string | null;
+  plannedStartAt: string | null;
+  plannedEndAt: string | null;
   state: string;
   summary: ProjectSummary;
 };

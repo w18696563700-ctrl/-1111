@@ -10,31 +10,25 @@ class RatingEntryPage extends StatefulWidget {
 }
 
 class _RatingEntryPageState extends State<RatingEntryPage> {
-  late final TextEditingController _orderIdController = TextEditingController(
-    text: widget.orderId ?? '',
-  );
-  ExhibitionLoadResult? _result;
+  ExhibitionLoadResult? _entryResult;
   bool _loading = false;
+  bool _submitting = false;
+  ExhibitionActionResult? _submitResult;
 
   @override
   void initState() {
     super.initState();
-    if (_orderIdController.text.trim().isEmpty) {
-      _result = ExhibitionLoadResult(
+    if (_normalizeId(widget.orderId) == null) {
+      _entryResult = ExhibitionLoadResult(
         state: AppPageState.notFound,
         method: 'GET',
         path: ExhibitionCanonicalPaths.ratingEntry,
         message: 'orderId is required from route context before rating entry',
       );
-    } else {
-      _load();
+      return;
     }
-  }
 
-  @override
-  void dispose() {
-    _orderIdController.dispose();
-    super.dispose();
+    _load();
   }
 
   Future<void> _load({bool forceRefresh = false}) async {
@@ -43,7 +37,7 @@ class _RatingEntryPageState extends State<RatingEntryPage> {
     });
 
     final result = await ExhibitionConsumerLayer.instance.loadRatingEntry(
-      orderId: _orderIdController.text,
+      orderId: widget.orderId,
       forceRefresh: forceRefresh,
     );
 
@@ -52,87 +46,173 @@ class _RatingEntryPageState extends State<RatingEntryPage> {
     }
 
     setState(() {
-      _result = result;
+      _entryResult = result;
       _loading = false;
+    });
+  }
+
+  Future<void> _submit() async {
+    final orderId = _normalizeId(widget.orderId);
+    if (_submitting || orderId == null) {
+      return;
+    }
+
+    setState(() {
+      _submitting = true;
+      _submitResult = null;
+    });
+
+    final result = await ExhibitionConsumerLayer.instance.submitRating(
+      RatingSubmitCommand(orderId: orderId),
+    );
+
+    if (result.isSuccess) {
+      await ExhibitionConsumerLayer.instance.loadMyProjectList(
+        forceRefresh: true,
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _submitting = false;
+      _submitResult = result;
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final routeOrderId = _normalizeId(widget.orderId);
-    final showRouteControls =
-        routeOrderId != null && _result?.state == AppPageState.content;
+    final result = _entryResult;
+    final entryState = _stateFromPayload(result?.payload);
 
     return _LoadPageFrame(
       title: '评价入口',
-      summary: '先确认当前评价是待提交还是已提交；待提交时继续提交，已提交时保持只读承接，不扩成争议入口、资格台、评审矩阵或历史报表。',
+      summary:
+          '这里只承接当前订单的最小评价 entry + submit 闭环。页面只消费既有评价锚点，不扩成评价工作台、历史列表或详情面。',
       loading: _loading,
-      result: _result,
+      result: result,
       onRetry: () => _load(forceRefresh: true),
-      controls: showRouteControls
-          ? _routeOnlyControls(
-              routeId: routeOrderId,
-              label: 'orderId',
-              onReload: () => _load(forceRefresh: true),
-              reloadLabel: '重新读取当前评价入口',
-            )
-          : const <Widget>[],
+      showConnectionInfo: false,
+      showTechnicalDisclosure: false,
+      controls: _routeOnlyControls(
+        routeId: routeOrderId,
+        label: 'orderId',
+        onReload: () => _load(forceRefresh: true),
+        reloadLabel: '重新读取评价入口',
+      ),
+      recoveryRouteOverride:
+          routeOrderId == null
+              ? null
+              : ExhibitionRoutes.orderDetailWithOrderId(routeOrderId),
+      recoveryButtonLabelOverride:
+          routeOrderId == null ? null : '回到订单详情',
       resultSectionsBuilder: (ExhibitionLoadResult result) {
-        final ratingState = _stateFromPayload(result.payload);
-        final ratingSummary = _payloadMap(result.payload)?['summary'];
         if (result.state != AppPageState.content || routeOrderId == null) {
           return const <Widget>[];
         }
 
-        final actionStatus = switch (ratingState) {
-          'draft' => '当前动作：可以继续提交评价',
-          _ => '当前动作：当前保持只读',
-        };
-        final nextStep = switch (ratingState) {
-          'draft' => '提交完成后，页面会继续承接已提交评价状态，不再展开更多流程。',
-          'submitted' => '当前评价已经提交，后续仍以现有入口回看为主。',
-          _ => '当前评价停留在受控承接面，后续不会在这里展开 review 或 moderation。',
-        };
-
-        final children = <Widget>[
-          Text(switch (ratingState) {
-            'draft' => '当前评价还未提交，现在可以继续完成评价提交。',
-            'submitted' => '当前评价已经提交，页面保持在只读承接面。',
-            _ => '当前评价停留在受控承接面，下一步仍以已有入口为准。',
-          }),
-          const SizedBox(height: 12),
-          _InstanceSummaryLine(title: '当前订单 ID', value: routeOrderId),
-          if (ratingState != null) ...<Widget>[
-            const SizedBox(height: 12),
-            Text('当前业务状态：${_frontStageStateLabel(ratingState)}'),
-          ],
-          if (ratingSummary is Map) ...<Widget>[
-            const SizedBox(height: 12),
-            const Text('摘要承接：已承接最小 summary'),
-          ],
-          const SizedBox(height: 12),
-          Chip(label: Text(actionStatus)),
-          const SizedBox(height: 12),
-          Text('后续如何继续：$nextStep'),
-        ];
-
-        if (ratingState == 'draft') {
-          children.addAll(<Widget>[
-            const SizedBox(height: 12),
-            FilledButton(
-              onPressed: () {
-                Navigator.of(context).pushNamed(
-                  ExhibitionRoutes.ratingSubmitWithOrderId(routeOrderId),
-                );
-              },
-              child: const Text('继续提交评价'),
-            ),
-          ]);
-        }
+        final payload = _payloadMap(result.payload);
+        final actionPayload = _payloadMap(_submitResult?.payload);
+        final ratingId =
+            _normalizeId(actionPayload?['ratingId'] as String?) ??
+            _normalizeId(payload?['ratingId'] as String?);
+        final summary = payload?['summary'];
+        final displayState =
+            (_submitResult?.isSuccess == true
+                ? _stateFromPayload(_submitResult?.payload)
+                : null) ??
+            entryState;
+        final showSubmitButton =
+            displayState == 'eligible' && !(_submitResult?.isSuccess == true);
 
         return <Widget>[
           const SizedBox(height: 16),
-          _ActionCard(title: '现在先处理什么', children: children),
+          _ActionCard(
+            title: '当前评价锚点',
+            summary: '先确认当前订单是否已经承接到可评价锚点；是否真的允许提交，仍以后端当前返回为准。',
+            tone: _ActionCardTone.emphasis,
+            children: <Widget>[
+              _InstanceSummaryLine(title: '当前订单 ID', value: routeOrderId),
+              if (ratingId != null) ...<Widget>[
+                const SizedBox(height: 12),
+                _InstanceSummaryLine(title: '当前评价 ID', value: ratingId),
+              ],
+              if (displayState != null) ...<Widget>[
+                const SizedBox(height: 12),
+                _DetailLine(
+                  label: '当前状态',
+                  value: _frontStageStateLabel(displayState),
+                  highlight: true,
+                ),
+              ],
+              if (summary is Map)
+                const _DetailLine(
+                  label: '当前说明',
+                  value: '当前评价入口已经读取到最小评价锚点；页面不会扩成评价工作台。',
+                ),
+              const SizedBox(height: 12),
+              _StateMessage(
+                title: '当前动作',
+                body: showSubmitButton
+                    ? '当前可以继续提交最小评价；提交后会刷新我的项目。'
+                    : '当前页继续保留最小评价结果承接，不展开第二套评价流程。',
+              ),
+              if (showSubmitButton) ...<Widget>[
+                const SizedBox(height: 12),
+                FilledButton(
+                  key: const ValueKey<String>('rating_submit_button'),
+                  onPressed: _submitting ? null : _submit,
+                  child: const Text('继续评价提交'),
+                ),
+              ],
+            ],
+          ),
+          if (_submitting) ...<Widget>[
+            const SizedBox(height: 16),
+            const _SubmittingPanel(),
+          ] else if (_submitResult != null) ...<Widget>[
+            const SizedBox(height: 16),
+            _SubmissionResultPanel(result: _submitResult!),
+            if (_submitResult!.isSuccess) ...<Widget>[
+              const SizedBox(height: 16),
+              _ActionCard(
+                title: '评价提交已受理',
+                summary: '当前页承接提交后的最小结果，并同步刷新我的项目。',
+                tone: _ActionCardTone.emphasis,
+                children: <Widget>[
+                  _InstanceSummaryLine(title: '当前订单 ID', value: routeOrderId),
+                  if (_normalizeId(
+                        _payloadMap(_submitResult?.payload)?['ratingId']
+                            as String?,
+                      )
+                      case final String submittedRatingId) ...<Widget>[
+                    const SizedBox(height: 12),
+                    _InstanceSummaryLine(
+                      title: '当前评价 ID',
+                      value: submittedRatingId,
+                    ),
+                  ],
+                  if (_stateFromPayload(_submitResult?.payload)
+                      case final String actionState) ...<Widget>[
+                    const SizedBox(height: 12),
+                    _DetailLine(
+                      label: '当前状态',
+                      value: _frontStageStateLabel(actionState),
+                      highlight: true,
+                    ),
+                  ],
+                  if (_payloadMap(_submitResult?.payload)?['summary'] is Map)
+                    const _DetailLine(
+                      label: '当前说明',
+                      value: '评价提交已受理；页面已经刷新我的项目缓存。',
+                    ),
+                ],
+              ),
+            ],
+          ],
         ];
       },
     );

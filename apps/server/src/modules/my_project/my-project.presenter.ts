@@ -18,6 +18,11 @@ export class MyProjectPresenter {
 
     for (const project of projects) {
       const item = this.toListItem(project, privateProgressByProjectId.get(project.id));
+      if (item.publicProject.state === 'archived') {
+        historicalProjects.push(item);
+        continue;
+      }
+      // historicalProjects contains owner-archived items plus formally completed continuation.
       if (item.privateSummary.formalCompletionStatus === 'formally_completed') {
         historicalProjects.push(item);
         continue;

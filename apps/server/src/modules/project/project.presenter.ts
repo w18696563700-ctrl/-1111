@@ -3,13 +3,18 @@ import { ProjectEntity } from './entities/project.entity';
 
 @Injectable()
 export class ProjectPresenter {
-  toAcceptedResponse(projectId: string) {
-    return { projectId };
+  toAcceptedResponse(projectId: string, state: string) {
+    return { projectId, state };
   }
 
-  toListResponse(projects: ProjectEntity[]) {
+  toDeleteAcceptedResponse(projectId: string) {
+    return { projectId, state: 'deleted' };
+  }
+
+  toListResponse(projects: ProjectEntity[], page: number, pageSize: number, total: number) {
     return {
-      items: projects.map((project) => this.toShowcaseListItem(project))
+      items: projects.map((project) => this.toShowcaseListItem(project)),
+      pagination: this.toPagination(page, pageSize, total)
     };
   }
 
@@ -37,6 +42,8 @@ export class ProjectPresenter {
       projectId: project.id,
       projectNo: project.projectNo,
       title: project.title,
+      exhibitionName: this.toNullableText(project.exhibitionName),
+      brandName: this.toNullableText(project.brandName),
       buildingType: project.buildingType,
       budgetAmount: Number(project.budgetAmount),
       areaSqm: this.toNullableNumber(project.areaSqm),
@@ -44,6 +51,8 @@ export class ProjectPresenter {
       provinceName: this.toNullableText(project.provinceName),
       cityCode: this.toNullableText(project.cityCode),
       cityName: this.toNullableText(project.cityName),
+      plannedStartAt: this.toNullableDate(project.plannedStartAt),
+      plannedEndAt: this.toNullableDate(project.plannedEndAt),
       state: project.state,
       summary: this.toSummary(project.summary, project.state)
     };
@@ -59,11 +68,23 @@ export class ProjectPresenter {
   }
 
   private toStateLabel(state: string) {
+    if (state === 'draft') return '当前项目为草稿，尚未进入公域展示。';
+    if (state === 'submitted') return '当前项目已提交，尚未进入公域展示。';
     if (state === 'published') return '当前项目已发布，可继续进入最小竞标继续面。';
     if (state === 'bidding_closed') return '当前项目投标窗口已关闭。';
     if (state === 'awarded') return '当前项目已授标。';
     if (state === 'converted_to_order') return '当前项目已进入订单链路。';
+    if (state === 'archived') return '当前项目已归档，可在历史项目中查看。';
     return '当前项目状态已承接。';
+  }
+
+  private toPagination(page: number, pageSize: number, total: number) {
+    return {
+      page,
+      pageSize,
+      total,
+      hasMore: page * pageSize < total
+    };
   }
 
   private readString(value: unknown) {

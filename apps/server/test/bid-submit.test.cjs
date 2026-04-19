@@ -231,19 +231,26 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
       async transaction(callback) {
         return callback({
           getRepository(entity) {
-            return {
-              async save(value) {
-                if (entity === BidEntity) {
+            if (entity === BidEntity) {
+              return {
+                async findOneBy() {
+                  return null;
+                },
+                async save(value) {
                   savedBids.push(value);
                   return value;
-                }
-                if (entity === IdentityAuditLogEntity) {
+                },
+              };
+            }
+            if (entity === IdentityAuditLogEntity) {
+              return {
+                async save(value) {
                   savedAudit.push(value);
                   return value;
-                }
-                throw new Error('unexpected repository');
-              },
-            };
+                },
+              };
+            }
+            throw new Error('unexpected repository');
           },
         });
       },
@@ -296,7 +303,7 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
 
   assert.equal(savedBids.length, 1);
   assert.equal(savedBids[0].projectId, 'project-1');
-  assert.equal(savedBids[0].bidNo, `BID-${createProject().projectNo}`);
+  assert.match(savedBids[0].bidNo, /^BID-PROJ-2026-1-[0-9A-F]{12}$/);
   assert.equal(savedBids[0].bidderOrganizationId, 'supplier-org');
   assert.equal(savedBids[0].organizationId, 'supplier-org');
   assert.equal(savedBids[0].quoteAmount, '88888.00');
@@ -308,6 +315,109 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   assert.equal(savedAudit[0].action, 'BidSubmitted');
   assert.equal(savedAudit[0].afterState, 'submitted');
   assert.deepEqual(result, { bidId: savedBids[0].id });
+});
+
+test('bid submit rejects same organization duplicate submission with controlled conflict', async () => {
+  const { BidEntity } = require('../dist/modules/bid/entities/bid.entity.js');
+  const { IdentityAuditLogEntity } = require('../dist/modules/audit/identity-audit-log.entity.js');
+  const { BidWriteService } = require('../dist/modules/bid/bid-write.service.js');
+  const service = new BidWriteService(
+    {
+      create(input) {
+        return input;
+      },
+    },
+    {
+      async findOneBy() {
+        return createProject();
+      },
+    },
+    {
+      async transaction(callback) {
+        return callback({
+          getRepository(entity) {
+            if (entity === BidEntity) {
+              return {
+                async findOneBy() {
+                  return {
+                    id: 'existing-bid',
+                    projectId: 'project-1',
+                    bidderOrganizationId: 'supplier-org',
+                  };
+                },
+                async save() {
+                  throw new Error('should not save duplicate bid');
+                },
+              };
+            }
+            if (entity === IdentityAuditLogEntity) {
+              return {
+                async save() {
+                  throw new Error('should not append audit for duplicate bid');
+                },
+              };
+            }
+            throw new Error('unexpected repository');
+          },
+        });
+      },
+    },
+    {
+      async verifyCurrentSessionContext(context) {
+        return {
+          outcome: 'verified',
+          currentSession: {
+            sessionId: 'session-1',
+            actorId: 'supplier-user',
+            userId: 'supplier-user',
+            organizationId: 'supplier-org',
+            requestId: context.requestId,
+            traceId: context.traceId,
+          },
+        };
+      },
+    },
+    {
+      async requireBidSubmitEligibilityFromContext(context, resolver, project) {
+        const verified = await resolver.verifyCurrentSessionContext(context);
+        return {
+          currentSession: verified.currentSession,
+          scope: {
+            organization: { id: 'supplier-org' },
+            membership: { roleKey: 'supplier_admin' },
+            certification: { certificationStatus: 'approved' },
+            roleKeys: ['supplier_admin'],
+          },
+          project,
+        };
+      },
+    },
+    {
+      toAcceptedResponse(bidId) {
+        return { bidId };
+      },
+    },
+  );
+
+  await assert.rejects(
+    () =>
+      service.submitBid(
+        {
+          projectId: 'project-1',
+          quoteAmount: 88888,
+          proposalSummary: '供应商最小报价与执行方案',
+        },
+        createContext('bid-duplicate'),
+      ),
+    (error) => {
+      assert.equal(error?.response?.code, 'BID_DUPLICATE_SUBMISSION');
+      assert.equal(
+        error?.response?.message,
+        'Current actor has already submitted a bid for this project.',
+      );
+      return true;
+    },
+  );
 });
 
 test('bid submit rejects malformed body and unavailable project with controlled errors', async () => {
@@ -340,5 +450,22 @@ test('bid submit rejects malformed body and unavailable project with controlled 
         createContext('unavailable'),
       ),
     (error) => error?.response?.code === 'AUTH_RESOURCE_UNAVAILABLE',
+  );
+});
+
+test('bid duplicate submission migration registers explicit project plus bidder uniqueness', () => {
+  const {
+    bidDuplicateSubmitRepairMigrations,
+    serverMigrations,
+  } = require('../dist/core/migrations/migrations.js');
+  const migration = bidDuplicateSubmitRepairMigrations.find(
+    (item) => item.key === '20260415_bid_duplicate_submission_controlled_repair',
+  );
+
+  assert.ok(migration);
+  assert.ok(serverMigrations.includes(migration));
+  assert.match(
+    migration.statements.join('\n'),
+    /CREATE UNIQUE INDEX IF NOT EXISTS idx_bids_project_bidder_unique/,
   );
 });

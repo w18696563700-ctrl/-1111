@@ -3,6 +3,8 @@ part of '../exhibition_consumer_layer.dart';
 class ProjectCreateCommand {
   ProjectCreateCommand({
     required this.title,
+    this.exhibitionName,
+    this.brandName,
     required this.buildingType,
     required this.budgetAmount,
     required this.provinceCode,
@@ -10,7 +12,7 @@ class ProjectCreateCommand {
     required this.cityCode,
     required this.cityName,
     required this.detailAddress,
-    required this.scopeSummary,
+    this.scopeSummary,
     this.areaSqm,
     this.buildingTypeRemark,
     this.districtCode,
@@ -25,6 +27,8 @@ class ProjectCreateCommand {
        );
 
   final String title;
+  final String? exhibitionName;
+  final String? brandName;
   final String buildingType;
   final double budgetAmount;
   final String provinceCode;
@@ -32,7 +36,7 @@ class ProjectCreateCommand {
   final String cityCode;
   final String cityName;
   final String detailAddress;
-  final String scopeSummary;
+  final String? scopeSummary;
   final double? areaSqm;
   final String? buildingTypeRemark;
   final String? districtCode;
@@ -48,6 +52,8 @@ class ProjectCreateCommand {
 
   Map<String, Object?> toJson() => <String, Object?>{
     'title': title,
+    if (_hasMeaningfulText(exhibitionName)) 'exhibitionName': exhibitionName,
+    if (_hasMeaningfulText(brandName)) 'brandName': brandName,
     'buildingType': buildingType,
     'budgetAmount': budgetAmount,
     if (areaSqm != null) 'areaSqm': areaSqm,
@@ -58,7 +64,7 @@ class ProjectCreateCommand {
     'cityCode': cityCode,
     'cityName': cityName,
     'detailAddress': detailAddress,
-    'scopeSummary': scopeSummary,
+    if (_hasMeaningfulText(scopeSummary)) 'scopeSummary': scopeSummary,
     if (_hasMeaningfulText(districtCode)) 'districtCode': districtCode,
     if (_hasMeaningfulText(districtName)) 'districtName': districtName,
     if (_hasMeaningfulText(plannedStartAt)) 'plannedStartAt': plannedStartAt,

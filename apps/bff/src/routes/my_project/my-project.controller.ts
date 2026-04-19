@@ -1,4 +1,4 @@
-import { Controller, Get, Headers, Param } from '@nestjs/common';
+import { Controller, Delete, Get, Headers, HttpCode, HttpStatus, Param } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
 import { MyProjectService } from './my-project.service';
 
@@ -18,5 +18,13 @@ export class MyProjectController {
   ) {
     return this.myProjectService.getMyProjectDetail(projectId, headers);
   }
-}
 
+  @Delete(':projectId')
+  @HttpCode(HttpStatus.ACCEPTED)
+  deleteMyProject(
+    @Param('projectId') projectId: string,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.myProjectService.deleteMyProject(projectId, headers);
+  }
+}

@@ -1,0 +1,34 @@
+import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
+import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module';
+import { AuthModule } from '../auth/auth.module';
+import { OrganizationModule } from '../organization/organization.module';
+import { ProjectEntity } from '../project/entities/project.entity';
+import { BidController } from './bid.controller';
+import { BidPackageCompletenessQueryService } from './bid-package-completeness.query.service';
+import { BidPackageController } from './bid-package.controller';
+import { BidSeatMigrationService } from './bid-seat-migration.service';
+import { BidSeatService } from './bid-seat.service';
+import { BidPresenter } from './bid.presenter';
+import { BidWriteService } from './bid-write.service';
+import { BidEntity } from './entities/bid.entity';
+import { BidSeatEntity } from './entities/bid-seat.entity';
+
+@Module({
+  imports: [
+    TypeOrmModule.forFeature([BidEntity, BidSeatEntity, ProjectEntity, IdentityAuditLogEntity]),
+    AuthModule,
+    OrganizationModule,
+    ProjectPublishAuditModule
+  ],
+  controllers: [BidController, BidPackageController],
+  providers: [
+    BidPresenter,
+    BidWriteService,
+    BidSeatMigrationService,
+    BidSeatService,
+    BidPackageCompletenessQueryService
+  ]
+})
+export class BidModule {}

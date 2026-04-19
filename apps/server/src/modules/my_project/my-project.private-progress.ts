@@ -22,8 +22,6 @@ export type MyProjectTradeTruthSnapshot = {
   ratingStatus: string | null;
 };
 
-const TERMINAL_DISPUTE_STATES = new Set(['withdrawn', 'closed', 'resolved']);
-
 export function createDefaultMyProjectPrivateProgress(): MyProjectPrivateProgressReadModel {
   return {
     hasAcceptedOrder: false,
@@ -40,10 +38,7 @@ export function createDefaultMyProjectPrivateProgress(): MyProjectPrivateProgres
 export function deriveMyProjectPrivateProgress(
   snapshot: MyProjectTradeTruthSnapshot
 ): MyProjectPrivateProgressReadModel {
-  const formalCompletionStatus = deriveFormalCompletionStatus(
-    snapshot.orderStatus,
-    snapshot.afterSalesOrDisputeStatus
-  );
+  const formalCompletionStatus = deriveFormalCompletionStatus(snapshot.orderStatus);
 
   return {
     hasAcceptedOrder: snapshot.hasAcceptedOrder,
@@ -57,28 +52,16 @@ export function deriveMyProjectPrivateProgress(
   };
 }
 
-function deriveFormalCompletionStatus(
-  orderStatus: string | null,
-  disputeStatus: string | null
-): MyProjectFormalCompletionStatus {
-  if (orderStatus !== 'completed') {
-    return 'not_formally_completed';
-  }
-  if (!disputeStatus) {
-    return 'formally_completed';
-  }
-  return TERMINAL_DISPUTE_STATES.has(disputeStatus) ? 'formally_completed' : 'not_formally_completed';
+function deriveFormalCompletionStatus(orderStatus: string | null): MyProjectFormalCompletionStatus {
+  return orderStatus === 'completed' ? 'formally_completed' : 'not_formally_completed';
 }
 
 function deriveEvaluationStatus(
   formalCompletionStatus: MyProjectFormalCompletionStatus,
   ratingStatus: string | null
 ): MyProjectEvaluationStatus {
-  if (ratingStatus === 'submitted') {
-    return 'submitted';
+  if (formalCompletionStatus !== 'formally_completed') {
+    return 'not_eligible';
   }
-  if (formalCompletionStatus === 'formally_completed') {
-    return 'eligible';
-  }
-  return 'not_eligible';
+  return ratingStatus === 'submitted' ? 'submitted' : 'eligible';
 }

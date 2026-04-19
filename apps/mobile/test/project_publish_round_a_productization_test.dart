@@ -8,41 +8,6 @@ import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
-Map<String, Object?> _workbenchPayload() {
-  return <String, Object?>{
-    'project_chain': <String, Object?>{
-      'hasProjects': false,
-      'recentProjectId': null,
-      'recentProjectTitle': null,
-      'canCreateProject': true,
-      'canOpenProjectPool': true,
-    },
-    'order_chain': <String, Object?>{
-      'activeOrderId': null,
-      'activeOrderNo': null,
-      'activeOrderState': null,
-      'canOpenOrderDetail': false,
-      'canOpenContractDetail': false,
-      'canOpenDisputeOpen': false,
-    },
-    'fulfillment_chain': <String, Object?>{
-      'activeMilestoneId': null,
-      'activeMilestoneTitle': null,
-      'inspectionState': null,
-      'canOpenMilestoneList': false,
-      'canOpenMilestoneSubmit': false,
-      'canOpenInspectionDetail': false,
-      'canOpenInspectionSubmit': false,
-    },
-    'extension_boundary': <String, Object?>{
-      'canOpenContractDetail': false,
-      'ratingEntryState': 'controlled_unavailable',
-      'canOpenDisputeOpen': false,
-      'disputeWithdrawState': 'frozen',
-    },
-  };
-}
-
 ExhibitionMobileApp _buildApp({
   required FakeAppApiTransport transport,
   AppSessionStore? sessionStore,
@@ -113,6 +78,9 @@ AppShellContextConsumer _buildShellContextConsumer() {
                     'roleKeys': const <String>['supplier_admin'],
                     'certificationStatus': 'verified',
                     'membershipStatus': 'active',
+                    'projectCreateEligibility': const <String, Object?>{
+                      'canCreateProject': true,
+                    },
                     'visibleBuildings': const <String>[
                       'exhibition',
                       'messages',
@@ -146,8 +114,11 @@ Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
 Finder _projectCreateField(String label) {
   final key = switch (label) {
     '项目名称' => 'project-create-title',
+    '品牌' => 'project-create-brand-name',
     '项目类型' => 'project-create-building-type',
+    '类型备注（选填）' => 'project-create-building-type-remark',
     '预算金额' => 'project-create-budget-amount',
+    '项目面积' => 'project-create-area-sqm',
     '省' => 'project-create-province',
     '市' => 'project-create-city',
     '区/县' => 'project-create-district',
@@ -161,39 +132,29 @@ Finder _projectCreateField(String label) {
   return find.byKey(ValueKey<String>(key));
 }
 
+Finder _projectCreateScopeSummaryInput() {
+  return find.byKey(
+    const ValueKey<String>('project-create-scope-summary-input'),
+  );
+}
+
+Future<void> _setProjectCreateScopeSummary(
+  WidgetTester tester,
+  String value,
+) async {
+  await _scrollAndTap(tester, _projectCreateField('范围说明'));
+  await tester.enterText(_projectCreateScopeSummaryInput(), value);
+  await tester.pumpAndSettle();
+  await tester.tap(find.widgetWithText(FilledButton, '保存说明'));
+  await tester.pumpAndSettle();
+}
+
 Future<void> _selectProjectType(
   WidgetTester tester, {
   String option = '会展',
 }) async {
   await _scrollAndTap(tester, _projectCreateField('项目类型'));
-  await _scrollAndTap(tester, find.text(option));
-}
-
-Future<void> _selectStandardizedProjectLocation(
-  WidgetTester tester, {
-  String location = '四川 / 成都',
-  String? district = '武侯区',
-}) async {
-  await _scrollAndTap(tester, _projectCreateField('省'));
-  await _scrollAndTap(tester, find.text(location));
-  if (district == null) {
-    return;
-  }
-  await _scrollAndTap(tester, _projectCreateField('区/县'));
-  await _scrollAndTap(tester, find.text(district));
-}
-
-Future<void> _fillCreateRequiredFields(
-  WidgetTester tester, {
-  String title = 'Round A 项目',
-  String budgetAmount = '1280',
-}) async {
-  await tester.enterText(_projectCreateField('项目名称'), title);
-  await _selectProjectType(tester, option: '会议');
-  await tester.enterText(_projectCreateField('预算金额'), budgetAmount);
-  await _selectStandardizedProjectLocation(tester);
-  await tester.enterText(_projectCreateField('详细地址'), '世纪城新国际会展中心 6 号馆西门');
-  await tester.enterText(_projectCreateField('范围说明'), '主舞台、医疗器械展区与灯光联动区进场搭建');
+  await tester.tap(find.text(option, skipOffstage: false).last);
   await tester.pumpAndSettle();
 }
 
@@ -206,16 +167,7 @@ void main() {
 
       final transport = FakeAppApiTransport(
         handlers:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/workbench':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: _workbenchPayload(),
-                    );
-                  },
-            },
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
       );
 
       await tester.pumpWidget(
@@ -231,6 +183,16 @@ void main() {
       expect(find.text('项目地点与范围', skipOffstage: false), findsOneWidget);
       expect(find.text('计划时间', skipOffstage: false), findsOneWidget);
 
+      final titleY = tester.getTopLeft(_projectCreateField('项目名称')).dy;
+      final brandY = tester.getTopLeft(_projectCreateField('品牌')).dy;
+      expect((titleY - brandY).abs(), lessThan(1));
+
+      final typeY = tester.getTopLeft(_projectCreateField('项目类型')).dy;
+      final budgetY = tester.getTopLeft(_projectCreateField('预算金额')).dy;
+      final areaY = tester.getTopLeft(_projectCreateField('项目面积')).dy;
+      expect((typeY - budgetY).abs(), lessThan(1));
+      expect((typeY - areaY).abs(), lessThan(1));
+
       final provinceY = tester.getTopLeft(_projectCreateField('省')).dy;
       final cityY = tester.getTopLeft(_projectCreateField('市')).dy;
       final districtY = tester.getTopLeft(_projectCreateField('区/县')).dy;
@@ -240,14 +202,15 @@ void main() {
       await _selectProjectType(tester, option: '会议');
       expect(find.textContaining('已选择会议'), findsOneWidget);
 
-      await _scrollAndTap(tester, find.byTooltip('选择计划开始日期'));
-      await tester.tap(
-        find
-            .descendant(of: find.byType(Dialog), matching: find.text('10'))
-            .last,
+      expect(find.text('添加范围说明'), findsOneWidget);
+      await _setProjectCreateScopeSummary(tester, '主舞台、医疗器械展区与灯光联动区进场搭建');
+      expect(find.text('编辑范围说明'), findsOneWidget);
+      expect(
+        find.textContaining('主舞台、医疗器械展区', skipOffstage: false),
+        findsWidgets,
       );
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('确定'));
+
+      await tester.enterText(_projectCreateField('计划开始日期'), '2026年4月10日');
       await tester.pumpAndSettle();
 
       final startDateField = tester.widget<TextField>(
@@ -257,6 +220,9 @@ void main() {
         startDateField.controller?.text,
         matches(RegExp(r'^\d{4}年\d{1,2}月\d{1,2}日$')),
       );
+      final startDateY = tester.getTopLeft(_projectCreateField('计划开始日期')).dy;
+      final endDateY = tester.getTopLeft(_projectCreateField('计划结束日期')).dy;
+      expect((startDateY - endDateY).abs(), lessThan(1));
       await tester.scrollUntilVisible(
         find.text('补充说明与附件'),
         200,
@@ -267,18 +233,49 @@ void main() {
 
       await tester.binding.setSurfaceSize(const Size(420, 1000));
       await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        _projectCreateField('项目类型'),
+        -200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
 
-      final narrowProvinceY = tester.getTopLeft(_projectCreateField('省')).dy;
-      final narrowCityY = tester.getTopLeft(_projectCreateField('市')).dy;
-      final narrowDistrictY = tester.getTopLeft(_projectCreateField('区/县')).dy;
+      final narrowTypeY = tester.getTopLeft(_projectCreateField('项目类型')).dy;
+      final narrowBudgetY = tester.getTopLeft(_projectCreateField('预算金额')).dy;
+      final narrowAreaY = tester.getTopLeft(_projectCreateField('项目面积')).dy;
       expect(
-        narrowCityY > narrowProvinceY + 10 ||
-            narrowDistrictY > narrowProvinceY + 10,
+        narrowBudgetY > narrowTypeY + 10 || narrowAreaY > narrowTypeY + 10,
         isTrue,
       );
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('Round A location fields use province and city wording', (
+    WidgetTester tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(900, 1100));
+
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        transport: transport,
+        sessionStore: _buildAuthenticatedSessionStore(
+          deviceId: 'region-picker',
+        ),
+        shellContextConsumer: _buildShellContextConsumer(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('点击选择省 / 市'), findsOneWidget);
+    expect(find.text('请选择项目所在省 / 市，系统会自动带入对应地区信息。'), findsOneWidget);
+  });
 
   testWidgets(
     'Round A validation shows unified message and scrolls to first invalid field',
@@ -288,16 +285,7 @@ void main() {
 
       final transport = FakeAppApiTransport(
         handlers:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/workbench':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: _workbenchPayload(),
-                    );
-                  },
-            },
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
       );
 
       await tester.pumpWidget(
@@ -313,14 +301,17 @@ void main() {
         find.byType(Scrollable).first,
       );
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, '发布项目'),
+        find.widgetWithText(FilledButton, '保存项目基本信息并跳转至我的项目'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
       final beforeSubmitOffset = scrollable.position.pixels;
 
-      final submitButton = find.widgetWithText(FilledButton, '发布项目');
+      final submitButton = find.widgetWithText(
+        FilledButton,
+        '保存项目基本信息并跳转至我的项目',
+      );
       final submitAction = tester.widget<FilledButton>(submitButton);
       expect(submitAction.onPressed, isNotNull);
       submitAction.onPressed!();
@@ -331,7 +322,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final titleField = tester.widget<TextField>(_projectCreateField('项目名称'));
-      expect(titleField.decoration?.errorText, '请输入项目名称');
+      expect(titleField.decoration?.errorText, '请输入展会');
       expect(scrollable.position.pixels, lessThan(beforeSubmitOffset));
       expect(tester.getTopLeft(_projectCreateField('项目名称')).dy, lessThan(220));
     },
@@ -340,20 +331,20 @@ void main() {
   testWidgets(
     'Round A selector still submits canonical buildingType exhibition',
     (WidgetTester tester) async {
+      var createCalled = false;
+      AppSessionStore.install(
+        _buildAuthenticatedSessionStore(deviceId: 'mapping-direct'),
+      );
+      addTearDown(AppSessionStore.reset);
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/workbench':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: _workbenchPayload(),
-                    );
-                  },
               'POST /api/app/project/create': (AppApiRequest request) async {
+                createCalled = true;
                 expect(request.body, <String, Object?>{
-                  'title': 'Round A 映射项目',
+                  'title': 'Round A 映射项目 - 坤特',
+                  'exhibitionName': 'Round A 映射项目',
+                  'brandName': '坤特',
                   'buildingType': 'exhibition',
                   'budgetAmount': 1280.0,
                   'provinceCode': '510000',
@@ -368,33 +359,96 @@ void main() {
                 return AppApiResponse(
                   statusCode: 202,
                   uri: request.uri,
-                  body: const <String, Object?>{'projectId': 'round-a-project'},
+                  body: const <String, Object?>{
+                    'projectId': 'round-a-project',
+                    'state': 'draft',
+                  },
                 );
               },
             },
       );
-
-      await tester.pumpWidget(
-        _buildApp(
+      final exhibitionConsumerLayer = ExhibitionConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
           transport: transport,
-          sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mapping'),
-          shellContextConsumer: _buildShellContextConsumer(),
         ),
       );
-      await tester.pumpAndSettle();
-
-      await _fillCreateRequiredFields(tester, title: 'Round A 映射项目');
-      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '发布项目'));
-
-      await tester.scrollUntilVisible(
-        find.text('项目创建成功'),
-        200,
-        scrollable: find.byType(Scrollable).first,
+      final result = await exhibitionConsumerLayer.createProject(
+        ProjectCreateCommand(
+          title: 'Round A 映射项目 - 坤特',
+          exhibitionName: 'Round A 映射项目',
+          brandName: '坤特',
+          buildingType: 'exhibition',
+          budgetAmount: 1280,
+          provinceCode: '510000',
+          provinceName: '四川',
+          cityCode: '510100',
+          cityName: '成都',
+          districtCode: '510107',
+          districtName: '武侯区',
+          detailAddress: '世纪城新国际会展中心 6 号馆西门',
+          scopeSummary: '主舞台、医疗器械展区与灯光联动区进场搭建',
+        ),
       );
-      await tester.pumpAndSettle();
 
-      expect(find.text('项目创建成功'), findsOneWidget);
-      expect(find.text('项目 ID：round-a-project'), findsOneWidget);
+      expect(createCalled, isTrue);
+      expect(result.isSuccess, isTrue);
+    },
+  );
+
+  testWidgets(
+    'Round A create keeps scope summary optional in request payload',
+    (WidgetTester tester) async {
+      var createCalled = false;
+      AppSessionStore.install(
+        _buildAuthenticatedSessionStore(deviceId: 'optional-direct'),
+      );
+      addTearDown(AppSessionStore.reset);
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/project/create': (AppApiRequest request) async {
+                createCalled = true;
+                expect(
+                  request.body,
+                  isNot(containsPair('scopeSummary', anything)),
+                );
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'projectId': 'round-a-optional',
+                    'state': 'draft',
+                  },
+                );
+              },
+            },
+      );
+      final exhibitionConsumerLayer = ExhibitionConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: transport,
+        ),
+      );
+      final result = await exhibitionConsumerLayer.createProject(
+        ProjectCreateCommand(
+          title: 'Round A 选填范围项目 - 坤特',
+          exhibitionName: 'Round A 选填范围项目',
+          brandName: '坤特',
+          buildingType: 'exhibition',
+          budgetAmount: 1280,
+          provinceCode: '510000',
+          provinceName: '四川',
+          cityCode: '510100',
+          cityName: '成都',
+          districtCode: '510107',
+          districtName: '武侯区',
+          detailAddress: '世纪城新国际会展中心 6 号馆西门',
+        ),
+      );
+
+      expect(createCalled, isTrue);
+      expect(result.isSuccess, isTrue);
     },
   );
 }

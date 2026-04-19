@@ -19,6 +19,8 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   final TextEditingController _quoteAmountController = TextEditingController();
   final TextEditingController _proposalSummaryController =
       TextEditingController();
+  late final List<_BidSubmitAttachmentSlotState> _attachmentSlots =
+      _createBidSubmitAttachmentSlots();
 
   bool _guardLoading = true;
   _BidAccessGuard? _accessGuard;
@@ -27,14 +29,15 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   bool _guardInitialized = false;
   int _guardRetryCount = 0;
   bool _submitting = false;
-  bool _seatActionInFlight = false;
   ExhibitionActionResult? _lastResult;
   ExhibitionStageDataOrigin? _lastResultOrigin;
   String? _submittedBidId;
   ExhibitionLoadResult? _bidResult;
-  ExhibitionLoadResult? _seatResult;
-  ExhibitionLoadResult? _completenessResult;
+  ExhibitionLoadResult? _projectDetailResult;
+  ExhibitionLoadResult? _bidMaterialResult;
   bool _resultLoading = false;
+  bool _bidFlowExpanded = false;
+  final Set<String> _openingBidMaterialIds = <String>{};
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
 
@@ -79,6 +82,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       _loadBidResultAccessGuard();
       return;
     }
+    _loadSubmitProjectDetail();
     _loadAccessGuard();
   }
 
@@ -166,6 +170,31 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       return;
     }
 
+    final confirmedAttachmentIds = <String>[];
+    final missingAttachments = <String>[];
+    for (final slot in _attachmentSlots) {
+      final fileAssetId = _normalizeId(slot.fileAssetId);
+      if (fileAssetId == null || !slot.isConfirmed) {
+        missingAttachments.add(slot.label);
+        continue;
+      }
+      confirmedAttachmentIds.add(fileAssetId);
+    }
+
+    if (missingAttachments.isNotEmpty) {
+      setState(() {
+        _lastResult = ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.bidSubmit,
+          isSuccess: false,
+          controlledState: AppPageState.errorNonRetryable,
+          message: '请先完成并确认附件：${missingAttachments.join('、')}，再继续提交竞标。',
+        );
+        _lastResultOrigin = ExhibitionStageDataOrigin.futureReal;
+      });
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _lastResult = null;
@@ -177,6 +206,9 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
         projectId: projectId,
         quoteAmount: quoteAmount,
         proposalSummary: proposalSummary,
+        projectUnderstandingFileAssetId: confirmedAttachmentIds[0],
+        quoteSheetFileAssetId: confirmedAttachmentIds[1],
+        schedulePlanFileAssetId: confirmedAttachmentIds[2],
       ),
     );
 
@@ -189,10 +221,6 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       _lastResult = result;
       _lastResultOrigin = ExhibitionStageDataOrigin.futureReal;
       _submittedBidId = _bidIdFromPayload(result.payload);
-      if (_submittedBidId == null) {
-        _seatResult = null;
-        _completenessResult = null;
-      }
     });
 
     if (result.isSuccess) {
@@ -208,7 +236,6 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           ),
         ]);
       }
-      await _loadBidSeatAndCompleteness(forceRefresh: true);
     }
   }
 
@@ -239,51 +266,65 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   Widget _buildSubmitMode(BuildContext context) {
     final routeProjectId = _normalizeId(widget.projectId);
     final projectId = _normalizeId(_projectIdController.text);
+    final showContinueBidFlowAction =
+        routeProjectId != null &&
+        !_guardLoading &&
+        _accessGuard == null &&
+        !_bidFlowExpanded;
+    final canContinueBidFlow =
+        showContinueBidFlowAction &&
+        _projectDetailResult?.state == AppPageState.content;
+    final submitDisabledMessage = _bidFlowExpanded
+        ? _bidSubmitAttachmentSubmitDisabledMessage(_attachmentSlots)
+        : null;
 
     return _SubmissionPageFrame(
       title: '竞标提交',
-      summary: '这里是当前项目下的最小竞标继续面，只收口报价、方案说明和提交反馈，不扩到订单或后续链路。',
+      summary: '这里是当前项目下的竞标提交页，只保留核对项目、填写报价、上传必选文档和最小结果反馈。',
       canonicalPath: ExhibitionCanonicalPaths.bidSubmit,
       submitting: _submitting,
       lastResult: _lastResult,
       onSubmitPressed: _submit,
       submitButtonLabel: '提交竞标',
-      showSubmitButton: !_guardLoading && _accessGuard == null,
-      sourceLabel: '当前展示方式：优先显示已接通内容',
-      sourceMessage: '默认优先展示已接通结果；这一步只保留最小竞标继续动作，如需不中断演示，也可以切换到演示内容继续讲解。',
+      showSubmitButton:
+          !_guardLoading && _accessGuard == null && _bidFlowExpanded,
+      submitEnabled: submitDisabledMessage == null,
+      submitDisabledMessage: submitDisabledMessage,
       showConnectionInfo: false,
       showTechnicalDisclosure: false,
+      showPageSummaryCard: false,
+      showSourceNotice: false,
+      showActionContainer: false,
+      hideResultPanelOnSuccess: true,
       resultSectionsBuilder: (ExhibitionActionResult result) =>
           _buildBidSubmitResultSections(
             context: context,
             result: result,
             projectId: projectId,
-            lastResultOrigin: _lastResultOrigin,
           ),
       body: _buildBidSubmitBody(
         context: context,
         routeProjectId: routeProjectId,
         guardLoading: _guardLoading,
         accessGuard: _accessGuard,
-        bidId: _submittedBidId,
-        seatResult: _seatResult,
-        completenessResult: _completenessResult,
+        flowExpanded: _bidFlowExpanded,
+        showContinueBidFlowAction: showContinueBidFlowAction,
+        canContinueBidFlow: canContinueBidFlow,
+        onContinueBidFlow: _continueBidFlow,
+        projectDetailResult: _projectDetailResult,
+        bidMaterialResult: _bidMaterialResult,
         quoteAmountController: _quoteAmountController,
         proposalSummaryController: _proposalSummaryController,
         submitting: _submitting,
-        onApplyDemoBidResult: _applyDemoBidResult,
+        attachmentSlots: _attachmentSlots,
+        openingBidMaterialIds: _openingBidMaterialIds,
         quoteAmountFieldKey: _quoteAmountFieldKey,
         proposalSummaryFieldKey: _proposalSummaryFieldKey,
-        onFocusQuoteAmount: _focusQuoteAmount,
-        onFocusProposalSummary: _focusProposalSummary,
-        onRetryBidProjection: () =>
-            _loadBidSeatAndCompleteness(forceRefresh: true),
-        onLockSeat: _lockSeat,
-        onReleaseSeat: _releaseSeat,
-        showSeatActions:
-            _submittedBidId != null &&
-            !_seatActionInFlight &&
-            _seatResultAllowsSeatActions(_seatResult),
+        onUploadAttachment: _uploadBidSubmitAttachment,
+        onPreviewBidMaterial: _previewBidMaterial,
+        onRetryBidMaterials: () => _loadBidMaterials(forceRefresh: true),
+        onPreviewAttachment: (slot) =>
+            _BidSubmitAttachmentPreviewActions(this).previewAttachment(slot),
       ),
     );
   }
@@ -500,149 +541,15 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     final detailResult = await ExhibitionConsumerLayer.instance
         .loadProjectDetail(projectId: projectId);
+    if (mounted) {
+      setState(() {
+        _projectDetailResult = detailResult;
+      });
+    }
     return _deriveBidProjectAccessGuard(
       projectId: projectId,
       detailResult: detailResult,
     );
-  }
-
-  Future<void> _loadBidSeatAndCompleteness({bool forceRefresh = false}) async {
-    final projectId = _normalizeId(_projectIdController.text);
-    final bidId = _submittedBidId;
-    if (projectId == null || bidId == null) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _seatResult = null;
-        _completenessResult = null;
-      });
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _seatResult = null;
-      _completenessResult = null;
-    });
-
-    final results =
-        await Future.wait<ExhibitionLoadResult>(<Future<ExhibitionLoadResult>>[
-          ExhibitionConsumerLayer.instance.loadBidSeatStatus(
-            projectId: projectId,
-            bidId: bidId,
-            forceRefresh: forceRefresh,
-          ),
-          ExhibitionConsumerLayer.instance.loadBidPackageCompleteness(
-            projectId: projectId,
-            bidId: bidId,
-            forceRefresh: forceRefresh,
-          ),
-        ]);
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _seatResult = results[0];
-      _completenessResult = results[1];
-    });
-  }
-
-  bool _seatResultAllowsSeatActions(ExhibitionLoadResult? result) {
-    if (result == null || result.state != AppPageState.content) {
-      return false;
-    }
-
-    final state = _stateFromPayload(result.payload) ?? 'available';
-    return state == 'available' || state == 'locked' || state == 'released';
-  }
-
-  Future<void> _lockSeat() async {
-    await _runSeatAction(() {
-      final projectId = _normalizeId(_projectIdController.text);
-      final bidId = _submittedBidId;
-      if (projectId == null || bidId == null) {
-        return Future<ExhibitionActionResult>.value(
-          ExhibitionActionResult(
-            method: 'POST',
-            path: '/api/app/bid/seat/lock',
-            isSuccess: false,
-            controlledState: AppPageState.notFound,
-            message: '当前页面尚未拿到明确 bidId，暂不能锁定候选席位。',
-          ),
-        );
-      }
-
-      return ExhibitionConsumerLayer.instance.lockBidSeat(
-        projectId: projectId,
-        bidId: bidId,
-      );
-    });
-  }
-
-  Future<void> _releaseSeat() async {
-    await _runSeatAction(() {
-      final projectId = _normalizeId(_projectIdController.text);
-      final bidId = _submittedBidId;
-      if (projectId == null || bidId == null) {
-        return Future<ExhibitionActionResult>.value(
-          ExhibitionActionResult(
-            method: 'POST',
-            path: '/api/app/bid/seat/release',
-            isSuccess: false,
-            controlledState: AppPageState.notFound,
-            message: '当前页面尚未拿到明确 bidId，暂不能释放候选席位。',
-          ),
-        );
-      }
-
-      return ExhibitionConsumerLayer.instance.releaseBidSeat(
-        projectId: projectId,
-        bidId: bidId,
-      );
-    });
-  }
-
-  Future<void> _runSeatAction(
-    Future<ExhibitionActionResult> Function() action,
-  ) async {
-    if (_seatActionInFlight) {
-      return;
-    }
-
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _seatActionInFlight = true;
-    });
-
-    try {
-      final result = await action();
-      if (!mounted) {
-        return;
-      }
-
-      if (result.isSuccess) {
-        await _loadBidSeatAndCompleteness(forceRefresh: true);
-        return;
-      }
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(result.message ?? '候选席位操作失败，请稍后再试。')),
-      );
-    } finally {
-      if (mounted) {
-        setState(() {
-          _seatActionInFlight = false;
-        });
-      }
-    }
   }
 
   Future<void> _loadBidResult({bool forceRefresh = false}) async {
@@ -676,8 +583,6 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     setState(() {
       _bidResult = result;
-      _seatResult = null;
-      _completenessResult = null;
       _resultLoading = false;
     });
   }
@@ -730,6 +635,216 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     }
   }
 
+  Future<void> _loadSubmitProjectDetail({bool forceRefresh = false}) async {
+    final projectId = _normalizeId(_projectIdController.text);
+    if (projectId == null) {
+      return;
+    }
+
+    final result = await ExhibitionConsumerLayer.instance.loadProjectDetail(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _projectDetailResult = result;
+    });
+  }
+
+  Future<void> _continueBidFlow() async {
+    if (_bidFlowExpanded) {
+      return;
+    }
+
+    setState(() {
+      _bidFlowExpanded = true;
+      _bidMaterialResult = ExhibitionLoadResult(
+        state: AppPageState.loading,
+        method: 'GET',
+        path: ExhibitionCanonicalPaths.projectBidMaterials,
+      );
+    });
+
+    await _loadBidMaterials();
+  }
+
+  Future<void> _loadBidMaterials({bool forceRefresh = false}) async {
+    final projectId = _normalizeId(_projectIdController.text);
+    if (projectId == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _bidMaterialResult = ExhibitionLoadResult(
+          state: AppPageState.notFound,
+          method: 'GET',
+          path: ExhibitionCanonicalPaths.projectBidMaterials,
+          message:
+              'projectId is required from route context or page context before bid materials',
+        );
+      });
+      return;
+    }
+
+    final result = await ExhibitionConsumerLayer.instance
+        .loadProjectBidMaterials(
+          projectId: projectId,
+          forceRefresh: forceRefresh,
+        );
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _bidMaterialResult = result;
+    });
+  }
+
+  Future<void> _uploadBidSubmitAttachment(
+    _BidSubmitAttachmentSlotState slot,
+  ) async {
+    final projectId = _normalizeId(_projectIdController.text);
+    if (projectId == null) {
+      setState(() {
+        slot.uploadState = null;
+        slot.uploadMessage = '当前还没有承接到项目，暂时不能上传附件。';
+        slot.uploadErrorCode = 'BID_PROJECT_ID_REQUIRED';
+        slot.uploadPath = ExhibitionCanonicalPaths.uploadInit;
+        slot.uploadDirective = null;
+        slot.fileAssetId = null;
+      });
+      return;
+    }
+
+    final draft = await _pickBidSubmitAttachmentDraft();
+    if (draft == null) {
+      return;
+    }
+
+    final resolvedDraft = _resolveBidSubmitAttachmentDraft(draft);
+    if (resolvedDraft == null ||
+        !_bidSubmitAttachmentKindMatchesMimeType(
+          slot.fileKind,
+          resolvedDraft.mimeType,
+        )) {
+      setState(() {
+        slot.draft = draft;
+        slot.resolvedDraft = resolvedDraft;
+        slot.uploadState = null;
+        slot.uploadMessage = _bidSubmitAttachmentUnsupportedTypeMessage(
+          slot.label,
+        );
+        slot.uploadErrorCode = 'BID_ATTACHMENT_UNSUPPORTED_TYPE';
+        slot.uploadPath = ExhibitionCanonicalPaths.uploadInit;
+        slot.uploadDirective = null;
+        slot.fileAssetId = null;
+      });
+      return;
+    }
+
+    setState(() {
+      slot.draft = draft;
+      slot.resolvedDraft = resolvedDraft;
+      slot.uploadState = AppUploadState.localValidating;
+      slot.uploadMessage = '正在准备上传 ${slot.label}。';
+      slot.uploadErrorCode = null;
+      slot.uploadPath = ExhibitionCanonicalPaths.uploadInit;
+      slot.uploadDirective = null;
+      slot.fileAssetId = null;
+    });
+
+    final initResult = await ExhibitionConsumerLayer.instance.uploadInit(
+      UploadInitCommand(
+        businessType: _bidSubmitAttachmentBusinessType,
+        businessId: projectId,
+        fileKind: slot.fileKind,
+        mimeType: resolvedDraft.mimeType,
+        size: resolvedDraft.sizeInBytes,
+        checksum: resolvedDraft.checksum,
+      ),
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (initResult.state != AppUploadState.signedReady ||
+        initResult.directive == null) {
+      setState(() {
+        slot.uploadState = initResult.state;
+        slot.uploadMessage = initResult.message ?? '当前附件上传初始化未完成，请稍后再试。';
+        slot.uploadErrorCode = initResult.errorCode;
+        slot.uploadPath = initResult.path;
+        slot.uploadDirective = initResult.directive;
+        slot.fileAssetId = null;
+      });
+      return;
+    }
+
+    setState(() {
+      slot.uploadState = AppUploadState.uploading;
+      slot.uploadMessage = '正在直传 ${slot.label}。';
+      slot.uploadErrorCode = null;
+      slot.uploadPath = initResult.path;
+      slot.uploadDirective = initResult.directive;
+    });
+
+    final directUploadResult = await ExhibitionConsumerLayer.instance
+        .directUpload(
+          directive: initResult.directive!,
+          bodyBytes: resolvedDraft.bytes,
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    if (directUploadResult.state != AppUploadState.uploadConfirming ||
+        directUploadResult.directive == null) {
+      setState(() {
+        slot.uploadState = directUploadResult.state;
+        slot.uploadMessage = directUploadResult.message ?? '当前附件直传未完成，请重新上传。';
+        slot.uploadErrorCode = directUploadResult.errorCode;
+        slot.uploadPath = directUploadResult.path;
+        slot.uploadDirective = directUploadResult.directive;
+        slot.fileAssetId = null;
+      });
+      return;
+    }
+
+    setState(() {
+      slot.uploadState = AppUploadState.uploadConfirming;
+      slot.uploadMessage = '正在确认 ${slot.label} 上传结果。';
+      slot.uploadErrorCode = null;
+      slot.uploadPath = directUploadResult.path;
+      slot.uploadDirective = directUploadResult.directive;
+    });
+
+    final confirmResult = await ExhibitionConsumerLayer.instance.uploadConfirm(
+      directive: directUploadResult.directive!,
+    );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      slot.uploadState = confirmResult.state;
+      slot.uploadMessage =
+          confirmResult.message ??
+          (confirmResult.state == AppUploadState.uploadBound
+              ? '当前文件已完成上传绑定。'
+              : '当前附件确认结果未完成，请稍后再试。');
+      slot.uploadErrorCode = confirmResult.errorCode;
+      slot.uploadPath = confirmResult.path;
+      slot.uploadDirective = directUploadResult.directive;
+      slot.fileAssetId = confirmResult.fileAssetId;
+    });
+  }
+
   void _focusQuoteAmount() {
     final context = _quoteAmountFieldKey.currentContext;
     if (context == null) {
@@ -752,5 +867,60 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOut,
     );
+  }
+
+  Future<void> _previewBidMaterial(
+    ProjectBidMaterialReadModel attachment,
+  ) async {
+    if (_openingBidMaterialIds.contains(attachment.attachmentId)) {
+      return;
+    }
+
+    setState(() => _openingBidMaterialIds.add(attachment.attachmentId));
+    final result = await ExhibitionConsumerLayer.instance
+        .requestProjectAttachmentAccess(
+          fileAssetId: attachment.fileAssetId,
+          mode: _projectAttachmentAccessMode(attachment.mimeType),
+        );
+    if (!mounted) {
+      return;
+    }
+
+    if (!result.isSuccess) {
+      setState(() => _openingBidMaterialIds.remove(attachment.attachmentId));
+      _showBidMaterialMessage(
+        _projectAttachmentFileAccessFailureMessage(result),
+      );
+      return;
+    }
+
+    final access = _projectAttachmentFileAccessFromPayload(result.payload);
+    if (access == null) {
+      setState(() => _openingBidMaterialIds.remove(attachment.attachmentId));
+      _showBidMaterialMessage('当前项目附件预览结果暂不可用，请稍后再试。');
+      return;
+    }
+
+    setState(() => _openingBidMaterialIds.remove(attachment.attachmentId));
+    if (_projectAttachmentIsImageMimeType(attachment.mimeType)) {
+      await _showBidMaterialRemoteImagePreviewDialog(
+        context,
+        fileName: attachment.fileName,
+        access: access,
+      );
+      return;
+    }
+
+    final opened = await _openProjectAttachmentUrl(access.accessUrl);
+    if (!mounted) {
+      return;
+    }
+    _showBidMaterialMessage(opened ? '已打开项目附件预览。' : '项目附件预览链接已生成，但当前设备未能直接打开。');
+  }
+
+  void _showBidMaterialMessage(String message) {
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 }

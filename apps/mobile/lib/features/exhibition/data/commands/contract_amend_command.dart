@@ -1,18 +1,9 @@
 part of '../exhibition_consumer_layer.dart';
 
 class ContractAmendCommand {
-  const ContractAmendCommand({
-    required this.contractId,
-    required this.amendmentSummary,
-  });
+  const ContractAmendCommand({required this.orderId});
 
-  final String contractId;
-  final String amendmentSummary;
+  final String orderId;
 
-  Map<String, Object?> toJson() {
-    return <String, Object?>{
-      'contractId': contractId,
-      'amendmentSummary': amendmentSummary,
-    };
-  }
+  Map<String, Object?> toJson() => <String, Object?>{'orderId': orderId};
 }

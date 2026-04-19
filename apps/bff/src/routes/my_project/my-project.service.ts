@@ -70,6 +70,23 @@ export class MyProjectService {
     }
   }
 
+  async deleteMyProject(projectId: string, headers: IncomingHttpHeaders) {
+    const normalizedProjectId = this.readProjectId(projectId);
+    try {
+      const result = await this.serverClient.delete<Record<string, unknown>>(
+        `/server/projects/${encodeURIComponent(normalizedProjectId)}`,
+        {
+          headers: this.authContext.buildForwardHeaders(headers),
+        },
+      );
+      return this.toProjectDeleteAcceptedResponse(
+        this.requireRecord(result, 'My-project delete response must be an object.'),
+      );
+    } catch (error) {
+      throw this.normalizeDeleteError(error);
+    }
+  }
+
   private normalizeListError(error: unknown) {
     const normalized = this.errors.toHttpException(
       error,
@@ -122,6 +139,57 @@ export class MyProjectService {
       },
       normalized.getStatus(),
     );
+  }
+
+  private normalizeDeleteError(error: unknown) {
+    const normalized = this.errors.toHttpException(
+      error,
+      'AUTH_RESOURCE_UNAVAILABLE',
+      '当前项目删除入口暂不可用，请稍后再试。',
+      {
+        401: 'AUTH_SESSION_INVALID',
+        403: 'AUTH_PERMISSION_INSUFFICIENT',
+        404: 'AUTH_RESOURCE_UNAVAILABLE',
+        409: 'PROJECT_INVALID_STATE',
+      },
+    );
+
+    const unauthorized = this.rewriteUnauthorizedMessage(
+      normalized,
+      '当前登录态不可用，请重新登录或刷新后再试。',
+    );
+    if (unauthorized !== normalized) {
+      return unauthorized;
+    }
+
+    const payload = this.asOptionalRecord(normalized.getResponse()) ?? {};
+    const statusCode = normalized.getStatus();
+    const code = this.asString(payload.code);
+    if (statusCode == 404 && code == 'AUTH_RESOURCE_UNAVAILABLE') {
+      return new HttpException(
+        {
+          ...payload,
+          statusCode,
+          source: payload.source === 'server' ? 'server' : 'bff',
+          message: '当前项目不可用。',
+        },
+        statusCode,
+      );
+    }
+
+    if (statusCode == 409 && code == 'PROJECT_INVALID_STATE') {
+      return new HttpException(
+        {
+          ...payload,
+          statusCode,
+          source: payload.source === 'server' ? 'server' : 'bff',
+          message: '当前只有草稿项目允许删除。',
+        },
+        statusCode,
+      );
+    }
+
+    return normalized;
   }
 
   private rewriteUnauthorizedMessage(normalized: HttpException, message: string) {
@@ -200,6 +268,19 @@ export class MyProjectService {
     };
   }
 
+  private toProjectDeleteAcceptedResponse(result: Record<string, unknown>) {
+    const projectId = this.asString(result.projectId);
+    const state = this.asString(result.state);
+    if (!projectId || state !== 'deleted') {
+      throw new Error('My-project delete response is missing required fields.');
+    }
+
+    return {
+      projectId,
+      state,
+    };
+  }
+
   private toProjectShowcaseListItemReadModel(
     result: Record<string, unknown>,
   ): ProjectShowcaseListItemReadModel {
@@ -219,6 +300,8 @@ export class MyProjectService {
       projectId,
       projectNo,
       title,
+      exhibitionName: this.asNullableString(result.exhibitionName),
+      brandName: this.asNullableString(result.brandName),
       buildingType,
       budgetAmount,
       areaSqm: this.asNullableFiniteNumber(
@@ -229,6 +312,8 @@ export class MyProjectService {
       provinceName: this.asNullableString(result.provinceName),
       cityCode: this.asNullableString(result.cityCode),
       cityName: this.asNullableString(result.cityName),
+      plannedStartAt: this.asNullableDateString(result.plannedStartAt),
+      plannedEndAt: this.asNullableDateString(result.plannedEndAt),
       state,
       summary,
     };
@@ -242,8 +327,6 @@ export class MyProjectService {
       districtName: this.asNullableString(result.districtName),
       detailAddress: this.asNullableString(result.detailAddress),
       scopeSummary: this.asNullableString(result.scopeSummary),
-      plannedStartAt: this.asNullableDateString(result.plannedStartAt),
-      plannedEndAt: this.asNullableDateString(result.plannedEndAt),
       scheduleDetail: this.asNullableString(result.scheduleDetail),
       description: this.asNullableString(result.description),
       // The private `my/projects/{projectId}` family is owner-scoped by the
@@ -354,7 +437,7 @@ export class MyProjectService {
 
   private asViewerProjectRelation(value: unknown): ProjectViewerRelation {
     if (value === null || value === undefined) {
-      return 'owner';
+      throw new Error('My-project publicProject is missing viewerProjectRelation.');
     }
 
     const normalized = this.asString(value) as ProjectViewerRelation;

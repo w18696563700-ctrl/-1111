@@ -7,7 +7,10 @@ List<Widget> _buildProjectCreateRoundABody({
   required String? formErrorMessage,
   required String? selectedProjectTypeLabel,
   required String? selectedStandardizedLocationLabel,
-  required TextEditingController titleController,
+  required bool hasStandardizedLocationSelection,
+  required bool districtSelectionEnabled,
+  required TextEditingController exhibitionNameController,
+  required TextEditingController brandNameController,
   required TextEditingController buildingTypeController,
   required TextEditingController buildingTypeRemarkController,
   required TextEditingController budgetAmountController,
@@ -27,26 +30,40 @@ List<Widget> _buildProjectCreateRoundABody({
   required Future<void> Function() onProjectTypePressed,
   required Future<void> Function() onStandardizedLocationPressed,
   required Future<void> Function() onDistrictPressed,
+  required Future<void> Function() onScopeSummaryPressed,
   required VoidCallback onPlannedStartDatePressed,
   required VoidCallback onPlannedEndDatePressed,
   required VoidCallback onPlannedStartDateCleared,
   required VoidCallback onPlannedEndDateCleared,
 }) {
   final projectTypeHelperText = switch (selectedProjectTypeLabel) {
-    final String value when value.isNotEmpty => '已选择$value，当前会统一按展览项目归类发布。',
-    _ => '请选择一个更贴近当前项目的场景，当前会统一按展览项目归类发布。',
+    final String value when value.isNotEmpty => '已选择$value，当前会统一按会展归类发布。',
+    _ => '请选择一个更贴近当前项目的场景，当前会统一按会展归类发布。',
   };
   final standardizedLocationHelperText =
       switch (selectedStandardizedLocationLabel) {
-        final String value when value.isNotEmpty => '已选择$value，提交时会自动带入省市信息。',
-        _ => '请选择项目所在地区，系统会自动带入省市信息。',
+        final String value when value.isNotEmpty => '已选择$value，可继续补充区/县。',
+        _ => '请选择项目所在省 / 市，系统会自动带入对应地区信息。',
       };
+  final cityHelperText = hasStandardizedLocationSelection
+      ? '市会随左侧地区自动带入；如需调整，请重新选择省 / 市。'
+      : '请先在左侧选择省 / 市，市会自动带入。';
+  final districtHintText = !hasStandardizedLocationSelection
+      ? '先选择省 / 市'
+      : districtSelectionEnabled
+      ? '可选填'
+      : '当前无需补充';
+  final districtHelperText = !hasStandardizedLocationSelection
+      ? '请先选择省 / 市，再决定是否补充区/县。'
+      : districtSelectionEnabled
+      ? '如需补充区/县，可继续选择更准确的位置。'
+      : '当前所选城市暂无区/县选项，可直接填写详细地址。';
 
   return <Widget>[
     if (guardLoading)
       const _ActionCard(
         title: '正在确认创建条件',
-        summary: '正在检查登录、组织和当前项目工作台状态。',
+        summary: '正在检查登录、组织主体、认证状态和当前创建资格。',
         tone: _ActionCardTone.emphasis,
         children: <Widget>[_DetailLine(label: '当前状态', value: '请稍候后再继续。')],
       ),
@@ -72,57 +89,63 @@ List<Widget> _buildProjectCreateRoundABody({
     if (guardLoading || accessGuard.blocked) const SizedBox(height: 16),
     _ActionCard(
       title: '基础信息',
-      summary: '先补齐项目名称、类型、预算和面积，让后续沟通更聚焦。',
+      summary: '先补齐展会、品牌、类型、预算和面积，让公开展示身份和沟通对象都更清楚。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         if (formErrorMessage case final String message) ...<Widget>[
           _StateMessage(title: '请先完善当前信息', body: message),
           const SizedBox(height: 12),
         ],
-        _InputField(
-          controller: titleController,
-          fieldKey: fieldKeys[_ProjectCreateFieldId.title],
-          inputKey: const ValueKey<String>('project-create-title'),
-          label: '项目名称',
-          hintText: '例如：春季医疗器械展主展区搭建',
-          helperText: '建议填写一个便于内部识别和对外沟通的项目名称。',
-          required: true,
-          errorText: fieldErrors[_ProjectCreateFieldId.title],
-          onChanged: (_) => onFieldInteracted(_ProjectCreateFieldId.title),
-        ),
-        _InputField(
-          controller: buildingTypeController,
-          fieldKey: fieldKeys[_ProjectCreateFieldId.buildingType],
-          inputKey: const ValueKey<String>('project-create-building-type'),
-          label: '项目类型',
-          hintText: '请选择项目类型',
-          helperText: projectTypeHelperText,
-          required: true,
-          readOnly: true,
-          errorText: fieldErrors[_ProjectCreateFieldId.buildingType],
-          onTap: onProjectTypePressed,
-          suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
-        ),
-        _InputField(
-          controller: buildingTypeRemarkController,
-          fieldKey: fieldKeys[_ProjectCreateFieldId.buildingTypeRemark],
-          inputKey: const ValueKey<String>(
-            'project-create-building-type-remark',
-          ),
-          label: '类型备注（选填）',
-          hintText: '例如：医疗器械展区特装搭建',
-          helperText: '只补充当前项目类型的细节，不替代正式项目类型。',
-          maxLines: 2,
-          errorText: fieldErrors[_ProjectCreateFieldId.buildingTypeRemark],
-          onChanged: (_) =>
-              onFieldInteracted(_ProjectCreateFieldId.buildingTypeRemark),
-        ),
         _ResponsiveFieldGroup(
           columnsWhenWide: 2,
-          minItemWidth: 240,
+          minItemWidth: 180,
           spacing: 12,
           runSpacing: 12,
           children: <Widget>[
+            _InputField(
+              controller: exhibitionNameController,
+              fieldKey: fieldKeys[_ProjectCreateFieldId.title],
+              inputKey: const ValueKey<String>('project-create-title'),
+              label: '展会',
+              hintText: '例如：春季医疗器械展',
+              helperText: '第一格填写展会名称；公域展示与详情会优先消费这个字段。',
+              required: true,
+              errorText: fieldErrors[_ProjectCreateFieldId.title],
+              onChanged: (_) => onFieldInteracted(_ProjectCreateFieldId.title),
+            ),
+            _InputField(
+              controller: brandNameController,
+              fieldKey: fieldKeys[_ProjectCreateFieldId.brandName],
+              inputKey: const ValueKey<String>('project-create-brand-name'),
+              label: '品牌',
+              hintText: '例如：迈德瑞',
+              helperText: '第二格填写品牌名称；前端会同时保留 legacy title compatibility。',
+              required: true,
+              errorText: fieldErrors[_ProjectCreateFieldId.brandName],
+              onChanged: (_) =>
+                  onFieldInteracted(_ProjectCreateFieldId.brandName),
+            ),
+          ],
+        ),
+        _ResponsiveFieldGroup(
+          columnsWhenWide: 3,
+          minItemWidth: 120,
+          spacing: 12,
+          runSpacing: 12,
+          children: <Widget>[
+            _InputField(
+              controller: buildingTypeController,
+              fieldKey: fieldKeys[_ProjectCreateFieldId.buildingType],
+              inputKey: const ValueKey<String>('project-create-building-type'),
+              label: '项目类型',
+              hintText: '请选择项目类型',
+              helperText: projectTypeHelperText,
+              required: true,
+              readOnly: true,
+              errorText: fieldErrors[_ProjectCreateFieldId.buildingType],
+              onTap: onProjectTypePressed,
+              suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
+            ),
             _InputField(
               controller: budgetAmountController,
               fieldKey: fieldKeys[_ProjectCreateFieldId.budgetAmount],
@@ -155,21 +178,36 @@ List<Widget> _buildProjectCreateRoundABody({
             ),
           ],
         ),
+        _InputField(
+          controller: buildingTypeRemarkController,
+          fieldKey: fieldKeys[_ProjectCreateFieldId.buildingTypeRemark],
+          inputKey: const ValueKey<String>(
+            'project-create-building-type-remark',
+          ),
+          label: '类型备注（选填）',
+          hintText: '例如：医疗器械展区特装搭建',
+          helperText: '只补充当前项目类型的细节，不替代正式项目类型。',
+          maxLines: 2,
+          errorText: fieldErrors[_ProjectCreateFieldId.buildingTypeRemark],
+          onChanged: (_) =>
+              onFieldInteracted(_ProjectCreateFieldId.buildingTypeRemark),
+        ),
       ],
     ),
     const SizedBox(height: 16),
     _ActionCard(
       title: '项目地点与范围',
-      summary: '先确认项目所在地区，再补充详细地址和范围说明。',
+      summary: '先确认项目所在地区，再补充详细地址；范围说明需要先补齐后才能保存项目。',
       children: <Widget>[
         const _StateMessage(
           title: '地区选择说明',
-          body: '请先选择项目所在地区，系统会自动带入省、市信息；如需补充区/县，也可以继续选择更准确的位置。',
+          body: '请先选择项目所在省 / 市，系统会自动带入对应层级；如需补充区/县，也可以继续选择更准确的位置。',
         ),
         const SizedBox(height: 12),
         _ResponsiveFieldGroup(
           wrapKey: const ValueKey<String>('project-create-location-fields'),
           columnsWhenWide: 3,
+          minItemWidth: 120,
           spacing: 12,
           runSpacing: 12,
           children: <Widget>[
@@ -178,7 +216,7 @@ List<Widget> _buildProjectCreateRoundABody({
               fieldKey: fieldKeys[_ProjectCreateFieldId.provinceName],
               inputKey: const ValueKey<String>('project-create-province'),
               label: '省',
-              hintText: '请选择项目所在地区',
+              hintText: '点击选择省 / 市',
               helperText: standardizedLocationHelperText,
               required: true,
               readOnly: true,
@@ -192,24 +230,28 @@ List<Widget> _buildProjectCreateRoundABody({
               inputKey: const ValueKey<String>('project-create-city'),
               label: '市',
               hintText: '将随地区自动带入',
-              helperText: '市会随地区选择自动带入，无需单独填写。',
-              required: true,
+              helperText: cityHelperText,
               readOnly: true,
+              enabled: false,
               errorText: fieldErrors[_ProjectCreateFieldId.cityName],
-              onTap: onStandardizedLocationPressed,
-              suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
+              suffixIcon: const Icon(Icons.lock_outline_rounded),
             ),
             _InputField(
               controller: districtNameController,
               fieldKey: fieldKeys[_ProjectCreateFieldId.districtName],
               inputKey: const ValueKey<String>('project-create-district'),
               label: '区/县',
-              hintText: '可选填',
-              helperText: '如需补充区/县，可继续选择更准确的位置。',
+              hintText: districtHintText,
+              helperText: districtHelperText,
               readOnly: true,
+              enabled: districtSelectionEnabled,
               errorText: fieldErrors[_ProjectCreateFieldId.districtName],
-              onTap: onDistrictPressed,
-              suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
+              onTap: districtSelectionEnabled ? onDistrictPressed : null,
+              suffixIcon: Icon(
+                districtSelectionEnabled
+                    ? Icons.keyboard_arrow_down_rounded
+                    : Icons.lock_outline_rounded,
+              ),
             ),
           ],
         ),
@@ -226,18 +268,12 @@ List<Widget> _buildProjectCreateRoundABody({
           onChanged: (_) =>
               onFieldInteracted(_ProjectCreateFieldId.detailAddress),
         ),
-        _InputField(
-          controller: scopeSummaryController,
+        _ProjectScopeSummaryButton(
           fieldKey: fieldKeys[_ProjectCreateFieldId.scopeSummary],
-          inputKey: const ValueKey<String>('project-create-scope-summary'),
-          label: '范围说明',
-          hintText: '例如：主舞台、医疗器械展区与灯光联动区进场搭建',
-          helperText: '一句话概括本次发布范围，方便快速理解需求。',
-          maxLines: 3,
-          required: true,
+          buttonKey: const ValueKey<String>('project-create-scope-summary'),
+          value: scopeSummaryController.text.trim(),
           errorText: fieldErrors[_ProjectCreateFieldId.scopeSummary],
-          onChanged: (_) =>
-              onFieldInteracted(_ProjectCreateFieldId.scopeSummary),
+          onPressed: onScopeSummaryPressed,
         ),
       ],
     ),
@@ -249,7 +285,7 @@ List<Widget> _buildProjectCreateRoundABody({
         _ResponsiveFieldGroup(
           wrapKey: const ValueKey<String>('project-create-date-fields'),
           columnsWhenWide: 2,
-          minItemWidth: 240,
+          minItemWidth: 180,
           spacing: 12,
           runSpacing: 12,
           children: <Widget>[
@@ -308,7 +344,7 @@ List<Widget> _buildProjectCreateRoundABody({
     const SizedBox(height: 16),
     _ActionCard(
       title: '补充说明与附件',
-      summary: '补充项目背景说明；资料可在发布成功后继续补齐。',
+      summary: '先补充项目背景说明；保存基本信息后会跳转到我的项目继续处理，进入预发布列表后即可补充正式附件。',
       children: <Widget>[
         _InputField(
           controller: descriptionController,
@@ -322,10 +358,89 @@ List<Widget> _buildProjectCreateRoundABody({
               onFieldInteracted(_ProjectCreateFieldId.description),
         ),
         const SizedBox(height: 4),
-        const _StateMessage(title: '资料补充', body: '项目发布成功后，可以继续补充效果图、施工图和其他资料。'),
+        const _StateMessage(
+          title: '资料补充',
+          body:
+              '保存基本信息后，会先跳转到我的项目；你可以从草稿或预发布列表继续确认回显。效果图、施工图和其他资料会在进入预发布列表后开放为正式附件。',
+        ),
       ],
     ),
   ];
+}
+
+class _ProjectScopeSummaryButton extends StatelessWidget {
+  const _ProjectScopeSummaryButton({
+    required this.value,
+    required this.onPressed,
+    this.fieldKey,
+    this.buttonKey,
+    this.errorText,
+  });
+
+  final String value;
+  final Key? fieldKey;
+  final Key? buttonKey;
+  final String? errorText;
+  final Future<void> Function() onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final hasValue = value.trim().isNotEmpty;
+
+    return Padding(
+      key: fieldKey,
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          OutlinedButton.icon(
+            key: buttonKey,
+            onPressed: () {
+              onPressed();
+            },
+            icon: Icon(
+              hasValue ? Icons.edit_outlined : Icons.add_rounded,
+              size: 18,
+            ),
+            label: Text(hasValue ? '编辑范围说明' : '添加范围说明'),
+            style: OutlinedButton.styleFrom(
+              minimumSize: const Size.fromHeight(52),
+              alignment: Alignment.centerLeft,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+              side: BorderSide(
+                color: errorText == null
+                    ? colorScheme.outlineVariant
+                    : colorScheme.error,
+              ),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            hasValue ? value.trim() : '一句话概括本次发布范围，当前为必填。',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: errorText == null
+                  ? colorScheme.onSurfaceVariant
+                  : colorScheme.error,
+            ),
+          ),
+          if (errorText case final String value) ...<Widget>[
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.error,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
 }
 
 class _ResponsiveFieldGroup extends StatelessWidget {

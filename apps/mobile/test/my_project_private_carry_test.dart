@@ -10,44 +10,6 @@ import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
-Map<String, Object?> _profilePayload() {
-  return <String, Object?>{
-    'organization': <String, Object?>{
-      'organizationId': 'org-my-project',
-      'roleKeys': <Object?>['buyer_admin'],
-      'visibleBuildings': <Object?>['exhibition', 'messages', 'profile'],
-    },
-    'certification': <String, Object?>{'status': 'approved'},
-    'membership': <String, Object?>{'status': 'active'},
-    'settingsEntry': <String, Object?>{'state': 'visible'},
-  };
-}
-
-Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
-_forumHandlers() {
-  AppApiResponse emptyPaged(AppApiRequest request) => AppApiResponse(
-    statusCode: 200,
-    uri: request.uri,
-    body: <String, Object?>{
-      'items': <Object?>[],
-      'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
-    },
-  );
-
-  return <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-    'GET /api/app/forum/me/posts': (AppApiRequest request) async =>
-        emptyPaged(request),
-    'GET /api/app/forum/me/comments': (AppApiRequest request) async =>
-        emptyPaged(request),
-    'GET /api/app/forum/me/bookmarks': (AppApiRequest request) async =>
-        emptyPaged(request),
-    'GET /api/app/forum/me/follows': (AppApiRequest request) async =>
-        emptyPaged(request),
-    'GET /api/app/forum/draft/list': (AppApiRequest request) async =>
-        emptyPaged(request),
-  };
-}
-
 Map<String, Object?> _publicProjectListItem({
   required String projectId,
   required String projectNo,
@@ -55,7 +17,7 @@ Map<String, Object?> _publicProjectListItem({
   required num budgetAmount,
   String buildingType = 'exhibition',
   String state = 'published',
-  String summaryHeading = '当前项目已承接',
+  String summaryHeading = '当前项目已保存',
   num? areaSqm,
   String? provinceCode,
   String? provinceName,
@@ -85,8 +47,7 @@ Map<String, Object?> _publicProjectDetail({
   required num budgetAmount,
   String buildingType = 'exhibition',
   String state = 'published',
-  String summaryHeading = '当前项目已承接',
-  String? summaryStateLabel,
+  String summaryHeading = '当前项目已保存',
   num? areaSqm,
   String? buildingTypeRemark,
   String? provinceCode,
@@ -103,11 +64,6 @@ Map<String, Object?> _publicProjectDetail({
   String? description,
   String? viewerProjectRelation,
 }) {
-  final summary = <String, Object?>{'heading': summaryHeading};
-  if (summaryStateLabel != null) {
-    summary['stateLabel'] = summaryStateLabel;
-  }
-
   return <String, Object?>{
     ..._publicProjectListItem(
       projectId: projectId,
@@ -123,7 +79,6 @@ Map<String, Object?> _publicProjectDetail({
       cityCode: cityCode,
       cityName: cityName,
     ),
-    'summary': summary,
     'buildingTypeRemark': buildingTypeRemark,
     'districtCode': districtCode,
     'districtName': districtName,
@@ -170,13 +125,48 @@ Map<String, Object?> _myProjectItem({
   };
 }
 
+Map<String, Object?> _attachmentListResponse(
+  String projectId,
+  List<Map<String, Object?>> attachments,
+) {
+  return <String, Object?>{'projectId': projectId, 'attachments': attachments};
+}
+
+Map<String, Object?> _publicResourceListResponse(
+  List<Map<String, Object?>> resources,
+) {
+  return <String, Object?>{'resources': resources};
+}
+
+Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
+_forumHandlers() {
+  AppApiResponse emptyPaged(AppApiRequest request) => AppApiResponse(
+    statusCode: 200,
+    uri: request.uri,
+    body: const <String, Object?>{
+      'items': <Object?>[],
+      'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+    },
+  );
+
+  return <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+    'GET /api/app/forum/me/posts': (AppApiRequest request) async =>
+        emptyPaged(request),
+    'GET /api/app/forum/me/comments': (AppApiRequest request) async =>
+        emptyPaged(request),
+    'GET /api/app/forum/me/bookmarks': (AppApiRequest request) async =>
+        emptyPaged(request),
+    'GET /api/app/forum/me/follows': (AppApiRequest request) async =>
+        emptyPaged(request),
+    'GET /api/app/forum/draft/list': (AppApiRequest request) async =>
+        emptyPaged(request),
+  };
+}
+
 ExhibitionMobileApp _buildApp({
   required Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
   exhibitionHandlers,
-  Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
-      profileHandlers =
-      const <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
-  String initialRoute = '/profile',
+  String initialRoute = ExhibitionRoutes.myProjectList,
 }) {
   final sessionStore = AppSessionStore()
     ..establishSession(
@@ -206,7 +196,7 @@ ExhibitionMobileApp _buildApp({
     profileConsumerLayer: ProfileConsumerLayer(
       client: AppApiClient(
         config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-        transport: FakeAppApiTransport(handlers: profileHandlers),
+        transport: FakeAppApiTransport(handlers: const {}),
       ),
     ),
     forumConsumerLayer: ForumConsumerLayer(
@@ -224,426 +214,778 @@ ExhibitionMobileApp _buildApp({
   );
 }
 
-void main() {
-  Future<void> scrollTo(WidgetTester tester, Finder finder) async {
-    await tester.scrollUntilVisible(
-      finder,
-      200,
-      scrollable: find.byType(Scrollable).first,
+Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(
+    finder,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+}
+
+Map<String, Object?> _projectMeta(String projectId) {
+  if (projectId.contains('draft')) {
+    return <String, Object?>{
+      'title': '草稿项目',
+      'budgetAmount': 1200,
+      'areaSqm': 180,
+      'provinceCode': '510000',
+      'provinceName': '四川',
+      'cityCode': '510100',
+      'cityName': '成都',
+    };
+  }
+  if (projectId.contains('submitted')) {
+    return <String, Object?>{
+      'title': '预发布项目',
+      'budgetAmount': 1600,
+      'areaSqm': 200,
+      'provinceCode': '310000',
+      'provinceName': '上海',
+      'cityCode': '310100',
+      'cityName': '上海',
+    };
+  }
+  if (projectId.contains('published')) {
+    return <String, Object?>{
+      'title': '已发布项目',
+      'budgetAmount': 2200,
+      'areaSqm': 320,
+      'provinceCode': '110000',
+      'provinceName': '北京',
+      'cityCode': '110100',
+      'cityName': '北京',
+    };
+  }
+  if (projectId.contains('active')) {
+    return <String, Object?>{
+      'title': '进行中项目',
+      'budgetAmount': 2800,
+      'areaSqm': 420,
+      'provinceCode': '330000',
+      'provinceName': '浙江',
+      'cityCode': '330100',
+      'cityName': '杭州',
+    };
+  }
+  if (projectId.contains('archived')) {
+    return <String, Object?>{
+      'title': '已归档项目',
+      'budgetAmount': 1400,
+      'areaSqm': 160,
+      'provinceCode': '320000',
+      'provinceName': '江苏',
+      'cityCode': '320100',
+      'cityName': '南京',
+    };
+  }
+  return <String, Object?>{
+    'title': '项目 $projectId',
+    'budgetAmount': 1999,
+    'areaSqm': 260,
+    'provinceCode': '440000',
+    'provinceName': '广东',
+    'cityCode': '440100',
+    'cityName': '广州',
+  };
+}
+
+String _projectNo(String projectId) {
+  return 'MY-${projectId.replaceAll('-', '_').toUpperCase()}';
+}
+
+Map<String, Object?> _privateProgressForState(String state) {
+  final isActive = state == 'converted_to_order' || state == 'awarded';
+  return _privateProgress(
+    hasAcceptedOrder: state == 'converted_to_order',
+    orderStatus: state == 'converted_to_order' ? 'active' : null,
+    contractStatus: state == 'converted_to_order' ? 'active' : null,
+    fulfillmentStatus: isActive ? 'submitted' : null,
+    acceptanceStatus: isActive ? 'rechecked' : null,
+    formalCompletionStatus: state == 'converted_to_order'
+        ? 'formally_completed'
+        : 'not_formally_completed',
+    evaluationStatus: state == 'converted_to_order'
+        ? 'eligible'
+        : 'not_eligible',
+  );
+}
+
+Map<String, Object?> _publicProjectListForState({
+  required String projectId,
+  required String state,
+}) {
+  final meta = _projectMeta(projectId);
+  return _publicProjectListItem(
+    projectId: projectId,
+    projectNo: _projectNo(projectId),
+    title: meta['title']! as String,
+    budgetAmount: meta['budgetAmount']! as num,
+    state: state,
+    areaSqm: meta['areaSqm'] as num?,
+    provinceCode: meta['provinceCode'] as String?,
+    provinceName: meta['provinceName'] as String?,
+    cityCode: meta['cityCode'] as String?,
+    cityName: meta['cityName'] as String?,
+  );
+}
+
+Map<String, Object?> _publicProjectDetailForState({
+  required String projectId,
+  required String state,
+}) {
+  final meta = _projectMeta(projectId);
+  return _publicProjectDetail(
+    projectId: projectId,
+    projectNo: _projectNo(projectId),
+    title: meta['title']! as String,
+    budgetAmount: meta['budgetAmount']! as num,
+    state: state,
+    areaSqm: meta['areaSqm'] as num?,
+    provinceCode: meta['provinceCode'] as String?,
+    provinceName: meta['provinceName'] as String?,
+    cityCode: meta['cityCode'] as String?,
+    cityName: meta['cityName'] as String?,
+    districtCode: '510107',
+    districtName: '武侯区',
+    detailAddress: '世纪城新国际会展中心 6 号馆西门',
+    scopeSummary: '主舞台、器械展区与接待区同步进场',
+    plannedStartAt: '2026-04-10',
+    plannedEndAt: '2026-04-18',
+    scheduleDetail: '4 月 10 日晚进场，4 月 18 日撤场',
+    description: '这里继续承接项目说明文案。',
+    buildingTypeRemark: '医疗器械展区主舞台与灯光联动搭建',
+    viewerProjectRelation: 'owner',
+  );
+}
+
+Map<String, Object?> _myProjectListBodyFromStates(Map<String, String> states) {
+  final ongoingProjects = <Object?>[];
+  final historicalProjects = <Object?>[];
+  final entries = states.entries.toList()
+    ..sort((MapEntry<String, String> left, MapEntry<String, String> right) {
+      return left.key.compareTo(right.key);
+    });
+  for (final entry in entries) {
+    final item = _myProjectItem(
+      publicProject: _publicProjectListForState(
+        projectId: entry.key,
+        state: entry.value,
+      ),
+      privateSummary: _privateProgressForState(entry.value),
     );
-    await tester.pumpAndSettle();
+    if (entry.value == 'archived' ||
+        entry.value == 'awarded' ||
+        entry.value == 'converted_to_order') {
+      historicalProjects.add(item);
+    } else {
+      ongoingProjects.add(item);
+    }
+  }
+  return <String, Object?>{
+    'ongoingProjects': ongoingProjects,
+    'historicalProjects': historicalProjects,
+  };
+}
+
+Finder _entityCardByTitle(String title) {
+  return find.ancestor(
+    of: find.text(title),
+    matching: find.byWidgetPredicate(
+      (Widget widget) => widget.runtimeType.toString() == '_EntityCard',
+    ),
+  );
+}
+
+Future<void> _tapEntityCardAction(
+  WidgetTester tester, {
+  required String title,
+  required String actionLabel,
+}) async {
+  final cardFinder = _entityCardByTitle(title).first;
+  final buttonFinder = find.descendant(
+    of: cardFinder,
+    matching: find.widgetWithText(FilledButton, actionLabel),
+  );
+  await _scrollTo(tester, buttonFinder.first);
+  await tester.tap(buttonFinder.first);
+  await tester.pumpAndSettle();
+}
+
+typedef _AppHandler = Future<AppApiResponse> Function(AppApiRequest request);
+
+Map<String, _AppHandler> _mutableMyProjectHandlers({
+  required Map<String, String> projectStates,
+  String? failingLifecyclePath,
+  String? failingLifecycleCode,
+  String? failingLifecycleMessage,
+  void Function(String projectId)? onDelete,
+}) {
+  Future<AppApiResponse> lifecycleSuccess(
+    AppApiRequest request, {
+    required String nextState,
+    required String invalidCode,
+    required String invalidMessage,
+    required bool Function(String state) allow,
+  }) async {
+    final body = request.body as Map<String, Object?>;
+    final projectId = body['projectId'] as String?;
+    final state = projectId == null ? null : projectStates[projectId];
+    if (projectId == null || state == null) {
+      return AppApiResponse(
+        statusCode: 404,
+        uri: request.uri,
+        body: const <String, Object?>{
+          'errorCode': 'AUTH_RESOURCE_UNAVAILABLE',
+          'message': '当前项目不可用。',
+        },
+      );
+    }
+    if (request.canonicalPath == failingLifecyclePath) {
+      return AppApiResponse(
+        statusCode: 409,
+        uri: request.uri,
+        body: <String, Object?>{
+          'errorCode': failingLifecycleCode ?? invalidCode,
+          'message': failingLifecycleMessage ?? invalidMessage,
+        },
+      );
+    }
+    if (!allow(state)) {
+      return AppApiResponse(
+        statusCode: 409,
+        uri: request.uri,
+        body: <String, Object?>{
+          'errorCode': invalidCode,
+          'message': invalidMessage,
+        },
+      );
+    }
+
+    projectStates[projectId] = nextState;
+    return AppApiResponse(
+      statusCode: 202,
+      uri: request.uri,
+      body: <String, Object?>{'projectId': projectId, 'state': nextState},
+    );
   }
 
-  testWidgets(
-    'my building entry shows my projects and closes the list-detail loop',
-    (WidgetTester tester) async {
-      final exhibitionHandlers =
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/my/projects': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'ongoingProjects': <Object?>[
-                    _myProjectItem(
-                      publicProject: _publicProjectListItem(
-                        projectId: 'my-project-1',
-                        projectNo: 'MY-001',
-                        title: '组织内项目 1',
-                        budgetAmount: 1800,
-                        areaSqm: 350.5,
-                        provinceCode: '510000',
-                        provinceName: '四川',
-                        cityCode: '510100',
-                        cityName: '成都',
-                        summaryHeading: '组织内项目摘要',
-                      ),
-                      privateSummary: _privateProgress(
-                        hasAcceptedOrder: false,
-                        formalCompletionStatus: 'not_formally_completed',
-                        evaluationStatus: 'not_eligible',
-                      ),
-                    ),
-                  ],
-                  'historicalProjects': <Object?>[],
-                },
-              );
+  final handlers = <String, _AppHandler>{
+    'GET /api/app/my/projects': (AppApiRequest request) async => AppApiResponse(
+      statusCode: 200,
+      uri: request.uri,
+      body: _myProjectListBodyFromStates(projectStates),
+    ),
+    'GET /api/app/project/public-resources': (AppApiRequest request) async =>
+        AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: _publicResourceListResponse(const <Map<String, Object?>>[
+            {
+              'resourceId': 'resource-contract-1',
+              'resourceCategory': 'contract_template',
+              'title': '标准合同模板',
+              'summary': '用于项目发布后的合同模板参考。',
+              'fileAssetId': 'file-resource-contract-1',
+              'fileName': 'standard-contract-template.pdf',
+              'mimeType': 'application/pdf',
+              'visibility': 'app_shared',
+              'sortOrder': 0,
+              'publishedAt': '2026-04-14T09:30:00Z',
             },
-            'GET /api/app/my/projects/my-project-1':
-                (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: <String, Object?>{
-                      'publicProject': _publicProjectDetail(
-                        projectId: 'my-project-1',
-                        projectNo: 'MY-001',
-                        title: '组织内项目 1',
-                        budgetAmount: 1800,
-                        areaSqm: 350.5,
-                        provinceCode: '510000',
-                        provinceName: '四川',
-                        cityCode: '510100',
-                        cityName: '成都',
-                        districtCode: '510107',
-                        districtName: '武侯区',
-                        detailAddress: '世纪城新国际会展中心 6 号馆西门',
-                        scopeSummary: '主舞台与器械展区联动搭建',
-                        plannedStartAt: '2026-04-10',
-                        plannedEndAt: '2026-04-18',
-                        scheduleDetail: '4 月 10 日晚进场，4 月 18 日撤场',
-                        description: '当前项目继续按最小私域基线承接。',
-                      ),
-                      'privateProgress': _privateProgress(
-                        hasAcceptedOrder: false,
-                        formalCompletionStatus: 'not_formally_completed',
-                        evaluationStatus: 'not_eligible',
-                      ),
-                    },
-                  );
-                },
-          };
-      final profileHandlers =
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/profile/index': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _profilePayload(),
-              );
+            {
+              'resourceId': 'resource-process-1',
+              'resourceCategory': 'process_guide',
+              'title': '发布流程图与说明',
+              'summary': '帮助理解项目发布与续接流程。',
+              'fileAssetId': 'file-resource-process-1',
+              'fileName': 'publish-process-guide.pdf',
+              'mimeType': 'application/pdf',
+              'visibility': 'app_shared',
+              'sortOrder': 1,
+              'publishedAt': '2026-04-14T09:40:00Z',
             },
-          };
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionHandlers: exhibitionHandlers,
-          profileHandlers: profileHandlers,
-        ),
-      );
-      await tester.pumpAndSettle();
-
-      await scrollTo(tester, find.text('我的项目'));
-      expect(find.text('我的项目'), findsOneWidget);
-      expect(find.text('当前组织项目资产与继续处理入口 · 进行中 1 个 · 历史 0 个'), findsOneWidget);
-
-      await tester.tap(find.text('我的项目'));
-      await tester.pumpAndSettle();
-
-      await scrollTo(tester, find.text('进行中'));
-      expect(find.text('我的项目'), findsWidgets);
-      expect(find.text('进行中'), findsWidgets);
-
-      await scrollTo(tester, find.widgetWithText(FilledButton, '查看项目'));
-      await tester.tap(find.widgetWithText(FilledButton, '查看项目'));
-      await tester.pumpAndSettle();
-
-      await scrollTo(tester, find.text('项目信息'));
-      expect(find.text('项目信息'), findsOneWidget);
-      await scrollTo(tester, find.text('当前进度'));
-      expect(find.text('当前进度'), findsOneWidget);
-      expect(find.text('公域信息区'), findsNothing);
-      expect(find.text('私域进度区'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'my project list consumes grouped publicProject and privateSummary only',
-    (WidgetTester tester) async {
-      final exhibitionHandlers =
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/my/projects': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'ongoingProjects': <Object?>[
-                    _myProjectItem(
-                      publicProject: <String, Object?>{
-                        ..._publicProjectListItem(
-                          projectId: 'my-project-ongoing',
-                          projectNo: 'MY-ONGOING-1',
-                          title: '进行中项目',
-                          budgetAmount: 2200,
-                          areaSqm: 350.5,
-                          provinceCode: '510000',
-                          provinceName: '四川',
-                          cityCode: '510100',
-                          cityName: '成都',
-                          summaryHeading: '私域最小摘要',
-                        ),
-                        'districtName': '武侯区',
-                        'detailAddress': '世纪城新国际会展中心 6 号馆西门',
-                        'description': '列表不应展示这个说明',
-                      },
-                      privateSummary: _privateProgress(
-                        hasAcceptedOrder: false,
-                        formalCompletionStatus: 'not_formally_completed',
-                        evaluationStatus: 'not_eligible',
-                      ),
-                    ),
-                  ],
-                  'historicalProjects': <Object?>[
-                    _myProjectItem(
-                      publicProject: _publicProjectListItem(
-                        projectId: 'my-project-history',
-                        projectNo: 'MY-HISTORY-1',
-                        title: '历史项目',
-                        budgetAmount: 3000,
-                        areaSqm: 420,
-                        provinceCode: '310000',
-                        provinceName: '上海',
-                        cityCode: '310100',
-                        cityName: '上海',
-                        state: 'converted_to_order',
-                        summaryHeading: '归档摘要',
-                      ),
-                      privateSummary: _privateProgress(
-                        hasAcceptedOrder: true,
-                        formalCompletionStatus: 'formally_completed',
-                        evaluationStatus: 'submitted',
-                      ),
-                    ),
-                  ],
-                },
-              );
+            {
+              'resourceId': 'resource-other-1',
+              'resourceCategory': 'other_resource',
+              'title': '公共资料汇编',
+              'summary': '用于补充平台共享公共资料。',
+              'fileAssetId': 'file-resource-other-1',
+              'fileName': 'public-resource-bundle.docx',
+              'mimeType':
+                  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              'visibility': 'app_shared',
+              'sortOrder': 2,
+              'publishedAt': '2026-04-14T09:50:00Z',
             },
-          };
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionHandlers: exhibitionHandlers,
-          initialRoute: ExhibitionRoutes.myProjectList,
+          ]),
         ),
+    'POST /api/app/project/withdraw': (AppApiRequest request) {
+      return lifecycleSuccess(
+        request,
+        nextState: 'draft',
+        invalidCode: 'PROJECT_WITHDRAW_INVALID',
+        invalidMessage: '当前项目尚未提交，暂不支持撤回到草稿。',
+        allow: (String state) => state == 'submitted',
       );
-      await tester.pumpAndSettle();
-
-      await scrollTo(tester, find.text('进行中：1 个'));
-      expect(find.text('进行中：1 个'), findsOneWidget);
-      expect(find.text('历史项目：1 个'), findsOneWidget);
-      expect(find.text('私域最小摘要'), findsOneWidget);
-      expect(find.text('四川 / 成都'), findsWidgets);
-      expect(find.text('350.5 ㎡'), findsWidgets);
-      expect(find.text('未接单'), findsWidgets);
-      expect(find.text('尚未正式完结'), findsWidgets);
-      expect(find.text('暂不可评价'), findsWidgets);
-      await scrollTo(tester, find.text('已接单'));
-      expect(find.text('已接单'), findsWidgets);
-      expect(find.text('已正式完结'), findsWidgets);
-      expect(find.text('已评价'), findsWidgets);
-      expect(find.text('510000'), findsNothing);
-      expect(find.text('510100'), findsNothing);
-      expect(find.text('武侯区'), findsNothing);
-      expect(find.textContaining('世纪城新国际会展中心 6 号馆西门'), findsNothing);
-      expect(find.textContaining('列表不应展示这个说明'), findsNothing);
-      expect(find.textContaining('正式附件'), findsNothing);
-      expect(find.textContaining('奖励金额'), findsNothing);
-      expect(find.textContaining('单位平方面积金额'), findsNothing);
-      expect(find.text('当前组织项目资产'), findsNothing);
-      expect(find.text('页面定位'), findsNothing);
-      expect(find.textContaining('不会伪造成仍有项目在推进'), findsNothing);
-      expect(find.textContaining('不会把计划结束时间误解释成历史归档'), findsNothing);
     },
-  );
+    'POST /api/app/project/publish': (AppApiRequest request) {
+      return lifecycleSuccess(
+        request,
+        nextState: 'published',
+        invalidCode: 'PROJECT_PUBLISH_INVALID',
+        invalidMessage: '当前项目尚未进入预发布列表，暂不支持正式发布。',
+        allow: (String state) => state == 'submitted',
+      );
+    },
+    'POST /api/app/project/archive': (AppApiRequest request) {
+      return lifecycleSuccess(
+        request,
+        nextState: 'archived',
+        invalidCode: 'PROJECT_ARCHIVE_INVALID',
+        invalidMessage: '当前项目尚未提交，暂不支持作废归档。',
+        allow: (String state) => state == 'submitted',
+      );
+    },
+    'POST /api/app/project/close': (AppApiRequest request) {
+      return lifecycleSuccess(
+        request,
+        nextState: 'archived',
+        invalidCode: 'PROJECT_CLOSE_INVALID',
+        invalidMessage: '当前项目状态暂不支持下架关闭。',
+        allow: (String state) => state == 'published',
+      );
+    },
+  };
 
-  testWidgets(
-    'my project detail consumes publicProject and privateProgress without code leakage',
-    (WidgetTester tester) async {
-      final exhibitionHandlers =
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/my/projects/my-project-1':
-                (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: <String, Object?>{
-                      'publicProject': _publicProjectDetail(
-                        projectId: 'my-project-1',
-                        projectNo: 'MY-001',
-                        title: '单项目私域承接',
-                        budgetAmount: 2600,
-                        areaSqm: 380,
-                        buildingTypeRemark: '医疗器械展区主舞台与灯光联动搭建',
-                        provinceCode: '510000',
-                        provinceName: '四川',
-                        cityCode: '510100',
-                        cityName: '成都',
-                        districtCode: '510107',
-                        districtName: '武侯区',
-                        detailAddress: '世纪城新国际会展中心 6 号馆西门',
-                        scopeSummary: '主舞台、器械展区与接待区同步进场',
-                        plannedStartAt: '2026-04-10',
-                        plannedEndAt: '2026-04-18',
-                        scheduleDetail: '4 月 10 日晚进场，4 月 18 日撤场',
-                        description: '这里继续承接项目说明文案。',
-                        viewerProjectRelation: 'non_owner',
-                      ),
-                      'privateProgress': _privateProgress(
-                        hasAcceptedOrder: false,
-                        formalCompletionStatus: 'not_formally_completed',
-                        evaluationStatus: 'not_eligible',
-                      ),
-                    },
-                  );
-                },
-          };
+  for (final projectId in projectStates.keys.toList()) {
+    handlers['GET /api/app/my/projects/$projectId'] =
+        (AppApiRequest request) async {
+          final state = projectStates[projectId];
+          if (state == null) {
+            return AppApiResponse(
+              statusCode: 404,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'errorCode': 'AUTH_RESOURCE_UNAVAILABLE',
+                'message': '当前项目不可用。',
+              },
+            );
+          }
 
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionHandlers: exhibitionHandlers,
-          initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
-            'my-project-1',
-          ),
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'publicProject': _publicProjectDetailForState(
+                projectId: projectId,
+                state: state,
+              ),
+              'privateProgress': _privateProgressForState(state),
+            },
+          );
+        };
+    handlers['GET /api/app/my/projects/$projectId/attachments'] =
+        (AppApiRequest request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _attachmentListResponse(
+              projectId,
+              const <Map<String, Object?>>[],
+            ),
+          );
+        };
+    handlers['DELETE /api/app/my/projects/$projectId'] =
+        (AppApiRequest request) async {
+          onDelete?.call(projectId);
+          projectStates.remove(projectId);
+          return AppApiResponse(
+            statusCode: 202,
+            uri: request.uri,
+            body: <String, Object?>{'projectId': projectId, 'state': 'deleted'},
+          );
+        };
+  }
+
+  return handlers;
+}
+
+void main() {
+  testWidgets('我的项目列表按四阶段切换并把已归档项目放到只读区', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{
+        'project-draft-1': 'draft',
+        'project-submitted-1': 'submitted',
+        'project-published-1': 'published',
+        'project-active-1': 'converted_to_order',
+        'project-archived-1': 'archived',
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    expect(find.text('草稿 · 1'), findsOneWidget);
+    expect(find.text('预发布列表 · 1'), findsOneWidget);
+    expect(find.text('竞标中 · 1'), findsOneWidget);
+    expect(find.text('进行中 · 1'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
+
+    await tester.tap(find.text('预发布列表 · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('预发布项目'), findsOneWidget);
+    expect(find.text('草稿项目'), findsNothing);
+
+    await tester.tap(find.text('竞标中 · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('竞标中'), findsWidgets);
+    expect(find.text('预发布项目'), findsNothing);
+
+    await tester.tap(find.text('进行中 · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('进行中项目'), findsOneWidget);
+    expect(find.text('当前阶段：竞标中'), findsNothing);
+
+    await _scrollTo(tester, find.text('已归档项目'));
+    expect(find.text('已归档项目'), findsOneWidget);
+  });
+
+  testWidgets('我的项目先分成我的发布和我的竞标', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{
+        'project-draft-1': 'draft',
+        'project-published-1': 'published',
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(ChoiceChip, '我的发布'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '我的竞标'), findsOneWidget);
+    expect(find.text('草稿 · 1'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '我的竞标'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前竞标列表暂未接通'), findsOneWidget);
+    expect(find.text('草稿 · 1'), findsNothing);
+
+    await tester.tap(find.widgetWithText(ChoiceChip, '我的发布'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('草稿 · 1'), findsOneWidget);
+  });
+
+  testWidgets('我的项目列表卡片显示阶段、下一步和归档只读说明', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{
+        'project-draft-1': 'draft',
+        'project-submitted-1': 'submitted',
+        'project-published-1': 'published',
+        'project-active-1': 'converted_to_order',
+        'project-archived-1': 'archived',
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前阶段：草稿'), findsOneWidget);
+    expect(find.text('当前下一步：继续编辑 / 删除此项目'), findsOneWidget);
+
+    await tester.tap(find.text('预发布列表 · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('当前阶段：预发布列表'), findsOneWidget);
+    expect(
+      find.text('当前下一步：查看详情 / 检查无误，确定发布 / 返回草稿继续编辑 / 作废归档'),
+      findsOneWidget,
+    );
+    expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '查看详情'), findsOneWidget);
+
+    await tester.tap(find.text('竞标中 · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('当前阶段：竞标中'), findsOneWidget);
+    expect(find.text('当前下一步：查看详情 / 补充资料'), findsOneWidget);
+
+    await tester.tap(find.text('进行中 · 1'));
+    await tester.pumpAndSettle();
+    expect(find.text('当前阶段：进行中'), findsOneWidget);
+    expect(find.text('当前下一步：查看详情 / 进入业务继续处理'), findsOneWidget);
+
+    await _scrollTo(tester, find.text('已归档项目'));
+    expect(find.text('当前阶段：已归档'), findsOneWidget);
+    expect(find.text('当前下一步：查看详情 / 当前只读'), findsOneWidget);
+  });
+
+  testWidgets('草稿详情显示继续编辑、删除并隐藏说明型区块', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-draft-detail': 'draft'},
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-draft-detail',
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('项目编号：MY-001'));
-      expect(find.text('项目名称：单项目私域承接'), findsOneWidget);
-      expect(find.text('建筑类型：展览装修'), findsOneWidget);
-      expect(find.text('预算金额：¥2600'), findsOneWidget);
-      expect(find.text('项目面积：380 ㎡'), findsOneWidget);
-      expect(find.text('类型备注：医疗器械展区主舞台与灯光联动搭建'), findsOneWidget);
-      expect(find.text('省：四川'), findsOneWidget);
-      expect(find.text('市：成都'), findsOneWidget);
-      expect(find.text('区县：武侯区'), findsOneWidget);
-      expect(find.text('详细地址：世纪城新国际会展中心 6 号馆西门'), findsOneWidget);
-      expect(find.text('范围说明：主舞台、器械展区与接待区同步进场'), findsOneWidget);
-      expect(find.text('计划结束日期：2026-04-18'), findsOneWidget);
-      expect(find.text('项目地点与安排'), findsOneWidget);
-      await scrollTo(tester, find.text('项目说明'));
-      expect(find.text('项目说明'), findsOneWidget);
-      await scrollTo(tester, find.text('当前进度'));
-      expect(find.text('当前进度'), findsOneWidget);
-      await scrollTo(tester, find.text('继续竞标'));
-      expect(find.text('继续竞标'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '管理当前'), findsNothing);
-      await scrollTo(tester, find.text('是否已接单：未接单'));
-      expect(find.text('进度摘要：未接单，尚未正式完结，暂不可评价。'), findsOneWidget);
-      expect(find.text('是否已接单：未接单'), findsOneWidget);
-      expect(find.text('当前订单状态：当前暂未提供'), findsOneWidget);
-      expect(find.text('正式完结：尚未正式完结'), findsOneWidget);
-      expect(find.text('评价状态：暂不可评价'), findsOneWidget);
-      expect(find.text('510000'), findsNothing);
-      expect(find.text('510100'), findsNothing);
-      expect(find.text('510107'), findsNothing);
-      expect(find.textContaining('正式附件'), findsNothing);
-      expect(find.textContaining('奖励金额'), findsNothing);
-      expect(find.textContaining('单位平方面积金额'), findsNothing);
-      expect(find.text('状态说明'), findsNothing);
-      expect(find.text('地点承接'), findsNothing);
-      expect(find.textContaining('页面不会伪造已填写状态'), findsNothing);
-    },
-  );
+    await _scrollTo(tester, find.text('当前阶段动作'));
+    expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '删除此项目'), findsOneWidget);
+    expect(find.text('当前展示：已接通内容'), findsNothing);
+    expect(find.text('当前提示'), findsNothing);
+    expect(find.text('已保存的地点与安排'), findsNothing);
+    expect(find.text('已保存的项目说明'), findsNothing);
+    expect(find.text('当前阶段补充信息'), findsNothing);
+  });
 
-  testWidgets(
-    'my project detail switches owner surface into local manage-current shell',
-    (WidgetTester tester) async {
-      final exhibitionHandlers =
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/my/projects/my-project-owner':
-                (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: <String, Object?>{
-                      'publicProject': _publicProjectDetail(
-                        projectId: 'my-project-owner',
-                        projectNo: 'MY-OWNER-1',
-                        title: '当前组织发布项目',
-                        budgetAmount: 3600,
-                        state: 'published',
-                        viewerProjectRelation: 'owner',
-                      ),
-                      'privateProgress': _privateProgress(
-                        hasAcceptedOrder: false,
-                        formalCompletionStatus: 'not_formally_completed',
-                        evaluationStatus: 'not_eligible',
-                      ),
-                    },
-                  );
-                },
-          };
+  testWidgets('预发布列表详情显示正式发布与回退动作', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-submitted-detail': 'submitted'},
+    );
 
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionHandlers: exhibitionHandlers,
-          initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
-            'my-project-owner',
-          ),
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-submitted-detail',
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.widgetWithText(FilledButton, '管理当前'));
-      expect(find.widgetWithText(FilledButton, '管理当前'), findsOneWidget);
-      expect(find.text('继续竞标'), findsNothing);
+    await _scrollTo(tester, find.text('当前阶段动作'));
+    expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '作废归档'), findsOneWidget);
+    expect(find.text('删除此项目'), findsNothing);
+  });
 
-      await tester.tap(find.widgetWithText(FilledButton, '管理当前'));
-      await tester.pumpAndSettle();
+  testWidgets('已发布详情把补资料入口收进摘要卡并隐藏阶段动作', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-published-detail': 'published'},
+    );
 
-      expect(find.text('推广此项目'), findsOneWidget);
-      expect(find.text('编辑'), findsOneWidget);
-      expect(find.text('下架'), findsOneWidget);
-      expect(find.text('删除此项目'), findsOneWidget);
-
-      await tester.tapAt(const Offset(12, 12));
-      await tester.pumpAndSettle();
-
-      expect(find.text('推广此项目'), findsNothing);
-      expect(find.text('删除此项目'), findsNothing);
-    },
-  );
-
-  testWidgets(
-    'my project progress mapping keeps formal completion and evaluation semantics exact',
-    (WidgetTester tester) async {
-      final exhibitionHandlers =
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/my/projects/my-project-2':
-                (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: <String, Object?>{
-                      'publicProject': _publicProjectDetail(
-                        projectId: 'my-project-2',
-                        projectNo: 'MY-002',
-                        title: '评价准入项目',
-                        budgetAmount: 3200,
-                        plannedEndAt: '2026-03-20',
-                      ),
-                      'privateProgress': _privateProgress(
-                        hasAcceptedOrder: true,
-                        orderStatus: 'active',
-                        contractStatus: 'active',
-                        fulfillmentStatus: 'submitted',
-                        acceptanceStatus: 'rechecked',
-                        formalCompletionStatus: 'formally_completed',
-                        evaluationStatus: 'eligible',
-                      ),
-                    },
-                  );
-                },
-          };
-
-      await tester.pumpWidget(
-        _buildApp(
-          exhibitionHandlers: exhibitionHandlers,
-          initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
-            'my-project-2',
-          ),
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-published-detail',
         ),
-      );
-      await tester.pumpAndSettle();
+      ),
+    );
+    await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('正式完结：已正式完结'));
-      expect(find.text('正式完结：已正式完结'), findsOneWidget);
-      expect(find.text('评价状态：待评价'), findsOneWidget);
-      expect(find.text('当前订单状态：订单进行中'), findsOneWidget);
-      expect(find.text('合同状态：合同进行中'), findsOneWidget);
-      expect(find.text('履约进度：已提交'), findsOneWidget);
-      expect(find.text('验收状态：已复检'), findsOneWidget);
-      expect(find.text('评价状态：已评价'), findsNothing);
-    },
-  );
+    expect(find.text('当前阶段动作'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '继续补充资料'), findsOneWidget);
+    expect(find.text('下架关闭'), findsNothing);
+    await _scrollTo(tester, find.text('项目详情文书区'));
+    expect(find.text('项目详情文书区'), findsOneWidget);
+    expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
+    expect(find.text('当前说明'), findsNothing);
+    await _scrollTo(tester, find.text('公共资源下载区'));
+    expect(find.text('公共资源下载区'), findsOneWidget);
+    expect(
+      find.text('这里提供平台共享参考资料，用于帮助项目发布与续接过程理解规则和流程，不替代私域项目文书区。'),
+      findsOneWidget,
+    );
+    expect(find.text('删除此项目'), findsNothing);
+  });
+
+  testWidgets('已归档详情只保留只读动作', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-archived-detail': 'archived'},
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-archived-detail',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.text('当前阶段动作'));
+    expect(find.widgetWithText(OutlinedButton, '当前已归档，仅支持查看'), findsOneWidget);
+    expect(find.text('继续编辑'), findsNothing);
+    expect(find.text('删除此项目'), findsNothing);
+  });
+
+  testWidgets('预发布列表返回草稿继续编辑后详情进入草稿承接', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-withdraw-flow': 'submitted',
+    };
+    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('预发布列表 · 1'));
+    await tester.pumpAndSettle();
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-withdraw-flow',
+      actionLabel: '查看详情',
+    );
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '返回草稿继续编辑'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('撤回后项目会回到草稿，可继续编辑。'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认撤回'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已撤回到草稿'), findsOneWidget);
+    expect(projectStates['project-withdraw-flow'], 'draft');
+    expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '删除此项目'), findsOneWidget);
+  });
+
+  testWidgets('预发布列表作废归档后详情进入归档只读承接', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-archive-flow': 'submitted',
+    };
+    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('预发布列表 · 1'));
+    await tester.pumpAndSettle();
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-archive-flow',
+      actionLabel: '查看详情',
+    );
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '作废归档'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '作废归档'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('归档后项目会退出当前活跃流转。'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认归档'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已作废归档'), findsOneWidget);
+    expect(projectStates['project-archive-flow'], 'archived');
+    expect(find.text('删除此项目'), findsNothing);
+  });
+
+  testWidgets('预发布列表卡片主动作可直接正式发布并进入已发布承接', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-publish-flow': 'submitted',
+    };
+    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('预发布列表 · 1'));
+    await tester.pumpAndSettle();
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-publish-flow',
+      actionLabel: '检查无误，确定发布',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('确认无误后，项目将正式进入公域展示。'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已正式发布'), findsOneWidget);
+    expect(projectStates['project-publish-flow'], 'published');
+    expect(find.textContaining('竞标中'), findsWidgets);
+  });
+
+  testWidgets('已发布详情不再提供阶段动作和下架关闭入口', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-close-flow': 'published',
+    };
+    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('竞标中 · 1'));
+    await tester.pumpAndSettle();
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-close-flow',
+      actionLabel: '查看详情',
+    );
+    expect(find.text('当前阶段动作'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '继续补充资料'), findsOneWidget);
+    expect(find.text('下架关闭'), findsNothing);
+    expect(projectStates['project-close-flow'], 'published');
+  });
+
+  testWidgets('生命周期动作失败时显示中文业务错误', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-submitted-fail': 'submitted'},
+      failingLifecyclePath: '/api/app/project/withdraw',
+      failingLifecycleCode: 'PROJECT_WITHDRAW_INVALID',
+      failingLifecycleMessage: '当前项目尚未提交，暂不支持撤回到草稿。',
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-submitted-fail',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '返回草稿继续编辑'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '确认撤回'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前项目尚未提交，暂不支持撤回到草稿。'), findsOneWidget);
+    expect(find.text('Current project state not supported'), findsNothing);
+  });
+
+  testWidgets('草稿项目删除后返回四阶段列表', (WidgetTester tester) async {
+    var deleteCalls = 0;
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-draft-delete': 'draft'},
+      onDelete: (_) => deleteCalls += 1,
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-draft-delete',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '删除此项目'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '删除此项目'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('只有草稿项目可以删除。删除后不可恢复。'), findsWidgets);
+    await tester.tap(find.widgetWithText(FilledButton, '确认删除'));
+    await tester.pumpAndSettle();
+
+    expect(deleteCalls, 1);
+    expect(find.text('我的项目'), findsWidgets);
+    expect(find.text('当前没有草稿项目'), findsOneWidget);
+  });
 }

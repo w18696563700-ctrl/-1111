@@ -1,9 +1,9 @@
 part of '../exhibition_consumer_layer.dart';
 
 class ContractConfirmCommand {
-  const ContractConfirmCommand({required this.contractId});
+  const ContractConfirmCommand({required this.orderId});
 
-  final String contractId;
+  final String orderId;
 
-  Map<String, Object?> toJson() => <String, Object?>{'contractId': contractId};
+  Map<String, Object?> toJson() => <String, Object?>{'orderId': orderId};
 }

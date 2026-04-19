@@ -101,12 +101,6 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
       return;
     }
 
-    if (result.isSuccess) {
-      ExhibitionConsumerLayer.instance.invalidateInspectionDetail(
-        milestoneId: milestoneId,
-      );
-    }
-
     setState(() {
       _submitting = false;
       _actionResult = result;
@@ -144,25 +138,25 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
         inspectionId != null &&
         inspectionState == 'draft';
     final currentStateMessage = switch (inspectionState) {
-      'draft' => '当前状态：验收还在草稿态，可以继续做首次提交。',
-      'submitted' => '当前状态：验收已经提交完成，这一页改为展示已提交结果，不继续放开复检主链。',
+      'draft' => '当前状态：验收还在草稿态，可以继续进入提交承接。',
+      'submitted' => '当前状态：验收已经提交完成，这一页改为展示只读结果承接，不继续放开复检主链。',
       'rechecked' => '当前状态：验收已经完成复检，这一页只保留结果承接。',
       _ when detailResult?.state == AppPageState.content =>
         '当前状态：验收详情已经承接完成，是否允许提交以后端返回为准。',
       _ => '当前状态：需要先完成验收详情承接，才能继续这一步。',
     };
     final actionMessage = canSubmit
-        ? '当前动作：可以继续提交验收；页面不会本地补做整改或复检判断。'
+        ? '当前动作：可以继续把当前 inspection 上下文交给提交入口；页面不会本地补做整改或复检判断。'
         : inspectionState == 'submitted'
         ? '当前动作：首次提交已经完成；当前页先停留在已提交结果承接，不继续放开复检。'
         : detailSnapshot?.isDemo == true
         ? '当前动作：真实承接暂未就位，你可以先使用演示结果继续讲解当前页面。'
-        : '当前动作：暂时不能继续提交，请先恢复当前验收详情承接。';
+        : '当前动作：暂时不能继续提交承接，请先恢复当前验收详情承接。';
     final continueMessage = _actionResult?.isSuccess == true
-        ? '提交后如何继续：验收会停留在已提交承接结果，当前首发主链先止于这里。'
+        ? '提交后如何继续：页面会停留在 shell accepted 结果，后续仍以验收详情真值为准。'
         : inspectionState == 'submitted'
         ? '提交后如何继续：当前已经是已提交结果，页面保持只读承接。'
-        : '提交后如何继续：如果提交成功，页面会保留 inspectionId 与 milestoneId，便于继续当前链路。';
+        : '提交后如何继续：如果提交 accepted，页面会保留 inspectionId 与 milestoneId，便于继续当前链路。';
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
@@ -195,8 +189,9 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
   }) {
     return <Widget>[
       const _SummaryCard(
-        title: '验收提交',
-        summary: '页面先读取验收详情，再做最小提交动作；提交完成后停留在已提交结果承接面，不扩成整改治理闭环或复检主链。',
+        title: '验收提交入口',
+        summary:
+            '页面先读取验收详情，再把当前 inspection 上下文交给 shell / handoff 入口；accepted 只代表续接已受理，不代表 inspection state 已在本页推进。',
       ),
       ..._buildNoticeCards(detailSnapshot),
       const SizedBox(height: 16),
@@ -258,7 +253,8 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
   }) {
     return _ActionCard(
       title: '现在提交什么',
-      summary: '先确认当前验收是否还处于草稿态。只有草稿态会继续放开提交，其余状态保持只读结果承接。',
+      summary:
+          '先确认当前验收是否还处于草稿态。只有草稿态会继续放开 shell / handoff 提交，其余状态保持只读结果承接。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         _StateMessage(title: '当前状态', body: currentStateMessage),
@@ -301,7 +297,7 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
             FilledButton(
               key: const ValueKey<String>('inspection_submit_button'),
               onPressed: _submitting || !canSubmit ? null : _submit,
-              child: const Text('提交验收'),
+              child: const Text('继续验收提交'),
             ),
             FilledButton.tonal(
               onPressed: _submitting ? null : _applyDemoResult,
@@ -333,10 +329,10 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
     final actionSummary = actionPayload?['summary'];
 
     return _ActionCard(
-      title: '已提交验收结果',
+      title: '验收提交入口已受理',
       summary: _actionOrigin == ExhibitionStageDataOrigin.demo
-          ? '当前页面先承接演示提交结果，帮助客户继续看已提交态界面，不代表真实提交链路已通。'
-          : '当前页面只承接后端返回的已提交结果，不额外扩展新的继续链路。',
+          ? '当前页面先承接演示提交结果，帮助客户继续看 shell accepted 姿态，不代表真实提交链路已通。'
+          : '当前页面只承接后端返回的 shell accepted 结果，不把这一路径写成 inspection truth 已推进。',
       children: <Widget>[
         if (_actionOrigin == ExhibitionStageDataOrigin.demo)
           const _EmptyNotice(
@@ -344,7 +340,7 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
             message: '当前已提交结果只用于继续讲解当前界面，真实链路恢复后会自动切回已接通内容。',
           )
         else
-          const Text('当前页面只承接后端返回的已提交结果。'),
+          const Text('当前页面只承接后端返回的 shell accepted 结果。'),
         if (actionMilestoneId != null) ...<Widget>[
           const SizedBox(height: 12),
           _InstanceSummaryLine(title: '当前里程碑 ID', value: actionMilestoneId),
@@ -362,12 +358,15 @@ class _InspectionSubmitPageState extends State<InspectionSubmitPage> {
           ),
         ],
         if (actionSummary is Map)
-          const _DetailLine(label: '当前说明', value: '验收已提交完成，页面继续保留当前结果承接。'),
-        if (actionState == 'submitted') ...<Widget>[
+          const _DetailLine(
+            label: '当前说明',
+            value: '当前验收提交入口已经受理，后续仍以验收详情真值为准。',
+          ),
+        if (actionState == 'submitted' || actionState == 'draft') ...<Widget>[
           const SizedBox(height: 12),
           const _EmptyNotice(
             title: '当前冻结',
-            message: '验收复检链路当前阶段不开放，页面先停留在只读结果面。',
+            message: '验收复检链路当前阶段不开放；accepted 之后页面仍停留在受控结果面。',
           ),
         ],
       ],

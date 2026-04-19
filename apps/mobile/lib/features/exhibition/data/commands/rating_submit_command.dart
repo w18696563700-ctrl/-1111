@@ -5,7 +5,5 @@ class RatingSubmitCommand {
 
   final String orderId;
 
-  Map<String, Object?> toJson() {
-    return <String, Object?>{'orderId': orderId};
-  }
+  Map<String, Object?> toJson() => <String, Object?>{'orderId': orderId};
 }

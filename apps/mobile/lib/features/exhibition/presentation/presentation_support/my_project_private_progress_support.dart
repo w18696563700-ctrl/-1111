@@ -72,10 +72,6 @@ String _myProjectAreaLabel(num? value) {
   return '$normalized ㎡';
 }
 
-String _myProjectAcceptedOrderLabel(bool hasAcceptedOrder) {
-  return hasAcceptedOrder ? '已接单' : '未接单';
-}
-
 String _myProjectFormalCompletionLabel(String? value) {
   return switch (_normalizeId(value)) {
     'formally_completed' => '已正式完结',
@@ -91,105 +87,4 @@ String _myProjectEvaluationLabel(String? value) {
     'not_eligible' => '暂不可评价',
     _ => '当前状态暂未归类',
   };
-}
-
-String _myProjectOrderStatusLabel(String? value) {
-  return switch (_normalizeId(value)) {
-    'active' => '订单进行中',
-    null => '当前暂未提供',
-    _ => '当前状态暂未归类',
-  };
-}
-
-String _myProjectContractStatusLabel(String? value) {
-  return switch (_normalizeId(value)) {
-    'pending_confirm' => '待确认',
-    'active' => '合同进行中',
-    'amended' => '已改单',
-    null => '当前暂未提供',
-    _ => '当前状态暂未归类',
-  };
-}
-
-String _myProjectFulfillmentStatusLabel(String? value) {
-  return switch (_normalizeId(value)) {
-    'pending_submission' => '待提交',
-    'submitted' => '已提交',
-    null => '当前暂未提供',
-    _ => '当前状态暂未归类',
-  };
-}
-
-String _myProjectAcceptanceStatusLabel(String? value) {
-  return switch (_normalizeId(value)) {
-    'draft' => '待提交',
-    'submitted' => '已提交',
-    'rechecked' => '已复检',
-    null => '当前暂未提供',
-    _ => '当前状态暂未归类',
-  };
-}
-
-String _myProjectAfterSalesStatusLabel(String? value) {
-  return switch (_normalizeId(value)) {
-    'opened' => '处理中',
-    'withdrawn' => '已撤回',
-    null => '当前暂未提供',
-    _ => '当前状态暂未归类',
-  };
-}
-
-List<String> _myProjectPrivateSummaryPills(
-  Map<String, Object?> privateProgress,
-) {
-  final pills = <String>[
-    _myProjectAcceptedOrderLabel(privateProgress['hasAcceptedOrder'] == true),
-    _myProjectFormalCompletionLabel(
-      privateProgress['formalCompletionStatus'] as String?,
-    ),
-    _myProjectEvaluationLabel(privateProgress['evaluationStatus'] as String?),
-  ];
-
-  final orderStatus = _normalizeId(privateProgress['orderStatus'] as String?);
-  if (orderStatus != null) {
-    pills.add('订单：${_myProjectOrderStatusLabel(orderStatus)}');
-  }
-  final contractStatus = _normalizeId(
-    privateProgress['contractStatus'] as String?,
-  );
-  if (contractStatus != null) {
-    pills.add('合同：${_myProjectContractStatusLabel(contractStatus)}');
-  }
-  final fulfillmentStatus = _normalizeId(
-    privateProgress['fulfillmentStatus'] as String?,
-  );
-  if (fulfillmentStatus != null) {
-    pills.add('履约：${_myProjectFulfillmentStatusLabel(fulfillmentStatus)}');
-  }
-  final acceptanceStatus = _normalizeId(
-    privateProgress['acceptanceStatus'] as String?,
-  );
-  if (acceptanceStatus != null) {
-    pills.add('验收：${_myProjectAcceptanceStatusLabel(acceptanceStatus)}');
-  }
-  final afterSalesStatus = _normalizeId(
-    privateProgress['afterSalesOrDisputeStatus'] as String?,
-  );
-  if (afterSalesStatus != null) {
-    pills.add('售后/争议：${_myProjectAfterSalesStatusLabel(afterSalesStatus)}');
-  }
-
-  return pills;
-}
-
-String _myProjectPrivateSummaryText(Map<String, Object?> privateProgress) {
-  final hasAcceptedOrder = privateProgress['hasAcceptedOrder'] == true;
-  final formalCompletion = _myProjectFormalCompletionLabel(
-    privateProgress['formalCompletionStatus'] as String?,
-  );
-  final evaluation = _myProjectEvaluationLabel(
-    privateProgress['evaluationStatus'] as String?,
-  );
-  final acceptedLabel = hasAcceptedOrder ? '已接单' : '未接单';
-  return '$acceptedLabel，$formalCompletion，$evaluation。';
 }

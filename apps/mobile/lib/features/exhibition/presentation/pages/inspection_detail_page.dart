@@ -25,6 +25,8 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
 
   ExhibitionStageLoadSnapshot? _snapshot;
   bool _loading = false;
+  bool _rechecking = false;
+  ExhibitionActionResult? _recheckResult;
 
   @override
   void initState() {
@@ -49,6 +51,43 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
     });
   }
 
+  Future<void> _recheckInspection() async {
+    final payload = _payloadMap(_snapshot?.result.payload);
+    final inspectionId = _inspectionIdFromPayload(_snapshot?.result.payload);
+    final milestoneId =
+        _normalizeId(payload?['milestoneId'] as String?) ??
+        _normalizeId(widget.milestoneId);
+    if (_rechecking || inspectionId == null || milestoneId == null) {
+      return;
+    }
+
+    setState(() {
+      _rechecking = true;
+      _recheckResult = null;
+    });
+
+    final result = await ExhibitionConsumerLayer.instance.recheckInspection(
+      InspectionRecheckCommand(inspectionId: inspectionId),
+    );
+
+    ExhibitionStageLoadSnapshot? refreshedSnapshot;
+    if (result.isSuccess) {
+      refreshedSnapshot = await _source.load(forceRefresh: true);
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _rechecking = false;
+      _recheckResult = result;
+      if (refreshedSnapshot != null) {
+        _snapshot = refreshedSnapshot;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final routeMilestoneId = _normalizeId(widget.milestoneId);
@@ -57,7 +96,7 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
 
     return _LoadPageFrame(
       title: '验收详情',
-      summary: '这里承接当前验收状态。草稿态可以继续验收提交，已提交和已复检会停留在结果承接面，不把复检放成首发必走路径。',
+      summary: '这里承接当前验收真值。草稿态继续只读；已提交验收可做最小复检；复检后会刷新验收详情。争议和整改流仍冻结。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -93,18 +132,19 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
     }
 
     final actionStatus = switch (inspectionState) {
-      'draft' => '当前动作：可以继续验收提交',
-      'submitted' => '当前动作：当前保持结果承接',
+      'draft' => '当前动作：当前保持只读查看',
+      'submitted' => '当前动作：可以复检当前验收',
+      'rechecked' => '当前动作：当前保持结果承接',
       _ => '当前动作：当前保持只读',
     };
     final nextStep = switch (inspectionState) {
-      'draft' => '提交完成后，页面会继续承接已提交验收状态，并停留在当前结果页。',
-      'submitted' => '当前验收已经提交完成，首发阶段先停留在已提交承接面，不继续放开复检主链。',
-      'rechecked' => '当前验收已经完成复检，页面保持只读承接，不再继续放开动作。',
+      'draft' => '当前验收真值仍停留在草稿态，但本页不开放提交。当前页只保留受控读取，避免伪装成可推进的小型交易台。',
+      'submitted' => '当前验收已经提交完成；如果需要最小复检，可以直接在这里执行。复检成功后页面会刷新验收详情。',
+      'rechecked' => '当前验收已经完成复检，页面继续保留只读结果承接。',
       _ => '当前验收停留在受控承接面，后续不会在这里展开整改或治理闭环。',
     };
 
-    return <Widget>[
+    final sections = <Widget>[
       const SizedBox(height: 16),
       _ActionCard(
         title: '现在先处理什么',
@@ -122,6 +162,24 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
         ),
       ),
     ];
+
+    if (_rechecking) {
+      sections.addAll(<Widget>[
+        const SizedBox(height: 16),
+        const _SubmittingPanel(),
+      ]);
+    } else if (_recheckResult != null) {
+      sections.addAll(<Widget>[
+        const SizedBox(height: 16),
+        _SubmissionResultPanel(result: _recheckResult!),
+        if (_recheckResult!.isSuccess) ...<Widget>[
+          const SizedBox(height: 16),
+          _buildRecheckResultCard(milestoneId),
+        ],
+      ]);
+    }
+
+    return sections;
   }
 
   List<Widget> _buildInspectionChildren(
@@ -138,7 +196,7 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
       _StateMessage(
         title: '当前验收说明',
         body: switch (inspectionState) {
-          'draft' => '当前验收还未提交，现在先完成提交，后续结果继续由这条链路承接。',
+          'draft' => '当前验收还未正式提交，当前页只保留受控读取，不在这里继续开放提交动作。',
           'submitted' => '当前验收已经提交完成，当前页保留只读结果承接，不把复检做成首发必走动作。',
           'rechecked' => '当前验收已经完成复检，当前页面继续保留只读结果承接。',
           _ => '当前验收停留在受控承接面，下一步仍以现有入口为准。',
@@ -175,6 +233,14 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
             ? _ActionCardTone.emphasis
             : _ActionCardTone.muted,
       ),
+      if (inspectionState == 'submitted' && inspectionId != null) ...<Widget>[
+        const SizedBox(height: 12),
+        FilledButton(
+          key: const ValueKey<String>('inspection_recheck_button'),
+          onPressed: _rechecking ? null : _recheckInspection,
+          child: const Text('继续验收复检'),
+        ),
+      ],
       const SizedBox(height: 12),
       _StateMessage(title: '后续如何继续', body: nextStep),
     ];
@@ -182,25 +248,47 @@ class _InspectionDetailPageState extends State<InspectionDetailPage> {
     if (inspectionState == 'draft') {
       children.addAll(<Widget>[
         const SizedBox(height: 12),
-        FilledButton(
-          onPressed: () {
-            Navigator.of(context).pushNamed(
-              ExhibitionRoutes.inspectionSubmitWithMilestoneId(milestoneId),
-            );
-          },
-          child: const Text('继续验收提交'),
-        ),
-      ]);
-    } else if (inspectionState == 'submitted') {
-      children.addAll(<Widget>[
-        const SizedBox(height: 12),
-        const _EmptyNotice(
-          title: '当前冻结',
-          message: '复检链路当前阶段不开放。当前页只继续展示已提交结果，不放开新的继续动作。',
+        _EmptyNotice(
+          title: '当前不在这里开放',
+          message:
+              '验收提交动作当前不从详情页继续放开。当前页只读取当前验收真值，不伪装成可继续推进的小型交易台。',
         ),
       ]);
     }
 
     return children;
+  }
+
+  Widget _buildRecheckResultCard(String milestoneId) {
+    final payload = _payloadMap(_recheckResult?.payload);
+    final inspectionId = _inspectionIdFromPayload(_recheckResult?.payload);
+    final actionState = _stateFromPayload(_recheckResult?.payload);
+    final summary = payload?['summary'];
+
+    return _ActionCard(
+      title: '验收复检入口已受理',
+      summary: '当前页承接复检后的最小结果，并继续回显最新验收真值。',
+      tone: _ActionCardTone.emphasis,
+      children: <Widget>[
+        _InstanceSummaryLine(title: '当前里程碑 ID', value: milestoneId),
+        if (inspectionId != null) ...<Widget>[
+          const SizedBox(height: 12),
+          _InstanceSummaryLine(title: '当前验收 ID', value: inspectionId),
+        ],
+        if (actionState != null) ...<Widget>[
+          const SizedBox(height: 12),
+          _DetailLine(
+            label: '当前状态',
+            value: _frontStageStateLabel(actionState),
+            highlight: true,
+          ),
+        ],
+        if (summary is Map)
+          const _DetailLine(
+            label: '当前说明',
+            value: '验收复检入口已受理；页面已经刷新验收详情缓存。',
+          ),
+      ],
+    );
   }
 }

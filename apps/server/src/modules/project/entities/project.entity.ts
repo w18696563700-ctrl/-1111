@@ -20,6 +20,12 @@ export class ProjectEntity {
   @Column({ type: 'varchar', length: 128 })
   title!: string;
 
+  @Column({ name: 'exhibition_name', type: 'text', nullable: true })
+  exhibitionName!: string | null;
+
+  @Column({ name: 'brand_name', type: 'text', nullable: true })
+  brandName!: string | null;
+
   @Column({ name: 'building_type', type: 'varchar', length: 64 })
   buildingType!: string;
 
