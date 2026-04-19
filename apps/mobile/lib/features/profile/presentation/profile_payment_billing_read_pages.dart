@@ -43,6 +43,16 @@ class _ProfilePaymentBillingExplanationPageState
       );
     }
     if (result.state != AppPageState.content || data == null) {
+      final unavailablePanel = _paymentBillingUnavailablePanel(
+        context: context,
+        state: result.state,
+        errorCode: result.errorCode,
+        rawMessage: result.message,
+      );
+      if (unavailablePanel != null) {
+        return unavailablePanel;
+      }
+
       return _ProfileScreenStatePanel(
         title: '规则说明当前暂不可用',
         message: profileVisibleReadMessage(
@@ -146,6 +156,16 @@ class _ProfilePaymentBillingHandoffPageState
       );
     }
     if (result.state != AppPageState.content || data == null) {
+      final unavailablePanel = _paymentBillingUnavailablePanel(
+        context: context,
+        state: result.state,
+        errorCode: result.errorCode,
+        rawMessage: result.message,
+      );
+      if (unavailablePanel != null) {
+        return unavailablePanel;
+      }
+
       return _ProfileScreenStatePanel(
         title: '处理与衔接当前暂不可用',
         message: profileVisibleReadMessage(

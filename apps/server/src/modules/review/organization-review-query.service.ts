@@ -43,6 +43,11 @@ export class OrganizationReviewQueryService {
         status: query.status.trim()
       });
     }
+    if (typeof query.organizationId === 'string' && query.organizationId.trim().length > 0) {
+      qb.andWhere('organization.id = :organizationId', {
+        organizationId: query.organizationId.trim()
+      });
+    }
     if (typeof query.keyword === 'string' && query.keyword.trim().length > 0) {
       qb.andWhere(
         '(organization.name ILIKE :keyword OR certification.legal_name ILIKE :keyword OR certification.uscc ILIKE :keyword)',

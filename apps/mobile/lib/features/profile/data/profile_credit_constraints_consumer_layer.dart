@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/protected_app_request.dart';
 
 final class ProfileCreditConstraintsCanonicalPaths {
   const ProfileCreditConstraintsCanonicalPaths._();
@@ -275,7 +276,9 @@ class ProfileCreditConstraintsConsumerLayer {
   }) async {
     const method = 'GET';
     try {
-      final response = await _client.get(canonicalPath);
+      final response = await runProtectedAppRequest(
+        () => _client.get(canonicalPath),
+      );
       return _mapResponse(
         response,
         method: method,

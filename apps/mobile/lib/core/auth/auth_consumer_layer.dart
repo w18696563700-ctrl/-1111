@@ -50,20 +50,79 @@ class AuthConsumerLayer {
   Future<AuthActionResult<SessionEnvelope>> loginWithOtp({
     required String mobile,
     required String otpCode,
+    required bool consentAccepted,
   }) async {
     final deviceId = AppSessionStore.instance.ensureDeviceId();
-    final result = await _post(
+    final result = await _loginWithSession(
       canonicalPath: AuthCanonicalPaths.otpLogin,
       body: <String, Object?>{
         'mobile': mobile.trim(),
         'otpCode': otpCode.trim(),
-        'deviceId': deviceId,
-        'deviceName': 'Frontend Steward',
-        'osType': Platform.operatingSystem,
+        ..._loginDeviceMetadata(deviceId: deviceId),
+        'consentAccepted': consentAccepted,
       },
+      deviceId: deviceId,
+      localLoginSource: AppSessionLoginSource.otpLogin,
+    );
+    return result;
+  }
+
+  Future<AuthActionResult<SessionEnvelope>> loginWithPassword({
+    required String mobile,
+    required String password,
+    required bool consentAccepted,
+  }) async {
+    final deviceId = AppSessionStore.instance.ensureDeviceId();
+    return _loginWithSession(
+      canonicalPath: AuthCanonicalPaths.passwordLogin,
+      body: <String, Object?>{
+        'mobile': mobile.trim(),
+        'password': password,
+        ..._loginDeviceMetadata(deviceId: deviceId),
+        'consentAccepted': consentAccepted,
+      },
+      deviceId: deviceId,
+      localLoginSource: AppSessionLoginSource.passwordLogin,
+    );
+  }
+
+  Future<AuthActionResult<ActionAckView>> resetPassword({
+    required String mobile,
+    required String otpCode,
+    required String newPassword,
+  }) {
+    return _post(
+      canonicalPath: AuthCanonicalPaths.passwordReset,
+      body: <String, Object?>{
+        'mobile': mobile.trim(),
+        'otpCode': otpCode.trim(),
+        'newPassword': newPassword,
+      },
+      parser: _parseActionAckView,
+    );
+  }
+
+  Future<AuthActionResult<ActionAckView>> setPassword({
+    required String newPassword,
+  }) {
+    return _post(
+      canonicalPath: AuthCanonicalPaths.passwordSet,
+      body: <String, Object?>{'newPassword': newPassword},
+      parser: _parseActionAckView,
+    );
+  }
+
+  Future<AuthActionResult<SessionEnvelope>> _loginWithSession({
+    required String canonicalPath,
+    required Map<String, Object?> body,
+    required String deviceId,
+    required String localLoginSource,
+  }) async {
+    final result = await _post(
+      canonicalPath: canonicalPath,
+      body: body,
       parser: _parseSessionEnvelope,
     );
-
     final session = result.data;
     if (result.state == AppPageState.content && session != null) {
       AppSessionStore.instance.establishSession(
@@ -71,9 +130,18 @@ class AuthConsumerLayer {
         refreshToken: session.refreshToken,
         expiresInSeconds: session.expiresInSeconds,
         deviceId: deviceId,
+        localLoginSource: localLoginSource,
       );
     }
     return result;
+  }
+
+  Map<String, Object?> _loginDeviceMetadata({required String deviceId}) {
+    return <String, Object?>{
+      'deviceId': deviceId,
+      'deviceName': 'Frontend Steward',
+      'osType': Platform.operatingSystem,
+    };
   }
 
   Future<AuthActionResult<SessionEnvelope>> refreshSession() async {
@@ -86,6 +154,9 @@ class AuthConsumerLayer {
         message: '当前没有可用刷新会话。',
       );
     }
+
+    final passwordSetupPromptDismissed =
+        AppSessionStore.instance.isPasswordSetupPromptDismissed;
 
     final result = await _post(
       canonicalPath: AuthCanonicalPaths.refresh,
@@ -103,7 +174,11 @@ class AuthConsumerLayer {
         refreshToken: session.refreshToken,
         expiresInSeconds: session.expiresInSeconds,
         deviceId: AppSessionStore.instance.deviceId,
+        localLoginSource: AppSessionStore.instance.localLoginSource,
       );
+      if (passwordSetupPromptDismissed) {
+        AppSessionStore.instance.markPasswordSetupPromptDismissed();
+      }
     } else if (result.state == AppPageState.unauthorized) {
       AppSessionStore.instance.clearSession();
     }

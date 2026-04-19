@@ -46,9 +46,8 @@ class _ProfileHeaderPanel extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  if (badgeText != null && badgeText!.trim().isNotEmpty) ...<
-                    Widget
-                  >[
+                  if (badgeText != null &&
+                      badgeText!.trim().isNotEmpty) ...<Widget>[
                     Text(
                       badgeText!,
                       style: theme.textTheme.labelMedium?.copyWith(
@@ -126,7 +125,10 @@ class _ProfileScreenStatePanel extends StatelessWidget {
             ),
             if (actionLabel != null && onAction != null) ...<Widget>[
               const SizedBox(height: 16),
-              FilledButton.tonal(onPressed: onAction, child: Text(actionLabel!)),
+              FilledButton.tonal(
+                onPressed: onAction,
+                child: Text(actionLabel!),
+              ),
             ],
           ],
         ),
@@ -205,24 +207,70 @@ class _ProfileCompactCard extends StatelessWidget {
 
 class _ProfileActionRow extends StatelessWidget {
   const _ProfileActionRow({
+    this.tileKey,
     required this.title,
     required this.subtitle,
     required this.onTap,
+    this.leadingIcon,
+    this.emphasized = false,
     this.trailing,
   });
 
+  final Key? tileKey;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final IconData? leadingIcon;
+  final bool emphasized;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final highlightColor = theme.colorScheme.primary;
+    final titleStyle = theme.textTheme.titleMedium?.copyWith(
+      fontWeight: FontWeight.w700,
+      color: emphasized ? highlightColor : null,
+    );
+    final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
+      color: theme.colorScheme.onSurfaceVariant,
+      height: 1.35,
+    );
+    final resolvedTrailing =
+        trailing ??
+        Icon(
+          Icons.chevron_right_rounded,
+          color: emphasized ? highlightColor : null,
+        );
+
     return ListTile(
+      key: tileKey,
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: trailing ?? const Icon(Icons.chevron_right_rounded),
+      tileColor: emphasized
+          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.42)
+          : null,
+      leading: leadingIcon == null
+          ? null
+          : DecoratedBox(
+              decoration: BoxDecoration(
+                color: emphasized
+                    ? highlightColor.withValues(alpha: 0.14)
+                    : theme.colorScheme.surfaceContainerHigh,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(8),
+                child: Icon(
+                  leadingIcon,
+                  color: emphasized
+                      ? highlightColor
+                      : theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+      title: Text(title, style: titleStyle),
+      subtitle: Text(subtitle, style: subtitleStyle),
+      trailing: resolvedTrailing,
       onTap: onTap,
     );
   }

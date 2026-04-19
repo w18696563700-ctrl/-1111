@@ -43,7 +43,7 @@ export class ContentSafetyRuleEngine {
   ) {}
 
   async evaluateProfileText(input: {
-    fieldKey: Extract<ContentSafetyProfileField, 'nickname' | 'intro'>;
+    fieldKey: ContentSafetyProfileField;
     content: string;
   }): Promise<ContentSafetyRuleResult> {
     const normalized = input.content.trim();

@@ -2,7 +2,12 @@ import { Body, Controller, Get, Headers, HttpCode, Param, Patch, Post, Query } f
 import type { HeaderBag } from '../../shared/request-context';
 import { resolveRequestContext } from '../../shared/request-context';
 import { OrganizationWriteService } from '../organization/organization-write.service';
+import { ProfileCertificationOcrService } from './profile-certification-ocr.service';
+import { ProfileCertificationRevalidationService } from './profile-certification-revalidation.service';
 import { ProfileCertificationWriteService } from './profile-certification-write.service';
+import { ProfileGovernanceStatusQueryService } from './profile-governance-status.query.service';
+import { ProfilePersonalCertificationOcrService } from './profile-personal-certification-ocr.service';
+import { ProfilePersonalCertificationWriteService } from './profile-personal-certification-write.service';
 import { ProfilePersonalWriteService } from './profile-personal.write.service';
 import { ProfileOrganizationMembersQueryService } from './profile-organization-members.query.service';
 import { ProfileOrganizationMembersWriteService } from './profile-organization-members.write.service';
@@ -17,7 +22,11 @@ import { ProfileSecurityWriteService } from './profile-security.write.service';
 export class ProfileController {
   constructor(
     private readonly queryService: ProfileQueryService,
+    private readonly certificationOcrService: ProfileCertificationOcrService,
+    private readonly certificationRevalidationService: ProfileCertificationRevalidationService,
     private readonly certificationWriteService: ProfileCertificationWriteService,
+    private readonly personalCertificationOcrService: ProfilePersonalCertificationOcrService,
+    private readonly personalCertificationWriteService: ProfilePersonalCertificationWriteService,
     private readonly personalWriteService: ProfilePersonalWriteService,
     private readonly safetyWriteService: ProfileSafetyWriteService,
     private readonly safetyQueryService: ProfileSafetyQueryService,
@@ -26,6 +35,7 @@ export class ProfileController {
     private readonly organizationMembersWriteService: ProfileOrganizationMembersWriteService,
     private readonly securityQueryService: ProfileSecurityQueryService,
     private readonly securityWriteService: ProfileSecurityWriteService,
+    private readonly governanceStatusQueryService: ProfileGovernanceStatusQueryService,
     private readonly blockService: ProfileBlockService
   ) {}
 
@@ -60,6 +70,30 @@ export class ProfileController {
   @Get('personal/safety')
   getPersonalSafetyState(@Headers() headers: HeaderBag) {
     return this.safetyQueryService.getCurrentSafetyState(resolveRequestContext(headers));
+  }
+
+  @Get('governance/status')
+  getGovernanceStatus(@Headers() headers: HeaderBag) {
+    return this.governanceStatusQueryService.getStatus(resolveRequestContext(headers));
+  }
+
+  @Get('governance/appeals')
+  getGovernanceAppeals(
+    @Query() query: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.queryService.getGovernanceAppeals(query, resolveRequestContext(headers));
+  }
+
+  @Get('governance/appeals/:appealCaseId')
+  getGovernanceAppealDetail(
+    @Param('appealCaseId') appealCaseId: string,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.queryService.getGovernanceAppealDetail(
+      appealCaseId,
+      resolveRequestContext(headers)
+    );
   }
 
   @Post('block')
@@ -117,6 +151,11 @@ export class ProfileController {
     return this.organizationWriteService.create(body, resolveRequestContext(headers));
   }
 
+  @Patch('organization/current')
+  patchCurrentOrganization(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.organizationWriteService.updateCurrent(body, resolveRequestContext(headers));
+  }
+
   @Post('organization/join-by-code')
   joinOrganizationByCode(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
     return this.organizationWriteService.joinByCode(body, resolveRequestContext(headers));
@@ -163,9 +202,49 @@ export class ProfileController {
     return this.certificationWriteService.submit(body, resolveRequestContext(headers));
   }
 
+  @Post('certification/license/ocr')
+  @HttpCode(200)
+  recognizeCertificationLicense(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.certificationOcrService.recognizeLicense(
+      body,
+      resolveRequestContext(headers)
+    );
+  }
+
+  @Post('certification/personal/id-card/ocr')
+  @HttpCode(200)
+  recognizePersonalCertificationIdCard(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.personalCertificationOcrService.recognizeIdCardFront(
+      body,
+      resolveRequestContext(headers)
+    );
+  }
+
+  @Post('certification/personal/submit')
+  submitPersonalCertification(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.personalCertificationWriteService.submit(
+      body,
+      resolveRequestContext(headers)
+    );
+  }
+
   @Post('certification/resubmit')
   resubmitCertification(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
     return this.certificationWriteService.resubmit(body, resolveRequestContext(headers));
+  }
+
+  @Post('certification/revalidate')
+  revalidateCertification(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.certificationRevalidationService.revalidate(body, resolveRequestContext(headers));
   }
 
   @Get('security/devices')

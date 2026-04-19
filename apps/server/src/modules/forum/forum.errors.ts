@@ -35,6 +35,14 @@ export function forumReportInvalid(message: string) {
   });
 }
 
+
+export function forumReportUnavailable(message: string) {
+  return new NotFoundException({
+    code: 'FORUM_REPORT_UNAVAILABLE',
+    message
+  });
+}
+
 export function forumPostUnavailable(message: string) {
   return new NotFoundException({
     code: 'FORUM_POST_UNAVAILABLE',

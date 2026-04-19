@@ -69,9 +69,7 @@ void main() {
           'caseStatus': 'published',
         },
       ],
-      'certification': <String, Object?>{
-        'certificationStatus': 'approved',
-      },
+      'certification': <String, Object?>{'certificationStatus': 'approved'},
       'readiness': <String, Object?>{
         'hasApplication': true,
         'draftEditable': latestApplicationStatus == 'draft',
@@ -131,7 +129,8 @@ void main() {
           'caseCoverFileAssetId': 'file-current-cover-1',
           'caseMediaFileAssetIds': <String>['file-current-cover-1'],
           'caseImageUrlMap': <String, String>{
-            'file-current-cover-1': 'https://example.com/current-case-cover.jpg',
+            'file-current-cover-1':
+                'https://example.com/current-case-cover.jpg',
           },
           'isFeatured': true,
           'caseStatus': 'approved',
@@ -169,7 +168,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/workbench':
+                    'GET /api/app/exhibition/enterprise-hub/factory/workbench':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -295,8 +294,8 @@ void main() {
       await tester.tap(find.text('我的工厂展示'));
       await tester.pumpAndSettle();
 
-      expect(find.text('工厂展示工作台'), findsOneWidget);
-      expect(find.text('优秀工厂工作台'), findsOneWidget);
+      expect(find.text('工厂展示工作台'), findsWidgets);
+      expect(find.text('固定板块入口'), findsOneWidget);
     },
   );
 
@@ -316,7 +315,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/workbench':
+                    'GET /api/app/exhibition/enterprise-hub/factory/workbench':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -340,7 +339,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/factory-1/changes/current':
+                    'GET /api/app/exhibition/enterprise-hub/factory/enterprises/factory-1/changes/current':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -348,7 +347,7 @@ void main() {
                             body: buildPublishedChangeWorkbenchPayload(),
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/factory-1/changes/current/status':
+                    'GET /api/app/exhibition/enterprise-hub/factory/enterprises/factory-1/changes/current/status':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -370,7 +369,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/factory-1':
+                    'GET /api/app/exhibition/enterprise-hub/factory/enterprises/factory-1':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -545,24 +544,18 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('工厂展示工作台'), findsOneWidget);
-      expect(find.text('优秀工厂变更工作台'), findsOneWidget);
+      expect(find.text('工厂展示变更工作台'), findsOneWidget);
       expect(find.text('线上公开展示'), findsOneWidget);
       await scrollTo(tester, find.text('当前变更稿预览'));
       expect(find.text('当前变更稿预览'), findsOneWidget);
-      expect(
-        find.textContaining('当前变更稿预览优先使用已解析到的 Logo'),
-        findsNothing,
-      );
+      expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsNothing);
       await tester.tap(
         find.byKey(
           const ValueKey<String>('enterprise-published-change-preview-toggle'),
         ),
       );
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining('当前变更稿预览优先使用已解析到的 Logo'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsOneWidget);
     },
   );
 

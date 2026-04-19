@@ -103,6 +103,11 @@ class _ProfileCreditConstraintsStatusPageState
             avatarLabel: '约',
           ),
           const SizedBox(height: 18),
+          const ProfileFeatureStatusCard(
+            snapshot: profileCreditConstraintsFeatureStatus,
+            forceVisible: true,
+          ),
+          const SizedBox(height: 14),
           _ProfileListSection(
             title: '当前摘要',
             children: <Widget>[

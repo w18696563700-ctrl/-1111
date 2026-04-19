@@ -21,6 +21,12 @@ export class ProfileCommandController {
     return this.profileCommandService.createOrganization(body, headers);
   }
 
+  @Patch('organization/current')
+  @HttpCode(200)
+  patchCurrentOrganization(@Body() body: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.profileCommandService.updateCurrentOrganization(body, headers);
+  }
+
   @Post('block')
   @HttpCode(200)
   block(@Body() body: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
@@ -46,6 +52,33 @@ export class ProfileCommandController {
   @Post('certification/submit')
   submitCertification(@Body() body: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
     return this.profileCommandService.submitCertification(body, headers);
+  }
+
+  @Post('certification/license/ocr')
+  @HttpCode(200)
+  recognizeCertificationLicense(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileCommandService.recognizeCertificationLicense(body, headers);
+  }
+
+  @Post('certification/personal/id-card/ocr')
+  @HttpCode(200)
+  recognizePersonalCertificationIdCard(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileCommandService.recognizePersonalCertificationIdCard(body, headers);
+  }
+
+  @Post('certification/personal/submit')
+  @HttpCode(200)
+  submitPersonalCertification(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileCommandService.submitPersonalCertification(body, headers);
   }
 
   @Post('certification/resubmit')

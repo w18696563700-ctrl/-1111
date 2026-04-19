@@ -13,10 +13,15 @@ import { AuthCommandParser } from './auth-command.parser';
 import { AuthController } from './auth.controller';
 import { AuthEventMaterializationService } from './auth-event-materialization.service';
 import { AuthOtpService } from './auth-otp.service';
+import { AuthOtpSmsDeliveryService } from './auth-otp-sms-delivery.service';
 import { AuthPresenter } from './auth.presenter';
 import { AuthSessionService } from './auth-session.service';
+import { AuthWhitelistTestSessionService } from './auth-whitelist-test-session.service';
 import { CurrentSessionVerificationService } from './current-session-verification.service';
+import { OrganizationCertificationEntity } from '../organization/entities/organization-certification.entity';
 import { AuthSecurityEventEntity } from './entities/auth-security-event.entity';
+import { PasswordCredentialEntity } from '../identity/entities/password-credential.entity';
+import { AuthPasswordService } from './auth-password.service';
 
 @Module({
   imports: [
@@ -27,6 +32,8 @@ import { AuthSecurityEventEntity } from './entities/auth-security-event.entity';
       DeviceEntity,
       LoginOtpCodeEntity,
       OrganizationMemberEntity,
+      OrganizationCertificationEntity,
+      PasswordCredentialEntity,
       IdentityAuditLogEntity,
       AuthSecurityEventEntity
     ])
@@ -39,8 +46,11 @@ import { AuthSecurityEventEntity } from './entities/auth-security-event.entity';
     CurrentSessionVerificationService,
     AuthEventMaterializationService,
     AuthAntiAbuseService,
+    AuthOtpSmsDeliveryService,
     AuthOtpService,
-    AuthSessionService
+    AuthSessionService,
+    AuthPasswordService,
+    AuthWhitelistTestSessionService
   ],
   exports: [CurrentSessionVerificationService]
 })

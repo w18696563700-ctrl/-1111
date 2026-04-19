@@ -20,6 +20,27 @@ export class OrganizationCertificationEntity {
   @Column({ name: 'license_file_id', type: 'uuid' })
   licenseFileId!: string;
 
+  @Column({ type: 'text', nullable: true })
+  address!: string | null;
+
+  @Column({ name: 'established_at', type: 'date', nullable: true })
+  establishedAt!: string | null;
+
+  @Column({ name: 'legal_person', type: 'text', nullable: true })
+  legalPerson!: string | null;
+
+  @Column({ name: 'business_type', type: 'text', nullable: true })
+  businessType!: string | null;
+
+  @Column({ name: 'registered_capital', type: 'text', nullable: true })
+  registeredCapital!: string | null;
+
+  @Column({ name: 'business_term', type: 'text', nullable: true })
+  businessTerm!: string | null;
+
+  @Column({ name: 'business_scope', type: 'text', nullable: true })
+  businessScope!: string | null;
+
   @Column({ name: 'submitted_at', type: 'timestamptz', nullable: true })
   submittedAt!: Date | null;
 

@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/protected_app_request.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_models.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_parser.dart';
 
@@ -59,7 +60,9 @@ class ProfilePaymentBillingConsumerLayer {
   }) async {
     const method = 'GET';
     try {
-      final response = await _client.get(canonicalPath);
+      final response = await runProtectedAppRequest(
+        () => _client.get(canonicalPath),
+      );
       return _mapResponse(
         response,
         method: method,

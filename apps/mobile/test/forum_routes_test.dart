@@ -4,6 +4,7 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/presentation/forum/forum_pages.dart';
+import 'package:mobile/features/profile/navigation/profile_routes.dart';
 
 import 'forum_test_support.dart';
 
@@ -86,11 +87,256 @@ void main() {
       ExhibitionRoutes.forumMeComments,
       ExhibitionRoutes.forumMeBookmarks,
       ExhibitionRoutes.forumMeFollows,
+      ExhibitionRoutes.forumMeReports,
+      ExhibitionRoutes.forumMeReportDetailWithTicketId('report-ticket-1'),
     ]) {
       await tester.pumpWidget(buildForumTestApp(initialRoute: route));
       await tester.pumpAndSettle();
       expect(find.byType(NavigationBar), findsOneWidget);
     }
+  });
+
+  testWidgets('forum my reports consume bounded list and detail routes', (
+    WidgetTester tester,
+  ) async {
+    final requestedPaths = <String>[];
+
+    await tester.pumpWidget(
+      buildForumTestAppWithOverrides(
+        initialRoute: ExhibitionRoutes.forumMeReports,
+        forumHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/reports/mine': (AppApiRequest request) async {
+                requestedPaths.add(request.canonicalPath);
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'items': <Object?>[
+                      <String, Object?>{
+                        'reportTicketId': 'report-ticket-1',
+                        'targetType': 'post',
+                        'targetId': 'post-materials-1',
+                        'reasonCode': 'spam_or_flood',
+                        'reasonDetail': '该内容重复刷屏。',
+                        'status': 'submitted',
+                        'targetSnapshot': <String, Object?>{
+                          'targetType': 'post',
+                          'postId': 'post-materials-1',
+                          'title': '夜间进场窗口怎么排吊装和安检顺序？',
+                          'excerpt': '当前举报目标快照摘要',
+                          'state': 'published',
+                          'publishedAt': '2026-03-27T09:30:00Z',
+                        },
+                        'submittedAt': '2026-03-31T09:00:00Z',
+                        'updatedAt': '2026-03-31T09:00:00Z',
+                      },
+                    ],
+                  },
+                );
+              },
+              'GET /api/app/forum/reports/mine/report-ticket-1':
+                  (AppApiRequest request) async {
+                    requestedPaths.add(request.canonicalPath);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'reportTicketId': 'report-ticket-1',
+                        'targetType': 'post',
+                        'targetId': 'post-materials-1',
+                        'reasonCode': 'spam_or_flood',
+                        'reasonDetail': '该内容重复刷屏。',
+                        'status': 'submitted',
+                        'targetSnapshot': <String, Object?>{
+                          'targetType': 'post',
+                          'postId': 'post-materials-1',
+                          'title': '夜间进场窗口怎么排吊装和安检顺序？',
+                          'excerpt': '当前举报目标快照摘要',
+                          'state': 'published',
+                          'publishedAt': '2026-03-27T09:30:00Z',
+                        },
+                        'submittedAt': '2026-03-31T09:00:00Z',
+                        'updatedAt': '2026-03-31T09:00:00Z',
+                      },
+                    );
+                  },
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('我的举报记录'), findsWidgets);
+    expect(find.text('夜间进场窗口怎么排吊装和安检顺序？'), findsOneWidget);
+    expect(find.textContaining('已提交'), findsWidgets);
+    expect(find.textContaining('举报处理中心'), findsNothing);
+    expect(find.textContaining('Admin Review'), findsNothing);
+    expect(find.textContaining('AI'), findsNothing);
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '查看详情'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('举报详情'), findsWidgets);
+    expect(find.text('提交原因'), findsOneWidget);
+    expect(find.text('该内容重复刷屏。'), findsOneWidget);
+    expect(find.textContaining('举报处理中心'), findsNothing);
+    expect(find.textContaining('申诉'), findsNothing);
+    expect(find.textContaining('处罚'), findsNothing);
+    expect(
+      requestedPaths,
+      containsAllInOrder(<String>[
+        '/api/app/forum/reports/mine',
+        '/api/app/forum/reports/mine/report-ticket-1',
+      ]),
+    );
+  });
+
+  testWidgets('profile forum exposes bounded my report entry', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      buildForumTestApp(initialRoute: ProfileRoutes.forum),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('我的论坛'), findsWidgets);
+    expect(find.text('我的举报记录'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(ListTile, '我的举报记录'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('夜间进场窗口怎么排吊装和安检顺序？'), findsOneWidget);
+    expect(find.textContaining('举报处理中心'), findsNothing);
+    expect(find.textContaining('Admin Review'), findsNothing);
+  });
+
+  testWidgets('profile governance appeals consume bounded list and detail routes', (
+    WidgetTester tester,
+  ) async {
+    final requestedPaths = <String>[];
+
+    await tester.pumpWidget(
+      buildForumTestAppWithOverrides(
+        initialRoute: ProfileRoutes.governanceAppeals,
+        profileGovernanceAppealHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/governance/appeals':
+                  (AppApiRequest request) async {
+                    requestedPaths.add(request.canonicalPath);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'appealCaseId': 'appeal-case-1',
+                            'status': 'submitted',
+                            'statusLabel': '待审核',
+                            'submittedAt': '2026-04-08T10:00:00Z',
+                            'decidedAt': null,
+                            'penalty': <String, Object?>{
+                              'penaltyId': 'penalty-1',
+                              'penaltyType': 'restrict_publish',
+                              'penaltyTypeLabel': '限制发布',
+                              'penaltyStatus': 'active',
+                              'penaltyStatusLabel': '生效中',
+                              'reasonSummary': '存在重复刷屏与误导性内容。',
+                              'effectiveFrom': '2026-04-07T09:00:00Z',
+                              'effectiveUntil': '2026-04-15T09:00:00Z',
+                            },
+                          },
+                        ],
+                        'pagination': <String, Object?>{
+                          'page': 1,
+                          'pageSize': 20,
+                          'total': 1,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+              'GET /api/app/profile/governance/appeals/appeal-case-1':
+                  (AppApiRequest request) async {
+                    requestedPaths.add(request.canonicalPath);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'appealCaseId': 'appeal-case-1',
+                        'status': 'submitted',
+                        'statusLabel': '待审核',
+                        'appealReason': '该处罚对当前账号影响过重，申请复核。',
+                        'decision': null,
+                        'decisionLabel': null,
+                        'decisionNote': null,
+                        'submittedAt': '2026-04-08T10:00:00Z',
+                        'decidedAt': null,
+                        'evidenceFileAssetIds': <Object?>[
+                          'file-asset-1',
+                          'file-asset-2',
+                        ],
+                        'penalty': <String, Object?>{
+                          'penaltyId': 'penalty-1',
+                          'penaltyType': 'restrict_publish',
+                          'penaltyTypeLabel': '限制发布',
+                          'penaltyStatus': 'active',
+                          'penaltyStatusLabel': '生效中',
+                          'reasonSummary': '存在重复刷屏与误导性内容。',
+                          'effectiveFrom': '2026-04-07T09:00:00Z',
+                          'effectiveUntil': '2026-04-15T09:00:00Z',
+                        },
+                      },
+                    );
+                  },
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('我的申诉记录'), findsWidgets);
+    expect(find.text('存在重复刷屏与误导性内容。'), findsOneWidget);
+    expect(find.textContaining('限制发布'), findsWidgets);
+    expect(find.textContaining('处罚历史中心'), findsNothing);
+    expect(find.textContaining('治理总控台'), findsNothing);
+    expect(find.textContaining('提交申诉'), findsNothing);
+
+    await tester.tap(find.text('存在重复刷屏与误导性内容。').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('申诉详情'), findsWidgets);
+    expect(find.text('申诉原因'), findsOneWidget);
+    expect(find.text('该处罚对当前账号影响过重，申请复核。'), findsOneWidget);
+    expect(find.textContaining('处罚历史中心'), findsNothing);
+    expect(find.textContaining('治理总控台'), findsNothing);
+    expect(
+      requestedPaths,
+      containsAllInOrder(<String>[
+        '/api/app/profile/governance/appeals',
+        '/api/app/profile/governance/appeals/appeal-case-1',
+      ]),
+    );
+  });
+
+  testWidgets('profile home exposes bounded my appeal entry', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(buildForumTestApp(initialRoute: '/profile'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('我的申诉记录'), findsOneWidget);
+
+    await tester.drag(find.byType(ListView).last, const Offset(0, -320));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('我的申诉记录').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('申诉列表'), findsOneWidget);
+    expect(find.textContaining('治理总控台'), findsNothing);
+    expect(find.textContaining('处罚历史中心'), findsNothing);
   });
 
   testWidgets('forum search surface keeps formal structure', (

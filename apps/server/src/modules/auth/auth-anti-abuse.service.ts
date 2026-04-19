@@ -18,6 +18,7 @@ const LOGIN_WINDOW_SECONDS = 900;
 const LOGIN_MAX_PER_MOBILE = 8;
 const LOGIN_MAX_PER_DEVICE = 10;
 const LOGIN_MAX_PER_IP = 12;
+type OtpSendAccessMode = 'public' | 'isolated_whitelist' | 'closed';
 
 @Injectable()
 export class AuthAntiAbuseService {
@@ -31,7 +32,17 @@ export class AuthAntiAbuseService {
   ) {}
 
   isOtpSendEnabledForMobile(mobile: string) {
-    return this.config.authPublicOtpSendEnabled || this.isWhitelistedMobile(mobile);
+    return this.resolveOtpSendAccessMode(mobile) !== 'closed';
+  }
+
+  resolveOtpSendAccessMode(mobile: string): OtpSendAccessMode {
+    if (this.config.authPublicOtpSendEnabled) {
+      return 'public';
+    }
+    if (!this.config.allowsIsolatedAuthWhitelist) {
+      return 'closed';
+    }
+    return this.isWhitelistedMobile(mobile) ? 'isolated_whitelist' : 'closed';
   }
 
   async assertOtpSendAllowed(
@@ -42,7 +53,7 @@ export class AuthAntiAbuseService {
     },
     context: RequestContext
   ) {
-    if (!this.isOtpSendEnabledForMobile(input.mobile)) {
+    if (this.resolveOtpSendAccessMode(input.mobile) === 'closed') {
       throw authUnavailable('The current public auth send capability is disabled.');
     }
 

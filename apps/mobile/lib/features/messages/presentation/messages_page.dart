@@ -4,6 +4,7 @@ import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 
 part 'messages_page_support.dart';
 
@@ -29,16 +30,20 @@ class _MessagesPageState extends State<MessagesPage> {
         ForumReadResult<ForumPagedCollectionView<ForumInteractionInboxItemView>>
       >{};
   _MessagesInteractionTab _selectedTab = _MessagesInteractionTab.replies;
+  MessagesIndexResult? _remindersResult;
   ValueListenable<int>? _refreshSignal;
   int _lastRefreshTick = 0;
   int _latestLoadToken = 0;
+  int _latestReminderLoadToken = 0;
   bool _loading = false;
+  bool _remindersLoading = false;
 
   @override
   void initState() {
     super.initState();
     _bindRefreshSignal(widget.refreshSignal);
     _load();
+    _loadRoundAReminders();
   }
 
   @override
@@ -73,6 +78,7 @@ class _MessagesPageState extends State<MessagesPage> {
     }
     _lastRefreshTick = tick;
     _load();
+    _loadRoundAReminders();
   }
 
   Future<void> _load() async {
@@ -93,12 +99,28 @@ class _MessagesPageState extends State<MessagesPage> {
     });
   }
 
+  Future<void> _loadRoundAReminders() async {
+    final loadToken = ++_latestReminderLoadToken;
+    setState(() => _remindersLoading = true);
+    final result = await MessagesConsumerLayer.instance.loadIndex();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      if (loadToken == _latestReminderLoadToken) {
+        _remindersResult = result;
+        _remindersLoading = false;
+      }
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = _results[_selectedTab];
     final state = _loading ? AppPageState.loading : result?.state;
     final items =
         result?.data?.items ?? const <ForumInteractionInboxItemView>[];
+    final roundAReminders = _roundAReminders(_remindersResult);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -114,12 +136,20 @@ class _MessagesPageState extends State<MessagesPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            '这里集中查看别人对你的回复、点赞和关注提醒。',
+            '这里集中查看别人对你的回复、点赞、关注，以及项目协作提醒。',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(height: 1.45),
           ),
           const SizedBox(height: 16),
+          if (_remindersLoading || roundAReminders.isNotEmpty) ...<Widget>[
+            _MessagesRoundAReminderSection(
+              loading: _remindersLoading,
+              items: roundAReminders,
+              onOpen: (MessagesTodoItem item) => _openReminder(context, item),
+            ),
+            const SizedBox(height: 16),
+          ],
           _MessagesInboxTabBar(
             selectedTab: _selectedTab,
             onSelectTab: (_MessagesInteractionTab tab) {
@@ -142,10 +172,7 @@ class _MessagesPageState extends State<MessagesPage> {
               message: result?.message,
             )
           else if (items.isEmpty)
-            _MessagesStaticCard(
-              title: '当前没有新互动',
-              body: _tabHint(_selectedTab),
-            )
+            _MessagesStaticCard(title: '当前没有新互动', body: _tabHint(_selectedTab))
           else
             ...items.map(
               (ForumInteractionInboxItemView item) => Padding(
@@ -165,6 +192,22 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
+  List<MessagesTodoItem> _roundAReminders(MessagesIndexResult? result) {
+    if (result?.state != AppPageState.content) {
+      return const <MessagesTodoItem>[];
+    }
+    return result!.items
+        .where((MessagesTodoItem item) {
+          return item.actionKey == 'project_clarification.open' ||
+              item.actionKey == 'bid_thread.open';
+        })
+        .toList(growable: false);
+  }
+
+  void _openReminder(BuildContext context, MessagesTodoItem item) {
+    Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
+  }
+
   void _openSource(BuildContext context, ForumInteractionInboxItemView item) {
     switch (item.targetType) {
       case 'forum_post':
@@ -179,9 +222,7 @@ class _MessagesPageState extends State<MessagesPage> {
         return;
       case 'forum_comment':
         ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          const SnackBar(
-            content: Text('这条提醒暂时还不能直接打开原评论，请稍后再试。'),
-          ),
+          const SnackBar(content: Text('这条提醒暂时还不能直接打开原评论，请稍后再试。')),
         );
         return;
       default:

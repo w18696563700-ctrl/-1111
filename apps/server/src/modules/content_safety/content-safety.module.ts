@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { CoreModule } from '../../core/core.module';
 import { ContentSafetyAuditService } from './content-safety-audit.service';
+import { ContentSafetyOcrService } from './content-safety-ocr.service';
 import { ContentSafetyRuleEngine } from './content-safety-rule.engine';
 import { ContentSafetySnapshotService } from './content-safety-snapshot.service';
 import { ContentSafetyAuditLogEntity } from './entities/content-safety-audit-log.entity';
@@ -9,13 +11,24 @@ import { ContentSafetySnapshotEntity } from './entities/content-safety-snapshot.
 
 @Module({
   imports: [
+    CoreModule,
     TypeOrmModule.forFeature([
       ContentSafetyAuditLogEntity,
       ContentSafetyRuleEntity,
       ContentSafetySnapshotEntity
     ])
   ],
-  providers: [ContentSafetyAuditService, ContentSafetyRuleEngine, ContentSafetySnapshotService],
-  exports: [ContentSafetyAuditService, ContentSafetyRuleEngine, ContentSafetySnapshotService]
+  providers: [
+    ContentSafetyAuditService,
+    ContentSafetyOcrService,
+    ContentSafetyRuleEngine,
+    ContentSafetySnapshotService
+  ],
+  exports: [
+    ContentSafetyAuditService,
+    ContentSafetyOcrService,
+    ContentSafetyRuleEngine,
+    ContentSafetySnapshotService
+  ]
 })
 export class ContentSafetyModule {}

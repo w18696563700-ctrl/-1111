@@ -27,6 +27,9 @@ type ProfileIndexViewModel = {
   };
   certification: {
     status: CertificationStatus | null;
+    personalStatus?: CertificationStatus | null;
+    personalQualified?: boolean | null;
+    personalLockedToOtherActor?: boolean | null;
   };
   membership: {
     status: MembershipStatus | null;
@@ -42,6 +45,11 @@ type MyOrganizationsViewModel = {
     organizationId: string;
     name: string;
     organizationType: string;
+    provinceCode?: string | null;
+    cityCode?: string | null;
+    contactName?: string | null;
+    contactMobile?: string | null;
+    intro?: string | null;
     roleKeys: string[];
     membershipStatus: MembershipStatus;
     certificationStatus: CertificationStatus;
@@ -55,9 +63,29 @@ type CertificationCurrentViewModel = {
   legalName?: string | null;
   uscc?: string | null;
   licenseFileId?: string | null;
+  address?: string | null;
+  establishedAt?: string | null;
+  legalPerson?: string | null;
+  businessType?: string | null;
+  registeredCapital?: string | null;
+  businessTerm?: string | null;
+  businessScope?: string | null;
   rejectReason?: string | null;
   expiresAt?: string | null;
   submittedAt?: string | null;
+  personalCertification?: {
+    organizationId: string;
+    userId: string | null;
+    certificationStatus: CertificationStatus;
+    realName?: string | null;
+    idNumberMasked?: string | null;
+    idCardFrontFileId?: string | null;
+    rejectReason?: string | null;
+    submittedAt?: string | null;
+    lockedAt?: string | null;
+    qualifiedForCurrentActor: boolean;
+    lockedToOtherActor: boolean;
+  } | null;
 };
 
 @Injectable()
@@ -244,6 +272,18 @@ export class ProfileReadService {
       },
       certification: {
         status: certificationStatus,
+        personalStatus: readNullableCertificationStatus(
+          certification.personalStatus ?? null,
+          'Profile index response is missing a valid certification.personalStatus.',
+        ),
+        personalQualified:
+          typeof certification.personalQualified === 'boolean'
+            ? certification.personalQualified
+            : null,
+        personalLockedToOtherActor:
+          typeof certification.personalLockedToOtherActor === 'boolean'
+            ? certification.personalLockedToOtherActor
+            : null,
       },
       membership: {
         status: membershipStatus,
@@ -293,6 +333,21 @@ export class ProfileReadService {
           organizationId,
           name,
           organizationType,
+          ...(Object.prototype.hasOwnProperty.call(record, 'provinceCode')
+            ? { provinceCode: this.asNullableString(record.provinceCode) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'cityCode')
+            ? { cityCode: this.asNullableString(record.cityCode) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'contactName')
+            ? { contactName: this.asNullableString(record.contactName) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'contactMobile')
+            ? { contactMobile: this.asNullableString(record.contactMobile) }
+            : {}),
+          ...(Object.prototype.hasOwnProperty.call(record, 'intro')
+            ? { intro: this.asNullableString(record.intro) }
+            : {}),
           roleKeys: this.asStringArray(record.roleKeys),
           membershipStatus,
           certificationStatus,
@@ -326,6 +381,27 @@ export class ProfileReadService {
       ...(Object.prototype.hasOwnProperty.call(result, 'licenseFileId')
         ? { licenseFileId: this.asNullableString(result.licenseFileId) }
         : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'address')
+        ? { address: this.asNullableString(result.address) }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'establishedAt')
+        ? { establishedAt: this.asNullableString(result.establishedAt) }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'legalPerson')
+        ? { legalPerson: this.asNullableString(result.legalPerson) }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'businessType')
+        ? { businessType: this.asNullableString(result.businessType) }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'registeredCapital')
+        ? { registeredCapital: this.asNullableString(result.registeredCapital) }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'businessTerm')
+        ? { businessTerm: this.asNullableString(result.businessTerm) }
+        : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'businessScope')
+        ? { businessScope: this.asNullableString(result.businessScope) }
+        : {}),
       ...(Object.prototype.hasOwnProperty.call(result, 'rejectReason')
         ? { rejectReason: this.asNullableString(result.rejectReason) }
         : {}),
@@ -335,6 +411,50 @@ export class ProfileReadService {
       ...(Object.prototype.hasOwnProperty.call(result, 'submittedAt')
         ? { submittedAt: this.asNullableString(result.submittedAt) }
         : {}),
+      ...(Object.prototype.hasOwnProperty.call(result, 'personalCertification')
+        ? {
+            personalCertification: this.readPersonalCertificationViewModel(
+              result.personalCertification
+            ),
+          }
+        : {}),
+    };
+  }
+
+  private readPersonalCertificationViewModel(value: unknown) {
+    if (value == null) {
+      return null;
+    }
+    const record = this.requireRecord(
+      value,
+      'Certification current response is missing a valid personalCertification object.'
+    );
+    this.requireKeys(record, [
+      'organizationId',
+      'certificationStatus',
+      'qualifiedForCurrentActor',
+      'lockedToOtherActor',
+    ]);
+    const organizationId = this.asString(record.organizationId);
+    const certificationStatus = readCertificationStatus(
+      record.certificationStatus,
+      'Certification current response is missing a valid personalCertification.certificationStatus.'
+    );
+    if (!organizationId) {
+      throw new Error('Certification current response is missing personalCertification.organizationId.');
+    }
+    return {
+      organizationId,
+      userId: this.asNullableString(record.userId),
+      certificationStatus,
+      realName: this.asNullableString(record.realName),
+      idNumberMasked: this.asNullableString(record.idNumberMasked),
+      idCardFrontFileId: this.asNullableString(record.idCardFrontFileId),
+      rejectReason: this.asNullableString(record.rejectReason),
+      submittedAt: this.asNullableString(record.submittedAt),
+      lockedAt: this.asNullableString(record.lockedAt),
+      qualifiedForCurrentActor: record.qualifiedForCurrentActor === true,
+      lockedToOtherActor: record.lockedToOtherActor === true,
     };
   }
 

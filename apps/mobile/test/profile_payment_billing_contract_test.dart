@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_consumer_layer.dart';
+import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 
 void main() {
   HttpOverrides? previousHttpOverrides;
@@ -202,6 +203,82 @@ void main() {
       'future_settlement_clearing_tax_finance_admin',
     );
   });
+
+  test(
+    'payment-billing unavailable visible copy only matches current-org notFound',
+    () {
+      final currentOrgCopy = profilePaymentBillingUnavailableVisibleCopy(
+        state: AppPageState.notFound,
+        errorCode: 'PAYMENT_STATUS_UNAVAILABLE',
+        rawMessage: 'Current organization payment status is unavailable.',
+      );
+      final messageCopy = profilePaymentBillingUnavailableVisibleCopy(
+        state: AppPageState.notFound,
+        rawMessage: '当前组织支付与账单状态暂不可用。',
+      );
+      final genericCopy = profilePaymentBillingUnavailableVisibleCopy(
+        state: AppPageState.notFound,
+        errorCode: 'PAYMENT_AND_BILLING_STATUS_ROUTE_UNAVAILABLE',
+        rawMessage: '当前支付与账单入口暂不可用，请稍后再试。',
+      );
+      final retryableCopy = profilePaymentBillingUnavailableVisibleCopy(
+        state: AppPageState.errorRetryable,
+        errorCode: 'PAYMENT_STATUS_UNAVAILABLE',
+        rawMessage: 'Current organization payment status is unavailable.',
+      );
+
+      expect(currentOrgCopy, isNotNull);
+      expect(currentOrgCopy!.title, '当前组织暂无支付与账单状态');
+      expect(
+        currentOrgCopy.message,
+        '当前组织暂无支付与账单状态。这不是支付执行失败，也不是系统异常。若你在其他组织下也有身份，可以切换组织后再查看。',
+      );
+      expect(currentOrgCopy.actionLabel, '切换组织查看');
+      expect(messageCopy, isNotNull);
+      expect(genericCopy, isNull);
+      expect(retryableCopy, isNull);
+    },
+  );
+
+  test(
+    'payment-billing consumer preserves current-org unavailable error code',
+    () async {
+      final consumer = ProfilePaymentBillingConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/payment-and-billing-status/status':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 404,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'message':
+                                'Current organization payment status is unavailable.',
+                            'code': 'PAYMENT_STATUS_UNAVAILABLE',
+                          },
+                        );
+                      },
+                },
+          ),
+        ),
+      );
+
+      final result = await consumer.loadStatus();
+
+      expect(result.state, AppPageState.notFound);
+      expect(result.errorCode, 'PAYMENT_STATUS_UNAVAILABLE');
+      expect(
+        result.message,
+        'Current organization payment status is unavailable.',
+      );
+    },
+  );
 }
 
 final class _PassthroughHttpOverrides extends HttpOverrides {}

@@ -72,14 +72,17 @@ class _ProfileHubHeader extends StatelessWidget {
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 10),
-                    Text(
-                      '$certificationLabel · $membershipLabel',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w600,
+                    if (_profileHomeStatusVisible) ...<Widget>[
+                      const SizedBox(height: 10),
+                      Text(
+                        '$certificationLabel · $membershipLabel',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
-                    ),
-                    const SizedBox(height: 4),
+                      const SizedBox(height: 4),
+                    ] else
+                      const SizedBox(height: 8),
                     Text(
                       activitySummary,
                       style: theme.textTheme.bodySmall?.copyWith(
@@ -196,13 +199,13 @@ class _ProfileEntryRow extends StatelessWidget {
   const _ProfileEntryRow({
     required this.icon,
     required this.title,
-    required this.subtitle,
+    this.subtitle,
     this.onTap,
   });
 
   final IconData icon;
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final VoidCallback? onTap;
 
   @override
@@ -232,14 +235,17 @@ class _ProfileEntryRow extends StatelessWidget {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  subtitle,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                    height: 1.3,
+                if (subtitle != null &&
+                    subtitle!.trim().isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 3),
+                  Text(
+                    subtitle!,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.3,
+                    ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

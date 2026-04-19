@@ -6,6 +6,7 @@ import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_governance_appeal_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
 Map<String, Object?> _feedItem(
@@ -161,6 +162,72 @@ Map<String, Object?> _draftDetail(
     'attachmentFileAssetIds': attachmentFileAssetIds,
     'state': state,
     'updatedAt': '2026-03-27T09:00:00Z',
+  };
+}
+
+Map<String, Object?> _myReportTicket(String reportTicketId) {
+  return <String, Object?>{
+    'reportTicketId': reportTicketId,
+    'targetType': 'post',
+    'targetId': 'post-materials-1',
+    'reasonCode': 'spam_or_flood',
+    'reasonDetail': '该内容重复刷屏。',
+    'status': 'submitted',
+    'targetSnapshot': const <String, Object?>{
+      'targetType': 'post',
+      'postId': 'post-materials-1',
+      'title': '夜间进场窗口怎么排吊装和安检顺序？',
+      'excerpt': '当前举报目标快照摘要',
+      'state': 'published',
+      'publishedAt': '2026-03-27T09:30:00Z',
+    },
+    'submittedAt': '2026-03-31T09:00:00Z',
+    'updatedAt': '2026-03-31T09:00:00Z',
+  };
+}
+
+Map<String, Object?> _myAppealListItem(String appealCaseId) {
+  return <String, Object?>{
+    'appealCaseId': appealCaseId,
+    'status': 'submitted',
+    'statusLabel': '待审核',
+    'submittedAt': '2026-04-08T10:00:00Z',
+    'decidedAt': null,
+    'penalty': const <String, Object?>{
+      'penaltyId': 'penalty-1',
+      'penaltyType': 'restrict_publish',
+      'penaltyTypeLabel': '限制发布',
+      'penaltyStatus': 'active',
+      'penaltyStatusLabel': '生效中',
+      'reasonSummary': '存在重复刷屏与误导性内容。',
+      'effectiveFrom': '2026-04-07T09:00:00Z',
+      'effectiveUntil': '2026-04-15T09:00:00Z',
+    },
+  };
+}
+
+Map<String, Object?> _myAppealDetail(String appealCaseId) {
+  return <String, Object?>{
+    'appealCaseId': appealCaseId,
+    'status': 'submitted',
+    'statusLabel': '待审核',
+    'appealReason': '该处罚对当前账号影响过重，申请复核。',
+    'decision': null,
+    'decisionLabel': null,
+    'decisionNote': null,
+    'submittedAt': '2026-04-08T10:00:00Z',
+    'decidedAt': null,
+    'evidenceFileAssetIds': const <Object?>['file-asset-1', 'file-asset-2'],
+    'penalty': const <String, Object?>{
+      'penaltyId': 'penalty-1',
+      'penaltyType': 'restrict_publish',
+      'penaltyTypeLabel': '限制发布',
+      'penaltyStatus': 'active',
+      'penaltyStatusLabel': '生效中',
+      'reasonSummary': '存在重复刷屏与误导性内容。',
+      'effectiveFrom': '2026-04-07T09:00:00Z',
+      'effectiveUntil': '2026-04-15T09:00:00Z',
+    },
   };
 }
 
@@ -348,6 +415,23 @@ _forumHandlers() {
         },
       );
     },
+    'GET /api/app/forum/reports/mine': (AppApiRequest request) async {
+      return AppApiResponse(
+        statusCode: 200,
+        uri: request.uri,
+        body: <String, Object?>{
+          'items': <Object?>[_myReportTicket('report-ticket-1')],
+        },
+      );
+    },
+    'GET /api/app/forum/reports/mine/report-ticket-1':
+        (AppApiRequest request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _myReportTicket('report-ticket-1'),
+          );
+        },
     'GET /api/app/profile/block/status': (AppApiRequest request) async {
       final targetUserId = request.uri.queryParameters['targetUserId'];
       if (targetUserId == null || targetUserId.trim().isEmpty) {
@@ -422,6 +506,29 @@ _forumHandlers() {
         },
       );
     },
+    'GET /api/app/profile/governance/appeals': (AppApiRequest request) async {
+      return AppApiResponse(
+        statusCode: 200,
+        uri: request.uri,
+        body: <String, Object?>{
+          'items': <Object?>[_myAppealListItem('appeal-case-1')],
+          'pagination': const <String, Object?>{
+            'page': 1,
+            'pageSize': 20,
+            'total': 1,
+            'hasMore': false,
+          },
+        },
+      );
+    },
+    'GET /api/app/profile/governance/appeals/appeal-case-1':
+        (AppApiRequest request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _myAppealDetail('appeal-case-1'),
+          );
+        },
     'GET /api/app/forum/author/profile': (AppApiRequest request) async {
       final authorId = request.uri.queryParameters['authorId'];
       if (authorId == null || authorId.trim().isEmpty) {
@@ -708,12 +815,43 @@ ExhibitionMobileApp buildForumTestAppWithOverrides({
   Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
       forumHandlerOverrides =
       const <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
+  Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
+      profileGovernanceAppealHandlerOverrides =
+      const <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
 }) {
   final manifest = AppConfigManifest.bootstrapDefaults();
   final forumHandlers =
       <String, Future<AppApiResponse> Function(AppApiRequest request)>{
         ..._forumHandlers(),
         ...forumHandlerOverrides,
+      };
+  final profileGovernanceAppealHandlers =
+      <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+        'GET /api/app/profile/governance/appeals':
+            (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'items': <Object?>[_myAppealListItem('appeal-case-1')],
+                  'pagination': const <String, Object?>{
+                    'page': 1,
+                    'pageSize': 20,
+                    'total': 1,
+                    'hasMore': false,
+                  },
+                },
+              );
+            },
+        'GET /api/app/profile/governance/appeals/appeal-case-1':
+            (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _myAppealDetail('appeal-case-1'),
+              );
+            },
+        ...profileGovernanceAppealHandlerOverrides,
       };
   return ExhibitionMobileApp(
     initialRoute: initialRoute,
@@ -774,8 +912,38 @@ ExhibitionMobileApp buildForumTestAppWithOverrides({
                     },
                   );
                 },
+                'GET /api/app/profile/governance/appeals':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'items': <Object?>[_myAppealListItem('appeal-case-1')],
+                          'pagination': const <String, Object?>{
+                            'page': 1,
+                            'pageSize': 20,
+                            'total': 1,
+                            'hasMore': false,
+                          },
+                        },
+                      );
+                    },
+                'GET /api/app/profile/governance/appeals/appeal-case-1':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: _myAppealDetail('appeal-case-1'),
+                      );
+                    },
               },
         ),
+      ),
+    ),
+    profileGovernanceAppealConsumerLayer: ProfileGovernanceAppealConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(handlers: profileGovernanceAppealHandlers),
       ),
     ),
   );

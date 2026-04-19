@@ -74,14 +74,22 @@ export class AuthSessionService {
         const refreshToken = this.generateRefreshToken();
         const refreshTokenHash = this.hashRefreshToken(refreshToken);
         const sessionExpiresAt = this.buildSessionExpiresAt();
+        const agreedAt = new Date();
+        const agreementVersion = this.config.authUserAgreementVersion;
+        const privacyVersion = this.config.authPrivacyPolicyVersion;
         const bootstrap = await this.resolveBootstrapState(user.id, membershipRepository);
         const accessExpiresAt = this.buildAccessExpiresAt(sessionExpiresAt);
+        const organizationId = bootstrap.organizationId;
         const session = sessionRepository.create({
           id: randomUUID(),
           userId: user.id,
           refreshTokenHash,
+          organizationId,
           deviceId: command.deviceId,
           deviceName: command.deviceName,
+          agreementVersion,
+          privacyVersion,
+          agreedAt,
           ip: this.nullable(context.remoteIp),
           userAgent: this.nullable(context.userAgent),
           status: 'valid',
@@ -96,6 +104,9 @@ export class AuthSessionService {
             mobile: command.mobile,
             deviceId: command.deviceId,
             ip: this.nullable(context.remoteIp),
+            agreementVersion,
+            privacyVersion,
+            agreedAt,
             shellBootstrapState: bootstrap.shellBootstrapState,
             organizationId: bootstrap.organizationId
           },
@@ -106,7 +117,7 @@ export class AuthSessionService {
         return this.presenter.toSessionEstablished({
           accessToken: this.accessCarrierService.issue({
             sessionId: session.id,
-            organizationId: bootstrap.organizationId,
+            organizationId,
             expiresAt: accessExpiresAt
           }),
           refreshToken,
@@ -133,19 +144,21 @@ export class AuthSessionService {
       }
 
       const refreshToken = this.generateRefreshToken();
-      const bootstrap = await this.resolveBootstrapState(user.id, membershipRepository);
       const sessionExpiresAt = this.buildSessionExpiresAt();
       const accessExpiresAt = this.buildAccessExpiresAt(sessionExpiresAt);
+      const bootstrap = await this.resolveBootstrapState(user.id, membershipRepository);
+      const organizationId = session.organizationId ?? bootstrap.organizationId;
 
       session.refreshTokenHash = this.hashRefreshToken(refreshToken);
       session.expiresAt = sessionExpiresAt;
+      session.organizationId = organizationId;
       await sessionRepository.save(session);
       await this.events.recordSessionRefresh(
         {
           sessionId: session.id,
           userId: user.id,
           deviceId: session.deviceId,
-          organizationId: bootstrap.organizationId
+          organizationId
         },
         context,
         manager
@@ -154,7 +167,7 @@ export class AuthSessionService {
       return this.presenter.toSessionRefreshed({
         accessToken: this.accessCarrierService.issue({
           sessionId: session.id,
-          organizationId: bootstrap.organizationId,
+          organizationId,
           expiresAt: accessExpiresAt
         }),
         refreshToken,
@@ -220,12 +233,16 @@ export class AuthSessionService {
     userId: string,
     repository: Repository<DeviceEntity>
   ) {
+    // Prefer the current user's existing device fingerprint record.
+    // This keeps repeated login attempts idempotent even when older clients
+    // reused a shared deviceId across multiple accounts.
+    const existingByFingerprint = await repository.findOneBy({
+      userId,
+      deviceFingerprint: command.deviceId
+    });
     const existing =
-      (await repository.findOneBy({ id: command.deviceId })) ??
-      (await repository.findOneBy({
-        userId,
-        deviceFingerprint: command.deviceId
-      }));
+      existingByFingerprint ??
+      (await repository.findOneBy({ id: command.deviceId }));
     const now = new Date();
     const device =
       existing ??

@@ -5,10 +5,16 @@ import { ProfileBlockErrorService } from './profile-block-error.service';
 import { ProfileBlockService } from './profile-block.service';
 import { ProfileCreditConstraintsErrorService } from './profile-credit-constraints-error.service';
 import { ProfileCreditConstraintsService } from './profile-credit-constraints.service';
+import { ProfileOrganizationCreditScoringErrorService } from './profile-organization-credit-scoring-error.service';
+import { ProfileOrganizationCreditScoringService } from './profile-organization-credit-scoring.service';
 import { ProfilePaymentBillingStatusErrorService } from './profile-payment-billing-status-error.service';
 import { ProfilePaymentBillingStatusService } from './profile-payment-billing-status.service';
 import { ProfileMembershipErrorService } from './profile-membership-error.service';
 import { ProfileMembershipService } from './profile-membership.service';
+import { ProfileGovernanceAppealsErrorService } from './profile-governance-appeals.error.service';
+import { ProfileGovernanceStatusErrorService } from './profile-governance-status.error.service';
+import { ProfileGovernanceAppealsService } from './profile-governance-appeals.service';
+import { ProfileGovernanceStatusService } from './profile-governance-status.service';
 import { AppProfileReadController } from './app-profile-read.controller';
 import { ProfileCommandController } from './profile-command.controller';
 import { ProfileCommandErrorService } from './profile-command-error.service';
@@ -36,6 +42,8 @@ import { ProfileSecurityService } from './profile-security.service';
     ProfileBlockErrorService,
     ProfileCreditConstraintsService,
     ProfileCreditConstraintsErrorService,
+    ProfileOrganizationCreditScoringService,
+    ProfileOrganizationCreditScoringErrorService,
     ProfilePaymentBillingStatusService,
     ProfilePaymentBillingStatusErrorService,
     ProfileMembershipService,
@@ -48,6 +56,10 @@ import { ProfileSecurityService } from './profile-security.service';
     ProfileMembersErrorService,
     ProfileSecurityService,
     ProfileSecurityErrorService,
+    ProfileGovernanceAppealsService,
+    ProfileGovernanceAppealsErrorService,
+    ProfileGovernanceStatusService,
+    ProfileGovernanceStatusErrorService,
   ],
 })
 export class ProfileReadModule {}

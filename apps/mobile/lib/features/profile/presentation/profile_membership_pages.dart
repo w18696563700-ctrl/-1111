@@ -102,6 +102,11 @@ class _ProfileMembershipCurrentPageState
             avatarLabel: '会',
           ),
           const SizedBox(height: 18),
+          const ProfileFeatureStatusCard(
+            snapshot: profileMembershipFeatureStatus,
+            forceVisible: true,
+          ),
+          const SizedBox(height: 14),
           _ProfileListSection(
             title: '当前状态',
             children: <Widget>[

@@ -1,0 +1,26 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "target": "ES2022",
+    "rootDir": "./src",
+    "outDir": "./test-dist",
+    "incremental": false,
+    "plugins": []
+  },
+  "include": [],
+  "files": [
+    "./src/core/auth/route-guard.ts",
+    "./src/core/config/env.ts",
+    "./src/core/server/admin-api-client.ts",
+    "./src/modules/audit/audit-state.ts",
+    "./src/modules/published_change_review/published-change-review-state.ts",
+    "./src/modules/published_change_review/published-change-review-form.ts",
+    "./src/modules/template_config/template-config-state.ts",
+    "./src/modules/template_config/template-config-form.ts",
+    "./src/modules/project_review/project-review-state.ts",
+    "./src/modules/project_review/project-review-form.ts"
+  ]
+}

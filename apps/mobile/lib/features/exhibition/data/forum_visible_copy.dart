@@ -245,6 +245,9 @@ String forumVisibleActionMessage({
   if (path.contains('/forum/report/submit')) {
     return '举报暂时没有提交成功，请稍后再试';
   }
+  if (path.contains('/forum/reports/mine')) {
+    return '我的举报记录暂时不可用，请稍后再试';
+  }
   if (path.contains('/profile/block')) {
     return '拉黑暂时没有完成，请稍后再试';
   }
@@ -364,6 +367,9 @@ String _readFailureFallback(String path, {String? errorCode}) {
   if (path.contains('/forum/search')) {
     return '搜索结果暂时不可用，请稍后再试';
   }
+  if (path.contains('/forum/reports/mine')) {
+    return '我的举报记录暂时不可用，请稍后再试';
+  }
   if (path.contains('/forum/draft/')) {
     return '草稿内容暂时不可用，请稍后再试';
   }
@@ -388,6 +394,9 @@ String _readEmptyFallback(String path) {
   }
   if (path.contains('/forum/author/posts')) {
     return '当前作者还没有公开帖子';
+  }
+  if (path.contains('/forum/reports/mine')) {
+    return '当前还没有举报记录';
   }
   if (path.contains('/forum/draft/')) {
     return '暂无草稿';

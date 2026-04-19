@@ -16,7 +16,7 @@ export class ProfileSafetyResponsePresenter {
       displayName: this.toDisplayName(user),
       avatarUrl: this.readAvatarUrl(user),
       profileIntro: this.readIntroValue(user),
-      safetySubmission: this.toSubmissionView(submission, true)
+      safetySubmission: this.toSubmissionView(submission, submission.status !== 'approved')
     };
   }
 

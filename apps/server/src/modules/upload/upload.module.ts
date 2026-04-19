@@ -3,8 +3,10 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CoreModule } from '../../core/core.module';
 import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { EnterpriseListingEntity } from '../enterprise_hub/entities/enterprise-listing.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { FileAssetEntity } from './entities/file-asset.entity';
+import { UploadEnterpriseDisplayBindingService } from './upload-enterprise-display-binding.service';
 import { UploadSessionEntity } from './entities/upload-session.entity';
 import { UploadController } from './upload.controller';
 import { UploadPresenter } from './upload.presenter';
@@ -16,11 +18,22 @@ import { UploadWriteService } from './upload-write.service';
   imports: [
     CoreModule,
     AuthModule,
-    TypeOrmModule.forFeature([UploadSessionEntity, FileAssetEntity, ProjectEntity]),
+    TypeOrmModule.forFeature([
+      UploadSessionEntity,
+      FileAssetEntity,
+      ProjectEntity,
+      EnterpriseListingEntity,
+    ]),
     ProjectPublishAuditModule
   ],
   controllers: [UploadController],
-  providers: [UploadPresenter, UploadStorageService, UploadPublicUrlService, UploadWriteService],
+  providers: [
+    UploadPresenter,
+    UploadStorageService,
+    UploadPublicUrlService,
+    UploadEnterpriseDisplayBindingService,
+    UploadWriteService,
+  ],
   exports: [UploadPublicUrlService]
 })
 export class UploadModule {}

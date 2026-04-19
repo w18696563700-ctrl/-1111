@@ -16,32 +16,48 @@ class ProfileSettingsPage extends StatelessWidget {
           detail: profileDisplayAccountLabel(shellContext.userId),
           avatarLabel: '设',
         ),
-        const SizedBox(height: 18),
-        _ProfileListSection(
-          title: '账号与安全',
-          children: <Widget>[
-            _ProfileActionRow(
-              title: '登录入口',
-              subtitle: shellContext.userId == null ? '去登录' : '查看当前登录状态',
-              onTap: () =>
-                  Navigator.of(context).pushNamed(ProfileIdentityRoutes.login),
-            ),
-            _ProfileActionRow(
-              title: '会话与设备',
-              subtitle: '管理当前设备与安全状态',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(ProfileIdentityRoutes.sessionCenter),
-            ),
-            _ProfileActionRow(
-              title: '公司认证与我的身份',
-              subtitle:
-                  '${profileDisplayCertificationStatus(shellContext.certificationStatus)} · ${profileDisplayMembershipStatus(shellContext.membershipStatus)}',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(ProfileIdentityRoutes.certificationCurrent),
-            ),
-          ],
+        if (profileFeatureStatusVisible) ...<Widget>[
+          const SizedBox(height: 18),
+          const ProfileFeatureStatusCard(
+            snapshot: profileSettingsFeatureStatus,
+          ),
+          const SizedBox(height: 14),
+        ] else
+          const SizedBox(height: 18),
+        AnimatedBuilder(
+          animation: AppSessionStore.instance,
+          builder: (BuildContext context, Widget? child) {
+            return _ProfileListSection(
+              title: '账号与安全',
+              children: <Widget>[
+                ..._buildProfilePasswordSetupEntryRows(context),
+                ..._buildProfileAuthEntryRows(context),
+                _ProfileActionRow(
+                  title: '会话与设备',
+                  subtitle: '管理当前设备与安全状态',
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pushNamed(ProfileIdentityRoutes.sessionCenter),
+                ),
+                _ProfileActionRow(
+                  title: '公司认证与我的身份',
+                  subtitle: profileDisplayCertificationIdentitySummary(
+                    certificationStatus: shellContext.certificationStatus,
+                    personalCertificationStatus:
+                        shellContext.personalCertificationStatus,
+                    personalCertificationQualified:
+                        shellContext.personalCertificationQualified,
+                    personalCertificationLockedToOtherActor:
+                        shellContext.personalCertificationLockedToOtherActor,
+                    membershipStatus: shellContext.membershipStatus,
+                  ),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pushNamed(ProfileIdentityRoutes.certificationCurrent),
+                ),
+              ],
+            );
+          },
         ),
         const SizedBox(height: 14),
         _ProfileListSection(

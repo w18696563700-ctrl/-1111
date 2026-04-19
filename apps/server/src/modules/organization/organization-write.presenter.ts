@@ -50,4 +50,11 @@ export class OrganizationWritePresenter {
       unreadSummary: {}
     };
   }
+
+  toActionAck(traceId: string) {
+    return {
+      ok: true,
+      traceId
+    };
+  }
 }

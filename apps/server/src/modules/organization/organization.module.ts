@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { IdentityModule } from '../identity/identity.module';
+import { PersonalCertificationEntity } from '../profile/entities/personal-certification.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { OrganizationCertificationEntity } from './entities/organization-certification.entity';
 import { OrganizationInvitationEntity } from './entities/organization-invitation.entity';
@@ -20,7 +21,8 @@ import { OrganizationWriteService } from './organization-write.service';
       OrganizationMemberEntity,
       OrganizationCertificationEntity,
       OrganizationInvitationEntity,
-      FileAssetEntity
+      FileAssetEntity,
+      PersonalCertificationEntity
     ])
   ],
   providers: [CurrentActorEligibilityService, OrganizationWritePresenter, OrganizationWriteService],

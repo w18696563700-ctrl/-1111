@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { RuntimeConfigService } from '../../core/runtime-config.service';
 import {
   CurrentSessionResolver,
   CurrentSessionVerificationResult,
@@ -18,7 +19,8 @@ export class CurrentSessionVerificationService implements CurrentSessionResolver
     private readonly sessionRepository: Repository<SessionEntity>,
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
-    private readonly accessCarrierService: AccessCarrierService
+    private readonly accessCarrierService: AccessCarrierService,
+    private readonly config: RuntimeConfigService
   ) {}
 
   async verifyCurrentSessionContext(context: RequestContext): Promise<CurrentSessionVerificationResult> {
@@ -47,6 +49,12 @@ export class CurrentSessionVerificationService implements CurrentSessionResolver
     if (!user || user.status !== 'active') {
       return this.failed('current_actor_inactive', context);
     }
+    if (!(await this.isAllowedWhitelistTestSession(session, user.mobile))) {
+      await this.revokeWhitelistTestSession(session);
+      return this.failed('current_session_revoked', context);
+    }
+
+    const organizationId = await this.resolveCurrentOrganizationScopeId(session, carrier.payload.organizationId);
 
     return {
       outcome: 'verified',
@@ -54,7 +62,7 @@ export class CurrentSessionVerificationService implements CurrentSessionResolver
         sessionId: session.id,
         actorId: user.id,
         userId: user.id,
-        organizationId: this.resolveOrganizationScopeId(context.organizationId, carrier.payload.organizationId),
+        organizationId,
         requestId: context.requestId,
         traceId: context.traceId
       }
@@ -73,14 +81,44 @@ export class CurrentSessionVerificationService implements CurrentSessionResolver
     };
   }
 
-  private resolveOrganizationScopeId(
-    hintedOrganizationId: string,
+  private async resolveCurrentOrganizationScopeId(
+    session: SessionEntity,
     carrierOrganizationId: string | null
   ) {
-    const normalizedHint = hintedOrganizationId.trim();
-    if (normalizedHint) {
-      return normalizedHint;
+    const currentOrganizationId = this.readOptionalId(session.organizationId);
+    if (currentOrganizationId) {
+      return currentOrganizationId;
     }
-    return carrierOrganizationId;
+    const normalizedCarrierOrganizationId = this.readOptionalId(carrierOrganizationId);
+    if (!normalizedCarrierOrganizationId) {
+      return null;
+    }
+    session.organizationId = normalizedCarrierOrganizationId;
+    await this.sessionRepository.save(session);
+    return normalizedCarrierOrganizationId;
+  }
+
+  private readOptionalId(value: string | null) {
+    const normalized = value?.trim() ?? '';
+    return normalized ? normalized : null;
+  }
+
+  private async isAllowedWhitelistTestSession(session: SessionEntity, mobile: string) {
+    if (session.authMode !== 'whitelist_test') {
+      return true;
+    }
+    if (!this.config.authWhitelistTestSessionEnabled) {
+      return false;
+    }
+    return this.config.authWhitelistTestSessionMobiles.includes(mobile.trim());
+  }
+
+  private async revokeWhitelistTestSession(session: SessionEntity) {
+    if (session.status !== 'valid') {
+      return;
+    }
+    session.status = 'revoked';
+    session.revokedAt = new Date();
+    await this.sessionRepository.save(session);
   }
 }

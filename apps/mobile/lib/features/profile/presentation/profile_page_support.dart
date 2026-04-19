@@ -75,20 +75,14 @@ String _companySummary({
   required ProfileIndexResult? profileResult,
   required bool hasSession,
 }) {
-  final profileData = profileResult?.data;
+  const summary = '查看当前公司与组织';
   if (!hasSession) {
-    return '当前会话暂不可用';
+    return summary;
   }
   if (profileResult == null || profileResult.state != AppPageState.content) {
-    return '组织摘要当前暂不可用';
+    return summary;
   }
-  if (profileData == null) {
-    return '组织摘要当前暂不可用';
-  }
-  if ((profileData.organization.organizationId ?? '').trim().isEmpty) {
-    return '组织上下文当前不可用';
-  }
-  return '查看我的公司摘要，并继续进入公司与组织';
+  return summary;
 }
 
 String _profileCertificationLabel({
@@ -121,29 +115,31 @@ String _profileActivitySummary({
   required bool hasSession,
   required ProfileIndexView? profileData,
 }) {
+  const summary = '进入个人资料，查看当前资料摘要与账号信息';
   if (!hasSession) {
-    return '当前会话暂不可用，页面不会伪造账号摘要。';
+    return summary;
   }
   if (profileData == null) {
-    return '账号摘要当前暂不可用，请以上方状态条和下游页面的受控状态为准。';
+    return summary;
   }
-  return '进入个人资料，查看当前资料摘要、我的公司与账号状态';
+  return summary;
 }
 
 String _memberManagementEntrySummary({
   required bool hasSession,
   required ProfileIndexView? profileData,
 }) {
+  const summary = '查看当前组织成员';
   if (!hasSession) {
-    return '当前会话暂不可用';
+    return summary;
   }
   if (profileData == null) {
-    return '查看当前公司/组织成员列表与最小角色调整';
+    return summary;
   }
   if ((profileData.organization.organizationId ?? '').trim().isEmpty) {
-    return '当前公司/组织上下文暂不可用';
+    return summary;
   }
-  return '查看当前公司/组织成员列表与最小角色调整';
+  return summary;
 }
 
 String _forumEntrySummary({
@@ -158,18 +154,32 @@ String _forumEntrySummary({
   required ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>?
   draftsResult,
 }) {
-  return '帖子 ${_countLabel(postsResult?.data?.items.length, postsResult?.state)} · '
-      '评论 ${_countLabel(commentsResult?.data?.items.length, commentsResult?.state)} · '
-      '关注 ${_countLabel(followsResult?.data?.items.length, followsResult?.state)} · '
-      '收藏 ${_countLabel(bookmarksResult?.data?.items.length, bookmarksResult?.state)} · '
-      '草稿 ${_countLabel(draftsResult?.data?.items.length, draftsResult?.state)}';
+  const summary = '查看帖子、评论、收藏、关注与草稿';
+  if (postsResult == null ||
+      commentsResult == null ||
+      bookmarksResult == null ||
+      followsResult == null ||
+      draftsResult == null) {
+    return summary;
+  }
+  return summary;
 }
 
-String _myProjectEntrySummary({
+String _enterpriseDisplayAssetEntrySummary(String assetKey) {
+  return switch (assetKey.trim()) {
+    'company' => '设计搭建、主场服务与活动执行能力',
+    'factory' => '工艺、产能、配送与交付能力',
+    'supplier' => '展会物料租赁、供应品类与响应时效',
+    'personal_team' => '个人设计师、团队与班组专区预留',
+    _ => '',
+  };
+}
+
+String _myProjectListEntrySummary({
   required bool hasSession,
   required ExhibitionLoadResult? result,
 }) {
-  const base = '当前组织项目资产与继续处理入口';
+  const base = '当前组织项目列表与项目详情入口';
   if (!hasSession) {
     return base;
   }
@@ -195,26 +205,19 @@ String _myMembershipEntrySummary({
 }) {
   const base = '当前会员状态与权益摘要';
   if (!hasSession) {
-    return base;
+    return '部分可用：$base';
   }
-  if ((shellContext.organizationId ?? '').trim().isEmpty) {
-    return '当前组织上下文不可用';
-  }
-
   final pieces = <String>[
-    if ((shellContext.paidMembershipTier ?? '').trim().isNotEmpty)
-      profileDisplayPaidMembershipTier(shellContext.paidMembershipTier),
-    if (shellContext.paidMembershipEntitlementsSummary.isNotEmpty)
-      shellContext.paidMembershipEntitlementsSummary.join('、'),
-    if (shellContext.paidMembershipQuotaSummary.isNotEmpty)
-      shellContext.paidMembershipQuotaSummary.join('、'),
+    profileDisplayPaidMembershipTier(shellContext.paidMembershipTier),
+    ...shellContext.paidMembershipEntitlementsSummary,
+    ...shellContext.paidMembershipQuotaSummary,
     if ((shellContext.paidMembershipNextRefreshAt ?? '').trim().isNotEmpty)
-      '下次刷新 ${shellContext.paidMembershipNextRefreshAt}',
+      '下次刷新 ${shellContext.paidMembershipNextRefreshAt!.trim()}',
   ];
-  if (pieces.isEmpty) {
-    return '会员摘要当前暂不可用';
+  if ((shellContext.organizationId ?? '').trim().isEmpty || pieces.isEmpty) {
+    return '部分可用：$base';
   }
-  return '$base · ${pieces.join(' · ')}';
+  return '部分可用：$base · ${pieces.join(' · ')}';
 }
 
 String _creditConstraintsEntrySummary({
@@ -222,16 +225,16 @@ String _creditConstraintsEntrySummary({
   required ProfileCreditConstraintsResult<ProfileCreditConstraintsStatusView>?
   result,
 }) {
-  const base = '当前信用、保证金与交易保障摘要';
+  const base = '查看信用、保证金与交易保障摘要';
   if (!hasSession) {
     return base;
   }
   if (result == null || result.state != AppPageState.content) {
-    return '信用与约束摘要当前暂不可用';
+    return base;
   }
   final data = result.data;
   if (data == null) {
-    return '信用与约束摘要当前暂不可用';
+    return base;
   }
   final pieces = <String>[
     profileDisplayCreditConstraintsSummaryStatus(
@@ -246,41 +249,30 @@ String _creditConstraintsEntrySummary({
     profileDisplayTransactionGuaranteeEligibilityStatus(
       data.privateSummary.transactionGuaranteeEligibilityStatus,
     ),
-    if (data.dependencyReference?.dependencyRequired ?? false)
-      '依赖 ${profileDisplayCreditConstraintsDependencyFamily(data.dependencyReference?.dependencyFamilyKey)}',
-    '更新于 ${data.privateSummary.updatedAt}',
   ];
-  return '$base · ${pieces.join(' · ')}';
+  return '当前信用、保证金与交易保障摘要 · ${pieces.join(' · ')}';
+}
+
+String _organizationCreditScoringEntrySummary() {
+  return '未来主线 reserve，只读 status / explanation / handoff';
 }
 
 String _paymentBillingEntrySummary({
   required bool hasSession,
   required ProfilePaymentBillingResult<ProfilePaymentBillingStatusView>? result,
 }) {
-  const base = '当前支付状态、账单引用与处理衔接摘要';
+  const base = '查看支付与账单摘要';
   if (!hasSession) {
     return base;
   }
   if (result == null || result.state != AppPageState.content) {
-    return '支付与账单摘要当前暂不可用';
+    return base;
   }
   final data = result.data;
   if (data == null) {
-    return '支付与账单摘要当前暂不可用';
+    return base;
   }
-  final pieces = <String>[
-    profileDisplayPaymentBillingSummaryStatus(
-      data.privateSummary.summaryStatus,
-    ),
-    profileDisplayPaymentStatus(data.privateSummary.paymentStatus),
-    profileDisplayBillingReferenceStatus(
-      data.privateSummary.billingReferenceStatus,
-    ),
-    if (data.dependencyReference?.dependencyRequired ?? false)
-      '依赖 ${profileDisplayPaymentBillingDependencyFamily(data.dependencyReference?.dependencyFamilyKey)}',
-    '更新于 ${data.privateSummary.updatedAt}',
-  ];
-  return '$base · ${pieces.join(' · ')}';
+  return base;
 }
 
 String _profilePrivateOperatingSystemSurfaceMessage(
@@ -372,14 +364,6 @@ String _profilePrivateOperatingSystemFamilyLabel(String familyKey) {
     'settings' => '设置',
     final String other when _profilePageContainsChinese(other) => other,
     _ => familyKey,
-  };
-}
-
-String _countLabel(int? count, AppPageState? state) {
-  return switch (state) {
-    AppPageState.content => '${count ?? 0}',
-    AppPageState.empty => '0',
-    _ => '—',
   };
 }
 

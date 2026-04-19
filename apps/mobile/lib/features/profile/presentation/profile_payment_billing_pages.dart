@@ -76,6 +76,16 @@ class _ProfilePaymentBillingStatusPageState
       );
     }
     if (result.state != AppPageState.content || data == null) {
+      final unavailablePanel = _paymentBillingUnavailablePanel(
+        context: context,
+        state: result.state,
+        errorCode: result.errorCode,
+        rawMessage: result.message,
+      );
+      if (unavailablePanel != null) {
+        return unavailablePanel;
+      }
+
       return _ProfileScreenStatePanel(
         title: '支付与账单状态当前暂不可用',
         message: profileVisibleReadMessage(
@@ -102,7 +112,14 @@ class _ProfilePaymentBillingStatusPageState
             detail: _paymentBillingHeaderDetail(data),
             avatarLabel: '账',
           ),
-          const SizedBox(height: 18),
+          if (profileFeatureStatusVisible) ...<Widget>[
+            const SizedBox(height: 18),
+            const ProfileFeatureStatusCard(
+              snapshot: profilePaymentBillingFeatureStatus,
+            ),
+            const SizedBox(height: 14),
+          ] else
+            const SizedBox(height: 18),
           _ProfileListSection(
             title: '当前摘要',
             children: <Widget>[
@@ -270,4 +287,29 @@ class _ProfilePaymentBillingStatusPageState
     }
     return '依赖 ${profileDisplayPaymentBillingDependencyFamily(dependencyReference.dependencyFamilyKey)}';
   }
+}
+
+Widget? _paymentBillingUnavailablePanel({
+  required BuildContext context,
+  required AppPageState state,
+  String? errorCode,
+  String? rawMessage,
+}) {
+  final copy = profilePaymentBillingUnavailableVisibleCopy(
+    state: state,
+    errorCode: errorCode,
+    rawMessage: rawMessage,
+  );
+  if (copy == null) {
+    return null;
+  }
+
+  return _ProfileScreenStatePanel(
+    title: copy.title,
+    message: copy.message,
+    actionLabel: copy.actionLabel,
+    onAction: () => Navigator.of(
+      context,
+    ).pushNamed(ProfileIdentityRoutes.organizationSwitch),
+  );
 }

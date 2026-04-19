@@ -15,6 +15,41 @@ export function certificationResubmitInvalid(message: string) {
   });
 }
 
+export function certificationRevalidateInvalid(message: string) {
+  return new BadRequestException({
+    code: 'CERTIFICATION_REVALIDATE_INVALID',
+    message
+  });
+}
+
+export function certificationLicenseOcrInvalid(message: string) {
+  return new BadRequestException({
+    code: 'CERTIFICATION_LICENSE_OCR_INVALID',
+    message
+  });
+}
+
+export function personalCertificationOcrInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PERSONAL_CERTIFICATION_OCR_INVALID',
+    message
+  });
+}
+
+export function personalCertificationSubmitInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PERSONAL_CERTIFICATION_SUBMIT_INVALID',
+    message
+  });
+}
+
+export function personalCertificationLocked(message: string) {
+  return new BadRequestException({
+    code: 'PERSONAL_CERTIFICATION_LOCKED',
+    message
+  });
+}
+
 export function securityDeviceUnavailable(message: string) {
   return new NotFoundException({
     code: 'SECURITY_DEVICE_UNAVAILABLE',

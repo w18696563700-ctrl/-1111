@@ -31,3 +31,17 @@ export function organizationReviewInvalidState(message: string) {
     message
   });
 }
+
+export function contentSafetyReviewTaskInvalid(message: string) {
+  return new BadRequestException({
+    code: 'CONTENT_SAFETY_REVIEW_TASK_INVALID',
+    message
+  });
+}
+
+export function contentSafetyReviewTaskUnavailable(message: string) {
+  return new NotFoundException({
+    code: 'CONTENT_SAFETY_REVIEW_TASK_UNAVAILABLE',
+    message
+  });
+}

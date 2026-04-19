@@ -11,6 +11,7 @@ import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_governance_status_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_personal_edit_consumer_layer.dart';
 import 'package:mobile/features/profile/navigation/profile_routes.dart';
@@ -690,6 +691,25 @@ ExhibitionMobileApp _buildApp({
       client: AppApiClient(
         config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
         transport: FakeAppApiTransport(handlers: _forumHandlers()),
+      ),
+    ),
+    profileGovernanceStatusConsumerLayer: ProfileGovernanceStatusConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/profile/governance/status':
+                    (AppApiRequest request) async => AppApiResponse(
+                      statusCode: 404,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'message': '当前累计分快照入口暂不可用。',
+                        'code': 'PROFILE_GOVERNANCE_STATUS_UNAVAILABLE',
+                      },
+                    ),
+              },
+        ),
       ),
     ),
     sessionStore: sessionStore,

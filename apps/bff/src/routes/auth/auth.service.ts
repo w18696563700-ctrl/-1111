@@ -71,6 +71,60 @@ export class AuthService {
     }
   }
 
+  async loginWithPassword(
+    payload: Record<string, unknown> | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.post<Record<string, unknown>>(
+        '/server/auth/password/login',
+        this.buildPasswordLoginPayload(payload, headers),
+        {
+          headers: this.authContext.buildAuthTransportHeaders(headers),
+        },
+      );
+      return this.toSessionEstablishResponse(result);
+    } catch (error) {
+      throw this.normalizePasswordLoginError(error);
+    }
+  }
+
+  async setPassword(
+    payload: Record<string, unknown> | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.post<Record<string, unknown>>(
+        '/server/auth/password/set',
+        this.buildPasswordSetPayload(payload),
+        {
+          headers: this.authContext.buildReadOnlyForwardHeaders(headers),
+        },
+      );
+      return this.toActionAckResponse(result);
+    } catch (error) {
+      throw this.normalizePasswordSetError(error);
+    }
+  }
+
+  async resetPassword(
+    payload: Record<string, unknown> | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.post<Record<string, unknown>>(
+        '/server/auth/password/reset',
+        this.buildPasswordResetPayload(payload),
+        {
+          headers: this.authContext.buildAuthTransportHeaders(headers),
+        },
+      );
+      return this.toActionAckResponse(result);
+    } catch (error) {
+      throw this.normalizePasswordResetError(error);
+    }
+  }
+
   async refreshSession(
     payload: Record<string, unknown> | undefined,
     headers: IncomingHttpHeaders,
@@ -120,6 +174,7 @@ export class AuthService {
       {
         AUTH_REQUEST_INVALID: '当前验证码发送请求无效，请检查后重试。',
         AUTH_RATE_LIMITED: '验证码发送过于频繁，请稍后再试。',
+        AUTH_OTP_SEND_LIMIT_REACHED: '当前手机号今日验证码次数已达上限，请明日再试或更换其他手机号。',
         AUTH_RESOURCE_UNAVAILABLE: '当前验证码发送能力暂不可用，请稍后再试。',
       },
     );
@@ -137,10 +192,76 @@ export class AuthService {
         503: 'AUTH_RESOURCE_UNAVAILABLE',
       },
       {
+        AUTH_CONSENT_REQUIRED: '请先阅读并同意《用户协议》《隐私政策》。',
         AUTH_REQUEST_INVALID: '当前登录请求无效，请检查后重试。',
         AUTH_LOGIN_INVALID: '当前验证码错误或已失效，请重试。',
         AUTH_RATE_LIMITED: '当前登录请求过于频繁，请稍后再试。',
         AUTH_RESOURCE_UNAVAILABLE: '当前登录能力暂不可用，请稍后再试。',
+      },
+    );
+  }
+
+  private normalizePasswordLoginError(error: unknown) {
+    return this.normalizeAuthError(
+      error,
+      'AUTH_RESOURCE_UNAVAILABLE',
+      '当前登录能力暂不可用，请稍后再试。',
+      {
+        400: 'AUTH_REQUEST_INVALID',
+        401: 'AUTH_PASSWORD_LOGIN_INVALID',
+        429: 'AUTH_RATE_LIMITED',
+        503: 'AUTH_RESOURCE_UNAVAILABLE',
+      },
+      {
+        AUTH_CONSENT_REQUIRED: '请先阅读并同意《用户协议》《隐私政策》。',
+        AUTH_PASSWORD_LOGIN_INVALID: '手机号或密码错误，请检查后重试。',
+        AUTH_PASSWORD_NOT_SET: '手机号或密码错误，请检查后重试。',
+        AUTH_REQUEST_INVALID: '当前登录请求无效，请检查后重试。',
+        AUTH_RATE_LIMITED: '当前登录请求过于频繁，请稍后再试。',
+        AUTH_RESOURCE_UNAVAILABLE: '当前登录能力暂不可用，请稍后再试。',
+      },
+    );
+  }
+
+  private normalizePasswordSetError(error: unknown) {
+    return this.normalizeAuthError(
+      error,
+      'AUTH_RESOURCE_UNAVAILABLE',
+      '当前设置密码能力暂不可用，请稍后再试。',
+      {
+        400: 'AUTH_REQUEST_INVALID',
+        401: 'AUTH_SESSION_INVALID',
+        403: 'AUTH_PERMISSION_INSUFFICIENT',
+        503: 'AUTH_RESOURCE_UNAVAILABLE',
+      },
+      {
+        AUTH_PASSWORD_SET_NOT_ALLOWED: '当前场景不允许设置密码。',
+        AUTH_PASSWORD_POLICY_INVALID: '密码不符合要求，请检查后重试。',
+        AUTH_REQUEST_INVALID: '当前设置密码请求无效，请检查后重试。',
+        AUTH_SESSION_INVALID: '当前登录态不可用，请重新登录后再试。',
+        AUTH_PERMISSION_INSUFFICIENT: '当前无权限执行密码设置。',
+        AUTH_RESOURCE_UNAVAILABLE: '当前设置密码能力暂不可用，请稍后再试。',
+      },
+    );
+  }
+
+  private normalizePasswordResetError(error: unknown) {
+    return this.normalizeAuthError(
+      error,
+      'AUTH_RESOURCE_UNAVAILABLE',
+      '当前重置密码能力暂不可用，请稍后再试。',
+      {
+        400: 'AUTH_REQUEST_INVALID',
+        401: 'AUTH_PASSWORD_RESET_OTP_INVALID',
+        403: 'AUTH_PERMISSION_INSUFFICIENT',
+        503: 'AUTH_RESOURCE_UNAVAILABLE',
+      },
+      {
+        AUTH_PASSWORD_RESET_OTP_INVALID: '验证码无效或已过期，请重新获取后重试。',
+        AUTH_PASSWORD_POLICY_INVALID: '密码不符合要求，请检查后重试。',
+        AUTH_REQUEST_INVALID: '当前重置密码请求无效，请检查后重试。',
+        AUTH_PERMISSION_INSUFFICIENT: '当前无权限执行密码重置。',
+        AUTH_RESOURCE_UNAVAILABLE: '当前重置密码能力暂不可用，请稍后再试。',
       },
     );
   }
@@ -329,6 +450,76 @@ export class AuthService {
     }
 
     return result;
+  }
+
+  private buildPasswordLoginPayload(
+    payload: Record<string, unknown> | undefined,
+    headers: IncomingHttpHeaders,
+  ): Record<string, unknown> {
+    const source = this.requireRequestBody(payload);
+    const result: Record<string, unknown> = {};
+    const mobile = this.asString(source.mobile);
+    const password = this.asString(source.password);
+    const deviceName = this.asString(source.deviceName);
+    const osType = this.asString(source.osType);
+    const deviceId = this.asString(source.deviceId) || this.readHeader(headers, 'x-device-id');
+
+    if (mobile) {
+      result.mobile = mobile;
+    }
+    if (password) {
+      result.password = password;
+    }
+    if (source.consentAccepted !== undefined) {
+      result.consentAccepted = source.consentAccepted;
+    }
+    if (deviceName) {
+      result.deviceName = deviceName;
+    }
+    if (osType) {
+      result.osType = osType;
+    }
+    if (deviceId) {
+      result.deviceId = deviceId;
+    }
+
+    return result;
+  }
+
+  private buildPasswordSetPayload(
+    payload: Record<string, unknown> | undefined,
+  ): Record<string, unknown> {
+    const source = this.requireRequestBody(payload);
+    const newPassword = this.asString(source.newPassword);
+    if (!newPassword) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'AUTH_REQUEST_INVALID',
+        message: '当前设置密码请求无效，请检查后重试。',
+        source: 'bff',
+      });
+    }
+
+    return { newPassword };
+  }
+
+  private buildPasswordResetPayload(
+    payload: Record<string, unknown> | undefined,
+  ): Record<string, unknown> {
+    const source = this.requireRequestBody(payload);
+    const mobile = this.asString(source.mobile);
+    const otpCode = this.asString(source.otpCode);
+    const newPassword = this.asString(source.newPassword);
+    if (!mobile || !otpCode || !newPassword) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'AUTH_REQUEST_INVALID',
+        message: '当前重置密码请求无效，请检查后重试。',
+        source: 'bff',
+      });
+    }
+
+    return { mobile, otpCode, newPassword };
   }
 
   private requireRecord(

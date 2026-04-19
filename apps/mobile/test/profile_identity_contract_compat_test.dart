@@ -7,13 +7,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
+import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/auth/auth_consumer_layer.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
+import 'package:mobile/core/boot/app_shell_context.dart';
+import 'package:mobile/core/config/config_manifest.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_membership_consumer_layer.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
+import 'package:mobile/shell/context/app_shell_scope.dart';
 
 void main() {
   HttpOverrides? previousHttpOverrides;
@@ -55,6 +59,14 @@ void main() {
                   );
                 },
                 'POST /api/app/auth/otp/login': (AppApiRequest request) async {
+                  expect(request.body, <String, Object?>{
+                    'mobile': '13800000000',
+                    'otpCode': '123456',
+                    'deviceId': AppSessionStore.instance.deviceId,
+                    'consentAccepted': true,
+                    'deviceName': 'Frontend Steward',
+                    'osType': Platform.operatingSystem,
+                  });
                   return AppApiResponse(
                     statusCode: 200,
                     uri: request.uri,
@@ -78,11 +90,152 @@ void main() {
     final loginResult = await consumer.loginWithOtp(
       mobile: '13800000000',
       otpCode: '123456',
+      consentAccepted: true,
     );
     expect(loginResult.state, AppPageState.content);
     expect(loginResult.data?.shellBootstrapState, 'authenticated');
     expect(AppSessionStore.instance.snapshot.hasAccessToken, isTrue);
     expect(AppSessionStore.instance.snapshot.hasRefreshToken, isTrue);
+    expect(
+      AppSessionStore.instance.snapshot.localLoginSource,
+      AppSessionLoginSource.otpLogin,
+    );
+  });
+
+  test('password login stays content on HTTP 200 (not 201-only)', () async {
+    final consumer = AuthConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/auth/password/login':
+                    (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'mobile': '13800000000',
+                        'password': 'Password123!',
+                        'deviceId': AppSessionStore.instance.deviceId,
+                        'deviceName': 'Frontend Steward',
+                        'osType': Platform.operatingSystem,
+                        'consentAccepted': true,
+                      });
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'accessToken': 'pwd-token',
+                          'refreshToken': 'pwd-refresh-token',
+                          'expiresInSeconds': 3600,
+                          'shellBootstrapState': 'authenticated',
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final loginResult = await consumer.loginWithPassword(
+      mobile: '13800000000',
+      password: 'Password123!',
+      consentAccepted: true,
+    );
+
+    expect(loginResult.state, AppPageState.content);
+    expect(loginResult.data?.shellBootstrapState, 'authenticated');
+    expect(AppSessionStore.instance.snapshot.hasAccessToken, isTrue);
+    expect(AppSessionStore.instance.snapshot.hasRefreshToken, isTrue);
+    expect(
+      AppSessionStore.instance.snapshot.localLoginSource,
+      AppSessionLoginSource.passwordLogin,
+    );
+  });
+
+  test('password reset stays content on HTTP 200 and does not auto login', () async {
+    final consumer = AuthConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/auth/password/reset':
+                    (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'mobile': '13800000000',
+                        'otpCode': '654321',
+                        'newPassword': 'Password456!',
+                      });
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'ok': true,
+                          'traceId': 'trace-password-reset',
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final resetResult = await consumer.resetPassword(
+      mobile: '13800000000',
+      otpCode: '654321',
+      newPassword: 'Password456!',
+    );
+
+    expect(resetResult.state, AppPageState.content);
+    expect(resetResult.data?.traceId, 'trace-password-reset');
+    expect(AppSessionStore.instance.hasAnySession, isFalse);
+    expect(AppSessionStore.instance.snapshot.localLoginSource, isNull);
+  });
+
+  test('password set stays content on HTTP 200 for active session', () async {
+    AppSessionStore.instance.establishSession(
+      accessToken: 'active-token',
+      refreshToken: 'refresh-token',
+      expiresInSeconds: 3600,
+      deviceId: 'device-password-set',
+      localLoginSource: AppSessionLoginSource.otpLogin,
+    );
+    final consumer = AuthConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/auth/password/set':
+                    (AppApiRequest request) async {
+                      expect(
+                        request.headers['authorization'],
+                        'Bearer active-token',
+                      );
+                      expect(request.body, <String, Object?>{
+                        'newPassword': 'Password789!',
+                      });
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'ok': true,
+                          'traceId': 'trace-password-set',
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final setResult = await consumer.setPassword(newPassword: 'Password789!');
+
+    expect(setResult.state, AppPageState.content);
+    expect(setResult.data?.traceId, 'trace-password-set');
+    expect(
+      AppSessionStore.instance.snapshot.localLoginSource,
+      AppSessionLoginSource.otpLogin,
+    );
   });
 
   test(
@@ -132,9 +285,59 @@ void main() {
   testWidgets('organization create only exposes frozen organization types', (
     WidgetTester tester,
   ) async {
-    await tester.pumpWidget(
-      const MaterialApp(home: Scaffold(body: OrganizationCreatePage())),
+    final manifest = AppConfigManifest.bootstrapDefaults();
+    ProfileIdentityConsumerLayer.install(
+      ProfileIdentityConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/organization/mine':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'items': <Object?>[],
+                            'traceId': 'org-mine-trace-1',
+                          },
+                        );
+                      },
+                  'GET /api/app/profile/certification/current':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'organizationId': null,
+                            'certificationStatus': 'not_submitted',
+                          },
+                        );
+                      },
+                },
+          ),
+        ),
+      ),
     );
+
+    await tester.pumpWidget(
+      AppShellScope(
+        controller: AppBootstrapController(
+          bootstrapManifest: manifest,
+          bootstrapShellContext: AppShellContextData.bootstrapDefaults(
+            manifest: manifest,
+          ),
+        ),
+        child: const MaterialApp(
+          home: Scaffold(body: OrganizationCreatePage()),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
 
     await tester.tap(find.byType(DropdownButtonFormField<String>));
     await tester.pumpAndSettle();
@@ -254,12 +457,20 @@ void main() {
               <String, Future<AppApiResponse> Function(AppApiRequest request)>{
                 'POST /api/app/profile/certification/submit':
                     (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'organizationId': 'org-cert-1',
+                        'legalName': '上海展建服务有限公司',
+                        'uscc': '91310000123456789A',
+                        'licenseFileId': 'file-asset-license-1',
+                        'contactName': '张三',
+                        'contactMobile': '13800000000',
+                      });
                       return AppApiResponse(
                         statusCode: 200,
                         uri: request.uri,
                         body: const <String, Object?>{
                           'organizationId': 'org-cert-1',
-                          'certificationStatus': 'pending_review',
+                          'certificationStatus': 'approved',
                           'submittedAt': '2026-04-05T10:00:00Z',
                           'traceId': 'cert-submit-1',
                         },
@@ -274,7 +485,7 @@ void main() {
       organizationId: 'org-cert-1',
       legalName: '上海展建服务有限公司',
       uscc: '91310000123456789A',
-      licenseFileId: 'file-license-1',
+      fileAssetId: 'file-asset-license-1',
       contactName: '张三',
       contactMobile: '13800000000',
     );
@@ -282,6 +493,201 @@ void main() {
     expect(result.state, AppPageState.content);
     expect(result.data?.organizationId, 'org-cert-1');
     expect(result.data?.traceId, 'cert-submit-1');
+  });
+
+  test('certification license ocr stays content on HTTP 200', () async {
+    final consumer = ProfileIdentityConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/profile/certification/license/ocr':
+                    (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'organizationId': 'org-cert-1',
+                        'licenseFileId': 'file-asset-license-ocr-1',
+                      });
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'status': 'recognized',
+                          'message': '当前已完成营业执照 OCR 识别。',
+                          'legalName': '上海展建服务有限公司',
+                          'uscc': '91310000123456789A',
+                          'legalPerson': '张三',
+                          'businessType': '有限责任公司',
+                          'address': '上海市徐汇区漕溪北路',
+                          'registeredCapital': '壹佰万元整',
+                          'establishedAt': '2016年03月30日',
+                          'businessTerm': '2016年03月30日至永久',
+                          'businessScope': '展览展示服务',
+                          'providerRequestId': 'ocr-request-1',
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final result = await consumer.recognizeCertificationLicense(
+      organizationId: 'org-cert-1',
+      fileAssetId: 'file-asset-license-ocr-1',
+    );
+
+    expect(result.state, AppPageState.content);
+    expect(result.data?.status, 'recognized');
+    expect(result.data?.legalName, '上海展建服务有限公司');
+    expect(result.data?.uscc, '91310000123456789A');
+    expect(result.data?.businessType, '有限责任公司');
+    expect(result.data?.businessScope, '展览展示服务');
+  });
+
+  test(
+    'certification current consumes current truth fields on HTTP 200',
+    () async {
+      final consumer = ProfileIdentityConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/certification/current':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'organizationId': 'org-cert-current-1',
+                            'certificationStatus': 'approved',
+                            'legalName': '上海展建服务有限公司',
+                            'uscc': '91310000123456789A',
+                            'legalPerson': '张三',
+                            'businessType': '有限责任公司',
+                            'address': '上海市徐汇区漕溪北路',
+                            'registeredCapital': '壹佰万元整',
+                            'establishedAt': '2016年03月30日',
+                            'businessTerm': '2016年03月30日至永久',
+                            'businessScope': '展览展示服务',
+                            'submittedAt': '2026-04-05T10:10:00Z',
+                          },
+                        );
+                      },
+                },
+          ),
+        ),
+      );
+
+      final result = await consumer.loadCertificationCurrent();
+
+      expect(result.state, AppPageState.content);
+      expect(result.data?.organizationId, 'org-cert-current-1');
+      expect(result.data?.legalPerson, '张三');
+      expect(result.data?.businessType, '有限责任公司');
+      expect(result.data?.address, '上海市徐汇区漕溪北路');
+      expect(result.data?.establishedAt, '2016年03月30日');
+      expect(result.data?.businessScope, '展览展示服务');
+    },
+  );
+
+  test(
+    'certification current consumes personal certification truth on HTTP 200',
+    () async {
+      final consumer = ProfileIdentityConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/certification/current':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'organizationId': 'org-cert-current-2',
+                            'certificationStatus': 'approved',
+                            'legalName': '上海展建服务有限公司',
+                            'legalPerson': '张三',
+                            'personalCertification': <String, Object?>{
+                              'organizationId': 'org-cert-current-2',
+                              'userId': 'user-2',
+                              'certificationStatus': 'approved',
+                              'realName': '张三',
+                              'idNumberMasked': '310***********1234',
+                              'qualifiedForCurrentActor': true,
+                              'lockedToOtherActor': false,
+                              'submittedAt': '2026-04-06T10:10:00Z',
+                              'lockedAt': '2026-04-06T10:10:00Z',
+                            },
+                          },
+                        );
+                      },
+                },
+          ),
+        ),
+      );
+
+      final result = await consumer.loadCertificationCurrent();
+
+      expect(result.state, AppPageState.content);
+      expect(result.data?.personalCertification?.organizationId, 'org-cert-current-2');
+      expect(result.data?.personalCertification?.realName, '张三');
+      expect(result.data?.personalCertification?.idNumberMasked, '310***********1234');
+      expect(result.data?.personalCertification?.qualifiedForCurrentActor, isTrue);
+      expect(result.data?.personalCertification?.lockedToOtherActor, isFalse);
+    },
+  );
+
+  test('personal certification submit stays content on HTTP 200', () async {
+    final consumer = ProfileIdentityConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/profile/certification/personal/submit':
+                    (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'organizationId': 'org-cert-personal-1',
+                        'idCardFrontFileId': 'file-asset-id-card-1',
+                      });
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'organizationId': 'org-cert-personal-1',
+                          'userId': 'user-personal-1',
+                          'certificationStatus': 'approved',
+                          'submittedAt': '2026-04-06T10:10:00Z',
+                          'lockedAt': '2026-04-06T10:10:00Z',
+                          'traceId': 'personal-cert-submit-1',
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final result = await consumer.submitPersonalCertification(
+      organizationId: 'org-cert-personal-1',
+      fileAssetId: 'file-asset-id-card-1',
+    );
+
+    expect(result.state, AppPageState.content);
+    expect(result.data?.organizationId, 'org-cert-personal-1');
+    expect(result.data?.userId, 'user-personal-1');
+    expect(result.data?.certificationStatus, 'approved');
+    expect(result.data?.traceId, 'personal-cert-submit-1');
   });
 
   test('certification resubmit stays content on HTTP 200', () async {
@@ -293,6 +699,13 @@ void main() {
               <String, Future<AppApiResponse> Function(AppApiRequest request)>{
                 'POST /api/app/profile/certification/resubmit':
                     (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'organizationId': 'org-cert-1',
+                        'legalName': '上海展建服务有限公司',
+                        'uscc': '91310000123456789A',
+                        'licenseFileId': 'file-asset-license-2',
+                        'supplementNote': '已补充新执照',
+                      });
                       return AppApiResponse(
                         statusCode: 200,
                         uri: request.uri,
@@ -313,7 +726,7 @@ void main() {
       organizationId: 'org-cert-1',
       legalName: '上海展建服务有限公司',
       uscc: '91310000123456789A',
-      licenseFileId: 'file-license-2',
+      fileAssetId: 'file-asset-license-2',
       supplementNote: '已补充新执照',
     );
 
@@ -321,6 +734,131 @@ void main() {
     expect(result.data?.organizationId, 'org-cert-1');
     expect(result.data?.traceId, 'cert-resubmit-1');
   });
+
+  test('certification revalidate stays content on HTTP 200', () async {
+    final consumer = ProfileIdentityConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/profile/certification/revalidate':
+                    (AppApiRequest request) async {
+                      expect(request.body, <String, Object?>{
+                        'organizationId': 'org-cert-approved-1',
+                        'legalName': '上海展建服务有限公司',
+                        'uscc': '91310000123456789A',
+                        'licenseFileId': 'file-asset-license-9',
+                        'correctionNote': '营业执照字段需更正',
+                      });
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'organizationId': 'org-cert-approved-1',
+                          'certificationStatus': 'approved',
+                          'submittedAt': '2026-04-10T10:10:00Z',
+                          'traceId': 'cert-revalidate-1',
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final result = await consumer.revalidateCertification(
+      organizationId: 'org-cert-approved-1',
+      legalName: '上海展建服务有限公司',
+      uscc: '91310000123456789A',
+      fileAssetId: 'file-asset-license-9',
+      correctionNote: '营业执照字段需更正',
+    );
+
+    expect(result.state, AppPageState.content);
+    expect(result.data?.organizationId, 'org-cert-approved-1');
+    expect(result.data?.certificationStatus, 'approved');
+    expect(result.data?.traceId, 'cert-revalidate-1');
+  });
+
+  test(
+    'certification upload init and confirm stay content on HTTP 200',
+    () async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/file/upload/init': (AppApiRequest request) async {
+                final body = request.body as Map<String, Object?>;
+                expect(body['businessType'], 'profile');
+                expect(body['businessId'], 'org-cert-1');
+                expect(body['fileKind'], 'business_license');
+                expect(body['mimeType'], 'image/png');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'uploadSessionId': 'license-upload-1',
+                    'directUpload': <String, Object?>{
+                      'url': 'https://oss.example.com/license-upload-1',
+                      'method': 'PUT',
+                      'headers': <String, Object?>{'content-type': 'image/png'},
+                    },
+                    'confirm': <String, Object?>{
+                      'endpoint': '/api/app/file/upload/confirm',
+                    },
+                  },
+                );
+              },
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'uploadSessionId': 'license-upload-1',
+                    });
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'fileAssetId': 'file-asset-license-3',
+                      },
+                    );
+                  },
+            },
+        uploadHandler: (AppApiUploadRequest request) async {
+          expect(request.method, 'PUT');
+          expect(request.url, 'https://oss.example.com/license-upload-1');
+          expect(request.headers['content-type'], 'image/png');
+          expect(request.bodyBytes, <int>[1, 2, 3, 4]);
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
+      );
+      final consumer = ProfileIdentityConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: transport,
+        ),
+      );
+
+      final initResult = await consumer.initCertificationLicenseUpload(
+        organizationId: 'org-cert-1',
+        mimeType: 'image/png',
+        bodyBytes: const <int>[1, 2, 3, 4],
+      );
+      expect(initResult.state, AppUploadState.signedReady);
+      expect(initResult.directive?.uploadSessionId, 'license-upload-1');
+
+      final directResult = await consumer.directCertificationLicenseUpload(
+        directive: initResult.directive!,
+        bodyBytes: const <int>[1, 2, 3, 4],
+      );
+      expect(directResult.state, AppUploadState.uploadConfirming);
+
+      final confirmResult = await consumer.confirmCertificationLicenseUpload(
+        directive: initResult.directive!,
+      );
+      expect(confirmResult.state, AppUploadState.uploadBound);
+      expect(confirmResult.fileAssetId, 'file-asset-license-3');
+    },
+  );
 
   test('membership current stays content on HTTP 200', () async {
     final consumer = ProfileMembershipConsumerLayer(
@@ -1044,6 +1582,57 @@ void main() {
       expect(result.data?.displayName, '张三');
       expect(result.data?.avatarUrl, 'http://127.0.0.1:1/avatar.png');
       expect(result.data?.organizationId, 'org-1');
+    },
+  );
+
+  test(
+    'shell/context consumes projectCreateEligibility extension without creating a second shell carrier',
+    () async {
+      final consumer = AppShellContextConsumer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/shell/context': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'userId': 'user-1',
+                        'organizationId': 'org-1',
+                        'roleKeys': <String>['buyer_admin'],
+                        'certificationStatus': 'approved',
+                        'membershipStatus': 'active',
+                        'projectCreateEligibility': <String, Object?>{
+                          'canCreateProject': true,
+                        },
+                        'visibleBuildings': <String>[
+                          'exhibition',
+                          'messages',
+                          'profile',
+                        ],
+                        'featureFlagsVersion': '0.1.0',
+                        'unreadSummary': <String, Object?>{
+                          'total': 0,
+                          'system': 0,
+                          'business': 0,
+                        },
+                      },
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+
+      final result = await consumer.loadResult();
+
+      expect(result.state, AppPageState.content);
+      expect(result.data?.projectCreateEligibility?.canCreateProject, isTrue);
     },
   );
 }

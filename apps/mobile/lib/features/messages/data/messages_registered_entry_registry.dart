@@ -40,29 +40,11 @@ class MessagesRegisteredEntryDefinition {
 
   String? buildRouteLocation(Map<String, String> routeParams) {
     switch (actionKey) {
-      case 'contract.confirm':
-        return _singleParamRouteLocation(
-          routeParams: routeParams,
-          requiredParam: 'orderId',
-          builder: ExhibitionRoutes.contractConfirmWithOrderId,
-        );
-      case 'contract.amend':
-        return _singleParamRouteLocation(
-          routeParams: routeParams,
-          requiredParam: 'orderId',
-          builder: ExhibitionRoutes.contractAmendWithOrderId,
-        );
       case 'inspection.submit':
         return _singleParamRouteLocation(
           routeParams: routeParams,
           requiredParam: 'milestoneId',
           builder: ExhibitionRoutes.inspectionSubmitWithMilestoneId,
-        );
-      case 'rating.submit':
-        return _singleParamRouteLocation(
-          routeParams: routeParams,
-          requiredParam: 'orderId',
-          builder: ExhibitionRoutes.ratingSubmitWithOrderId,
         );
       case 'dispute.open':
         return _singleParamRouteLocation(
@@ -70,19 +52,14 @@ class MessagesRegisteredEntryDefinition {
           requiredParam: 'orderId',
           builder: ExhibitionRoutes.disputeOpenWithOrderId,
         );
-      case 'dispute.withdraw':
-        final disputeId = routeParams['disputeId'];
-        final orderId = routeParams['orderId'];
-        if (disputeId == null || disputeId.trim().isEmpty) {
-          return 'routeTarget.routeParams for "$actionKey" must include non-empty "disputeId"';
-        }
-        if (!_sameKeySet(routeParams.keys.toSet(), requiredParams.toSet())) {
-          return 'routeTarget.routeParams for "$actionKey" must match the frozen minimum parameter shape';
-        }
-        return ExhibitionRoutes.disputeWithdrawWithDisputeId(
-          disputeId,
-          orderId: orderId,
+      case 'project_clarification.open':
+        return _singleParamRouteLocation(
+          routeParams: routeParams,
+          requiredParam: 'projectId',
+          builder: ExhibitionRoutes.projectClarificationWithProjectId,
         );
+      case 'bid_thread.open':
+        return _bidThreadRouteLocation(routeParams);
     }
 
     return 'routeTarget actionKey "$actionKey" is unsupported';
@@ -90,75 +67,58 @@ class MessagesRegisteredEntryDefinition {
 }
 
 const Set<String> messagesAllowedObjectTypes = <String>{
-  'contract',
   'inspection',
-  'rating',
   'dispute',
+  'project_clarification',
+  'bid_thread',
 };
 
 const Set<String> messagesAllowedActionKeys = <String>{
-  'contract.confirm',
-  'contract.amend',
   'inspection.submit',
-  'rating.submit',
   'dispute.open',
-  'dispute.withdraw',
+  'project_clarification.open',
+  'bid_thread.open',
 };
 
 const Map<String, String> messagesActionKeyToObjectType = <String, String>{
-  'contract.confirm': 'contract',
-  'contract.amend': 'contract',
   'inspection.submit': 'inspection',
-  'rating.submit': 'rating',
   'dispute.open': 'dispute',
-  'dispute.withdraw': 'dispute',
+  'project_clarification.open': 'project_clarification',
+  'bid_thread.open': 'bid_thread',
 };
 
 const Map<String, MessagesRegisteredEntryDefinition>
-messagesRegisteredEntryByActionKey = <String, MessagesRegisteredEntryDefinition>{
-  'contract.confirm': MessagesRegisteredEntryDefinition(
-    objectType: 'contract',
-    actionKey: 'contract.confirm',
-    canonicalPath: '/api/app/contract/detail',
-    localEntryKey: 'registered.contract.confirm',
-    requiredParams: <String>['orderId'],
-  ),
-  'contract.amend': MessagesRegisteredEntryDefinition(
-    objectType: 'contract',
-    actionKey: 'contract.amend',
-    canonicalPath: '/api/app/contract/detail',
-    localEntryKey: 'registered.contract.amend',
-    requiredParams: <String>['orderId'],
-  ),
-  'inspection.submit': MessagesRegisteredEntryDefinition(
-    objectType: 'inspection',
-    actionKey: 'inspection.submit',
-    canonicalPath: '/api/app/inspection/detail',
-    localEntryKey: 'registered.inspection.submit',
-    requiredParams: <String>['milestoneId'],
-  ),
-  'rating.submit': MessagesRegisteredEntryDefinition(
-    objectType: 'rating',
-    actionKey: 'rating.submit',
-    canonicalPath: '/api/app/rating/entry',
-    localEntryKey: 'registered.rating.submit',
-    requiredParams: <String>['orderId'],
-  ),
-  'dispute.open': MessagesRegisteredEntryDefinition(
-    objectType: 'dispute',
-    actionKey: 'dispute.open',
-    canonicalPath: '/api/app/order/detail',
-    localEntryKey: 'registered.dispute.open',
-    requiredParams: <String>['orderId'],
-  ),
-  'dispute.withdraw': MessagesRegisteredEntryDefinition(
-    objectType: 'dispute',
-    actionKey: 'dispute.withdraw',
-    canonicalPath: '/api/app/order/detail',
-    localEntryKey: 'registered.dispute.withdraw',
-    requiredParams: <String>['disputeId', 'orderId'],
-  ),
-};
+messagesRegisteredEntryByActionKey =
+    <String, MessagesRegisteredEntryDefinition>{
+      'inspection.submit': MessagesRegisteredEntryDefinition(
+        objectType: 'inspection',
+        actionKey: 'inspection.submit',
+        canonicalPath: '/api/app/inspection/detail',
+        localEntryKey: 'registered.inspection.submit',
+        requiredParams: <String>['milestoneId'],
+      ),
+      'dispute.open': MessagesRegisteredEntryDefinition(
+        objectType: 'dispute',
+        actionKey: 'dispute.open',
+        canonicalPath: '/api/app/order/detail',
+        localEntryKey: 'registered.dispute.open',
+        requiredParams: <String>['orderId'],
+      ),
+      'project_clarification.open': MessagesRegisteredEntryDefinition(
+        objectType: 'project_clarification',
+        actionKey: 'project_clarification.open',
+        canonicalPath: '/api/app/project/clarification/list',
+        localEntryKey: 'registered.project_clarification.open',
+        requiredParams: <String>['projectId'],
+      ),
+      'bid_thread.open': MessagesRegisteredEntryDefinition(
+        objectType: 'bid_thread',
+        actionKey: 'bid_thread.open',
+        canonicalPath: '/api/app/bid/thread/detail',
+        localEntryKey: 'registered.bid_thread.open',
+        requiredParams: <String>['projectId', 'bidId'],
+      ),
+    };
 
 String? _singleParamRouteLocation({
   required Map<String, String> routeParams,
@@ -175,6 +135,23 @@ String? _singleParamRouteLocation({
   return builder(value);
 }
 
+String? _bidThreadRouteLocation(Map<String, String> routeParams) {
+  if (routeParams.length != 2 ||
+      !routeParams.containsKey('projectId') ||
+      !routeParams.containsKey('bidId')) {
+    return 'routeTarget.routeParams must include only "projectId" and "bidId"';
+  }
+  final projectId = routeParams['projectId'];
+  final bidId = routeParams['bidId'];
+  if (projectId == null ||
+      projectId.trim().isEmpty ||
+      bidId == null ||
+      bidId.trim().isEmpty) {
+    return 'routeTarget.routeParams projectId and bidId must be non-empty';
+  }
+  return ExhibitionRoutes.bidThreadWithIds(projectId: projectId, bidId: bidId);
+}
+
 bool _sameOrderedList(List<String> left, List<String> right) {
   if (left.length != right.length) {
     return false;
@@ -182,20 +159,6 @@ bool _sameOrderedList(List<String> left, List<String> right) {
 
   for (var index = 0; index < left.length; index += 1) {
     if (left[index] != right[index]) {
-      return false;
-    }
-  }
-
-  return true;
-}
-
-bool _sameKeySet(Set<String> left, Set<String> right) {
-  if (left.length != right.length) {
-    return false;
-  }
-
-  for (final value in left) {
-    if (!right.contains(value)) {
       return false;
     }
   }

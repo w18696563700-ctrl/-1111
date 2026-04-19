@@ -1,0 +1,26 @@
+{
+  "name": "@exhibition/admin",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev --port 3100",
+    "build": "next build",
+    "start": "next start --port 3100",
+    "lint": "eslint .",
+    "test:admin-side:prepare": "rm -rf test-dist && tsc -p tsconfig.admin-tests.json",
+    "test:admin-side": "npm run test:admin-side:prepare && node --test test/admin-route-guard.test.cjs test/admin-api-client.test.cjs test/admin-project-review.test.cjs test/admin-audit.test.cjs test/admin-template-config.test.cjs test/admin-published-change-review.test.cjs"
+  },
+  "dependencies": {
+    "next": "16.2.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "16.2.1",
+    "typescript": "^5"
+  }
+}

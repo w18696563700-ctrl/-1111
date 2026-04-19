@@ -1,6 +1,147 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+function createRequestContext() {
+  return {
+    actorId: 'actor-1',
+    userId: 'user-1',
+    organizationId: 'org-1',
+    actorRole: 'buyer_admin',
+    requestId: 'request-1',
+    traceId: 'trace-1',
+  };
+}
+
+function createUploadWriteHarness(overrides = {}) {
+  const state = {
+    projectId: overrides.projectId ?? 'project-1',
+    session: overrides.session ?? null,
+    fileAsset: overrides.fileAsset ?? null,
+    savedSessions: [],
+    savedFileAssets: [],
+    auditEvents: [],
+  };
+
+  const uploadSessionRepository = {
+    create: (value) => ({ ...value }),
+    async findOneBy(where) {
+      if (!state.session) {
+        return null;
+      }
+      if (where?.id && state.session.id !== where.id) {
+        return null;
+      }
+      return state.session;
+    },
+    async save(value) {
+      state.session = { ...value };
+      state.savedSessions.push({ ...value });
+      return value;
+    },
+  };
+
+  const fileAssetRepository = {
+    create: (value) => ({ ...value }),
+    async findOneBy(where) {
+      if (!state.fileAsset) {
+        return null;
+      }
+      if (where?.id && state.fileAsset.id !== where.id) {
+        return null;
+      }
+      return state.fileAsset;
+    },
+    async save(value) {
+      state.fileAsset = { ...value };
+      state.savedFileAssets.push({ ...value });
+      return value;
+    },
+  };
+
+  const projectRepository = {
+    async findOneBy(where) {
+      if (where?.id !== state.projectId) {
+        return null;
+      }
+      return { id: state.projectId };
+    },
+  };
+
+  const manager = {
+    getRepository(entity) {
+      if (entity.name === 'UploadSessionEntity') return uploadSessionRepository;
+      if (entity.name === 'FileAssetEntity') return fileAssetRepository;
+      if (entity.name === 'ProjectEntity') return projectRepository;
+      throw new Error(`Unexpected repository request: ${entity.name}`);
+    },
+  };
+
+  const dataSource = {
+    transaction: async (run) => run(manager),
+  };
+
+  const presenter = {
+    toInitResponse: (session) => ({
+      uploadSessionId: session.id,
+      businessType: session.businessType,
+      businessId: session.businessId,
+      fileKind: session.fileKind,
+    }),
+    toConfirmResponse: (fileAsset) => ({
+      fileAssetId: fileAsset.id,
+      businessType: fileAsset.businessType,
+      businessId: fileAsset.businessId,
+      fileKind: fileAsset.fileKind,
+    }),
+  };
+
+  const storageService = {
+    buildDirective: async ({ fileKind }) => ({
+      objectKey: `project/${fileKind}/2026/04/file.bin`,
+      directUploadUrl: 'https://upload.example.com/object',
+      directUploadMethod: 'PUT',
+      directUploadHeaders: { 'Content-Type': 'application/octet-stream' },
+    }),
+    verifyTransportObject: async () => {},
+    ...overrides.storageService,
+  };
+
+  const enterpriseDisplayBinding = {
+    loadOwnedListingForInit: async () => null,
+    loadOwnedListingForConfirm: async () => null,
+    ensureFileAsset: () => {},
+  };
+
+  const auditService = {
+    record: async (event) => {
+      state.auditEvents.push(event);
+    },
+  };
+
+  const currentSessionVerificationService = {
+    verifyCurrentSessionContext: async () => {
+      throw new Error('not used for project upload');
+    },
+  };
+
+  const { UploadWriteService } = require('../dist/modules/upload/upload-write.service.js');
+
+  return {
+    state,
+    service: new UploadWriteService(
+      uploadSessionRepository,
+      fileAssetRepository,
+      projectRepository,
+      dataSource,
+      presenter,
+      storageService,
+      enterpriseDisplayBinding,
+      auditService,
+      currentSessionVerificationService,
+    ),
+  };
+}
+
 function withEnv(patch, run) {
   const previous = new Map();
   for (const [key, value] of Object.entries(patch)) {
@@ -218,4 +359,147 @@ test('confirm upload fails without transport truth and does not create FileAsset
   assert.equal(fileAssetSaved, false);
   assert.equal(sessionSaved, false);
   assert.equal(auditRecorded, false);
+});
+
+test('upload init accepts project_attachment and keeps project binding truth', async () => {
+  const { service, state } = createUploadWriteHarness();
+
+  const response = await service.initUpload(
+    {
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'project_attachment',
+      mimeType: 'application/pdf',
+      size: 128,
+      checksum: 'checksum-project-attachment',
+    },
+    createRequestContext(),
+  );
+
+  assert.equal(response.businessType, 'project');
+  assert.equal(response.businessId, 'project-1');
+  assert.equal(response.fileKind, 'project_attachment');
+  assert.equal(state.savedSessions.length, 1);
+  assert.equal(state.savedSessions[0].fileKind, 'project_attachment');
+});
+
+test('upload init accepts bid submit required attachment file kinds', async () => {
+  const cases = [
+    {
+      fileKind: 'bid_project_understanding',
+      mimeType: 'application/pdf',
+    },
+    {
+      fileKind: 'bid_project_understanding',
+      mimeType: 'image/png',
+    },
+    {
+      fileKind: 'bid_quote_sheet',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    },
+    {
+      fileKind: 'bid_schedule_plan',
+      mimeType: 'application/vnd.ms-excel',
+    },
+  ];
+
+  for (const item of cases) {
+    const { service, state } = createUploadWriteHarness();
+
+    const response = await service.initUpload(
+      {
+        businessType: 'project',
+        businessId: 'project-1',
+        fileKind: item.fileKind,
+        mimeType: item.mimeType,
+        size: 128,
+        checksum: `checksum-${item.fileKind}`,
+      },
+      createRequestContext(),
+    );
+
+    assert.equal(response.businessType, 'project');
+    assert.equal(response.businessId, 'project-1');
+    assert.equal(response.fileKind, item.fileKind);
+    assert.equal(state.savedSessions.length, 1);
+    assert.equal(state.savedSessions[0].fileKind, item.fileKind);
+  }
+});
+
+test('upload init rejects spreadsheet as project understanding attachment', async () => {
+  const { service } = createUploadWriteHarness();
+
+  await assert.rejects(
+    () =>
+      service.initUpload(
+        {
+          businessType: 'project',
+          businessId: 'project-1',
+          fileKind: 'bid_project_understanding',
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          size: 128,
+          checksum: 'checksum-project-understanding-xlsx',
+        },
+        createRequestContext(),
+      ),
+    (error) =>
+      typeof error?.getStatus === 'function' &&
+      error.getStatus() === 400 &&
+      error.getResponse()?.code === 'FILE_UPLOAD_INIT_INVALID'
+  );
+});
+
+test('upload init keeps legacy project evidence binding compatible', async () => {
+  const { service, state } = createUploadWriteHarness();
+
+  const response = await service.initUpload(
+    {
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'evidence',
+      mimeType: 'application/pdf',
+      size: 64,
+      checksum: 'checksum-project-evidence',
+    },
+    createRequestContext(),
+  );
+
+  assert.equal(response.fileKind, 'evidence');
+  assert.equal(state.savedSessions.length, 1);
+  assert.equal(state.savedSessions[0].fileKind, 'evidence');
+});
+
+test('confirm upload keeps project_attachment in FileAsset truth for post-publish corridor', async () => {
+  const { service, state } = createUploadWriteHarness({
+    session: {
+      id: 'session-project-attachment',
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'project_attachment',
+      objectKey: 'project/project_attachment/2026/04/file.pdf',
+      mimeType: 'application/pdf',
+      size: 256,
+      checksum: 'checksum-confirm-project-attachment',
+      actorId: 'actor-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      fileAssetId: null,
+      directUploadUrl: 'https://upload.example.com/object',
+      directUploadMethod: 'PUT',
+      directUploadHeaders: {},
+      sessionStatus: 'initiated',
+      confirmedAt: null,
+    },
+  });
+
+  const response = await service.confirmUpload(
+    { uploadSessionId: 'session-project-attachment' },
+    createRequestContext(),
+  );
+
+  assert.equal(response.fileKind, 'project_attachment');
+  assert.equal(state.savedFileAssets.length, 1);
+  assert.equal(state.savedFileAssets[0].fileKind, 'project_attachment');
+  assert.equal(state.savedFileAssets[0].businessType, 'project');
+  assert.equal(state.savedFileAssets[0].businessId, 'project-1');
 });

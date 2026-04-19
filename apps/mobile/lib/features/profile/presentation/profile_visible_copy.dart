@@ -1,6 +1,10 @@
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 
+String profileDisplayTimeLabel(String? rawValue, {String fallback = '时间未知'}) {
+  return forumDisplayTimeLabel(rawValue, fallback: fallback);
+}
+
 String profileDisplayName(String? rawUserId) {
   final value = rawUserId?.trim();
   if (value == null || value.isEmpty) {
@@ -30,6 +34,23 @@ String profileDisplayCertificationStatus(String? state) {
   };
 }
 
+String profileDisplayCertificationIdentitySummary({
+  required String? certificationStatus,
+  required String? personalCertificationStatus,
+  required bool? personalCertificationQualified,
+  required bool? personalCertificationLockedToOtherActor,
+  required String? membershipStatus,
+}) {
+  final enterpriseLabel =
+      '企业${profileDisplayCertificationStatus(certificationStatus)}';
+  final personalLabel = personalCertificationLockedToOtherActor == true
+      ? '我的认证已锁定其他账号'
+      : personalCertificationQualified == true
+      ? '我的认证已通过'
+      : '我的认证${profileDisplayCertificationStatus(personalCertificationStatus)}';
+  return '$enterpriseLabel · $personalLabel · ${profileDisplayMembershipStatus(membershipStatus)}';
+}
+
 String profileDisplayMembershipStatus(String? state) {
   return switch (state?.trim()) {
     null || '' => '未开通',
@@ -41,6 +62,14 @@ String profileDisplayMembershipStatus(String? state) {
     final String other when _containsChinese(other) => other,
     _ => '待补充',
   };
+}
+
+String profileDisplayEnterpriseCertificationBadge(String? state) {
+  return '企业${profileDisplayCertificationStatus(state)}';
+}
+
+String profileDisplayMembershipBadge(String? state) {
+  return '成员${profileDisplayMembershipStatus(state)}';
 }
 
 String profileDisplayPaidMembershipTier(String? tier) {
@@ -288,6 +317,60 @@ String profileDisplayPaymentBillingDependencyHint(String? key) {
   };
 }
 
+class ProfilePaymentBillingUnavailableVisibleCopy {
+  const ProfilePaymentBillingUnavailableVisibleCopy({
+    required this.title,
+    required this.message,
+    required this.actionLabel,
+  });
+
+  final String title;
+  final String message;
+  final String actionLabel;
+}
+
+ProfilePaymentBillingUnavailableVisibleCopy?
+profilePaymentBillingUnavailableVisibleCopy({
+  required AppPageState state,
+  String? errorCode,
+  String? rawMessage,
+}) {
+  if (!profileIsPaymentBillingCurrentOrganizationUnavailable(
+    state: state,
+    errorCode: errorCode,
+    rawMessage: rawMessage,
+  )) {
+    return null;
+  }
+
+  return const ProfilePaymentBillingUnavailableVisibleCopy(
+    title: '当前组织暂无支付与账单状态',
+    message: '当前组织暂无支付与账单状态。这不是支付执行失败，也不是系统异常。若你在其他组织下也有身份，可以切换组织后再查看。',
+    actionLabel: '切换组织查看',
+  );
+}
+
+bool profileIsPaymentBillingCurrentOrganizationUnavailable({
+  required AppPageState state,
+  String? errorCode,
+  String? rawMessage,
+}) {
+  if (state != AppPageState.notFound) {
+    return false;
+  }
+
+  if (errorCode?.trim() == 'PAYMENT_STATUS_UNAVAILABLE') {
+    return true;
+  }
+
+  final value = rawMessage?.trim();
+  if (value == null || value.isEmpty) {
+    return false;
+  }
+
+  return _looksLikeCurrentOrganizationPaymentBillingUnavailableMessage(value);
+}
+
 String profileDisplayCreditReasonHint(String? restrictionReasonCode) {
   if ((restrictionReasonCode?.trim().isEmpty ?? true)) {
     return '当前限制原因以规则说明页为准';
@@ -355,6 +438,21 @@ String profileDisplayRoleSummary(List<String> roleKeys) {
     return '当前成员';
   }
   return resolved.join('、');
+}
+
+List<String> profileBuildOrganizationStatusBadges({
+  required List<String> roleKeys,
+  required String? membershipStatus,
+  required String? certificationStatus,
+}) {
+  final badges = <String>[
+    profileDisplayMembershipBadge(membershipStatus),
+    profileDisplayEnterpriseCertificationBadge(certificationStatus),
+    profileDisplayRoleSummary(roleKeys),
+  ];
+  return badges
+      .where((String item) => item.trim().isNotEmpty)
+      .toList(growable: false);
 }
 
 String profileDisplayRoleKey(String? roleKey) {
@@ -445,4 +543,21 @@ bool _looksTechnicalVisibleMessage(String value) {
       lower.contains('organizationid') ||
       lower.contains('userid') ||
       lower.contains('settingsentry');
+}
+
+bool _looksLikeCurrentOrganizationPaymentBillingUnavailableMessage(
+  String value,
+) {
+  final lower = value.toLowerCase();
+  final compact = lower.replaceAll(RegExp(r'\s+'), ' ');
+  return ((compact.contains('current organization') ||
+              compact.contains('current organisation') ||
+              compact.contains('organization') ||
+              compact.contains('organisation') ||
+              compact.contains('当前组织')) &&
+          (compact.contains('payment status') ||
+              compact.contains('payment-and-billing') ||
+              compact.contains('支付状态') ||
+              compact.contains('支付与账单状态'))) &&
+      (compact.contains('unavailable') || compact.contains('不可用'));
 }

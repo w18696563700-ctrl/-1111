@@ -1,7 +1,9 @@
-import { Controller, Get, Headers, Query } from '@nestjs/common';
+import { Controller, Get, Headers, Param, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
 import { ProfileBlockService } from './profile-block.service';
 import { ProfileCreditConstraintsService } from './profile-credit-constraints.service';
+import { ProfileGovernanceAppealsService } from './profile-governance-appeals.service';
+import { ProfileGovernanceStatusService } from './profile-governance-status.service';
 import { ProfilePaymentBillingStatusService } from './profile-payment-billing-status.service';
 import { ProfileMembershipService } from './profile-membership.service';
 import { ProfileMembersService } from './profile-members.service';
@@ -20,6 +22,8 @@ export class ProfileReadController {
     private readonly profileMembersService: ProfileMembersService,
     private readonly profileSafetyService: ProfileSafetyService,
     private readonly profileSecurityService: ProfileSecurityService,
+    private readonly profileGovernanceAppealsService: ProfileGovernanceAppealsService,
+    private readonly profileGovernanceStatusService: ProfileGovernanceStatusService,
   ) {}
 
   @Get('index')
@@ -103,6 +107,27 @@ export class ProfileReadController {
   @Get('certification/current')
   getCurrentCertification(@Headers() headers: IncomingHttpHeaders) {
     return this.profileReadService.getCurrentCertification(headers);
+  }
+
+  @Get('governance/status')
+  getGovernanceStatus(@Headers() headers: IncomingHttpHeaders) {
+    return this.profileGovernanceStatusService.getStatus(headers);
+  }
+
+  @Get('governance/appeals')
+  getGovernanceAppeals(
+    @Headers() headers: IncomingHttpHeaders,
+    @Query() query: Record<string, unknown>,
+  ) {
+    return this.profileGovernanceAppealsService.getAppeals(headers, query);
+  }
+
+  @Get('governance/appeals/:appealCaseId')
+  getGovernanceAppealDetail(
+    @Headers() headers: IncomingHttpHeaders,
+    @Param('appealCaseId') appealCaseId: string,
+  ) {
+    return this.profileGovernanceAppealsService.getAppealDetail(headers, appealCaseId);
   }
 
   @Get('security/devices')

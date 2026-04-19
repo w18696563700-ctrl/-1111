@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
+import 'package:mobile/features/profile/presentation/profile_feature_status_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 
 Future<void> showOrganizationMembersSheet(BuildContext context) {
@@ -179,6 +180,12 @@ class _OrganizationMembersSheetState extends State<_OrganizationMembersSheet> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: <Widget>[
+        if (profileFeatureStatusVisible) ...<Widget>[
+          const ProfileFeatureStatusCard(
+            snapshot: profileMemberManagementFeatureStatus,
+          ),
+          const SizedBox(height: 12),
+        ],
         _MembersCard(
           title: '成员列表暂不可用',
           child: Column(
@@ -213,6 +220,12 @@ class _OrganizationMembersSheetState extends State<_OrganizationMembersSheet> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: <Widget>[
+        if (profileFeatureStatusVisible) ...<Widget>[
+          const ProfileFeatureStatusCard(
+            snapshot: profileMemberManagementFeatureStatus,
+          ),
+          const SizedBox(height: 12),
+        ],
         _MembersCard(
           title: '成员摘要',
           child: Text(

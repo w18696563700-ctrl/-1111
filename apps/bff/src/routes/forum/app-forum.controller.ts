@@ -1,10 +1,14 @@
-import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { ForumReportMineService } from './forum-report-mine.service';
 import { ForumService } from './forum.service';
 
 @Controller('api/app/forum')
 export class AppForumController {
-  constructor(private readonly forumService: ForumService) {}
+  constructor(
+    private readonly forumService: ForumService,
+    private readonly forumReportMineService: ForumReportMineService,
+  ) {}
 
   @Get('feed')
   getFeed(
@@ -51,6 +55,16 @@ export class AppForumController {
   @HttpCode(HttpStatus.ACCEPTED)
   publishDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
     return this.forumService.publishDraft(payload, headers);
+  }
+
+  @Get('reports/mine')
+  getMyReports(@Headers() headers: IncomingHttpHeaders, @Query('limit') limit?: string) {
+    return this.forumReportMineService.getMine(headers, limit);
+  }
+
+  @Get('reports/mine/:ticketId')
+  getMyReportDetail(@Headers() headers: IncomingHttpHeaders, @Param('ticketId') ticketId: string) {
+    return this.forumReportMineService.getMineDetail(headers, ticketId);
   }
 
   @Post('report/submit')

@@ -32,13 +32,13 @@ final class ProfilePersonalEditParser {
     );
   }
 
-  static ProfilePersonalAvatarUploadResult uploadFailure({
+  static ProfileFileUploadResult uploadFailure({
     required AppUploadState state,
     required AppPageState controlledState,
     required Object? body,
     required String fallbackMessage,
   }) {
-    return ProfilePersonalAvatarUploadResult(
+    return ProfileFileUploadResult(
       state: state,
       controlledState: controlledState,
       message: readString(readMap(body)?['message']) ?? fallbackMessage,
@@ -141,9 +141,7 @@ final class ProfilePersonalEditParser {
     );
   }
 
-  static ProfilePersonalAvatarUploadDirective? parseUploadDirective(
-    Object? body,
-  ) {
+  static ProfileFileUploadDirective? parseUploadDirective(Object? body) {
     final payload = readMap(body);
     final uploadSessionId = readString(payload?['uploadSessionId']);
     final directUpload = readMap(payload?['directUpload']);
@@ -158,7 +156,7 @@ final class ProfilePersonalEditParser {
       return null;
     }
 
-    return ProfilePersonalAvatarUploadDirective(
+    return ProfileFileUploadDirective(
       uploadSessionId: uploadSessionId,
       directUploadUrl: url,
       directUploadMethod: method.toUpperCase(),

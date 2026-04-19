@@ -24,6 +24,33 @@ export class AuthController {
     return this.authService.loginWithOtp(payload, headers);
   }
 
+  @Post('password/login')
+  @HttpCode(HttpStatus.OK)
+  loginWithPassword(
+    @Body() payload: Record<string, unknown> | undefined,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.authService.loginWithPassword(payload, headers);
+  }
+
+  @Post('password/set')
+  @HttpCode(HttpStatus.OK)
+  setPassword(
+    @Body() payload: Record<string, unknown> | undefined,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.authService.setPassword(payload, headers);
+  }
+
+  @Post('password/reset')
+  @HttpCode(HttpStatus.OK)
+  resetPassword(
+    @Body() payload: Record<string, unknown> | undefined,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.authService.resetPassword(payload, headers);
+  }
+
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   refreshSession(

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -5,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
+import 'package:mobile/core/auth/auth_consumer_layer.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
@@ -12,9 +14,16 @@ import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_governance_status_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_organization_credit_scoring_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_membership_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_personal_edit_upload_models.dart';
+import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
+import 'package:mobile/features/profile/navigation/profile_routes.dart';
+import 'package:mobile/features/profile/presentation/profile_avatar_picker.dart';
+import 'package:mobile/features/profile/presentation/profile_member_management_sheet.dart';
 import 'package:mobile/shell/shell_app.dart';
 
 Map<String, Object?> _profilePayload({
@@ -40,6 +49,10 @@ Map<String, Object?> _profilePayload({
     'settingsEntry': <String, Object?>{'state': settingsState},
   };
 }
+
+final List<int> _tinyPngBytes = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIW2P8z/D/PwAHggJ/PF2uWQAAAABJRU5ErkJggg==',
+);
 
 Map<String, Object?> _shellContextPayload({
   String? organizationId,
@@ -104,11 +117,21 @@ Map<String, Object?> _organizationItemPayload({
   required String membershipStatus,
   required String certificationStatus,
   required bool current,
+  String? provinceCode,
+  String? cityCode,
+  String? contactName,
+  String? contactMobile,
+  String? intro,
 }) {
   return <String, Object?>{
     'organizationId': organizationId,
     'name': name,
     'organizationType': organizationType,
+    'provinceCode': provinceCode,
+    'cityCode': cityCode,
+    'contactName': contactName,
+    'contactMobile': contactMobile,
+    'intro': intro,
     'roleKeys': roleKeys,
     'membershipStatus': membershipStatus,
     'certificationStatus': certificationStatus,
@@ -248,7 +271,9 @@ ExhibitionMobileApp _buildProfileApp({
   String initialRoute = '/profile',
   FakeAppApiTransport? exhibitionTransport,
   FakeAppApiTransport? forumTransport,
+  FakeAppApiTransport? governanceStatusTransport,
   FakeAppApiTransport? profileIdentityTransport,
+  AuthConsumerLayer? authConsumerLayer,
   ProfileIdentityConsumerLayer? profileIdentityConsumerLayer,
   AppShellContextData? shellContext,
   AppShellContextConsumer? shellContextConsumer,
@@ -298,11 +323,36 @@ ExhibitionMobileApp _buildProfileApp({
         transport: transport,
       ),
     ),
+    authConsumerLayer: authConsumerLayer,
     forumConsumerLayer: ForumConsumerLayer(
       client: AppApiClient(
         config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
         transport:
             forumTransport ?? FakeAppApiTransport(handlers: _forumHandlers()),
+      ),
+    ),
+    profileGovernanceStatusConsumerLayer: ProfileGovernanceStatusConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport:
+            governanceStatusTransport ??
+            FakeAppApiTransport(
+              handlers:
+                  <
+                    String,
+                    Future<AppApiResponse> Function(AppApiRequest request)
+                  >{
+                    'GET /api/app/profile/governance/status':
+                        (AppApiRequest request) async => AppApiResponse(
+                          statusCode: 404,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'message': '当前累计分快照入口暂不可用。',
+                            'code': 'PROFILE_GOVERNANCE_STATUS_UNAVAILABLE',
+                          },
+                        ),
+                  },
+            ),
       ),
     ),
     profileIdentityConsumerLayer:
@@ -326,6 +376,7 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
     required this.membersLoader,
     required this.rolePatcher,
     required this.memberDisabler,
+    this.organizationUpdater,
   });
 
   final Future<ProfileIdentityResult<MyOrganizationsView>> Function()
@@ -344,6 +395,15 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
     String memberId,
   )
   memberDisabler;
+  final Future<ProfileIdentityResult<ProfileActionAckView>> Function(
+    String name,
+    String provinceCode,
+    String cityCode,
+    String contactName,
+    String contactMobile,
+    String? intro,
+  )?
+  organizationUpdater;
 
   @override
   Future<ProfileIdentityResult<MyOrganizationsView>> loadMyOrganizations() {
@@ -390,6 +450,30 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
   }) => throw UnimplementedError();
 
   @override
+  Future<ProfileIdentityResult<ProfileActionAckView>>
+  updateCurrentOrganization({
+    required String name,
+    required String provinceCode,
+    required String cityCode,
+    required String contactName,
+    required String contactMobile,
+    String? intro,
+  }) {
+    final handler = organizationUpdater;
+    if (handler == null) {
+      throw UnimplementedError();
+    }
+    return handler(
+      name,
+      provinceCode,
+      cityCode,
+      contactName,
+      contactMobile,
+      intro,
+    );
+  }
+
+  @override
   Future<ProfileIdentityResult<ProfileOrganizationJoinAcceptedView>>
   joinByCode({required String inviteCode}) => throw UnimplementedError();
 
@@ -404,9 +488,19 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
     required String organizationId,
     required String legalName,
     required String uscc,
-    required String licenseFileId,
+    required String fileAssetId,
     String? contactName,
     String? contactMobile,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfileIdentityResult<ProfileCertificationAcceptedView>>
+  revalidateCertification({
+    required String organizationId,
+    required String legalName,
+    required String uscc,
+    required String fileAssetId,
+    String? correctionNote,
   }) => throw UnimplementedError();
 
   @override
@@ -415,8 +509,68 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
     required String organizationId,
     required String legalName,
     required String uscc,
-    required String licenseFileId,
+    required String fileAssetId,
     String? supplementNote,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfilePersonalAvatarUploadResult> initCertificationLicenseUpload({
+    required String? organizationId,
+    required String mimeType,
+    required List<int> bodyBytes,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfileIdentityResult<CertificationLicenseOcrView>>
+  recognizeCertificationLicense({
+    required String organizationId,
+    required String fileAssetId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfileIdentityResult<PersonalCertificationIdCardOcrView>>
+  recognizePersonalCertificationIdCard({
+    required String organizationId,
+    required String fileAssetId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfileIdentityResult<PersonalCertificationAcceptedView>>
+  submitPersonalCertification({
+    required String organizationId,
+    required String fileAssetId,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfilePersonalAvatarUploadResult> directCertificationLicenseUpload({
+    required ProfilePersonalAvatarUploadDirective directive,
+    required List<int> bodyBytes,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfilePersonalAvatarUploadResult> confirmCertificationLicenseUpload({
+    required ProfilePersonalAvatarUploadDirective directive,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfilePersonalAvatarUploadResult>
+  initPersonalCertificationIdCardUpload({
+    required String? organizationId,
+    required String mimeType,
+    required List<int> bodyBytes,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfilePersonalAvatarUploadResult>
+  directPersonalCertificationIdCardUpload({
+    required ProfilePersonalAvatarUploadDirective directive,
+    required List<int> bodyBytes,
+  }) => throw UnimplementedError();
+
+  @override
+  Future<ProfilePersonalAvatarUploadResult>
+  confirmPersonalCertificationIdCardUpload({
+    required ProfilePersonalAvatarUploadDirective directive,
   }) => throw UnimplementedError();
 
   @override
@@ -435,6 +589,7 @@ void main() {
   setUp(() {
     previousHttpOverrides = HttpOverrides.current;
     HttpOverrides.global = _PassthroughHttpOverrides();
+    ProfileAvatarPicker.reset();
     ProfileCreditConstraintsConsumerLayer.install(
       ProfileCreditConstraintsConsumerLayer(
         client: AppApiClient(
@@ -510,13 +665,16 @@ void main() {
         ),
       ),
     );
+    ProfileOrganizationCreditScoringConsumerLayer.reset();
     ProfileMembershipConsumerLayer.reset();
   });
 
   tearDown(() {
     HttpOverrides.global = previousHttpOverrides;
+    ProfileAvatarPicker.reset();
     ProfileCreditConstraintsConsumerLayer.reset();
     ProfilePaymentBillingConsumerLayer.reset();
+    ProfileOrganizationCreditScoringConsumerLayer.reset();
     ProfileMembershipConsumerLayer.reset();
   });
 
@@ -659,12 +817,13 @@ void main() {
     expect(find.text('我的会员'), findsOneWidget);
     expect(
       find.text(
-        '当前会员状态与权益摘要 · 标准会员 · 更高排序 · 商机提醒剩余 12 次 · 下次刷新 2026-04-06 00:00',
+        '部分可用：当前会员状态与权益摘要 · 标准会员 · 更高排序 · 商机提醒剩余 12 次 · 下次刷新 2026-04-06 00:00',
       ),
       findsOneWidget,
     );
     await scrollTo(tester, find.text('我的项目'));
-    expect(find.text('当前组织项目资产与继续处理入口 · 进行中 1 个 · 历史 2 个'), findsOneWidget);
+    expect(find.text('当前组织项目列表与项目详情入口 · 进行中 1 个 · 历史 2 个'), findsOneWidget);
+    expect(find.text('发布项目工作台'), findsNothing);
     await scrollTo(tester, find.text('我的论坛'));
     expect(find.text('我的论坛'), findsOneWidget);
     await scrollTo(tester, find.text('设置').last);
@@ -771,6 +930,7 @@ void main() {
       await scrollTo(tester, find.text('我的论坛'));
       await tester.tap(find.text('我的论坛').first);
       await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('论坛资产'));
       expect(find.text('论坛资产'), findsOneWidget);
       expect(find.text('我的帖子'), findsOneWidget);
       expect(find.text('我的评论'), findsOneWidget);
@@ -785,14 +945,35 @@ void main() {
       await scrollTo(tester, find.text('我的公司'));
       await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
-      expect(find.text('公司名称'), findsOneWidget);
-      expect(find.text('上海展建服务有限公司'), findsWidgets);
       await scrollTo(tester, find.text('可进行的操作'));
       expect(find.text('可进行的操作'), findsOneWidget);
       expect(find.text('公司与组织'), findsWidgets);
+      expect(find.text('编辑当前组织'), findsNothing);
+      expect(find.text('再创建一个组织'), findsNothing);
+      expect(find.text('加入组织'), findsNothing);
+      expect(find.text('成员管理'), findsNothing);
+      expect(find.text('切换当前公司/组织'), findsNothing);
+      expect(find.text('认证与身份'), findsNothing);
       expect(find.text('公司认证与我的身份'), findsWidgets);
-      expect(find.text('成员管理'), findsWidgets);
+      final organizationAction = tester.widget<ListTile>(
+        find.byKey(
+          const ValueKey<String>('profile-company-action-organization'),
+        ),
+      );
+      final certificationAction = tester.widget<ListTile>(
+        find.byKey(
+          const ValueKey<String>('profile-company-action-certification'),
+        ),
+      );
+      expect(organizationAction.tileColor, isNotNull);
+      expect(certificationAction.tileColor, isNotNull);
+      expect(find.widgetWithText(FilledButton, '提交认证'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '重新提交认证'), findsNothing);
       expect(find.text('当前认证已通过，可查看成员身份与当前组织状态'), findsOneWidget);
+      expect(find.text('功能状态'), findsNothing);
+      expect(find.text('当前公司/组织现状'), findsNothing);
+      expect(find.text('认证资料'), findsNothing);
+      expect(find.text('公司名称'), findsNothing);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -800,10 +981,427 @@ void main() {
       await scrollTo(tester, find.text('账号与安全、通知、隐私与权限等'));
       await tester.tap(find.text('账号与安全、通知、隐私与权限等'));
       await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('账号与安全'));
       expect(find.text('账号与安全'), findsOneWidget);
       expect(find.text('通知'), findsOneWidget);
       await scrollTo(tester, find.text('关于我们'));
       expect(find.text('关于我们'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'personal page shows bounded governance score snapshot from governance status only',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-1',
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final governanceStatusTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/governance/status':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'violationScoreSnapshot': 6,
+                      'violationScoreUpdatedAt': '2026-04-08T10:30:00Z',
+                    },
+                  ),
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          governanceStatusTransport: governanceStatusTransport,
+          initialRoute: ProfileRoutes.personal,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-1',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('治理记录'));
+
+      expect(find.text('治理记录'), findsOneWidget);
+      expect(find.text('累计分快照'), findsOneWidget);
+      expect(find.textContaining('这是基于已生效处罚记录生成的累计分快照'), findsOneWidget);
+      expect(find.textContaining('分值：6'), findsOneWidget);
+      expect(find.textContaining('更新时间：'), findsOneWidget);
+      expect(
+        governanceStatusTransport.requests
+            .map((AppApiRequest request) => request.canonicalPath)
+            .toList(),
+        const <String>['/api/app/profile/governance/status'],
+      );
+    },
+  );
+
+  testWidgets(
+    'personal page keeps governance score snapshot hidden when route is unavailable',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-1',
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final governanceStatusTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/governance/status':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 404,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'message': '当前累计分快照入口暂不可用。',
+                      'code': 'PROFILE_GOVERNANCE_STATUS_UNAVAILABLE',
+                    },
+                  ),
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          governanceStatusTransport: governanceStatusTransport,
+          initialRoute: ProfileRoutes.personal,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-1',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('治理记录'));
+
+      expect(find.text('治理记录'), findsOneWidget);
+      expect(find.text('我的申诉记录'), findsOneWidget);
+      expect(find.text('累计分快照'), findsNothing);
+      expect(
+        governanceStatusTransport.requests
+            .map((AppApiRequest request) => request.canonicalPath)
+            .toList(),
+        const <String>['/api/app/profile/governance/status'],
+      );
+    },
+  );
+
+  testWidgets('settings page shows switch account and logout after login', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('账号与安全'));
+
+    expect(find.text('切换账号'), findsOneWidget);
+    expect(find.text('退出登录'), findsOneWidget);
+    expect(find.text('登录入口'), findsNothing);
+  });
+
+  testWidgets('switch account logs out and routes to login page', (
+    WidgetTester tester,
+  ) async {
+    final authTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'POST /api/app/auth/logout': (AppApiRequest request) async =>
+                AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'ok': true,
+                    'traceId': 'logout-1',
+                  },
+                ),
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        authConsumerLayer: AuthConsumerLayer(
+          client: AppApiClient(
+            config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+            transport: authTransport,
+          ),
+        ),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('切换账号'));
+    await tester.pumpAndSettle();
+
+    expect(
+      authTransport.requests
+          .map((AppApiRequest request) => request.canonicalPath)
+          .toList(),
+      const <String>[AuthCanonicalPaths.logout],
+    );
+    expect(AppSessionStore.instance.hasAnySession, isFalse);
+    expect(find.widgetWithText(FilledButton, '发送验证码'), findsOneWidget);
+  });
+
+  testWidgets('personal page shows switch account and logout after login', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.personal,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await scrollTo(tester, find.text('身份与安全'));
+
+    expect(find.text('切换账号'), findsOneWidget);
+    expect(find.text('退出登录'), findsOneWidget);
+    expect(find.text('登录入口'), findsNothing);
+  });
+
+  testWidgets(
+    'personal page surfaces set password entry for otp login session',
+    (WidgetTester tester) async {
+      final sessionStore = AppSessionStore();
+      sessionStore.establishSession(
+        accessToken: 'access-otp',
+        refreshToken: 'refresh-otp',
+        expiresInSeconds: 3600,
+        deviceId: 'device-otp',
+        localLoginSource: AppSessionLoginSource.otpLogin,
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-otp',
+                        certificationStatus: 'approved',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          initialRoute: ProfileRoutes.personal,
+          sessionStore: sessionStore,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-otp',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('身份与安全'));
+
+      expect(find.widgetWithText(ListTile, '设置登录密码'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ListTile, '设置登录密码'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('只服务已登录账号补齐账号密码登录能力'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'personal page hides set password entry for password login session',
+    (WidgetTester tester) async {
+      final sessionStore = AppSessionStore();
+      sessionStore.establishSession(
+        accessToken: 'access-password',
+        refreshToken: 'refresh-password',
+        expiresInSeconds: 3600,
+        deviceId: 'device-password',
+        localLoginSource: AppSessionLoginSource.passwordLogin,
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-password',
+                        certificationStatus: 'approved',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          initialRoute: ProfileRoutes.personal,
+          sessionStore: sessionStore,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-password',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('身份与安全'));
+
+      expect(find.widgetWithText(ListTile, '设置登录密码'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'personal page removes set password entry after prompt dismissal',
+    (WidgetTester tester) async {
+      final sessionStore = AppSessionStore();
+      sessionStore.establishSession(
+        accessToken: 'access-dismiss',
+        refreshToken: 'refresh-dismiss',
+        expiresInSeconds: 3600,
+        deviceId: 'device-dismiss',
+        localLoginSource: AppSessionLoginSource.otpLogin,
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-dismiss',
+                        certificationStatus: 'approved',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          initialRoute: ProfileRoutes.personal,
+          sessionStore: sessionStore,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-dismiss',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('身份与安全'));
+
+      expect(find.widgetWithText(ListTile, '设置登录密码'), findsOneWidget);
+
+      sessionStore.markPasswordSetupPromptDismissed();
+      await tester.pumpAndSettle();
+
+      expect(find.widgetWithText(ListTile, '设置登录密码'), findsNothing);
     },
   );
 
@@ -951,23 +1549,28 @@ void main() {
       expect(find.text('我的会员'), findsOneWidget);
       expect(
         find.text(
-          '当前会员状态与权益摘要 · 标准会员 · 更高排序 · 商机提醒剩余 12 次 · 下次刷新 2026-04-06 00:00',
+          '部分可用：当前会员状态与权益摘要 · 标准会员 · 更高排序 · 商机提醒剩余 12 次 · 下次刷新 2026-04-06 00:00',
         ),
         findsOneWidget,
       );
-      expect(find.text('公司认证与我的身份'), findsOneWidget);
+      expect(find.text('公司认证与我的身份'), findsNothing);
       expect(find.text('我的项目'), findsOneWidget);
+      expect(find.text('发布项目工作台'), findsNothing);
       expect(find.text('我的论坛'), findsOneWidget);
-      expect(find.text('设置'), findsWidgets);
 
       await tester.tap(find.text('我的会员'));
       await tester.pumpAndSettle();
 
+      expect(find.text('功能状态'), findsOneWidget);
+      expect(find.text('当前功能状态'), findsOneWidget);
+      expect(find.text('当前不承接购买、续费、下单、支付与账单闭环。'), findsOneWidget);
+      await scrollTo(tester, find.text('会员档位'));
       expect(find.text('会员档位'), findsOneWidget);
       expect(find.text('标准会员'), findsWidgets);
       expect(find.text('费率档位'), findsOneWidget);
       expect(find.text('标准费率档位'), findsOneWidget);
       expect(find.textContaining('更高排序'), findsWidgets);
+      await scrollTo(tester, find.textContaining('商机提醒剩余 12 次'));
       expect(find.textContaining('商机提醒剩余 12 次'), findsWidgets);
       await scrollTo(tester, find.text('权益说明页'));
       expect(find.text('权益说明页'), findsOneWidget);
@@ -1254,14 +1857,15 @@ void main() {
 
       await scrollTo(tester, find.text('我的信用与约束'));
       expect(find.text('我的信用与约束'), findsOneWidget);
-      expect(find.textContaining('当前信用、保证金与交易保障摘要'), findsOneWidget);
-      expect(find.text('我的项目'), findsOneWidget);
+      expect(find.text('发布项目工作台'), findsNothing);
       expect(find.text('我的论坛'), findsOneWidget);
-      expect(find.text('设置'), findsWidgets);
 
       await tester.tap(find.text('我的信用与约束'));
       await tester.pumpAndSettle();
 
+      expect(find.text('功能状态'), findsOneWidget);
+      expect(find.text('当前不承接真实保证金缴纳、资金冻结、支付执行或结算。'), findsOneWidget);
+      await scrollTo(tester, find.text('当前摘要'));
       expect(find.text('当前摘要'), findsOneWidget);
       expect(find.text('当前需后续衔接'), findsWidgets);
       expect(find.textContaining('当前保证金需后续衔接'), findsWidgets);
@@ -1362,7 +1966,483 @@ void main() {
     },
   );
 
-  testWidgets('company page keeps controlled empty state when data is absent', (
+  testWidgets(
+    'organization-credit-scoring reserve entry consumes status explanation and handoff without polluting current V2.1',
+    (WidgetTester tester) async {
+      ProfileOrganizationCreditScoringConsumerLayer.install(
+        ProfileOrganizationCreditScoringConsumerLayer(
+          client: AppApiClient(
+            config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+            transport: FakeAppApiTransport(
+              handlers:
+                  <
+                    String,
+                    Future<AppApiResponse> Function(AppApiRequest request)
+                  >{
+                    'GET /api/app/profile/organization-credit-scoring/status':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'score': 86,
+                              'tierCode': 'T2',
+                              'tierLabel': '稳态档位',
+                              'sampleStatus': 'SUFFICIENT',
+                              'riskPosture': 'LOW',
+                              'ratedCompletedOrderCount': 18,
+                              'positiveRate': 0.94,
+                              'negativeRate': 0.06,
+                              'verySatisfiedCount': 12,
+                              'satisfiedCount': 5,
+                              'passableCount': 1,
+                              'negativeCount': 0,
+                              'actionableState': 'continue_observe',
+                              'updatedAt': '2026-04-14T09:00:00Z',
+                            },
+                          );
+                        },
+                    'GET /api/app/profile/organization-credit-scoring/explanation':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'reasonSummary': '未来主线 reserve 只读说明摘要',
+                              'reasonCodes': <Object?>[
+                                'order_rating_sample_ready',
+                                'low_negative_rate',
+                              ],
+                              'sampleStatus': 'SUFFICIENT',
+                              'riskPosture': 'LOW',
+                              'ratedCompletedOrderCount': 18,
+                              'positiveRate': 0.94,
+                              'negativeRate': 0.06,
+                              'verySatisfiedCount': 12,
+                              'satisfiedCount': 5,
+                              'passableCount': 1,
+                              'negativeCount': 0,
+                              'updatedAt': '2026-04-14T09:00:00Z',
+                            },
+                          );
+                        },
+                    'GET /api/app/profile/organization-credit-scoring/handoff':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'actionableState': 'continue_observe',
+                              'sampleStatus': 'SUFFICIENT',
+                              'riskPosture': 'LOW',
+                              'primaryActionCode': 'continue_observe',
+                              'primaryActionLabel': '继续观察',
+                              'handoffMessage': '未来主线 reserve 仅作只读衔接',
+                              'updatedAt': '2026-04-14T09:00:00Z',
+                            },
+                          );
+                        },
+                  },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-credit',
+                        roleKeys: const <String>['buyer_admin'],
+                        certificationStatus: 'approved',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          shellContext: _shellContextData(
+            organizationId: 'org-credit',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('组织信用评分 reserve'));
+      expect(find.text('组织信用评分 reserve'), findsOneWidget);
+      expect(find.textContaining('未来主线 reserve'), findsWidgets);
+
+      await tester.tap(find.text('组织信用评分 reserve'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('评分 86'), findsOneWidget);
+      expect(find.text('稳态档位'), findsWidgets);
+      expect(find.text('未来主线 reserve 只读总览'), findsNothing);
+      expect(find.text('未来主线 reserve'), findsWidgets);
+
+      await scrollTo(tester, find.text('说明页'));
+      await tester.tap(find.text('说明页'));
+      await tester.pumpAndSettle();
+      expect(find.text('未来主线 reserve 只读说明摘要'), findsOneWidget);
+      await scrollTo(tester, find.text('原因码列表'));
+      expect(find.textContaining('order_rating_sample_ready'), findsWidgets);
+      expect(find.text('低风险姿态'), findsWidgets);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('衔接页'));
+      await tester.tap(find.text('衔接页'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('主动作标签'));
+      expect(find.text('未来主线 reserve 仅作只读衔接'), findsOneWidget);
+      expect(find.text('继续观察'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('我的信用与约束'));
+      await tester.tap(find.text('我的信用与约束'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('未来主线 reserve'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'organization-credit-scoring reserve keeps insufficient shadow projection readable when riskPosture is null',
+    (WidgetTester tester) async {
+      ProfileOrganizationCreditScoringConsumerLayer.install(
+        ProfileOrganizationCreditScoringConsumerLayer(
+          client: AppApiClient(
+            config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+            transport: FakeAppApiTransport(
+              handlers:
+                  <
+                    String,
+                    Future<AppApiResponse> Function(AppApiRequest request)
+                  >{
+                    'GET /api/app/profile/organization-credit-scoring/status':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'score': null,
+                              'tierCode': null,
+                              'tierLabel': null,
+                              'sampleStatus': 'INSUFFICIENT',
+                              'riskPosture': null,
+                              'ratedCompletedOrderCount': 4,
+                              'positiveRate': null,
+                              'negativeRate': null,
+                              'verySatisfiedCount': 2,
+                              'satisfiedCount': 1,
+                              'passableCount': 1,
+                              'negativeCount': 0,
+                              'actionableState': null,
+                              'updatedAt': '2026-04-14T09:00:00Z',
+                            },
+                          );
+                        },
+                    'GET /api/app/profile/organization-credit-scoring/explanation':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'reasonSummary':
+                                  '当前有效评价样本不足，future-mainline reserve 仅展示只读占位。',
+                              'reasonCodes': <Object?>[
+                                'SAMPLE_INSUFFICIENT',
+                                'RATING_ONLY_MODE_ACTIVE',
+                              ],
+                              'sampleStatus': 'INSUFFICIENT',
+                              'riskPosture': null,
+                              'ratedCompletedOrderCount': 4,
+                              'positiveRate': null,
+                              'negativeRate': null,
+                              'verySatisfiedCount': 2,
+                              'satisfiedCount': 1,
+                              'passableCount': 1,
+                              'negativeCount': 0,
+                              'updatedAt': '2026-04-14T09:00:00Z',
+                            },
+                          );
+                        },
+                    'GET /api/app/profile/organization-credit-scoring/handoff':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'actionableState': null,
+                              'sampleStatus': 'INSUFFICIENT',
+                              'riskPosture': null,
+                              'primaryActionCode': null,
+                              'primaryActionLabel': null,
+                              'handoffMessage': null,
+                              'updatedAt': '2026-04-14T09:00:00Z',
+                            },
+                          );
+                        },
+                  },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-credit',
+                        roleKeys: const <String>['buyer_admin'],
+                        certificationStatus: 'approved',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          shellContext: _shellContextData(
+            organizationId: 'org-credit',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('组织信用评分 reserve'));
+      await tester.tap(find.text('组织信用评分 reserve'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('样本不足'), findsWidgets);
+      expect(find.text('风险姿态暂未提供'), findsWidgets);
+      expect(find.text('当前评分暂未提供'), findsOneWidget);
+
+      await scrollTo(tester, find.text('说明页'));
+      await tester.tap(find.text('说明页'));
+      await tester.pumpAndSettle();
+      expect(find.textContaining('当前有效评价样本不足'), findsOneWidget);
+      expect(find.text('风险姿态暂未提供'), findsWidgets);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('衔接页'));
+      await tester.tap(find.text('衔接页'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.text('当前说明'));
+      expect(find.text('当前暂无主动作标签'), findsOneWidget);
+      expect(find.text('当前暂无衔接说明'), findsOneWidget);
+      expect(find.text('风险姿态暂未提供'), findsWidgets);
+    },
+  );
+
+  testWidgets(
+    'company page keeps summary handoff actions when no organization exists',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{'items': <Object?>[]},
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 404,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'code': 'PROFILE_CERTIFICATION_UNAVAILABLE',
+                        'message': 'profile certification unavailable',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('当前还没有我的公司'), findsWidgets);
+      expect(find.text('可进行的操作'), findsOneWidget);
+      expect(find.text('公司与组织'), findsWidgets);
+      expect(find.text('创建组织'), findsNothing);
+      expect(find.text('加入组织'), findsNothing);
+      expect(find.text('功能状态'), findsNothing);
+      expect(find.text('当前公司/组织现状'), findsNothing);
+      expect(find.text('认证资料'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'company page shows failure title instead of no-company title on retryable organization read error',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 500,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'code': 'PROFILE_ORGANIZATION_TEMPORARY_UNAVAILABLE',
+                        'message': 'organization read temporarily unavailable',
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 404,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'code': 'PROFILE_CERTIFICATION_UNAVAILABLE',
+                        'message': 'profile certification unavailable',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('公司信息暂时没有加载成功'), findsOneWidget);
+      expect(find.text('公司信息暂时没有加载成功，请稍后再试'), findsOneWidget);
+      expect(find.text('当前还没有我的公司'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'company page keeps no-company title when organization list is truly empty',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{'items': <Object?>[]},
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 404,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'code': 'PROFILE_CERTIFICATION_UNAVAILABLE',
+                        'message': 'profile certification unavailable',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('当前还没有我的公司'), findsWidgets);
+      expect(find.text('公司信息暂时没有加载成功'), findsNothing);
+    },
+  );
+
+  testWidgets('company page highlights the two primary handoff actions', (
     WidgetTester tester,
   ) async {
     final transport = FakeAppApiTransport(
@@ -1372,7 +2452,11 @@ void main() {
               return AppApiResponse(
                 statusCode: 200,
                 uri: request.uri,
-                body: _profilePayload(),
+                body: _profilePayload(
+                  organizationId: 'org-company-highlight',
+                  certificationStatus: 'approved',
+                  membershipStatus: 'active',
+                ),
               );
             },
           },
@@ -1385,17 +2469,31 @@ void main() {
                   return AppApiResponse(
                     statusCode: 200,
                     uri: request.uri,
-                    body: const <String, Object?>{'items': <Object?>[]},
+                    body: const <String, Object?>{
+                      'items': <Object?>[
+                        <String, Object?>{
+                          'organizationId': 'org-company-highlight',
+                          'name': '重庆坤特展览展示有限公司',
+                          'organizationType': 'supplier',
+                          'roleKeys': <Object?>['buyer_admin'],
+                          'membershipStatus': 'active',
+                          'certificationStatus': 'approved',
+                          'current': true,
+                        },
+                      ],
+                    },
                   );
                 },
             'GET /api/app/profile/certification/current':
                 (AppApiRequest request) async {
                   return AppApiResponse(
-                    statusCode: 404,
+                    statusCode: 200,
                     uri: request.uri,
                     body: const <String, Object?>{
-                      'code': 'PROFILE_CERTIFICATION_UNAVAILABLE',
-                      'message': 'profile certification unavailable',
+                      'organizationId': 'org-title-dedup',
+                      'certificationStatus': 'approved',
+                      'legalName': '重庆坤特展览展示有限公司',
+                      'uscc': '91500105MA5U58K346',
                     },
                   );
                 },
@@ -1406,15 +2504,186 @@ void main() {
       _buildProfileApp(
         transport: transport,
         profileIdentityTransport: profileIdentityTransport,
+        initialRoute: '/profile/company',
+        shellContext: _shellContextData(
+          organizationId: 'org-company-highlight',
+          roleKeys: const <String>['buyer_admin'],
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+        ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('我的公司').first);
+    await scrollTo(tester, find.text('可进行的操作'));
+    expect(find.text('可进行的操作'), findsOneWidget);
+
+    final organizationAction = tester.widget<ListTile>(
+      find.byKey(const ValueKey<String>('profile-company-action-organization')),
+    );
+    final certificationAction = tester.widget<ListTile>(
+      find.byKey(
+        const ValueKey<String>('profile-company-action-certification'),
+      ),
+    );
+
+    expect(organizationAction.tileColor, isNotNull);
+    expect(certificationAction.tileColor, isNotNull);
+    expect(find.text('功能状态'), findsNothing);
+    expect(find.text('当前公司/组织现状'), findsNothing);
+    expect(find.text('认证资料'), findsNothing);
+    expect(find.text('公司名称'), findsNothing);
+  });
+
+  testWidgets('organization handoff keeps only one page title instance', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/profile/index': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _profilePayload(
+                  organizationId: 'org-title-dedup',
+                  certificationStatus: 'approved',
+                  membershipStatus: 'active',
+                ),
+              );
+            },
+          },
+    );
+    final profileIdentityTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/profile/organization/mine':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'items': <Object?>[
+                        <String, Object?>{
+                          'organizationId': 'org-title-dedup',
+                          'name': '重庆坤特展览展示有限公司',
+                          'organizationType': 'supplier',
+                          'roleKeys': <Object?>['buyer_admin'],
+                          'membershipStatus': 'active',
+                          'certificationStatus': 'approved',
+                          'current': true,
+                        },
+                      ],
+                    },
+                  );
+                },
+            'GET /api/app/profile/certification/current':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'organizationId': 'org-title-dedup',
+                      'certificationStatus': 'approved',
+                      'legalName': '重庆坤特展览展示有限公司',
+                      'uscc': '91500105MA5U58K346',
+                    },
+                  );
+                },
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: transport,
+        profileIdentityTransport: profileIdentityTransport,
+        initialRoute: '/profile/organization',
+        shellContext: _shellContextData(
+          organizationId: 'org-title-dedup',
+          roleKeys: const <String>['buyer_admin'],
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+        ),
+      ),
+    );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前还没有我的公司'), findsOneWidget);
-    expect(find.text('去公司与组织'), findsOneWidget);
+    expect(find.text('公司与组织'), findsOneWidget);
+  });
+
+  testWidgets('certification current keeps only one page title instance', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/profile/index': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _profilePayload(
+                  organizationId: 'org-cert-title-dedup',
+                  certificationStatus: 'approved',
+                  membershipStatus: 'active',
+                ),
+              );
+            },
+          },
+    );
+    final profileIdentityTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/profile/organization/mine':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'items': <Object?>[
+                        <String, Object?>{
+                          'organizationId': 'org-cert-title-dedup',
+                          'name': '重庆坤特展览展示有限公司',
+                          'organizationType': 'supplier',
+                          'roleKeys': <Object?>['buyer_admin'],
+                          'membershipStatus': 'active',
+                          'certificationStatus': 'approved',
+                          'current': true,
+                        },
+                      ],
+                    },
+                  );
+                },
+            'GET /api/app/profile/certification/current':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'organizationId': 'org-cert-title-dedup',
+                      'certificationStatus': 'approved',
+                      'legalName': '重庆坤特展览展示有限公司',
+                    },
+                  );
+                },
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: transport,
+        profileIdentityTransport: profileIdentityTransport,
+        initialRoute: '/profile/certification/current',
+        shellContext: _shellContextData(
+          organizationId: 'org-cert-title-dedup',
+          roleKeys: const <String>['buyer_admin'],
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('公司认证与我的身份'), findsOneWidget);
   });
 
   testWidgets('profile page keeps controlled failure wording compact', (
@@ -1519,7 +2788,7 @@ void main() {
 
       expect(find.text('组织上下文未开放'), findsOneWidget);
       expect(find.text('公司名称'), findsNothing);
-      expect(find.text('去公司与组织'), findsOneWidget);
+      expect(find.text('公司与组织'), findsWidgets);
     },
   );
 
@@ -1605,12 +2874,19 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('未认证'), findsWidgets);
+      await scrollTo(tester, find.text('我的公司'));
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
       await scrollTo(tester, find.text('公司认证与我的身份'));
-      await tester.tap(find.text('公司认证与我的身份').first);
+      await tester.tap(find.text('公司认证与我的身份'));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
       expect(find.text('未认证'), findsWidgets);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
 
       await tester.pageBack();
       await tester.pumpAndSettle();
@@ -1621,8 +2897,982 @@ void main() {
 
       expect(find.text(freshOrganizationName), findsWidgets);
       expect(find.text('需求方 / 供应商'), findsWidgets);
-      await scrollTo(tester, find.text('认证状态'));
-      expect(find.text('未认证'), findsOneWidget);
+      expect(find.text('编辑当前组织'), findsNothing);
+      expect(find.text('再创建一个组织'), findsNothing);
+      expect(find.text('认证与身份'), findsNothing);
+      await scrollTo(tester, find.text('公司认证与我的身份'));
+      expect(find.text('公司认证与我的身份'), findsWidgets);
+      expect(find.text('认证状态'), findsNothing);
+      expect(find.text('未认证'), findsWidgets);
+      expect(find.widgetWithText(FilledButton, '提交认证'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '重新提交认证'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'company and organization pages prefer certification current truth over stale organization certification badge',
+    (WidgetTester tester) async {
+      const organizationId = 'org-company-approved';
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'organizationId': organizationId,
+                            'name': '重庆展宏展览展示有限公司',
+                            'organizationType': 'both',
+                            'roleKeys': <Object?>['buyer_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'not_submitted',
+                            'current': true,
+                          },
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': organizationId,
+                        'certificationStatus': 'approved',
+                        'submittedAt': '2026-04-15T08:30:00Z',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: '/profile/company',
+          profileIdentityTransport: profileIdentityTransport,
+          shellContext: _shellContextData(
+            organizationId: organizationId,
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('企业已认证'), findsOneWidget);
+      expect(find.text('成员已开通'), findsOneWidget);
+      expect(find.text('需求管理员'), findsOneWidget);
+      expect(find.text('企业未认证'), findsNothing);
+
+      await scrollTo(tester, find.text('公司与组织'));
+      await tester.tap(find.text('公司与组织').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('企业已认证'), findsOneWidget);
+      expect(find.text('成员已开通'), findsOneWidget);
+      expect(find.text('需求管理员'), findsOneWidget);
+      expect(find.text('企业未认证'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'company and organization pages prefer shell current organization over stale current marker',
+    (WidgetTester tester) async {
+      const staleOrganizationId = 'org-stale-current';
+      const shellOrganizationId = 'org-shell-current';
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: shellOrganizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'organizationId': staleOrganizationId,
+                            'name': '旧当前主体',
+                            'organizationType': 'demand',
+                            'roleKeys': <Object?>['buyer_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'approved',
+                            'current': true,
+                          },
+                          <String, Object?>{
+                            'organizationId': shellOrganizationId,
+                            'name': '壳层当前主体',
+                            'organizationType': 'both',
+                            'roleKeys': <Object?>['buyer_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'not_submitted',
+                            'current': false,
+                          },
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': shellOrganizationId,
+                        'certificationStatus': 'not_submitted',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: '/profile/company',
+          profileIdentityTransport: profileIdentityTransport,
+          shellContext: _shellContextData(
+            organizationId: shellOrganizationId,
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'not_submitted',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('壳层当前主体'), findsOneWidget);
+      expect(find.text('旧当前主体'), findsNothing);
+
+      await scrollTo(tester, find.text('公司与组织'));
+      await tester.tap(find.text('公司与组织').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('壳层当前主体'), findsOneWidget);
+      expect(find.text('旧当前主体'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'organization switch page renders switch targets as compact list rows',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-current',
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          _organizationItemPayload(
+                            organizationId: 'org-current',
+                            name: '重庆坤特展览展示有限公司',
+                            organizationType: 'both',
+                            roleKeys: const <String>['buyer_admin'],
+                            membershipStatus: 'active',
+                            certificationStatus: 'not_submitted',
+                            current: true,
+                          ),
+                          _organizationItemPayload(
+                            organizationId: 'org-platform',
+                            name: 'Smoke Admin Review P0 Platform Org',
+                            organizationType: 'platform',
+                            roleKeys: const <String>['platform_reviewer'],
+                            membershipStatus: 'active',
+                            certificationStatus: 'not_submitted',
+                            current: false,
+                          ),
+                          _organizationItemPayload(
+                            organizationId: 'org-supplier',
+                            name: '我的公司',
+                            organizationType: 'supplier',
+                            roleKeys: const <String>['supplier_admin'],
+                            membershipStatus: 'active',
+                            certificationStatus: 'approved',
+                            current: false,
+                          ),
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': 'org-current',
+                        'certificationStatus': 'not_submitted',
+                        'legalName': '重庆坤特展览展示有限公司',
+                        'uscc': '91500105MA5U58K346',
+                        'legalPerson': '王巍威',
+                        'businessType': '有限责任公司',
+                        'address': '重庆市江北区洋河二村73号1幢20-7',
+                        'registeredCapital': '壹佰万元整',
+                        'establishedAt': '2016-03-30',
+                        'businessTerm': '2016年03月30日至永久',
+                        'businessScope': '展览展示服务',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+          initialRoute: ProfileIdentityRoutes.organizationSwitch,
+          shellContext: _shellContextData(
+            organizationId: 'org-current',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'not_submitted',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('切换当前公司/组织'), findsOneWidget);
+      expect(find.text('当前公司/组织'), findsNothing);
+      expect(find.textContaining('当前主体：重庆坤特展览展示有限公司'), findsOneWidget);
+      expect(find.text('切换为当前公司/组织'), findsNothing);
+      expect(find.text('Smoke Admin Review P0 Platform Org'), findsNothing);
+      expect(find.text('我的公司'), findsOneWidget);
+      expect(find.text('切换'), findsOneWidget);
+      expect(find.textContaining('类型：供应商；认证：已认证；成员：已开通'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'organization switch falls back to read-back verification when switch response body is incomplete',
+    (WidgetTester tester) async {
+      String currentOrganizationId = 'org-switch-a';
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: currentOrganizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'organizationId': 'org-switch-a',
+                            'name': '切换前主体',
+                            'organizationType': 'supplier',
+                            'roleKeys': <Object?>['buyer_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'approved',
+                            'current': true,
+                          },
+                          <String, Object?>{
+                            'organizationId': 'org-switch-b',
+                            'name': '切换后主体',
+                            'organizationType': 'both',
+                            'roleKeys': <Object?>['buyer_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'not_submitted',
+                            'current': false,
+                          },
+                        ],
+                      },
+                    );
+                  },
+              'POST /api/app/profile/organization/switch':
+                  (AppApiRequest request) async {
+                    currentOrganizationId = 'org-switch-b';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: null,
+                    );
+                  },
+            },
+      );
+      final shellTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/shell/context': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _shellContextPayload(
+                    organizationId: currentOrganizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: ProfileIdentityRoutes.organizationSwitch,
+          profileIdentityTransport: profileIdentityTransport,
+          shellContextConsumer: AppShellContextConsumer(
+            client: AppApiClient(
+              config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+              transport: shellTransport,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('切换').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('切换成功'), findsOneWidget);
+      expect(find.textContaining('当前主体：切换后主体'), findsOneWidget);
+      expect(find.text('切换当前未完成'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'organization handoff opens dedicated switch page and back returns to handoff',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-current',
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          _organizationItemPayload(
+                            organizationId: 'org-current',
+                            name: '重庆坤特展览展示有限公司',
+                            organizationType: 'both',
+                            roleKeys: const <String>['buyer_admin'],
+                            membershipStatus: 'active',
+                            certificationStatus: 'not_submitted',
+                            current: true,
+                          ),
+                          _organizationItemPayload(
+                            organizationId: 'org-platform',
+                            name: 'Smoke Admin Review P0 Platform Org',
+                            organizationType: 'platform',
+                            roleKeys: const <String>['platform_reviewer'],
+                            membershipStatus: 'active',
+                            certificationStatus: 'not_submitted',
+                            current: false,
+                          ),
+                          _organizationItemPayload(
+                            organizationId: 'org-supplier',
+                            name: '我的公司',
+                            organizationType: 'supplier',
+                            roleKeys: const <String>['supplier_admin'],
+                            membershipStatus: 'active',
+                            certificationStatus: 'approved',
+                            current: false,
+                          ),
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': 'org-current',
+                        'certificationStatus': 'not_submitted',
+                        'legalName': '重庆坤特展览展示有限公司',
+                        'uscc': '91500105MA5U58K346',
+                        'legalPerson': '王巍威',
+                        'businessType': '有限责任公司',
+                        'address': '重庆市江北区洋河二村73号1幢20-7',
+                        'registeredCapital': '壹佰万元整',
+                        'establishedAt': '2016-03-30',
+                        'businessTerm': '2016年03月30日至永久',
+                        'businessScope': '展览展示服务',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+          initialRoute: ProfileIdentityRoutes.organizationHandoff,
+          shellContext: _shellContextData(
+            organizationId: 'org-current',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'not_submitted',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('正式认证资料'), findsOneWidget);
+      expect(find.text('认证主体：重庆坤特展览展示有限公司'), findsOneWidget);
+      await scrollTo(
+        tester,
+        find.byKey(const ValueKey<String>('organization-action-switch')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('organization-action-switch')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('可切换主体'), findsOneWidget);
+      expect(find.textContaining('当前主体：重庆坤特展览展示有限公司'), findsOneWidget);
+      expect(find.text('Smoke Admin Review P0 Platform Org'), findsNothing);
+      expect(find.text('我的公司'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      expect(find.text('公司与组织'), findsWidgets);
+      expect(find.text('可切换主体'), findsNothing);
+      expect(find.text('编辑当前组织'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'organization edit current mode patches current organization and keeps organization type locked',
+    (WidgetTester tester) async {
+      const organizationId = 'org-edit';
+      const membershipStatus = 'active';
+      var patchCalled = false;
+      String currentName = '重庆博览展示有限公司';
+      String currentProvinceCode = '500000';
+      String currentCityCode = '500100';
+      String currentContactName = '王经理';
+      String currentContactMobile = '13900001111';
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: membershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+      final shellTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/shell/context': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _shellContextPayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: membershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: ProfileIdentityRoutes.organizationHandoff,
+          profileIdentityConsumerLayer: _FakeOrganizationMembersConsumer(
+            organizationsLoader: () async =>
+                ProfileIdentityResult<MyOrganizationsView>(
+                  state: AppPageState.content,
+                  method: 'GET',
+                  path: '/api/app/profile/organization/mine',
+                  data: MyOrganizationsView(
+                    items: <MyOrganizationItemView>[
+                      MyOrganizationItemView(
+                        organizationId: organizationId,
+                        name: currentName,
+                        organizationType: 'supplier',
+                        provinceCode: currentProvinceCode,
+                        cityCode: currentCityCode,
+                        contactName: currentContactName,
+                        contactMobile: currentContactMobile,
+                        roleKeys: const <String>['buyer_admin'],
+                        membershipStatus: membershipStatus,
+                        certificationStatus: 'not_submitted',
+                        current: true,
+                      ),
+                    ],
+                  ),
+                ),
+            certificationLoader: () async =>
+                const ProfileIdentityResult<ProfileCertificationCurrentView>(
+                  state: AppPageState.notFound,
+                  method: 'GET',
+                  path: '/api/app/profile/certification/current',
+                  message: '当前还没有认证记录。',
+                  errorCode: 'PROFILE_CERTIFICATION_UNAVAILABLE',
+                ),
+            membersLoader: () async =>
+                const ProfileIdentityResult<OrganizationMembersView>(
+                  state: AppPageState.content,
+                  method: 'GET',
+                  path: '/api/app/profile/organization/members',
+                  data: OrganizationMembersView(
+                    items: <OrganizationMemberItemView>[],
+                  ),
+                ),
+            rolePatcher: (String memberId, String roleKey) async =>
+                throw UnimplementedError(),
+            memberDisabler: (String memberId) async =>
+                throw UnimplementedError(),
+            organizationUpdater:
+                (
+                  String name,
+                  String provinceCode,
+                  String cityCode,
+                  String contactName,
+                  String contactMobile,
+                  String? intro,
+                ) async {
+                  patchCalled = true;
+                  expect(name, '重庆展会新主体');
+                  expect(provinceCode, currentProvinceCode);
+                  expect(cityCode, currentCityCode);
+                  expect(contactName, '李经理');
+                  expect(contactMobile, '13900002222');
+                  expect(intro, isNull);
+                  currentName = name;
+                  currentProvinceCode = provinceCode;
+                  currentCityCode = cityCode;
+                  currentContactName = contactName;
+                  currentContactMobile = contactMobile;
+                  return const ProfileIdentityResult<ProfileActionAckView>(
+                    state: AppPageState.content,
+                    method: 'PATCH',
+                    path: '/api/app/profile/organization/current',
+                    data: ProfileActionAckView(
+                      ok: true,
+                      traceId: 'org-update-1',
+                    ),
+                  );
+                },
+          ),
+          shellContextConsumer: AppShellContextConsumer(
+            client: AppApiClient(
+              config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+              transport: shellTransport,
+            ),
+          ),
+          shellContext: _shellContextData(
+            organizationId: organizationId,
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'not_submitted',
+            membershipStatus: membershipStatus,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('编辑当前组织'), findsOneWidget);
+      await scrollTo(
+        tester,
+        find.byKey(const ValueKey<String>('organization-action-edit')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('organization-action-edit')).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('已创建当前组织'), findsOneWidget);
+      expect(find.textContaining('组织类型与认证字段已锁定'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<String>), findsNothing);
+      expect(find.textContaining('供应商（已锁定'), findsOneWidget);
+
+      final nameField = tester.widget<TextField>(
+        find.widgetWithText(TextField, '组织名称'),
+      );
+      expect(nameField.controller?.text, currentName);
+      expect(find.text('所在省'), findsOneWidget);
+      expect(find.text('所在市'), findsOneWidget);
+
+      await tester.enterText(find.widgetWithText(TextField, '组织名称'), '重庆展会新主体');
+      final contactNameField = find.byWidgetPredicate(
+        (Widget widget) =>
+            widget is TextField && widget.decoration?.labelText == '联系人',
+      );
+      final contactMobileField = find.byWidgetPredicate(
+        (Widget widget) =>
+            widget is TextField && widget.decoration?.labelText == '联系电话',
+      );
+      await tester.enterText(contactNameField, '李经理');
+      await tester.enterText(contactMobileField, '13900002222');
+      await scrollTo(tester, find.widgetWithText(FilledButton, '保存修改'));
+      await tester.tap(find.widgetWithText(FilledButton, '保存修改'));
+      await tester.pumpAndSettle();
+
+      expect(patchCalled, isTrue);
+      expect(find.widgetWithText(FilledButton, '保存修改'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'organization edit current mode keeps certification subject read-only and saves the formal subject name',
+    (WidgetTester tester) async {
+      const organizationId = 'org-certified';
+      const membershipStatus = 'active';
+      var patchCalled = false;
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'approved',
+                    membershipStatus: membershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+      final shellTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/shell/context': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _shellContextPayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'approved',
+                    membershipStatus: membershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: ProfileIdentityRoutes.organizationHandoff,
+          profileIdentityConsumerLayer: _FakeOrganizationMembersConsumer(
+            organizationsLoader: () async =>
+                const ProfileIdentityResult<MyOrganizationsView>(
+                  state: AppPageState.content,
+                  method: 'GET',
+                  path: '/api/app/profile/organization/mine',
+                  data: MyOrganizationsView(
+                    items: <MyOrganizationItemView>[
+                      MyOrganizationItemView(
+                        organizationId: organizationId,
+                        name: '旧组织名称',
+                        organizationType: 'both',
+                        provinceCode: '500000',
+                        cityCode: '500100',
+                        contactName: '王巍威',
+                        contactMobile: '18696563700',
+                        roleKeys: <String>['buyer_admin'],
+                        membershipStatus: membershipStatus,
+                        certificationStatus: 'approved',
+                        current: true,
+                      ),
+                    ],
+                  ),
+                ),
+            certificationLoader: () async =>
+                const ProfileIdentityResult<ProfileCertificationCurrentView>(
+                  state: AppPageState.content,
+                  method: 'GET',
+                  path: '/api/app/profile/certification/current',
+                  data: ProfileCertificationCurrentView(
+                    organizationId: organizationId,
+                    certificationStatus: 'approved',
+                    legalName: '重庆坤特展览展示有限公司',
+                    uscc: '91500105MA5U58K346',
+                    legalPerson: '王巍威',
+                    businessType: '有限责任公司',
+                    address: '重庆市江北区洋河二村73号1幢20-7',
+                    registeredCapital: '壹佰万元整',
+                    establishedAt: '2016-03-30',
+                    businessTerm: '2016年03月30日至永久',
+                    businessScope: '展览展示服务',
+                  ),
+                ),
+            membersLoader: () async =>
+                const ProfileIdentityResult<OrganizationMembersView>(
+                  state: AppPageState.content,
+                  method: 'GET',
+                  path: '/api/app/profile/organization/members',
+                  data: OrganizationMembersView(
+                    items: <OrganizationMemberItemView>[],
+                  ),
+                ),
+            rolePatcher: (String memberId, String roleKey) async =>
+                throw UnimplementedError(),
+            memberDisabler: (String memberId) async =>
+                throw UnimplementedError(),
+            organizationUpdater:
+                (
+                  String name,
+                  String provinceCode,
+                  String cityCode,
+                  String contactName,
+                  String contactMobile,
+                  String? intro,
+                ) async {
+                  patchCalled = true;
+                  expect(name, '重庆坤特展览展示有限公司');
+                  expect(provinceCode, '500000');
+                  expect(cityCode, '500100');
+                  expect(contactName, '王巍威');
+                  expect(contactMobile, '18696563700');
+                  expect(intro, isNull);
+                  return const ProfileIdentityResult<ProfileActionAckView>(
+                    state: AppPageState.content,
+                    method: 'PATCH',
+                    path: '/api/app/profile/organization/current',
+                    data: ProfileActionAckView(
+                      ok: true,
+                      traceId: 'org-update-certified-1',
+                    ),
+                  );
+                },
+          ),
+          shellContextConsumer: AppShellContextConsumer(
+            client: AppApiClient(
+              config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+              transport: shellTransport,
+            ),
+          ),
+          shellContext: _shellContextData(
+            organizationId: organizationId,
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: membershipStatus,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(
+        tester,
+        find.byKey(const ValueKey<String>('organization-action-edit')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('organization-action-edit')).first,
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('认证主体信息'), findsOneWidget);
+      expect(find.widgetWithText(TextField, '组织名称'), findsNothing);
+      expect(find.text('认证主体：重庆坤特展览展示有限公司'), findsOneWidget);
+      expect(find.text('统一社会信用代码：91500105MA5U58K346'), findsOneWidget);
+      expect(find.text('住所：重庆市江北区洋河二村73号1幢20-7'), findsOneWidget);
+      expect(find.textContaining('如需修改，请走“更正认证资料”'), findsOneWidget);
+      await scrollTo(tester, find.widgetWithText(FilledButton, '保存修改'));
+      await tester.tap(find.widgetWithText(FilledButton, '保存修改'));
+      await tester.pumpAndSettle();
+
+      expect(patchCalled, isTrue);
+    },
+  );
+
+  testWidgets(
+    'organization create another mode keeps create flow even when current organization exists',
+    (WidgetTester tester) async {
+      const organizationId = 'org-edit';
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: organizationId,
+                        roleKeys: const <String>['buyer_admin'],
+                        certificationStatus: 'not_submitted',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          initialRoute: '/profile/organization/create?mode=create_another',
+          profileIdentityTransport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/organization/mine':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: <String, Object?>{
+                            'items': <Object?>[
+                              _organizationItemPayload(
+                                organizationId: organizationId,
+                                name: '重庆博览展示有限公司',
+                                organizationType: 'supplier',
+                                roleKeys: const <String>['buyer_admin'],
+                                membershipStatus: 'active',
+                                certificationStatus: 'not_submitted',
+                                current: true,
+                              ),
+                            ],
+                          },
+                        );
+                      },
+                  'GET /api/app/profile/certification/current':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 404,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'code': 'PROFILE_CERTIFICATION_UNAVAILABLE',
+                            'message': '当前还没有认证记录。',
+                          },
+                        );
+                      },
+                },
+          ),
+          shellContext: _shellContextData(
+            organizationId: organizationId,
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'not_submitted',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('再创建一个组织'), findsOneWidget);
+      expect(find.textContaining('“再创建一个组织”模式'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '返回编辑当前组织'), findsOneWidget);
+      expect(find.byType(DropdownButtonFormField<String>), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '创建组织'), findsOneWidget);
     },
   );
 
@@ -1715,8 +3965,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.textContaining('认证中'), findsWidgets);
+      await scrollTo(tester, find.text('我的公司'));
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
       await scrollTo(tester, find.text('公司认证与我的身份'));
-      await tester.tap(find.text('公司认证与我的身份').first);
+      await tester.tap(find.text('公司认证与我的身份'));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
@@ -1726,21 +3980,27 @@ void main() {
       await tester.pageBack();
       await tester.pumpAndSettle();
 
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
       await scrollTo(tester, find.text('我的公司'));
       await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('认证状态'));
+      expect(find.text('功能状态'), findsNothing);
+      expect(find.text('当前公司/组织现状'), findsNothing);
+      expect(find.text('认证资料'), findsNothing);
+      expect(find.text('认证状态'), findsNothing);
       expect(find.text('认证中'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'certification submit success read-back keeps certification page, company page and hub on pending_review truth',
+    'certification submit happy path uploads license then submits with confirmed fileAssetId',
     (WidgetTester tester) async {
       const organizationId = 'org-submit';
-      const staleCertificationStatus = 'not_submitted';
       const currentMembershipStatus = 'active';
+      String currentCertificationStatus = 'not_submitted';
 
       final transport = FakeAppApiTransport(
         handlers:
@@ -1752,7 +4012,7 @@ void main() {
                   body: _profilePayload(
                     organizationId: organizationId,
                     roleKeys: const <String>['buyer_admin'],
-                    certificationStatus: 'pending_review',
+                    certificationStatus: currentCertificationStatus,
                     membershipStatus: currentMembershipStatus,
                   ),
                 );
@@ -1775,7 +4035,7 @@ void main() {
                             organizationType: 'supplier',
                             roleKeys: const <String>['buyer_admin'],
                             membershipStatus: currentMembershipStatus,
-                            certificationStatus: 'pending_review',
+                            certificationStatus: currentCertificationStatus,
                             current: true,
                           ),
                         ],
@@ -1789,49 +4049,282 @@ void main() {
                       uri: request.uri,
                       body: <String, Object?>{
                         'organizationId': organizationId,
-                        'certificationStatus': 'pending_review',
+                        'certificationStatus': currentCertificationStatus,
                         'submittedAt': '2026-04-03 09:00',
                       },
                     );
                   },
+              'POST /api/app/file/upload/init': (AppApiRequest request) async {
+                expect(request.body, isA<Map<String, Object?>>());
+                final body = request.body! as Map<String, Object?>;
+                expect(body['businessType'], 'profile');
+                expect(body['businessId'], organizationId);
+                expect(body['fileKind'], 'business_license');
+                expect(body['mimeType'], 'image/png');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'uploadSessionId': 'cert-upload-submit-1',
+                    'directUpload': <String, Object?>{
+                      'url': 'https://oss.example.com/cert-upload-submit-1',
+                      'method': 'PUT',
+                      'headers': <String, Object?>{'content-type': 'image/png'},
+                    },
+                    'confirm': <String, Object?>{
+                      'endpoint': '/api/app/file/upload/confirm',
+                    },
+                  },
+                );
+              },
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'uploadSessionId': 'cert-upload-submit-1',
+                    });
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'fileAssetId': 'file-asset-cert-submit-1',
+                      },
+                    );
+                  },
+              'POST /api/app/profile/certification/license/ocr':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'organizationId': organizationId,
+                      'licenseFileId': 'file-asset-cert-submit-1',
+                    });
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'status': 'recognized',
+                        'message': '当前已完成营业执照 OCR 识别，认证主体和统一社会信用代码已自动回填。',
+                        'legalName': '上海待认证组织',
+                        'uscc': '91310000123456789A',
+                        'legalPerson': '张三',
+                        'businessType': '有限责任公司',
+                        'address': '重庆市江北区洋河二村73号1幢20-7',
+                        'registeredCapital': '壹佰万元整',
+                        'establishedAt': '2016年03月30日',
+                        'businessTerm': '2016年03月30日至永久',
+                        'businessScope': '展览展示服务',
+                        'providerRequestId': 'ocr-submit-1',
+                      },
+                    );
+                  },
+              'POST /api/app/profile/certification/submit':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'organizationId': organizationId,
+                      'legalName': '上海待认证组织',
+                      'uscc': '91310000123456789A',
+                      'licenseFileId': 'file-asset-cert-submit-1',
+                      'contactName': '张三',
+                      'contactMobile': '13800000000',
+                    });
+                    currentCertificationStatus = 'approved';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': organizationId,
+                        'certificationStatus': 'approved',
+                        'submittedAt': '2026-04-05 10:10',
+                        'traceId': 'cert-submit-1',
+                      },
+                    );
+                  },
             },
+        uploadHandler: (AppApiUploadRequest request) async {
+          expect(request.method, 'PUT');
+          expect(request.url, 'https://oss.example.com/cert-upload-submit-1');
+          expect(request.headers['content-type'], 'image/png');
+          expect(request.bodyBytes, _tinyPngBytes);
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
+      );
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-submit.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
       );
 
-      ExhibitionMobileApp buildApp() {
-        return _buildProfileApp(
+      await tester.pumpWidget(
+        _buildProfileApp(
           transport: transport,
           profileIdentityTransport: profileIdentityTransport,
+          initialRoute: '/profile/certification/submit',
           shellContext: _shellContextData(
             organizationId: organizationId,
             roleKeys: const <String>['buyer_admin'],
-            certificationStatus: staleCertificationStatus,
+            certificationStatus: currentCertificationStatus,
             membershipStatus: currentMembershipStatus,
           ),
-        );
-      }
-
-      await tester.pumpWidget(buildApp());
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('认证中'), findsWidgets);
-      await scrollTo(tester, find.text('公司认证与我的身份'));
-      await tester.tap(find.text('公司认证与我的身份').first);
+      expect(
+        find.text(
+          '当前认证只接收 1 张营业执照图片。请先选择并确认上传，上传完成后会自动尝试 OCR 识别、展示营业执照摘要并回填认证主体与统一社会信用代码；提交认证后会基于 OCR 自动核验，符合直接通过，不符合直接打回。',
+        ),
+        findsOneWidget,
+      );
+      await tester.enterText(find.widgetWithText(TextField, '联系人'), '张三');
+      await tester.enterText(
+        find.widgetWithText(TextField, '联系电话'),
+        '13800000000',
+      );
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      expect(find.text('营业执照待上传'), findsNothing);
+      expect(find.text('点击图片可放大查看完整营业执照。'), findsOneWidget);
+      await tester.tap(find.text('点击图片可放大查看完整营业执照。'));
+      await tester.pumpAndSettle();
+      expect(find.text('再次点击图片可恢复常规预览。'), findsOneWidget);
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('当前认证状态'));
-      expect(find.text('认证中'), findsWidgets);
-      expect(find.text('提交时间'), findsOneWidget);
+      expect(find.text('营业执照已完成上传绑定'), findsNothing);
+      expect(find.text('营业执照 OCR 已完成'), findsNothing);
+      expect(find.text('法定代表人'), findsOneWidget);
+      expect(find.text('有限责任公司'), findsOneWidget);
+      expect(find.text('展览展示服务'), findsOneWidget);
+      expect(find.text('营业执照文件 ID'), findsNothing);
+      expect(find.byType(Image), findsWidgets);
+      final legalNameField = tester.widget<TextField>(
+        find.widgetWithText(TextField, '认证主体'),
+      );
+      final usccField = tester.widget<TextField>(
+        find.widgetWithText(TextField, '统一社会信用代码'),
+      );
+      expect(legalNameField.controller?.text, '上海待认证组织');
+      expect(usccField.controller?.text, '91310000123456789A');
 
-      await tester.pageBack();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '提交认证'));
+      await tester.tap(find.widgetWithText(FilledButton, '提交认证'));
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('我的公司'));
-      await tester.tap(find.text('我的公司').first);
+      expect(find.text('认证提交当前未完成'), findsNothing);
+      expect(
+        profileIdentityTransport.requests
+            .map((AppApiRequest request) => request.canonicalPath)
+            .where((String path) => path == '/api/app/file/upload/init')
+            .length,
+        1,
+      );
+      expect(
+        profileIdentityTransport.requests
+            .map((AppApiRequest request) => request.canonicalPath)
+            .where((String path) => path == '/api/app/file/upload/confirm')
+            .length,
+        1,
+      );
+      expect(
+        profileIdentityTransport.requests
+            .map((AppApiRequest request) => request.canonicalPath)
+            .where(
+              (String path) => path == '/api/app/profile/certification/submit',
+            )
+            .length,
+        1,
+      );
+    },
+  );
+
+  testWidgets(
+    'certification submit keeps controlled failure when upload init fails',
+    (WidgetTester tester) async {
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-init-failure.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-submit-failure',
+                        certificationStatus: 'not_submitted',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          initialRoute: '/profile/certification/submit',
+          profileIdentityTransport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'POST /api/app/file/upload/init':
+                      (AppApiRequest request) async => AppApiResponse(
+                        statusCode: 409,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'message': '当前营业执照上传入口暂不可用，请稍后再试。',
+                        },
+                      ),
+                },
+          ),
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-submit-failure',
+            certificationStatus: 'not_submitted',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('认证状态'));
-      expect(find.text('认证中'), findsWidgets);
-      expect(find.text('未认证'), findsNothing);
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('营业执照上传当前未开始'), findsOneWidget);
+      expect(find.text('当前营业执照上传入口暂不可用，请稍后再试。'), findsOneWidget);
+      expect(find.text('营业执照文件 ID'), findsNothing);
     },
   );
 
@@ -2173,21 +4666,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('公司名称'), findsOneWidget);
-      await tester.fling(
-        find.byType(Scrollable).first,
-        const Offset(0, -600),
-        1000,
-      );
-      await tester.pumpAndSettle();
-      await tester.fling(
-        find.byType(Scrollable).first,
-        const Offset(0, -600),
-        1000,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('成员管理'), findsWidgets);
-      await tester.tap(find.text('成员管理').first);
+      showOrganizationMembersSheet(tester.element(find.byType(Scaffold).first));
       await tester.pumpAndSettle();
 
       expect(find.text('张三'), findsOneWidget);
@@ -2321,23 +4800,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('当前公司/组织'), findsOneWidget);
-      await tester.fling(
-        find.byType(Scrollable).first,
-        const Offset(0, -500),
-        1000,
-      );
-      await tester.pumpAndSettle();
-      await tester.fling(
-        find.byType(Scrollable).first,
-        const Offset(0, -500),
-        1000,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('成员管理'), findsWidgets);
-      await tester.tap(find.text('成员管理').first);
+      showOrganizationMembersSheet(tester.element(find.byType(Scaffold).first));
       await tester.pumpAndSettle();
 
+      await scrollTo(tester, find.text('李四'));
       await tester.tap(find.text('需求成员').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('供应商管理员').last);
@@ -2470,32 +4936,55 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('公司认证与我的身份'));
-      await tester.tap(find.text('公司认证与我的身份').first);
+      await scrollTo(tester, find.text('我的公司'));
+      await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.widgetWithText(FilledButton, '加入组织'));
-      await tester.tap(find.widgetWithText(FilledButton, '加入组织').first);
+      await scrollTo(tester, find.text('公司与组织'));
+      await tester.tap(find.text('公司与组织').first);
+      await tester.pumpAndSettle();
+
+      await scrollTo(
+        tester,
+        find.byKey(const ValueKey<String>('organization-action-join')),
+      );
+      await tester.tap(
+        find.byKey(const ValueKey<String>('organization-action-join')).first,
+      );
       await tester.pumpAndSettle();
 
       await tester.enterText(find.widgetWithText(TextField, '邀请码'), 'JOIN-001');
       await tester.tap(find.widgetWithText(FilledButton, '加入组织'));
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('当前认证状态'));
-      expect(find.text('org-join-1'), findsOneWidget);
-      expect(find.text('已认证'), findsWidgets);
-
-      await tester.pageBack();
-      await tester.pumpAndSettle();
+      if (find.text('北京加入后组织').evaluate().isEmpty) {
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+      if (find.text('北京加入后组织').evaluate().isEmpty) {
+        await scrollTo(tester, find.text('我的公司'));
+        await tester.tap(find.text('我的公司').first);
+        await tester.pumpAndSettle();
+      }
 
       expect(find.textContaining('已认证'), findsWidgets);
-      await scrollTo(tester, find.text('我的公司'));
-      await tester.tap(find.text('我的公司').first);
+      expect(find.text('北京加入后组织'), findsWidgets);
+      expect(find.text('功能状态'), findsNothing);
+      expect(find.text('当前公司/组织现状'), findsNothing);
+      expect(find.text('认证资料'), findsNothing);
+      expect(find.text('认证状态'), findsNothing);
+      expect(find.text('已认证'), findsWidgets);
+
+      if (find.text('公司认证与我的身份').evaluate().isEmpty) {
+        await tester.pageBack();
+        await tester.pumpAndSettle();
+      }
+      await scrollTo(tester, find.text('公司认证与我的身份'));
+      await tester.tap(find.text('公司认证与我的身份').first);
       await tester.pumpAndSettle();
 
+      await scrollTo(tester, find.text('当前认证状态'));
       expect(find.text('北京加入后组织'), findsWidgets);
-      await scrollTo(tester, find.text('认证状态'));
       expect(find.text('已认证'), findsWidgets);
     },
   );
@@ -2557,7 +5046,215 @@ void main() {
   );
 
   testWidgets(
-    'certification page keeps resubmit unavailable without rejected or expired truth',
+    'certification current page separates status from formal certification truth fields',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-approved-rich',
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'organizationId': 'org-approved-rich',
+                            'name': '上海展建服务有限公司',
+                            'organizationType': 'supplier',
+                            'roleKeys': <Object?>['buyer_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'approved',
+                            'current': true,
+                          },
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': 'org-approved-rich',
+                        'certificationStatus': 'approved',
+                        'legalName': '上海展建服务有限公司',
+                        'uscc': '91310000123456789A',
+                        'legalPerson': '张三',
+                        'businessType': '有限责任公司',
+                        'address': '上海市徐汇区漕溪北路 398 号',
+                        'registeredCapital': '壹佰万元整',
+                        'establishedAt': '2016-03-30',
+                        'businessTerm': '2016-03-30 至长期',
+                        'businessScope': '展览展示服务',
+                        'submittedAt': '2026-04-05 10:10',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: '/profile/certification/current',
+          profileIdentityTransport: profileIdentityTransport,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-approved-rich',
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('当前认证状态'));
+      expect(find.text('当前认证状态'), findsOneWidget);
+      expect(find.text('上海展建服务有限公司'), findsWidgets);
+      expect(find.text('org-approved-rich'), findsNothing);
+      expect(find.text('提交时间'), findsOneWidget);
+      await scrollTo(tester, find.text('正式认证资料'));
+      expect(find.text('正式认证资料'), findsOneWidget);
+      expect(find.text('法定代表人'), findsOneWidget);
+      expect(find.text('张三'), findsOneWidget);
+      expect(find.text('企业类型'), findsOneWidget);
+      expect(find.text('有限责任公司'), findsOneWidget);
+      expect(find.text('住所'), findsOneWidget);
+      expect(find.text('上海市徐汇区漕溪北路 398 号'), findsOneWidget);
+      expect(find.text('成立日期'), findsOneWidget);
+      expect(find.text('2016-03-30'), findsOneWidget);
+      expect(find.text('经营范围'), findsOneWidget);
+      expect(find.text('展览展示服务'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'certification current page surfaces personal certification truth and dual-cert action',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-personal-cert',
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'organizationId': 'org-personal-cert',
+                            'name': '上海展建服务有限公司',
+                            'organizationType': 'supplier',
+                            'roleKeys': <Object?>['supplier_admin'],
+                            'membershipStatus': 'active',
+                            'certificationStatus': 'approved',
+                            'current': true,
+                          },
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': 'org-personal-cert',
+                        'certificationStatus': 'approved',
+                        'legalName': '上海展建服务有限公司',
+                        'legalPerson': '张三',
+                        'personalCertification': <String, Object?>{
+                          'organizationId': 'org-personal-cert',
+                          'userId': 'user-personal-cert',
+                          'certificationStatus': 'rejected',
+                          'realName': '李四',
+                          'idNumberMasked': '310***********5678',
+                          'qualifiedForCurrentActor': false,
+                          'lockedToOtherActor': false,
+                          'rejectReason': '身份证姓名与营业执照法定代表人不一致，当前不能通过我的认证。',
+                          'submittedAt': '2026-04-06 10:10',
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: '/profile/certification/current',
+          profileIdentityTransport: profileIdentityTransport,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-personal-cert',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'approved',
+            personalCertificationStatus: 'rejected',
+            personalCertificationQualified: false,
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('当前我的认证'));
+      expect(find.text('当前我的认证'), findsOneWidget);
+      expect(find.text('当前资格说明'), findsOneWidget);
+      expect(find.text('竞标资格要求企业认证和我的认证同时通过。'), findsOneWidget);
+      expect(find.text('身份证姓名与营业执照法定代表人不一致，当前不能通过我的认证。'), findsOneWidget);
+      await scrollTo(tester, find.text('重新提交我的认证'));
+      expect(find.text('重新提交我的认证'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'approved certification page shows revalidate entry but keeps submit and resubmit unavailable',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(
         handlers:
@@ -2634,10 +5331,262 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('当前认证状态'));
+      await scrollTo(tester, find.text('更正认证资料'));
       expect(find.text('已认证'), findsOneWidget);
+      expect(find.text('更正认证资料'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '管理公司与组织'), findsOneWidget);
+      expect(find.text('公司与组织'), findsNothing);
+      expect(find.text('成员管理'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '加入组织'), findsNothing);
       expect(find.text('重新提交认证'), findsNothing);
       expect(find.text('提交认证'), findsNothing);
+
+      await tester.tap(find.widgetWithText(FilledButton, '管理公司与组织'));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.text('在这里继续创建公司/组织、加入公司/组织或切换当前公司/组织，不扩成治理后台。'),
+        findsOneWidget,
+      );
+    },
+  );
+
+  testWidgets(
+    'certification revalidate keeps formal truth separate from OCR preview and stays approved after success',
+    (WidgetTester tester) async {
+      const organizationId = 'org-approved-revalidate';
+      const membershipStatus = 'active';
+      String currentCertificationStatus = 'approved';
+      String currentLegalName = '上海展建服务有限公司';
+      String currentUscc = '91310000123456789A';
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: currentCertificationStatus,
+                    membershipStatus: membershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          _organizationItemPayload(
+                            organizationId: organizationId,
+                            name: currentLegalName,
+                            organizationType: 'supplier',
+                            roleKeys: const <String>['buyer_admin'],
+                            membershipStatus: membershipStatus,
+                            certificationStatus: currentCertificationStatus,
+                            current: true,
+                          ),
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/profile/certification/current':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'organizationId': organizationId,
+                        'certificationStatus': currentCertificationStatus,
+                        'legalName': currentLegalName,
+                        'uscc': currentUscc,
+                        'legalPerson': '张三',
+                        'businessType': '有限责任公司',
+                        'submittedAt': '2026-04-01 09:00',
+                      },
+                    );
+                  },
+              'POST /api/app/profile/certification/revalidate':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'organizationId': organizationId,
+                      'legalName': '上海展建服务集团有限公司',
+                      'uscc': '91310000999999999X',
+                      'licenseFileId': 'file-asset-cert-revalidate-1',
+                      'correctionNote': '营业执照字段已更新',
+                    });
+                    currentCertificationStatus = 'approved';
+                    currentLegalName = '上海展建服务集团有限公司';
+                    currentUscc = '91310000999999999X';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'organizationId': organizationId,
+                        'certificationStatus': 'approved',
+                        'submittedAt': '2026-04-10 10:10',
+                        'traceId': 'cert-revalidate-1',
+                      },
+                    );
+                  },
+              'POST /api/app/file/upload/init': (AppApiRequest request) async =>
+                  AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'uploadSessionId': 'cert-upload-revalidate-1',
+                      'directUpload': <String, Object?>{
+                        'url':
+                            'https://oss.example.com/cert-upload-revalidate-1',
+                        'method': 'PUT',
+                        'headers': <String, Object?>{
+                          'content-type': 'image/png',
+                        },
+                      },
+                      'confirm': <String, Object?>{
+                        'endpoint': '/api/app/file/upload/confirm',
+                      },
+                    },
+                  ),
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'fileAssetId': 'file-asset-cert-revalidate-1',
+                    },
+                  ),
+              'POST /api/app/profile/certification/license/ocr':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'organizationId': organizationId,
+                      'licenseFileId': 'file-asset-cert-revalidate-1',
+                    });
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'status': 'recognized',
+                        'message': '当前已完成营业执照 OCR 识别，认证主体和统一社会信用代码已自动回填。',
+                        'legalName': '上海展建服务集团有限公司',
+                        'uscc': '91310000999999999X',
+                        'legalPerson': '李四',
+                        'businessType': '有限责任公司',
+                        'providerRequestId': 'ocr-revalidate-1',
+                      },
+                    );
+                  },
+            },
+        uploadHandler: (AppApiUploadRequest request) async =>
+            AppApiResponse(statusCode: 200, uri: Uri.parse(request.url)),
+      );
+      final shellTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/shell/context': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _shellContextPayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: currentCertificationStatus,
+                    membershipStatus: membershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-revalidate.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+          shellContextConsumer: AppShellContextConsumer(
+            client: AppApiClient(
+              config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+              transport: shellTransport,
+            ),
+          ),
+          initialRoute: '/profile/certification/current',
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: organizationId,
+            certificationStatus: 'approved',
+            membershipStatus: membershipStatus,
+            roleKeys: const <String>['buyer_admin'],
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('更正认证资料'));
+      await tester.tap(find.text('更正认证资料'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('当前正式认证资料'), findsOneWidget);
+      expect(find.text('上海展建服务有限公司'), findsWidgets);
+      expect(find.text('待审核更正状态'), findsOneWidget);
+      expect(
+        find.text('当前轮没有单独的待审核更正状态，也不会生成并行资格真值；当前页展示的“正式认证资料”仍然是当前有效真值。'),
+        findsOneWidget,
+      );
+      expect(find.text('项目主线影响'), findsOneWidget);
+
+      await tester.enterText(
+        find.widgetWithText(TextField, '更正说明'),
+        '营业执照字段已更新',
+      );
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OCR识别预览'), findsOneWidget);
+      expect(find.text('上海展建服务集团有限公司'), findsWidgets);
+      expect(find.text('91310000999999999X'), findsWidgets);
+
+      await scrollTo(tester, find.widgetWithText(FilledButton, '提交资料更正'));
+      await tester.tap(find.widgetWithText(FilledButton, '提交资料更正'));
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('当前认证状态'));
+      expect(find.text('已认证'), findsWidgets);
+      await scrollTo(tester, find.text('正式认证资料'));
+      expect(find.text('正式认证资料'), findsOneWidget);
+      expect(find.text('上海展建服务集团有限公司'), findsWidgets);
+      expect(find.text('91310000999999999X'), findsWidgets);
     },
   );
 
@@ -2883,20 +5832,74 @@ void main() {
                   },
               'POST /api/app/profile/certification/resubmit':
                   (AppApiRequest request) async {
-                    currentCertificationStatus = 'pending_review';
+                    expect(request.body, const <String, Object?>{
+                      'organizationId': organizationId,
+                      'legalName': '上海展建服务有限公司',
+                      'uscc': '91310000123456789A',
+                      'licenseFileId': 'file-asset-cert-resubmit-1',
+                      'supplementNote': '已补充最新营业执照',
+                    });
+                    currentCertificationStatus = 'approved';
                     currentRejectReason = null;
                     return AppApiResponse(
                       statusCode: 200,
                       uri: request.uri,
                       body: const <String, Object?>{
                         'organizationId': organizationId,
-                        'certificationStatus': 'pending_review',
+                        'certificationStatus': 'approved',
                         'submittedAt': '2026-04-05 10:10',
                         'traceId': 'cert-resubmit-1',
                       },
                     );
                   },
+              'POST /api/app/file/upload/init': (AppApiRequest request) async =>
+                  AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'uploadSessionId': 'cert-upload-resubmit-1',
+                      'directUpload': <String, Object?>{
+                        'url': 'https://oss.example.com/cert-upload-resubmit-1',
+                        'method': 'PUT',
+                        'headers': <String, Object?>{
+                          'content-type': 'image/png',
+                        },
+                      },
+                      'confirm': <String, Object?>{
+                        'endpoint': '/api/app/file/upload/confirm',
+                      },
+                    },
+                  ),
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'fileAssetId': 'file-asset-cert-resubmit-1',
+                    },
+                  ),
+              'POST /api/app/profile/certification/license/ocr':
+                  (AppApiRequest request) async {
+                    expect(request.body, const <String, Object?>{
+                      'organizationId': organizationId,
+                      'licenseFileId': 'file-asset-cert-resubmit-1',
+                    });
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'status': 'recognized',
+                        'message': '当前已完成营业执照 OCR 识别，认证主体和统一社会信用代码已自动回填。',
+                        'legalName': '上海展建服务有限公司',
+                        'uscc': '91310000123456789A',
+                        'legalPerson': '张三',
+                        'providerRequestId': 'ocr-resubmit-1',
+                      },
+                    );
+                  },
             },
+        uploadHandler: (AppApiUploadRequest request) async =>
+            AppApiResponse(statusCode: 200, uri: Uri.parse(request.url)),
       );
       final shellTransport = FakeAppApiTransport(
         handlers:
@@ -2940,11 +5943,26 @@ void main() {
           ),
         ),
       );
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-resubmit.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.textContaining('认证未通过'), findsWidgets);
+      await scrollTo(tester, find.text('我的公司'));
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
       await scrollTo(tester, find.text('公司认证与我的身份'));
-      await tester.tap(find.text('公司认证与我的身份').first);
+      await tester.tap(find.text('公司认证与我的身份'));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
@@ -2952,10 +5970,17 @@ void main() {
       expect(find.text('拒绝原因'), findsOneWidget);
       expect(find.text('营业执照信息不一致'), findsOneWidget);
 
-      await scrollTo(tester, find.text('重新提交认证'));
-      await tester.tap(find.text('重新提交认证'));
+      expect(find.widgetWithText(FilledButton, '重新提交认证'), findsOneWidget);
+      await scrollTo(tester, find.widgetWithText(FilledButton, '重新提交认证'));
+      await tester.tap(find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.pumpAndSettle();
 
+      expect(
+        find.text(
+          '当前认证只接收 1 张营业执照图片。请先选择并确认上传，上传完成后会自动尝试 OCR 识别、展示营业执照摘要并回填认证主体与统一社会信用代码；重新提交后会基于 OCR 自动核验，符合直接通过，不符合直接打回。',
+        ),
+        findsOneWidget,
+      );
       await tester.enterText(
         find.widgetWithText(TextField, '认证主体'),
         '上海展建服务有限公司',
@@ -2965,34 +5990,176 @@ void main() {
         '91310000123456789A',
       );
       await tester.enterText(
-        find.widgetWithText(TextField, '营业执照文件 ID'),
-        'file-license-2',
-      );
-      await tester.enterText(
         find.widgetWithText(TextField, '补充说明'),
         '已补充最新营业执照',
       );
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.pumpAndSettle();
+      expect(find.text('营业执照已完成上传绑定'), findsNothing);
       await scrollTo(tester, find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.tap(find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
-      expect(find.text('认证中'), findsWidgets);
+      expect(find.text('已认证'), findsWidgets);
       expect(find.text('拒绝原因'), findsNothing);
       expect(find.text('营业执照信息不一致'), findsNothing);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('认证中'), findsWidgets);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 2000));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('已认证'), findsWidgets);
       await scrollTo(tester, find.text('我的公司'));
       await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('认证状态'));
-      expect(find.text('认证中'), findsWidgets);
+      expect(find.text('功能状态'), findsNothing);
+      expect(find.text('当前公司/组织现状'), findsNothing);
+      expect(find.text('认证资料'), findsNothing);
+      expect(find.text('认证状态'), findsNothing);
+      expect(find.text('已认证'), findsWidgets);
       expect(find.text('拒绝原因'), findsNothing);
       expect(find.text('营业执照信息不一致'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'certification submit keeps OCR preview separate and filters invalid business type values',
+    (WidgetTester tester) async {
+      const organizationId = 'org-cert-ocr-preview';
+      const currentMembershipStatus = 'active';
+      const currentCertificationStatus = 'not_submitted';
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: organizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: currentCertificationStatus,
+                    membershipStatus: currentMembershipStatus,
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/file/upload/init': (AppApiRequest request) async =>
+                  AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'uploadSessionId': 'cert-upload-preview-1',
+                      'directUpload': <String, Object?>{
+                        'url': 'https://oss.example.com/cert-upload-preview-1',
+                        'method': 'PUT',
+                        'headers': <String, Object?>{
+                          'content-type': 'image/png',
+                        },
+                      },
+                      'confirm': <String, Object?>{
+                        'endpoint': '/api/app/file/upload/confirm',
+                      },
+                    },
+                  ),
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'fileAssetId': 'file-asset-cert-preview-1',
+                    },
+                  ),
+              'POST /api/app/profile/certification/license/ocr':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'status': 'recognized',
+                        'message': '当前已完成营业执照 OCR 识别。',
+                        'legalName': '上海待认证组织',
+                        'uscc': '91310000123456789A',
+                        'legalPerson': '张三',
+                        'businessType': 'QRCode',
+                        'address': '重庆市江北区洋河二村73号1幢20-7',
+                        'establishedAt': '2016年03月30日',
+                        'businessScope': '展览展示服务',
+                        'providerRequestId': 'ocr-preview-1',
+                      },
+                    );
+                  },
+            },
+        uploadHandler: (AppApiUploadRequest request) async =>
+            AppApiResponse(statusCode: 200, uri: Uri.parse(request.url)),
+      );
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-preview.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          profileIdentityTransport: profileIdentityTransport,
+          initialRoute: '/profile/certification/submit',
+          shellContext: _shellContextData(
+            organizationId: organizationId,
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: currentCertificationStatus,
+            membershipStatus: currentMembershipStatus,
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('OCR识别预览'), findsOneWidget);
+      expect(
+        find.text('以下内容来自营业执照 OCR 识别结果，仅用于当前页核对与回填。正式认证资料以认证状态页中的“正式认证资料”为准。'),
+        findsOneWidget,
+      );
+      expect(find.text('法定代表人'), findsOneWidget);
+      expect(find.text('张三'), findsOneWidget);
+      expect(find.text('住所'), findsOneWidget);
+      expect(find.text('重庆市江北区洋河二村73号1幢20-7'), findsOneWidget);
+      expect(find.text('成立日期'), findsOneWidget);
+      expect(find.text('2016年03月30日'), findsOneWidget);
+      expect(find.text('企业类型'), findsNothing);
+      expect(find.text('QRCode'), findsNothing);
     },
   );
 
@@ -3022,57 +6189,109 @@ void main() {
             },
       );
       final profileIdentityTransport = FakeAppApiTransport(
-        handlers:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/profile/organization/mine':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: <String, Object?>{
-                        'items': <Object?>[
-                          _organizationItemPayload(
-                            organizationId: organizationId,
-                            name: '上海展建服务有限公司',
-                            organizationType: 'supplier',
-                            roleKeys: const <String>['buyer_admin'],
-                            membershipStatus: membershipStatus,
-                            certificationStatus: currentCertificationStatus,
-                            current: true,
-                          ),
-                        ],
-                      },
-                    );
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          'GET /api/app/profile/organization/mine':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'items': <Object?>[
+                      _organizationItemPayload(
+                        organizationId: organizationId,
+                        name: '上海展建服务有限公司',
+                        organizationType: 'supplier',
+                        roleKeys: const <String>['buyer_admin'],
+                        membershipStatus: membershipStatus,
+                        certificationStatus: currentCertificationStatus,
+                        current: true,
+                      ),
+                    ],
                   },
-              'GET /api/app/profile/certification/current':
-                  (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: <String, Object?>{
-                        'organizationId': organizationId,
-                        'certificationStatus': currentCertificationStatus,
-                        'submittedAt': '2025-04-01 09:00',
-                        'expiresAt': ?currentExpiresAt,
-                      },
-                    );
+                );
+              },
+          'GET /api/app/profile/certification/current':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'organizationId': organizationId,
+                    'certificationStatus': currentCertificationStatus,
+                    'submittedAt': '2025-04-01 09:00',
+                    'expiresAt': ?currentExpiresAt,
                   },
-              'POST /api/app/profile/certification/resubmit':
-                  (AppApiRequest request) async {
-                    currentCertificationStatus = 'pending_review';
-                    currentExpiresAt = null;
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: const <String, Object?>{
-                        'organizationId': organizationId,
-                        'certificationStatus': 'pending_review',
-                        'submittedAt': '2026-04-05 10:10',
-                        'traceId': 'cert-resubmit-expired-1',
-                      },
-                    );
+                );
+              },
+          'POST /api/app/profile/certification/resubmit':
+              (AppApiRequest request) async {
+                expect(request.body, const <String, Object?>{
+                  'organizationId': organizationId,
+                  'legalName': '上海展建服务有限公司',
+                  'uscc': '91310000123456789A',
+                  'licenseFileId': 'file-asset-cert-resubmit-expired-1',
+                  'supplementNote': '已补充最新过期材料',
+                });
+                currentCertificationStatus = 'approved';
+                currentExpiresAt = null;
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'organizationId': organizationId,
+                    'certificationStatus': 'approved',
+                    'submittedAt': '2026-04-05 10:10',
+                    'traceId': 'cert-resubmit-expired-1',
                   },
-            },
+                );
+              },
+          'POST /api/app/file/upload/init': (AppApiRequest request) async =>
+              AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'uploadSessionId': 'cert-upload-resubmit-expired-1',
+                  'directUpload': <String, Object?>{
+                    'url':
+                        'https://oss.example.com/cert-upload-resubmit-expired-1',
+                    'method': 'PUT',
+                    'headers': <String, Object?>{'content-type': 'image/png'},
+                  },
+                  'confirm': <String, Object?>{
+                    'endpoint': '/api/app/file/upload/confirm',
+                  },
+                },
+              ),
+          'POST /api/app/file/upload/confirm': (AppApiRequest request) async =>
+              AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'fileAssetId': 'file-asset-cert-resubmit-expired-1',
+                },
+              ),
+          'POST /api/app/profile/certification/license/ocr':
+              (AppApiRequest request) async {
+                expect(request.body, const <String, Object?>{
+                  'organizationId': organizationId,
+                  'licenseFileId': 'file-asset-cert-resubmit-expired-1',
+                });
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'status': 'recognized',
+                    'message': '当前已完成营业执照 OCR 识别，认证主体和统一社会信用代码已自动回填。',
+                    'legalName': '上海展建服务有限公司',
+                    'uscc': '91310000123456789A',
+                    'legalPerson': '张三',
+                    'providerRequestId': 'ocr-resubmit-expired-1',
+                  },
+                );
+              },
+        },
+        uploadHandler: (AppApiUploadRequest request) async =>
+            AppApiResponse(statusCode: 200, uri: Uri.parse(request.url)),
       );
       final shellTransport = FakeAppApiTransport(
         handlers:
@@ -3116,11 +6335,26 @@ void main() {
           ),
         ),
       );
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-expired.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
       await tester.pumpAndSettle();
 
       expect(find.textContaining('已过期'), findsWidgets);
+      await scrollTo(tester, find.text('我的公司'));
+      await tester.tap(find.text('我的公司').first);
+      await tester.pumpAndSettle();
+
       await scrollTo(tester, find.text('公司认证与我的身份'));
-      await tester.tap(find.text('公司认证与我的身份').first);
+      await tester.tap(find.text('公司认证与我的身份'));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
@@ -3128,10 +6362,17 @@ void main() {
       expect(find.text('有效期'), findsOneWidget);
       expect(find.text('2026-04-01'), findsOneWidget);
 
-      await scrollTo(tester, find.text('重新提交认证'));
-      await tester.tap(find.text('重新提交认证'));
+      expect(find.widgetWithText(FilledButton, '重新提交认证'), findsOneWidget);
+      await scrollTo(tester, find.widgetWithText(FilledButton, '重新提交认证'));
+      await tester.tap(find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.pumpAndSettle();
 
+      expect(
+        find.text(
+          '当前认证只接收 1 张营业执照图片。请先选择并确认上传，上传完成后会自动尝试 OCR 识别、展示营业执照摘要并回填认证主体与统一社会信用代码；重新提交后会基于 OCR 自动核验，符合直接通过，不符合直接打回。',
+        ),
+        findsOneWidget,
+      );
       await tester.enterText(
         find.widgetWithText(TextField, '认证主体'),
         '上海展建服务有限公司',
@@ -3141,32 +6382,46 @@ void main() {
         '91310000123456789A',
       );
       await tester.enterText(
-        find.widgetWithText(TextField, '营业执照文件 ID'),
-        'file-license-3',
-      );
-      await tester.enterText(
         find.widgetWithText(TextField, '补充说明'),
         '已补充最新过期材料',
       );
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.pumpAndSettle();
+      expect(find.text('营业执照已完成上传绑定'), findsNothing);
       await scrollTo(tester, find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.tap(find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
-      expect(find.text('认证中'), findsWidgets);
+      expect(find.text('已认证'), findsWidgets);
       expect(find.text('有效期'), findsNothing);
       expect(find.text('2026-04-01'), findsNothing);
 
       await tester.pageBack();
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('认证中'), findsWidgets);
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 2000));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('已认证'), findsWidgets);
       await scrollTo(tester, find.text('我的公司'));
       await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('认证状态'));
-      expect(find.text('认证中'), findsWidgets);
+      expect(find.text('功能状态'), findsNothing);
+      expect(find.text('当前公司/组织现状'), findsNothing);
+      expect(find.text('认证资料'), findsNothing);
+      expect(find.text('认证状态'), findsNothing);
+      expect(find.text('已认证'), findsWidgets);
       expect(find.text('2026-04-01'), findsNothing);
     },
   );
@@ -3174,6 +6429,17 @@ void main() {
   testWidgets(
     'certification resubmit keeps controlled failure when current truth does not allow resubmit',
     (WidgetTester tester) async {
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-blocked.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
       await tester.pumpWidget(
         _buildProfileApp(
           transport: FakeAppApiTransport(
@@ -3202,8 +6468,61 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
+                  'POST /api/app/file/upload/init':
+                      (AppApiRequest request) async => AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'uploadSessionId': 'cert-upload-blocked-1',
+                          'directUpload': <String, Object?>{
+                            'url':
+                                'https://oss.example.com/cert-upload-blocked-1',
+                            'method': 'PUT',
+                            'headers': <String, Object?>{
+                              'content-type': 'image/png',
+                            },
+                          },
+                          'confirm': <String, Object?>{
+                            'endpoint': '/api/app/file/upload/confirm',
+                          },
+                        },
+                      ),
+                  'POST /api/app/file/upload/confirm':
+                      (AppApiRequest request) async => AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'fileAssetId': 'file-asset-cert-blocked-1',
+                        },
+                      ),
+                  'POST /api/app/profile/certification/license/ocr':
+                      (AppApiRequest request) async {
+                        expect(request.body, const <String, Object?>{
+                          'organizationId': 'org-approved',
+                          'licenseFileId': 'file-asset-cert-blocked-1',
+                        });
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'status': 'recognized',
+                            'message': '当前已完成营业执照 OCR 识别，认证主体和统一社会信用代码已自动回填。',
+                            'legalName': '上海展建服务有限公司',
+                            'uscc': '91310000123456789A',
+                            'legalPerson': '张三',
+                            'providerRequestId': 'ocr-cert-blocked-1',
+                          },
+                        );
+                      },
                   'POST /api/app/profile/certification/resubmit':
                       (AppApiRequest request) async {
+                        expect(request.body, const <String, Object?>{
+                          'organizationId': 'org-approved',
+                          'legalName': '上海展建服务有限公司',
+                          'uscc': '91310000123456789A',
+                          'licenseFileId': 'file-asset-cert-blocked-1',
+                          'supplementNote': null,
+                        });
                         return AppApiResponse(
                           statusCode: 409,
                           uri: request.uri,
@@ -3213,6 +6532,8 @@ void main() {
                         );
                       },
                 },
+            uploadHandler: (AppApiUploadRequest request) async =>
+                AppApiResponse(statusCode: 200, uri: Uri.parse(request.url)),
           ),
           shellContext: AppShellContextData(
             userId: '13812345678',
@@ -3237,22 +6558,37 @@ void main() {
         find.widgetWithText(TextField, '统一社会信用代码'),
         '91310000123456789A',
       );
-      await tester.enterText(
-        find.widgetWithText(TextField, '营业执照文件 ID'),
-        'file-license-2',
-      );
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.pumpAndSettle();
       await scrollTo(tester, find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.tap(find.widgetWithText(FilledButton, '重新提交认证'));
       await tester.pumpAndSettle();
 
-      expect(find.text('认证提交当前未完成'), findsOneWidget);
+      expect(find.text('认证提交当前未完成'), findsNothing);
       expect(find.text('当前认证状态不允许重新提交，请先返回查看最新认证状态。'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'certification resubmit keeps controlled failure when license file truth is missing',
+    'certification resubmit keeps controlled failure when upload confirm fails',
     (WidgetTester tester) async {
+      ProfileAvatarPicker.install(
+        _FakeProfileAvatarPicker(
+          result: ProfileAvatarPickResult.selected(
+            ProfileAvatarPickedFile(
+              fileName: 'license-confirm-failure.png',
+              mimeType: 'image/png',
+              bytes: _tinyPngBytes,
+            ),
+          ),
+        ),
+      );
       await tester.pumpWidget(
         _buildProfileApp(
           transport: FakeAppApiTransport(
@@ -3281,24 +6617,44 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'POST /api/app/profile/certification/resubmit':
-                      (AppApiRequest request) async {
-                        expect(request.body, <String, Object?>{
-                          'organizationId': 'org-expired',
-                          'legalName': '上海展建服务有限公司',
-                          'uscc': '91310000123456789A',
-                          'licenseFileId': '',
-                          'supplementNote': '已补充说明但缺少执照文件',
-                        });
-                        return AppApiResponse(
-                          statusCode: 409,
-                          uri: request.uri,
-                          body: const <String, Object?>{
-                            'message': '当前缺少营业执照文件，请重新上传后再试。',
+                  'POST /api/app/file/upload/init':
+                      (AppApiRequest request) async => AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'uploadSessionId': 'cert-upload-confirm-failure-1',
+                          'directUpload': <String, Object?>{
+                            'url':
+                                'https://oss.example.com/cert-upload-confirm-failure-1',
+                            'method': 'PUT',
+                            'headers': <String, Object?>{
+                              'content-type': 'image/png',
+                            },
                           },
-                        );
-                      },
+                          'confirm': <String, Object?>{
+                            'endpoint': '/api/app/file/upload/confirm',
+                          },
+                        },
+                      ),
+                  'POST /api/app/file/upload/confirm':
+                      (AppApiRequest request) async => AppApiResponse(
+                        statusCode: 409,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'message': '当前营业执照上传确认失败，请重新上传后再试。',
+                        },
+                      ),
+                  'POST /api/app/profile/certification/resubmit':
+                      (AppApiRequest request) async => AppApiResponse(
+                        statusCode: 409,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'message': '当前不应直接进入重新提交。',
+                        },
+                      ),
                 },
+            uploadHandler: (AppApiUploadRequest request) async =>
+                AppApiResponse(statusCode: 200, uri: Uri.parse(request.url)),
           ),
           shellContext: AppShellContextData(
             userId: '13812345678',
@@ -3325,16 +6681,35 @@ void main() {
       );
       await tester.enterText(
         find.widgetWithText(TextField, '补充说明'),
-        '已补充说明但缺少执照文件',
+        '已补充说明但确认失败',
       );
-      await scrollTo(tester, find.widgetWithText(FilledButton, '重新提交认证'));
-      await tester.tap(find.widgetWithText(FilledButton, '重新提交认证'));
+      await scrollTo(tester, find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '选择营业执照'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('从相册选择'));
+      await tester.pumpAndSettle();
+      await scrollTo(tester, find.widgetWithText(FilledButton, '确认上传营业执照'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认上传营业执照'));
       await tester.pumpAndSettle();
 
-      expect(find.text('认证提交当前未完成'), findsOneWidget);
-      expect(find.text('当前缺少营业执照文件，请重新上传后再试。'), findsOneWidget);
+      expect(find.text('营业执照确认当前未完成'), findsOneWidget);
+      expect(find.text('当前营业执照上传确认失败，请重新上传后再试。'), findsOneWidget);
+      expect(find.text('营业执照文件 ID'), findsNothing);
     },
   );
 }
 
 class _PassthroughHttpOverrides extends HttpOverrides {}
+
+class _FakeProfileAvatarPicker implements ProfileAvatarPicker {
+  _FakeProfileAvatarPicker({required this.result});
+
+  final ProfileAvatarPickResult result;
+
+  @override
+  Future<ProfileAvatarPickResult> pick({
+    required ProfileAvatarPickSource source,
+  }) async {
+    return result;
+  }
+}

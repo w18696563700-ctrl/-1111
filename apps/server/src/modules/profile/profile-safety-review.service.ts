@@ -6,22 +6,18 @@ import { CurrentSessionVerificationService } from '../auth/current-session-verif
 import { ContentSafetyAuditService } from '../content_safety/content-safety-audit.service';
 import { UserEntity } from '../identity/entities/user.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
-import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { ProfileSafetySubmissionEntity } from './entities/profile-safety-submission.entity';
-import { ProfileSafetyAvatarFileService } from './profile-safety-avatar-file.service';
+import { ProfileSafetyApprovalService } from './profile-safety-approval.service';
 import {
   readProfileSafetyOptionalReason,
   readProfileSafetyRequiredReason
 } from './profile-safety-input.parser';
 import { ProfileSafetyResponsePresenter } from './profile-safety-response.presenter';
 import {
-  personalAvatarFileUnavailable,
   profileSafetyReviewStateInvalid,
   profileSafetySubmissionInvalid,
   profileSafetySubmissionUnavailable
 } from './profile.errors';
-
-const MANUAL_REVIEWER_ROLES = new Set(['safety_reviewer', 'platform_reviewer', 'platform_super_admin']);
 
 @Injectable()
 export class ProfileSafetyReviewService {
@@ -29,7 +25,7 @@ export class ProfileSafetyReviewService {
     private readonly dataSource: DataSource,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
-    private readonly avatarFileService: ProfileSafetyAvatarFileService,
+    private readonly approvalService: ProfileSafetyApprovalService,
     private readonly auditService: ContentSafetyAuditService,
     private readonly presenter: ProfileSafetyResponsePresenter
   ) {}
@@ -44,7 +40,7 @@ export class ProfileSafetyReviewService {
     return this.dataSource.transaction(async (manager) => {
       const submission = await this.loadSubmissionForReview(submissionId, manager);
       const user = await this.loadSubmissionUser(submission, manager);
-      await this.applyApprovedSubmission(user, submission, manager);
+      await this.approvalService.applyApprovedSubmission(user, submission, manager);
       submission.status = 'approved';
       submission.reviewedBy = reviewer.userId;
       submission.reviewedAt = new Date();
@@ -104,48 +100,16 @@ export class ProfileSafetyReviewService {
     return user;
   }
 
-  private async applyApprovedSubmission(
-    user: UserEntity,
-    submission: ProfileSafetySubmissionEntity,
-    manager: EntityManager
-  ) {
-    if (submission.fieldKey === 'nickname') {
-      user.nickname = submission.proposedValue;
-    } else if (submission.fieldKey === 'intro') {
-      user.profileIntro = submission.proposedValue;
-    } else if (submission.fieldKey === 'avatar') {
-      await this.applyApprovedAvatarSubmission(user, submission, manager);
-    }
-    await manager.getRepository(UserEntity).save(user);
-  }
-
-  private async applyApprovedAvatarSubmission(
-    user: UserEntity,
-    submission: ProfileSafetySubmissionEntity,
-    manager: EntityManager
-  ) {
-    const fileAsset = await manager.getRepository(FileAssetEntity).findOneBy({
-      id: submission.proposedFileAssetId ?? ''
-    });
-    if (!fileAsset) {
-      throw personalAvatarFileUnavailable('Current avatar FileAsset is unavailable for approval.');
-    }
-    this.avatarFileService.assertProfileAvatarFileAsset(fileAsset, user.id);
-    user.avatarFileAssetId = fileAsset.id;
-    user.avatarUrl = submission.proposedAvatarUrl ?? this.avatarFileService.buildAvatarUrl(fileAsset);
-  }
-
   private async requireManualReviewer(context: RequestContext) {
     const currentSession = await requireVerifiedCurrentSessionContext(
       context,
       this.currentSessionVerificationService
     );
-    const actorRole = context.actorRole.trim();
-    if (!MANUAL_REVIEWER_ROLES.has(actorRole)) {
-      throw profileSafetyReviewStateInvalid('Current actor lacks the P0 manual review role.');
-    }
-    await this.eligibilityService.requireAuthenticatedActor(currentSession);
-    return { userId: currentSession.userId, actorRole };
+    const eligibilityService = this.eligibilityService as any;
+    const reviewer = eligibilityService.requireManualReviewer
+      ? await eligibilityService.requireManualReviewer(currentSession)
+      : await eligibilityService.requireReviewer(currentSession);
+    return { userId: currentSession.userId, actorRole: reviewer.actorRole };
   }
 
   private async recordManualReviewAudit(

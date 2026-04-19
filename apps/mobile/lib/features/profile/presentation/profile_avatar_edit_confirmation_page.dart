@@ -8,18 +8,35 @@ import 'package:mobile/features/profile/presentation/profile_avatar_picker.dart'
 Future<ProfileAvatarPickedFile?> openProfileAvatarEditConfirmationPage(
   BuildContext context, {
   required ProfileAvatarPickedFile file,
+  String title = '调整头像',
+  String imageLabel = '图片',
+  String defaultStem = 'avatar',
 }) {
   return Navigator.of(context).push<ProfileAvatarPickedFile?>(
     MaterialPageRoute<ProfileAvatarPickedFile?>(
-      builder: (_) => ProfileAvatarEditConfirmationPage(file: file),
+      builder: (_) => ProfileAvatarEditConfirmationPage(
+        file: file,
+        title: title,
+        imageLabel: imageLabel,
+        defaultStem: defaultStem,
+      ),
     ),
   );
 }
 
 class ProfileAvatarEditConfirmationPage extends StatefulWidget {
-  const ProfileAvatarEditConfirmationPage({required this.file, super.key});
+  const ProfileAvatarEditConfirmationPage({
+    required this.file,
+    this.title = '调整头像',
+    this.imageLabel = '图片',
+    this.defaultStem = 'avatar',
+    super.key,
+  });
 
   final ProfileAvatarPickedFile file;
+  final String title;
+  final String imageLabel;
+  final String defaultStem;
 
   @override
   State<ProfileAvatarEditConfirmationPage> createState() =>
@@ -53,7 +70,7 @@ class _ProfileAvatarEditConfirmationPageState
       appBar: AppBar(
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
-        title: const Text('调整头像'),
+        title: Text(widget.title),
         actions: <Widget>[
           TextButton(
             onPressed: _cropping ? null : _finish,
@@ -122,6 +139,16 @@ class _ProfileAvatarEditConfirmationPageState
                     label: const Text('旋转'),
                   ),
                   TextButton.icon(
+                    onPressed: _cropping ? null : _flipHorizontal,
+                    icon: const Icon(Icons.flip),
+                    label: const Text('左右翻转'),
+                  ),
+                  TextButton.icon(
+                    onPressed: _cropping ? null : _flipVertical,
+                    icon: const Icon(Icons.flip_camera_android_outlined),
+                    label: const Text('上下翻转'),
+                  ),
+                  TextButton.icon(
                     onPressed: _cropping || !_modified ? null : _restore,
                     icon: const Icon(Icons.restore),
                     label: const Text('还原'),
@@ -157,7 +184,7 @@ class _ProfileAvatarEditConfirmationPageState
   void _rotateRight() {
     final decoded = image_lib.decodeImage(_imageBytes);
     if (decoded == null) {
-      setState(() => _errorMessage = '当前图片无法旋转，请重新选择头像图片。');
+      setState(() => _errorMessage = '当前${widget.imageLabel}无法旋转，请重新选择后再试。');
       return;
     }
 
@@ -165,6 +192,44 @@ class _ProfileAvatarEditConfirmationPageState
       _cropController = CropController();
       _imageBytes = Uint8List.fromList(
         image_lib.encodePng(image_lib.copyRotate(decoded, angle: 90)),
+      );
+      _editorReady = false;
+      _modified = true;
+      _errorMessage = null;
+      _editorVersion += 1;
+    });
+  }
+
+  void _flipHorizontal() {
+    final decoded = image_lib.decodeImage(_imageBytes);
+    if (decoded == null) {
+      setState(() => _errorMessage = '当前${widget.imageLabel}无法翻转，请重新选择后再试。');
+      return;
+    }
+
+    setState(() {
+      _cropController = CropController();
+      _imageBytes = Uint8List.fromList(
+        image_lib.encodePng(image_lib.flipHorizontal(decoded)),
+      );
+      _editorReady = false;
+      _modified = true;
+      _errorMessage = null;
+      _editorVersion += 1;
+    });
+  }
+
+  void _flipVertical() {
+    final decoded = image_lib.decodeImage(_imageBytes);
+    if (decoded == null) {
+      setState(() => _errorMessage = '当前${widget.imageLabel}无法翻转，请重新选择后再试。');
+      return;
+    }
+
+    setState(() {
+      _cropController = CropController();
+      _imageBytes = Uint8List.fromList(
+        image_lib.encodePng(image_lib.flipVertical(decoded)),
       );
       _editorReady = false;
       _modified = true;
@@ -190,7 +255,7 @@ class _ProfileAvatarEditConfirmationPageState
       setState(() {
         _cropping = true;
         _finishPending = true;
-        _errorMessage = '当前图片正在准备中，准备完成后会继续裁切。';
+        _errorMessage = '当前${widget.imageLabel}正在准备中，准备完成后会继续裁切。';
       });
       return;
     }
@@ -234,7 +299,7 @@ class _ProfileAvatarEditConfirmationPageState
         }
         setState(() {
           _cropping = false;
-          _errorMessage = '当前头像裁切失败，请调整裁切区域后重试。';
+          _errorMessage = '当前${widget.imageLabel}裁切失败，请调整裁切区域后重试。';
         });
     }
   }
@@ -243,8 +308,8 @@ class _ProfileAvatarEditConfirmationPageState
     final extension = _mimeTypeFor(bytes) == 'image/jpeg' ? 'jpg' : 'png';
     final baseName = widget.file.fileName.trim();
     final dotIndex = baseName.lastIndexOf('.');
-    final stem = dotIndex > 0 ? baseName.substring(0, dotIndex) : 'avatar';
-    final normalizedStem = stem.trim().isEmpty ? 'avatar' : stem.trim();
+    final stem = dotIndex > 0 ? baseName.substring(0, dotIndex) : widget.defaultStem;
+    final normalizedStem = stem.trim().isEmpty ? widget.defaultStem : stem.trim();
     return '${normalizedStem}_edited.$extension';
   }
 

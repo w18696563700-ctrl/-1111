@@ -6,6 +6,7 @@ import { requireVerifiedCurrentSessionContext } from '../../shared/current-sessi
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
+import { SessionEntity } from '../identity/entities/session.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { CurrentActorEligibilityService } from './current-actor-eligibility.service';
 import { OrganizationCertificationEntity } from './entities/organization-certification.entity';
@@ -13,20 +14,20 @@ import { OrganizationInvitationEntity } from './entities/organization-invitation
 import { OrganizationMemberEntity } from './entities/organization-member.entity';
 import { OrganizationEntity } from './entities/organization.entity';
 import {
+  APP_ORGANIZATION_ROLE_KEYS,
+  isAppFacingOrganizationType
+} from './organization-scope.constants';
+import {
   orgCreateInvalid,
   orgJoinDuplicate,
   orgJoinInvalid,
-  orgSwitchInvalid
+  orgSwitchInvalid,
+  orgUpdateInvalid
 } from './organization-auth.errors';
 import { OrganizationWritePresenter } from './organization-write.presenter';
 
 const ORGANIZATION_TYPES = new Set(['demand', 'supplier', 'both']);
-const APP_ORGANIZATION_ROLE_KEYS = new Set([
-  'buyer_admin',
-  'buyer_member(scoped)',
-  'supplier_admin',
-  'supplier_member(scoped)'
-]);
+const INVALID_AREA_CODE_PLACEHOLDERS = new Set(['000000']);
 
 type OrganizationCreateCommand = {
   name: string;
@@ -46,6 +47,15 @@ type OrganizationJoinByCodeCommand = {
 
 type OrganizationSwitchCommand = {
   organizationId: string;
+};
+
+type OrganizationUpdateCurrentCommand = {
+  name: string;
+  provinceCode: string;
+  cityCode: string;
+  contactName: string;
+  contactMobile: string;
+  intro: string | null;
 };
 
 @Injectable()
@@ -107,6 +117,10 @@ export class OrganizationWriteService {
         disabledAt: null
       });
       await manager.getRepository(OrganizationMemberEntity).save(membership);
+      await manager.getRepository(SessionEntity).update(
+        { id: currentSession.sessionId },
+        { organizationId: organization.id }
+      );
 
       await this.appendAudit(manager, {
         objectType: 'organization',
@@ -235,26 +249,43 @@ export class OrganizationWriteService {
     if (!membership) {
       throw orgSwitchInvalid('Current actor cannot switch to the requested organization.');
     }
+    if (
+      !APP_ORGANIZATION_ROLE_KEYS.has(membership.roleKey) ||
+      !isAppFacingOrganizationType(organization.organizationType)
+    ) {
+      throw orgSwitchInvalid('Current actor cannot switch to the requested organization.');
+    }
     const certification = await this.organizationCertificationRepository.findOne({
       where: { organizationId: organization.id },
       order: { updatedAt: 'DESC' }
     });
 
-    if (this.readOptionalId(currentSession.organizationId) !== organization.id) {
-      await this.dataSource.transaction(async (manager) => {
-        await this.appendAudit(manager, {
-          objectType: 'organization_scope',
-          objectId: organization.id,
-          objectNo: organization.name,
-          action: 'OrganizationSwitched',
-          actorId: user.id,
-          actorRole: membership.roleKey,
-          beforeState: this.readOptionalId(currentSession.organizationId) ?? 'null',
-          afterState: organization.id,
-          reason: `membershipId=${membership.id}`
-        }, context);
-      });
-    }
+    const beforeState = this.readOptionalId(currentSession.organizationId) ?? 'null';
+    const shouldWriteAudit = beforeState !== organization.id;
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(SessionEntity).update(
+        { id: currentSession.sessionId },
+        { organizationId: organization.id }
+      );
+      if (shouldWriteAudit) {
+        await this.appendAudit(
+          manager,
+          {
+            objectType: 'organization_scope',
+            objectId: organization.id,
+            objectNo: organization.name,
+            action: 'OrganizationSwitched',
+            actorId: user.id,
+            actorRole: membership.roleKey,
+            beforeState,
+            afterState: organization.id,
+            reason: `membershipId=${membership.id}`
+          },
+          context
+        );
+      }
+    });
 
     return this.presenter.toSwitchedShellContext({
       userId: user.id,
@@ -262,6 +293,59 @@ export class OrganizationWriteService {
       roleKeys: [membership.roleKey],
       certificationStatus: certification?.certificationStatus ?? 'not_submitted',
       membershipStatus: membership.memberStatus
+    });
+  }
+
+  async updateCurrent(payload: Record<string, unknown>, context: RequestContext) {
+    const command = this.toUpdateCurrentCommand(payload);
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    const currentOrganizationId = this.readOptionalId(currentSession.organizationId);
+    if (!currentOrganizationId) {
+      throw orgUpdateInvalid('Current organization scope is required for organization update.');
+    }
+    const user = await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.requireOrganizationAdmin(
+      currentSession,
+      currentOrganizationId
+    );
+
+    return this.dataSource.transaction(async (manager) => {
+      const organizationRepository = manager.getRepository(OrganizationEntity);
+      const organization = await organizationRepository.findOneBy({
+        id: scope.organization.id
+      });
+      if (!organization) {
+        throw orgUpdateInvalid('Current organization update target is unavailable.');
+      }
+
+      organization.name = command.name;
+      organization.provinceCode = command.provinceCode;
+      organization.cityCode = command.cityCode;
+      organization.contactName = command.contactName;
+      organization.contactMobile = command.contactMobile;
+      organization.intro = command.intro;
+      await organizationRepository.save(organization);
+
+      await this.appendAudit(
+        manager,
+        {
+          objectType: 'organization',
+          objectId: organization.id,
+          objectNo: organization.name,
+          action: 'OrganizationUpdated',
+          actorId: user.id,
+          actorRole: scope.membership.roleKey,
+          beforeState: organization.status,
+          afterState: organization.status,
+          reason: 'fields=name,provinceCode,cityCode,contactName,contactMobile,intro'
+        },
+        context
+      );
+
+      return this.presenter.toActionAck(context.traceId);
     });
   }
 
@@ -281,7 +365,11 @@ export class OrganizationWriteService {
       objectType: string;
       objectId: string;
       objectNo: string;
-      action: 'OrganizationCreated' | 'OrganizationJoinRequested' | 'OrganizationSwitched';
+      action:
+        | 'OrganizationCreated'
+        | 'OrganizationJoinRequested'
+        | 'OrganizationSwitched'
+        | 'OrganizationUpdated';
       actorId: string;
       actorRole: string;
       beforeState: string;
@@ -322,13 +410,13 @@ export class OrganizationWriteService {
     return {
       name: this.readRequiredString(source.name, 'name', orgCreateInvalid, 256),
       organizationType,
-      provinceCode: this.readRequiredString(
+      provinceCode: this.readRequiredAreaCode(
         source.provinceCode,
         'provinceCode',
         orgCreateInvalid,
         32
       ),
-      cityCode: this.readRequiredString(source.cityCode, 'cityCode', orgCreateInvalid, 32),
+      cityCode: this.readRequiredAreaCode(source.cityCode, 'cityCode', orgCreateInvalid, 32),
       contactName: this.readRequiredString(
         source.contactName,
         'contactName',
@@ -349,6 +437,37 @@ export class OrganizationWriteService {
       ),
       intro: this.readOptionalString(source.intro, orgCreateInvalid)
     } satisfies OrganizationCreateCommand;
+  }
+
+  private toUpdateCurrentCommand(payload: Record<string, unknown>) {
+    const source = this.asRecord(
+      payload,
+      orgUpdateInvalid,
+      'Organization update body must be an object.'
+    );
+    return {
+      name: this.readRequiredString(source.name, 'name', orgUpdateInvalid, 256),
+      provinceCode: this.readRequiredAreaCode(
+        source.provinceCode,
+        'provinceCode',
+        orgUpdateInvalid,
+        32
+      ),
+      cityCode: this.readRequiredAreaCode(source.cityCode, 'cityCode', orgUpdateInvalid, 32),
+      contactName: this.readRequiredString(
+        source.contactName,
+        'contactName',
+        orgUpdateInvalid,
+        128
+      ),
+      contactMobile: this.readRequiredString(
+        source.contactMobile,
+        'contactMobile',
+        orgUpdateInvalid,
+        32
+      ),
+      intro: this.readOptionalString(source.intro, orgUpdateInvalid)
+    } satisfies OrganizationUpdateCurrentCommand;
   }
 
   private toJoinByCodeCommand(payload: Record<string, unknown>) {
@@ -389,6 +508,21 @@ export class OrganizationWriteService {
     }
     if (maxLength && normalized.length > maxLength) {
       throw errorFactory(`Field \`${field}\` exceeds the current maximum length.`);
+    }
+    return normalized;
+  }
+
+  private readRequiredAreaCode(
+    value: unknown,
+    field: string,
+    errorFactory: (message: string) => Error,
+    maxLength?: number
+  ) {
+    const normalized = this.readRequiredString(value, field, errorFactory, maxLength);
+    if (INVALID_AREA_CODE_PLACEHOLDERS.has(normalized)) {
+      throw errorFactory(
+        `Field \`${field}\` must carry a real administrative area code, placeholder values are not allowed.`
+      );
     }
     return normalized;
   }

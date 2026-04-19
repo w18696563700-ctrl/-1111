@@ -108,6 +108,13 @@ class MessagesConsumerLayer {
         path: MessagesCanonicalPaths.messageIndex,
         message: 'http error while loading instance_todo items',
       );
+    } on StateError {
+      return const MessagesIndexResult(
+        state: AppPageState.empty,
+        method: 'GET',
+        path: MessagesCanonicalPaths.messageIndex,
+        message: 'current fake transport did not provide message index',
+      );
     } on FormatException {
       return const MessagesIndexResult(
         state: AppPageState.errorNonRetryable,

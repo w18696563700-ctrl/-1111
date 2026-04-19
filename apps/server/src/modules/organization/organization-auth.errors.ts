@@ -13,10 +13,14 @@ export function authSessionInvalid(message: string) {
   });
 }
 
-export function authPermissionInsufficient(message: string) {
+export function authPermissionInsufficient(
+  message: string,
+  details?: Record<string, unknown>
+) {
   return new ForbiddenException({
     code: 'AUTH_PERMISSION_INSUFFICIENT',
-    message
+    message,
+    ...(details ? { details } : {})
   });
 }
 
@@ -37,6 +41,13 @@ export function certificationDuplicateSubmit(message: string) {
 export function orgCreateInvalid(message: string) {
   return new BadRequestException({
     code: 'ORG_CREATE_INVALID',
+    message
+  });
+}
+
+export function orgUpdateInvalid(message: string) {
+  return new BadRequestException({
+    code: 'ORG_UPDATE_INVALID',
     message
   });
 }

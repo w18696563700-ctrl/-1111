@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/protected_app_request.dart';
 
 final class ProfileCanonicalPaths {
   const ProfileCanonicalPaths._();
@@ -22,9 +23,17 @@ class ProfileOrganizationView {
 }
 
 class ProfileCertificationView {
-  const ProfileCertificationView({required this.status});
+  const ProfileCertificationView({
+    required this.status,
+    this.personalStatus,
+    this.personalQualified,
+    this.personalLockedToOtherActor,
+  });
 
   final String? status;
+  final String? personalStatus;
+  final bool? personalQualified;
+  final bool? personalLockedToOtherActor;
 }
 
 class ProfileMembershipView {
@@ -99,7 +108,9 @@ class ProfileConsumerLayer {
 
   Future<ProfileIndexResult> loadIndex() async {
     try {
-      final response = await _client.get(ProfileCanonicalPaths.profileIndex);
+      final response = await runProtectedAppRequest(
+        () => _client.get(ProfileCanonicalPaths.profileIndex),
+      );
       return _mapResponse(response);
     } on SocketException {
       return const ProfileIndexResult(
@@ -272,7 +283,18 @@ Object _parseCertification(Object? raw) {
     return 'profile certification is missing required field "status"';
   }
 
-  return ProfileCertificationView(status: _readNullableString(body['status']));
+  return ProfileCertificationView(
+    status: _readNullableString(body['status']),
+    personalStatus: _readNullableString(body['personalStatus']),
+    personalQualified:
+        body['personalQualified'] is bool
+            ? body['personalQualified'] as bool
+            : null,
+    personalLockedToOtherActor:
+        body['personalLockedToOtherActor'] is bool
+            ? body['personalLockedToOtherActor'] as bool
+            : null,
+  );
 }
 
 Object _parseMembership(Object? raw) {

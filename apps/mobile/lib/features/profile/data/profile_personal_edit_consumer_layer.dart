@@ -18,8 +18,9 @@ final class ProfilePersonalEditCanonicalPaths {
   static const String avatar = '/api/app/profile/personal/avatar';
   static const String bio = '/api/app/profile/personal/bio';
   static const String safetyStatus = '/api/app/profile/personal/safety';
-  static const String uploadInit = '/api/app/file/upload/init';
-  static const String uploadConfirm = '/api/app/file/upload/confirm';
+  static const String uploadInit = ProfileFileUploadCanonicalPaths.uploadInit;
+  static const String uploadConfirm =
+      ProfileFileUploadCanonicalPaths.uploadConfirm;
 }
 
 class ProfilePersonalEditConsumerLayer {
@@ -241,6 +242,13 @@ class ProfilePersonalEditConsumerLayer {
     required ProfilePersonalAvatarUploadDirective directive,
     required List<int> bodyBytes,
   }) async {
+    return directFileUpload(directive: directive, bodyBytes: bodyBytes);
+  }
+
+  Future<ProfileFileUploadResult> directFileUpload({
+    required ProfileFileUploadDirective directive,
+    required List<int> bodyBytes,
+  }) async {
     try {
       final response = await _client.upload(
         method: directive.directUploadMethod,
@@ -249,7 +257,7 @@ class ProfilePersonalEditConsumerLayer {
         bodyBytes: bodyBytes,
       );
       if (ProfilePersonalEditParser.isSuccessful(response.statusCode)) {
-        return const ProfilePersonalAvatarUploadResult(
+        return const ProfileFileUploadResult(
           state: AppUploadState.uploadConfirming,
           controlledState: AppPageState.content,
         );
@@ -264,13 +272,13 @@ class ProfilePersonalEditConsumerLayer {
         fallbackMessage: '当前头像图片上传失败，请稍后再试。',
       );
     } on SocketException {
-      return const ProfilePersonalAvatarUploadResult(
+      return const ProfileFileUploadResult(
         state: AppUploadState.uploadFailedRetryable,
         controlledState: AppPageState.errorRetryable,
         message: '当前头像图片上传网络异常，请检查后重试。',
       );
     } on HttpException {
-      return const ProfilePersonalAvatarUploadResult(
+      return const ProfileFileUploadResult(
         state: AppUploadState.uploadFailedRetryable,
         controlledState: AppPageState.errorRetryable,
         message: '当前头像图片上传请求失败，请稍后再试。',
@@ -281,10 +289,16 @@ class ProfilePersonalEditConsumerLayer {
   Future<ProfilePersonalAvatarUploadResult> confirmAvatarUpload({
     required ProfilePersonalAvatarUploadDirective directive,
   }) async {
+    return confirmFileUpload(directive: directive);
+  }
+
+  Future<ProfileFileUploadResult> confirmFileUpload({
+    required ProfileFileUploadDirective directive,
+  }) async {
     try {
       final response = await runProtectedAppRequest(
         () => _client.post(
-          ProfilePersonalEditCanonicalPaths.uploadConfirm,
+          ProfileFileUploadCanonicalPaths.uploadConfirm,
           body: <String, Object?>{'uploadSessionId': directive.uploadSessionId},
         ),
       );
@@ -303,32 +317,32 @@ class ProfilePersonalEditConsumerLayer {
         response.body,
       );
       if (fileAssetId == null) {
-        return const ProfilePersonalAvatarUploadResult(
+        return const ProfileFileUploadResult(
           state: AppUploadState.uploadConfirmFailed,
           controlledState: AppPageState.errorNonRetryable,
           message: '头像上传确认响应缺少 fileAssetId，页面保持受控失败。',
         );
       }
 
-      return ProfilePersonalAvatarUploadResult(
+      return ProfileFileUploadResult(
         state: AppUploadState.uploadBound,
         controlledState: AppPageState.content,
         fileAssetId: fileAssetId,
       );
     } on SocketException {
-      return const ProfilePersonalAvatarUploadResult(
+      return const ProfileFileUploadResult(
         state: AppUploadState.uploadConfirmFailed,
         controlledState: AppPageState.errorRetryable,
         message: '当前头像上传确认网络异常，请检查后重试。',
       );
     } on HttpException {
-      return const ProfilePersonalAvatarUploadResult(
+      return const ProfileFileUploadResult(
         state: AppUploadState.uploadConfirmFailed,
         controlledState: AppPageState.errorRetryable,
         message: '当前头像上传确认请求失败，请稍后再试。',
       );
     } on FormatException {
-      return const ProfilePersonalAvatarUploadResult(
+      return const ProfileFileUploadResult(
         state: AppUploadState.uploadConfirmFailed,
         controlledState: AppPageState.errorNonRetryable,
         message: '当前头像上传确认响应解析失败，页面保持受控失败。',

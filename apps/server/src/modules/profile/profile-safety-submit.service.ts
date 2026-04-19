@@ -8,14 +8,15 @@ import { ContentSafetyProfileField } from '../content_safety/content-safety.cons
 import { ContentSafetyAuditService } from '../content_safety/content-safety-audit.service';
 import { ContentSafetySnapshotService } from '../content_safety/content-safety-snapshot.service';
 import { profileSafetyRuleBlocked } from '../content_safety/content-safety.errors';
-import {
-  ContentSafetyRuleEngine,
-  ContentSafetyRuleResult
-} from '../content_safety/content-safety-rule.engine';
 import { UserEntity } from '../identity/entities/user.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { ProfileSafetySubmissionEntity } from './entities/profile-safety-submission.entity';
+import { ProfileSafetyApprovalService } from './profile-safety-approval.service';
+import {
+  ProfileSafetyAutoDecision,
+  ProfileSafetyAutoDecisionService
+} from './profile-safety-auto-decision.service';
 import { ProfileSafetyAvatarFileService } from './profile-safety-avatar-file.service';
 import {
   readProfileSafetyFileAssetId,
@@ -52,7 +53,7 @@ type ProfileValueInput =
 
 type SubmitResult =
   | {
-      outcome: 'pending';
+      outcome: 'submitted';
       submission: ProfileSafetySubmissionEntity;
       user: UserEntity;
     }
@@ -70,8 +71,9 @@ export class ProfileSafetySubmitService {
     private readonly dataSource: DataSource,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly approvalService: ProfileSafetyApprovalService,
+    private readonly autoDecisionService: ProfileSafetyAutoDecisionService,
     private readonly avatarFileService: ProfileSafetyAvatarFileService,
-    private readonly ruleEngine: ContentSafetyRuleEngine,
     private readonly auditService: ContentSafetyAuditService,
     private readonly snapshotService: ContentSafetySnapshotService,
     private readonly presenter: ProfileSafetyResponsePresenter
@@ -148,7 +150,16 @@ export class ProfileSafetySubmitService {
     user: UserEntity,
     context: RequestContext
   ): Promise<SubmitResult> {
-    const ruleResult = await this.evaluateRules(input);
+    const moderation = await this.autoDecisionService.decide({
+      fieldKey: input.fieldKey,
+      proposedValue: input.proposedValue,
+      fileAsset: input.fileAsset
+        ? {
+            id: input.fileAsset.id,
+            objectKey: input.fileAsset.objectKey
+          }
+        : null
+    });
     return this.dataSource.transaction(async (manager) => {
       const resubmittedFromId = await this.markLatestRejectedAsResubmitted(
         user.id,
@@ -156,14 +167,19 @@ export class ProfileSafetySubmitService {
         context,
         manager
       );
-      const submission = await this.createSubmission(input, user, ruleResult, resubmittedFromId, manager);
+      const submission = await this.createSubmission(input, user, moderation, resubmittedFromId, manager);
       await this.captureSubmissionSnapshot(input, user, submission, manager);
       await this.recordSubmitAudit(input.fieldKey, user.id, submission, resubmittedFromId, context, manager);
-      await this.recordRuleAudit(input.fieldKey, user.id, submission, ruleResult, context, manager);
-      if (ruleResult.decision === 'block') {
-        return this.toBlockedSubmitResult(submission, ruleResult);
+      await this.recordModerationAudit(input.fieldKey, user.id, submission, moderation, context, manager);
+      if (submission.status === 'approved') {
+        await this.approvalService.applyApprovedSubmission(user, submission, manager);
+        await this.recordAutomaticReviewAudit(submission, user.id, context, manager);
+        await this.recordReplacementAudit(submission, user.id, context, manager);
       }
-      return { outcome: 'pending' as const, submission, user };
+      if (submission.status === 'rejected') {
+        return this.toBlockedSubmitResult(submission, moderation);
+      }
+      return { outcome: 'submitted' as const, submission, user };
     });
   }
 
@@ -180,26 +196,10 @@ export class ProfileSafetySubmitService {
     return this.presenter.toSubmitResponse(result.submission, result.user, context);
   }
 
-  private async evaluateRules(input: ProfileValueInput): Promise<ContentSafetyRuleResult> {
-    if (input.fieldKey === 'avatar') {
-      return {
-        decision: 'allow',
-        engineType: 'rule',
-        matchedRules: [],
-        reasonCode: null,
-        reasonText: null
-      };
-    }
-    return this.ruleEngine.evaluateProfileText({
-      fieldKey: input.fieldKey,
-      content: input.proposedValue
-    });
-  }
-
   private async createSubmission(
     input: ProfileValueInput,
     user: UserEntity,
-    ruleResult: ContentSafetyRuleResult,
+    moderation: ProfileSafetyAutoDecision,
     resubmittedFromId: string | null,
     manager: EntityManager
   ) {
@@ -208,21 +208,21 @@ export class ProfileSafetySubmitService {
       id: randomUUID(),
       userId: user.id,
       fieldKey: input.fieldKey,
-      status: ruleResult.decision === 'block' ? 'rejected' : 'pending_review',
+      status: moderation.status,
       currentValue: input.currentValue,
       proposedValue: input.proposedValue,
       proposedFileAssetId: input.fileAsset?.id ?? null,
       proposedAvatarUrl: input.proposedAvatarUrl,
-      engineType: 'rule',
-      ruleDecision: ruleResult.decision,
-      matchedRuleIds: ruleResult.matchedRules.map((rule) => rule.id),
-      rejectReasonCode: ruleResult.reasonCode,
-      rejectReason: ruleResult.reasonText,
+      engineType: moderation.engineType,
+      ruleDecision: moderation.decision,
+      matchedRuleIds: moderation.matchedRules.map((rule) => rule.id),
+      rejectReasonCode: moderation.reasonCode,
+      rejectReason: moderation.reasonText,
       submittedBy: user.id,
       reviewedBy: null,
-      reviewedAt: ruleResult.decision === 'block' ? new Date() : null,
+      reviewedAt: moderation.status === 'pending_review' ? null : new Date(),
       resubmittedFromId,
-      metadata: input.metadata ?? {}
+      metadata: { ...(input.metadata ?? {}), ...moderation.metadata }
     });
     return repository.save(submission);
   }
@@ -304,11 +304,11 @@ export class ProfileSafetySubmitService {
     );
   }
 
-  private async recordRuleAudit(
+  private async recordModerationAudit(
     fieldKey: ContentSafetyProfileField,
     userId: string,
     submission: ProfileSafetySubmissionEntity,
-    ruleResult: ContentSafetyRuleResult,
+    moderation: ProfileSafetyAutoDecision,
     context: RequestContext,
     manager: EntityManager
   ) {
@@ -318,16 +318,61 @@ export class ProfileSafetySubmitService {
         subjectId: submission.id,
         userId,
         actorId: userId,
-        action: 'rule_result',
-        engineType: 'rule',
-        decision: ruleResult.decision,
-        reasonCode: ruleResult.reasonCode,
-        reason: ruleResult.reasonText,
-        matchedRuleIds: ruleResult.matchedRules.map((rule) => rule.id),
+        action: moderation.engineType === 'ocr' ? 'ocr_result' : 'rule_result',
+        engineType: moderation.engineType,
+        decision: moderation.decision,
+        reasonCode: moderation.reasonCode,
+        reason: moderation.reasonText,
+        matchedRuleIds: moderation.matchedRules.map((rule) => rule.id),
         metadata: {
           fieldKey,
-          ruleKeys: ruleResult.matchedRules.map((rule) => rule.ruleKey)
+          ruleKeys: moderation.matchedRules.map((rule) => rule.ruleKey),
+          ...moderation.metadata
         }
+      },
+      context,
+      manager
+    );
+  }
+
+  private async recordAutomaticReviewAudit(
+    submission: ProfileSafetySubmissionEntity,
+    userId: string,
+    context: RequestContext,
+    manager: EntityManager
+  ) {
+    await this.auditService.record(
+      {
+        subjectType: 'profile_safety_submission',
+        subjectId: submission.id,
+        userId,
+        actorId: userId,
+        action: 'automatic_review_result',
+        engineType: submission.engineType as ProfileSafetyAutoDecision['engineType'],
+        decision: submission.status,
+        metadata: { fieldKey: submission.fieldKey }
+      },
+      context,
+      manager
+    );
+  }
+
+  private async recordReplacementAudit(
+    submission: ProfileSafetySubmissionEntity,
+    userId: string,
+    context: RequestContext,
+    manager: EntityManager
+  ) {
+    await this.auditService.record(
+      {
+        subjectType: 'profile_safety_submission',
+        subjectId: submission.id,
+        userId,
+        actorId: userId,
+        action: 'replacement_action',
+        engineType: submission.engineType as ProfileSafetyAutoDecision['engineType'],
+        decision: 'approved',
+        metadata: { fieldKey: submission.fieldKey }
       },
       context,
       manager
@@ -336,14 +381,14 @@ export class ProfileSafetySubmitService {
 
   private toBlockedSubmitResult(
     submission: ProfileSafetySubmissionEntity,
-    ruleResult: ContentSafetyRuleResult
+    moderation: ProfileSafetyAutoDecision
   ): SubmitResult {
     return {
       outcome: 'blocked',
       submission,
-      reason: ruleResult.reasonText ?? 'Profile safety rule blocked the submission.',
-      reasonCode: ruleResult.reasonCode,
-      matchedRuleIds: ruleResult.matchedRules.map((rule) => rule.id)
+      reason: moderation.reasonText ?? 'Profile safety rule blocked the submission.',
+      reasonCode: moderation.reasonCode,
+      matchedRuleIds: moderation.matchedRules.map((rule) => rule.id)
     };
   }
 }

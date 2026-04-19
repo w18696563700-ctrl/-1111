@@ -164,6 +164,107 @@ class _MessagesInteractionCard extends StatelessWidget {
   }
 }
 
+class _MessagesRoundAReminderSection extends StatelessWidget {
+  const _MessagesRoundAReminderSection({
+    required this.loading,
+    required this.items,
+    required this.onOpen,
+  });
+
+  final bool loading;
+  final List<MessagesTodoItem> items;
+  final ValueChanged<MessagesTodoItem> onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '项目协作提醒',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (loading) ...<Widget>[
+              const SizedBox(height: 12),
+              const LinearProgressIndicator(minHeight: 6),
+            ] else
+              ...items.map(
+                (MessagesTodoItem item) => Padding(
+                  padding: const EdgeInsets.only(top: 12),
+                  child: _MessagesRoundAReminderCard(
+                    item: item,
+                    onOpen: () => onOpen(item),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessagesRoundAReminderCard extends StatelessWidget {
+  const _MessagesRoundAReminderCard({required this.item, required this.onOpen});
+
+  final MessagesTodoItem item;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _MessagesMetaPill(label: _todoActionLabel(item.actionKey)),
+                _MessagesMetaPill(label: item.state),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              item.title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(item.summary, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 12),
+            FilledButton.tonalIcon(
+              onPressed: onOpen,
+              icon: const Icon(Icons.open_in_new_rounded),
+              label: const Text('回到对象'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MessagesTabHintCard extends StatelessWidget {
   const _MessagesTabHintCard({required this.currentTab});
 
@@ -338,8 +439,7 @@ String _targetTypeLabel(String targetType) {
 
 String _tabHint(_MessagesInteractionTab tab) {
   return switch (tab) {
-    _MessagesInteractionTab.replies =>
-      '这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。',
+    _MessagesInteractionTab.replies => '这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。',
     _MessagesInteractionTab.likes => '这里只显示别人给你的帖子或评论点的赞。',
     _MessagesInteractionTab.follows => '这里只显示已经进入消息楼的新关注提醒。',
   };
@@ -355,4 +455,12 @@ String _notFoundHint(_MessagesInteractionTab tab) {
 
 String _sourceActionLabel(String targetType) {
   return targetType == 'forum_comment' ? '查看说明' : '回到源对象';
+}
+
+String _todoActionLabel(String actionKey) {
+  return switch (actionKey) {
+    'project_clarification.open' => '项目澄清',
+    'bid_thread.open' => '沟通与投标',
+    _ => actionKey,
+  };
 }

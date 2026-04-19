@@ -2,13 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
+import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/enterprise_hub_published_change_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/enterprise_hub_workbench_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_private_operating_system_projection.dart';
-import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/features/profile/presentation/profile_detail_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_member_management_sheet.dart';
@@ -19,6 +21,8 @@ import 'package:mobile/shell/context/app_shell_scope.dart';
 
 part 'profile_page_sections.dart';
 part 'profile_page_support.dart';
+
+const bool _profileHomeStatusVisible = false;
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -106,6 +110,65 @@ class _ProfilePageState extends State<ProfilePage> {
     await _load();
   }
 
+  Future<void> _openDisplayEntry(EnterpriseBoardType boardType) async {
+    final routeName = await _resolveDisplayEntryRoute(boardType);
+    if (!mounted) {
+      return;
+    }
+    await _openRouteAndReload(routeName);
+  }
+
+  Future<String> _resolveDisplayEntryRoute(
+    EnterpriseBoardType boardType,
+  ) async {
+    final fallbackRoute = ExhibitionRoutes.enterpriseWorkbenchForBoard(
+      boardType.contractName,
+    );
+    try {
+      final workbenchResult = await EnterpriseHubWorkbenchConsumerLayer.instance
+          .loadWorkbench(boardType: boardType);
+      final workbenchData = workbenchResult.data;
+      final enterpriseId = workbenchData?.enterpriseId?.trim();
+      if (enterpriseId == null || enterpriseId.isEmpty) {
+        return fallbackRoute;
+      }
+      if (!_shouldPreferPublishedChangeEntry(
+        workbenchData?.latestApplication?.applicationStatus,
+      )) {
+        return fallbackRoute;
+      }
+      final statusResult = await EnterpriseHubPublishedChangeConsumerLayer
+          .instance
+          .loadCurrentChangeStatus(
+            boardType: boardType,
+            enterpriseId: enterpriseId,
+          );
+      if (statusResult.state != AppPageState.content ||
+          statusResult.data == null) {
+        return fallbackRoute;
+      }
+      return ExhibitionRoutes.enterprisePublishedChangeWorkbenchWithEnterpriseId(
+        enterpriseId,
+        boardType: boardType.contractName,
+      );
+    } catch (_) {
+      return fallbackRoute;
+    }
+  }
+
+  bool _shouldPreferPublishedChangeEntry(String? applicationStatus) {
+    switch (applicationStatus?.trim()) {
+      case 'submitted':
+      case 'under_review':
+      case 'approved':
+      case 'revision_required':
+      case 'rejected':
+        return true;
+      default:
+        return false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final shellContext = AppShellScope.of(context).snapshot.shellContext;
@@ -143,13 +206,16 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () =>
                 Navigator.of(context).pushNamed(ProfileRoutes.personal),
           ),
-          const SizedBox(height: 12),
-          _ProfileStatusStrip(
-            title: privateOperatingSystemSurface.stripTitle,
-            message: privateOperatingSystemSurface.stripMessage,
-            onRetry: privateOperatingSystemSurface.retryable ? _load : null,
-          ),
-          const SizedBox(height: 18),
+          if (_profileHomeStatusVisible) ...<Widget>[
+            const SizedBox(height: 12),
+            _ProfileStatusStrip(
+              title: privateOperatingSystemSurface.stripTitle,
+              message: privateOperatingSystemSurface.stripMessage,
+              onRetry: privateOperatingSystemSurface.retryable ? _load : null,
+            ),
+            const SizedBox(height: 18),
+          ] else
+            const SizedBox(height: 18),
           Builder(
             builder: (BuildContext context) {
               final companyEntry = _ProfileEntryRow(
@@ -160,14 +226,6 @@ class _ProfilePageState extends State<ProfilePage> {
                   hasSession: hasSession,
                 ),
                 onTap: () => _openRouteAndReload(ProfileRoutes.company),
-              );
-              final identityEntry = _ProfileEntryRow(
-                icon: Icons.verified_user_outlined,
-                title: '公司认证与我的身份',
-                subtitle: '$certificationLabel · $membershipLabel',
-                onTap: () => _openRouteAndReload(
-                  ProfileIdentityRoutes.certificationCurrent,
-                ),
               );
               final memberManagementEntry = _ProfileEntryRow(
                 icon: Icons.group_outlined,
@@ -181,20 +239,39 @@ class _ProfilePageState extends State<ProfilePage> {
               final membershipEntry = _ProfileEntryRow(
                 icon: Icons.workspace_premium_outlined,
                 title: '我的会员',
-                subtitle: _myMembershipEntrySummary(
-                  hasSession: hasSession,
-                  shellContext: shellContext,
-                ),
+                subtitle: _profileHomeStatusVisible
+                    ? _myMembershipEntrySummary(
+                        hasSession: hasSession,
+                        shellContext: shellContext,
+                      )
+                    : null,
                 onTap: () => openProfileMembershipCurrentPage(context),
               );
               final creditEntry = _ProfileEntryRow(
                 icon: Icons.shield_outlined,
                 title: '我的信用与约束',
-                subtitle: _creditConstraintsEntrySummary(
-                  hasSession: hasSession,
-                  result: _creditConstraintsResult,
-                ),
+                subtitle: _profileHomeStatusVisible
+                    ? _creditConstraintsEntrySummary(
+                        hasSession: hasSession,
+                        result: _creditConstraintsResult,
+                      )
+                    : null,
                 onTap: () => openProfileCreditConstraintsStatusPage(context),
+              );
+              final reserveCreditScoringEntry = _ProfileEntryRow(
+                icon: Icons.bar_chart_outlined,
+                title: '组织信用评分 reserve',
+                subtitle: _organizationCreditScoringEntrySummary(),
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(ProfileRoutes.organizationCreditScoring),
+              );
+              final governanceAppealsEntry = _ProfileEntryRow(
+                icon: Icons.gavel_outlined,
+                title: '我的申诉记录',
+                subtitle: '查看当前账号的申诉记录',
+                onTap: () =>
+                    _openRouteAndReload(ProfileRoutes.governanceAppeals),
               );
               final paymentEntry = _ProfileEntryRow(
                 icon: Icons.receipt_long_outlined,
@@ -206,12 +283,14 @@ class _ProfilePageState extends State<ProfilePage> {
                 onTap: () => openProfilePaymentBillingStatusPage(context),
               );
               final projectEntry = _ProfileEntryRow(
-                icon: Icons.folder_copy_outlined,
+                icon: Icons.folder_open_outlined,
                 title: '我的项目',
-                subtitle: _myProjectEntrySummary(
-                  hasSession: hasSession,
-                  result: _myProjectResult,
-                ),
+                subtitle: _profileHomeStatusVisible
+                    ? _myProjectListEntrySummary(
+                        hasSession: hasSession,
+                        result: _myProjectResult,
+                      )
+                    : null,
                 onTap: () => Navigator.of(
                   context,
                 ).pushNamed(ExhibitionRoutes.myProjectList),
@@ -229,6 +308,32 @@ class _ProfilePageState extends State<ProfilePage> {
                 onTap: () =>
                     Navigator.of(context).pushNamed(ProfileRoutes.forum),
               );
+              final companyDisplayEntry = _ProfileEntryRow(
+                icon: Icons.design_services_outlined,
+                title: '我的公司展示',
+                subtitle: _enterpriseDisplayAssetEntrySummary('company'),
+                onTap: () => _openDisplayEntry(EnterpriseBoardType.company),
+              );
+              final factoryDisplayEntry = _ProfileEntryRow(
+                icon: Icons.factory_outlined,
+                title: '我的工厂展示',
+                subtitle: _enterpriseDisplayAssetEntrySummary('factory'),
+                onTap: () => _openDisplayEntry(EnterpriseBoardType.factory),
+              );
+              final supplierDisplayEntry = _ProfileEntryRow(
+                icon: Icons.chair_outlined,
+                title: '我的供应商展示',
+                subtitle: _enterpriseDisplayAssetEntrySummary('supplier'),
+                onTap: () => _openDisplayEntry(EnterpriseBoardType.supplier),
+              );
+              final personalTeamDisplayEntry = _ProfileEntryRow(
+                icon: Icons.groups_outlined,
+                title: '我的个人/团队展示',
+                subtitle: _enterpriseDisplayAssetEntrySummary('personal_team'),
+                onTap: () => ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+                  const SnackBar(content: Text('个人/团队展示工作台正在接通，当前先保留选择位。')),
+                ),
+              );
 
               if (privateOperatingSystemSurface.showRegroupedSections) {
                 return Column(
@@ -237,17 +342,25 @@ class _ProfilePageState extends State<ProfilePage> {
                       title: '身份与组织',
                       children: <Widget>[
                         companyEntry,
-                        identityEntry,
                         memberManagementEntry,
                         membershipEntry,
                         creditEntry,
+                        reserveCreditScoringEntry,
+                        governanceAppealsEntry,
                         paymentEntry,
                       ],
                     ),
                     const SizedBox(height: 24),
                     _ProfileGroupedSection(
                       title: '我的资产',
-                      children: <Widget>[projectEntry, forumEntry],
+                      children: <Widget>[
+                        projectEntry,
+                        forumEntry,
+                        companyDisplayEntry,
+                        factoryDisplayEntry,
+                        supplierDisplayEntry,
+                        personalTeamDisplayEntry,
+                      ],
                     ),
                   ],
                 );
@@ -257,13 +370,18 @@ class _ProfilePageState extends State<ProfilePage> {
                 title: '常用入口',
                 children: <Widget>[
                   companyEntry,
-                  identityEntry,
                   memberManagementEntry,
                   membershipEntry,
                   creditEntry,
+                  reserveCreditScoringEntry,
+                  governanceAppealsEntry,
                   paymentEntry,
                   projectEntry,
                   forumEntry,
+                  companyDisplayEntry,
+                  factoryDisplayEntry,
+                  supplierDisplayEntry,
+                  personalTeamDisplayEntry,
                 ],
               );
             },

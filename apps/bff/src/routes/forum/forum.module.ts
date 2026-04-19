@@ -9,6 +9,8 @@ import { ForumInteractionCommandErrorMessageService } from './forum-interaction-
 import { ForumOwnPostCommandErrorMessageService } from './forum-own-post-command-error-message.service';
 import { ForumPublishResultService } from './forum-publish-result.service';
 import { ForumReportCommandErrorMessageService } from './forum-report-command-error-message.service';
+import { ForumReportMineErrorService } from './forum-report-mine-error.service';
+import { ForumReportMineService } from './forum-report-mine.service';
 import { ForumService } from './forum.service';
 
 @Module({
@@ -22,6 +24,8 @@ import { ForumService } from './forum.service';
     ForumOwnPostCommandErrorMessageService,
     ForumPublishResultService,
     ForumReportCommandErrorMessageService,
+    ForumReportMineErrorService,
+    ForumReportMineService,
     ForumService,
   ],
 })

@@ -8,6 +8,7 @@ import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 part 'forum_consumer_models.dart';
 part 'forum_consumer_interaction_models.dart';
 part 'forum_consumer_governance_models.dart';
+part 'forum_consumer_my_report_models.dart';
 part 'forum_consumer_block_models.dart';
 part 'forum_consumer_publish_models.dart';
 part 'forum_consumer_author_models.dart';
@@ -15,6 +16,7 @@ part 'forum_consumer_own_post_models.dart';
 part 'forum_consumer_parsers.dart';
 part 'forum_consumer_interaction_parsers.dart';
 part 'forum_consumer_governance_parsers.dart';
+part 'forum_consumer_my_report_parsers.dart';
 part 'forum_consumer_block_parsers.dart';
 part 'forum_consumer_publish_parsers.dart';
 part 'forum_consumer_author_parsers.dart';
@@ -44,6 +46,7 @@ final class ForumCanonicalPaths {
   static const String postEdit = '/api/app/forum/post/edit';
   static const String postDelete = '/api/app/forum/post/delete';
   static const String reportSubmit = '/api/app/forum/report/submit';
+  static const String reportsMine = '/api/app/forum/reports/mine';
   static const String relationBlock = '/api/app/profile/block';
   static const String relationUnblock = '/api/app/profile/unblock';
   static const String relationBlockStatus = '/api/app/profile/block/status';
@@ -62,6 +65,10 @@ final class ForumCanonicalPaths {
   static const String meFollows = '/api/app/forum/me/follows';
   static const String interactionInbox = '/api/app/forum/interaction/inbox';
   static const String fileAccess = '/api/app/file/access';
+
+  static String reportMineDetail(String ticketId) {
+    return '$reportsMine/${Uri.encodeComponent(ticketId)}';
+  }
 }
 
 class ForumConsumerLayer {
@@ -317,6 +324,43 @@ class ForumConsumerLayer {
       parser: _parseMyFollows,
       isEmpty: (ForumPagedCollectionView<ForumTopicCardView> data) =>
           data.items.isEmpty,
+      useProtectedSession: true,
+    );
+  }
+
+  Future<ForumReadResult<ForumPagedCollectionView<ForumMyReportTicketItemView>>>
+  loadMyReports() {
+    return _loadRead(
+      path: ForumCanonicalPaths.reportsMine,
+      parser: _parseMyReportTicketList,
+      isEmpty: (ForumPagedCollectionView<ForumMyReportTicketItemView> data) =>
+          data.items.isEmpty,
+      useProtectedSession: true,
+    );
+  }
+
+  Future<ForumReadResult<ForumMyReportTicketDetailView>> loadMyReportDetail({
+    required String? ticketId,
+  }) {
+    final resolved = _requiredRouteValue(ticketId);
+    if (resolved == null) {
+      return Future<ForumReadResult<ForumMyReportTicketDetailView>>.value(
+        ForumReadResult(
+          state: AppPageState.notFound,
+          method: 'GET',
+          path: ForumCanonicalPaths.reportsMine,
+          message: forumVisibleReadMessage(
+            path: ForumCanonicalPaths.reportsMine,
+            state: AppPageState.notFound,
+          ),
+        ),
+      );
+    }
+
+    return _loadRead(
+      path: ForumCanonicalPaths.reportMineDetail(resolved),
+      parser: _parseMyReportTicketDetail,
+      isEmpty: (_) => false,
       useProtectedSession: true,
     );
   }

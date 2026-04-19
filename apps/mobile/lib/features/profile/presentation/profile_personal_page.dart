@@ -33,9 +33,16 @@ class ProfilePersonalPage extends StatelessWidget {
             rawUserId: shellContext.userId,
           ),
           subtitle: profileDisplayAccountLabel(shellContext.userId),
-          detail:
-              '${profileDisplayCertificationStatus(shellContext.certificationStatus)} · '
-              '${profileDisplayMembershipStatus(shellContext.membershipStatus)}',
+          detail: profileDisplayCertificationIdentitySummary(
+            certificationStatus: shellContext.certificationStatus,
+            personalCertificationStatus:
+                shellContext.personalCertificationStatus,
+            personalCertificationQualified:
+                shellContext.personalCertificationQualified,
+            personalCertificationLockedToOtherActor:
+                shellContext.personalCertificationLockedToOtherActor,
+            membershipStatus: shellContext.membershipStatus,
+          ),
           avatarLabel: profileResolvedAvatarFallbackLabel(
             displayName: shellContext.displayName,
             rawUserId: shellContext.userId,
@@ -44,7 +51,14 @@ class ProfilePersonalPage extends StatelessWidget {
           badgeText: '个人资料',
           supportingText: '当前只展示资料摘要；头像和昵称请通过下方两项单独设置。',
         ),
-        const SizedBox(height: 18),
+        if (profileFeatureStatusVisible) ...<Widget>[
+          const SizedBox(height: 18),
+          const ProfileFeatureStatusCard(
+            snapshot: profilePersonalFeatureStatus,
+          ),
+          const SizedBox(height: 14),
+        ] else
+          const SizedBox(height: 18),
         _ProfileCompactCard(
           children: <Widget>[
             _ProfileActionRow(
@@ -132,37 +146,125 @@ class ProfilePersonalPage extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 14),
-        _ProfileListSection(
-          title: '身份与安全',
-          children: <Widget>[
-            _ProfileActionRow(
-              title: '公司认证与我的身份',
-              subtitle:
-                  '${profileDisplayCertificationStatus(shellContext.certificationStatus)} · ${profileDisplayMembershipStatus(shellContext.membershipStatus)}',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(ProfileIdentityRoutes.certificationCurrent),
-            ),
-            _ProfileValueRow(
-              title: '成员身份',
-              value: profileDisplayMembershipStatus(
-                shellContext.membershipStatus,
-              ),
-            ),
-            _ProfileActionRow(
-              title: '会话与设备',
-              subtitle: '管理当前登录设备与安全状态',
-              onTap: () => Navigator.of(
-                context,
-              ).pushNamed(ProfileIdentityRoutes.sessionCenter),
-            ),
-            _ProfileActionRow(
-              title: '登录入口',
-              subtitle: shellContext.userId == null ? '去登录' : '切换或恢复登录',
-              onTap: () =>
-                  Navigator.of(context).pushNamed(ProfileIdentityRoutes.login),
-            ),
-          ],
+        AnimatedBuilder(
+          animation: AppSessionStore.instance,
+          builder: (BuildContext context, Widget? child) {
+            return _ProfileListSection(
+              title: '身份与安全',
+              children: <Widget>[
+                ..._buildProfilePasswordSetupEntryRows(context),
+                _ProfileActionRow(
+                  title: '公司认证与我的身份',
+                  subtitle: profileDisplayCertificationIdentitySummary(
+                    certificationStatus: shellContext.certificationStatus,
+                    personalCertificationStatus:
+                        shellContext.personalCertificationStatus,
+                    personalCertificationQualified:
+                        shellContext.personalCertificationQualified,
+                    personalCertificationLockedToOtherActor:
+                        shellContext.personalCertificationLockedToOtherActor,
+                    membershipStatus: shellContext.membershipStatus,
+                  ),
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pushNamed(ProfileIdentityRoutes.certificationCurrent),
+                ),
+                _ProfileValueRow(
+                  title: '成员身份',
+                  value: profileDisplayMembershipStatus(
+                    shellContext.membershipStatus,
+                  ),
+                ),
+                _ProfileActionRow(
+                  title: '会话与设备',
+                  subtitle: '管理当前登录设备与安全状态',
+                  onTap: () => Navigator.of(
+                    context,
+                  ).pushNamed(ProfileIdentityRoutes.sessionCenter),
+                ),
+                ..._buildProfileAuthEntryRows(context),
+              ],
+            );
+          },
+        ),
+        const SizedBox(height: 14),
+        const _ProfileGovernanceRecordSection(),
+      ],
+    );
+  }
+}
+
+class _ProfileGovernanceRecordSection extends StatefulWidget {
+  const _ProfileGovernanceRecordSection();
+
+  @override
+  State<_ProfileGovernanceRecordSection> createState() =>
+      _ProfileGovernanceRecordSectionState();
+}
+
+class _ProfileGovernanceRecordSectionState
+    extends State<_ProfileGovernanceRecordSection> {
+  ProfileGovernanceStatusResult? _result;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final result = await ProfileGovernanceStatusConsumerLayer.instance
+        .loadStatus();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _result = result;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final data = _result?.state == AppPageState.content ? _result?.data : null;
+    final children = <Widget>[
+      if (data != null) _ProfileGovernanceScoreSnapshotCard(data: data),
+      _ProfileActionRow(
+        title: '我的申诉记录',
+        subtitle: '查看当前账号的申诉历史列表与详情',
+        onTap: () =>
+            Navigator.of(context).pushNamed(ProfileRoutes.governanceAppeals),
+      ),
+    ];
+
+    return _ProfileListSection(title: '治理记录', children: children);
+  }
+}
+
+class _ProfileGovernanceScoreSnapshotCard extends StatelessWidget {
+  const _ProfileGovernanceScoreSnapshotCard({required this.data});
+
+  final ProfileGovernanceStatusView data;
+
+  @override
+  Widget build(BuildContext context) {
+    final updatedAt = profileDisplayTimeLabel(
+      data.violationScoreUpdatedAt,
+      fallback: '时间未知',
+    );
+
+    return _ProfileCompactCard(
+      children: <Widget>[
+        ListTile(
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 6,
+          ),
+          title: const Text('累计分快照'),
+          subtitle: Text(
+            '这是基于已生效处罚记录生成的累计分快照。\n'
+            '分值：${data.violationScoreSnapshot}\n'
+            '更新时间：$updatedAt',
+          ),
         ),
       ],
     );

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/profile/presentation/profile_feature_status_copy.dart';
 
 class ProfileForumPage extends StatefulWidget {
   const ProfileForumPage({super.key});
@@ -64,6 +65,13 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
   @override
   Widget build(BuildContext context) {
     final warningMessage = _primaryMessage();
+    final ready =
+        !_loading &&
+        _isReadyState(_postsResult?.state) &&
+        _isReadyState(_commentsResult?.state) &&
+        _isReadyState(_bookmarksResult?.state) &&
+        _isReadyState(_followsResult?.state) &&
+        _isReadyState(_draftsResult?.state);
 
     return RefreshIndicator(
       onRefresh: _load,
@@ -74,6 +82,12 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
           _ProfileForumHeader(
             detail: _loading ? '正在同步论坛资产入口' : _forumSummary(),
           ),
+          if (profileFeatureStatusVisible) ...<Widget>[
+            const SizedBox(height: 12),
+            ProfileFeatureStatusCard(
+              snapshot: profileForumFeatureStatus(runtimeReady: ready),
+            ),
+          ],
           if (warningMessage != null) ...<Widget>[
             const SizedBox(height: 12),
             _ProfileForumStatusPanel(
@@ -140,6 +154,14 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
                   context,
                 ).pushNamed(ExhibitionRoutes.forumDrafts),
               ),
+              _ProfileForumEntryRow(
+                title: '我的举报记录',
+                subtitle: '查看我提交过的论坛举报记录',
+                countLabel: '查看',
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(ExhibitionRoutes.forumMeReports),
+              ),
             ],
           ),
         ],
@@ -191,6 +213,10 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
         ?.where((ForumMyPostItemView item) => item.state != 'archived')
         .length;
   }
+
+  static bool _isReadyState(AppPageState? state) {
+    return state == AppPageState.content || state == AppPageState.empty;
+  }
 }
 
 class _ProfileForumHeader extends StatelessWidget {
@@ -235,7 +261,7 @@ class _ProfileForumHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '帖子、评论、收藏、关注与草稿',
+                    '帖子、评论、收藏、关注、草稿与举报记录',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

@@ -1,7 +1,7 @@
-export const CONTENT_SAFETY_P0_ENGINE_TYPES = ['rule', 'manual'] as const;
+export const CONTENT_SAFETY_P0_ENGINE_TYPES = ['rule', 'ocr', 'manual'] as const;
 
 export type ContentSafetyEngineType = (typeof CONTENT_SAFETY_P0_ENGINE_TYPES)[number];
-export type ContentSafetyDecision = 'allow' | 'block';
+export type ContentSafetyDecision = 'allow' | 'block' | 'manual_review';
 export type ContentSafetyProfileField = 'nickname' | 'avatar' | 'intro';
 
 export const CONTENT_SAFETY_FORUM_REPORT_TARGET_TYPES = ['post', 'comment'] as const;

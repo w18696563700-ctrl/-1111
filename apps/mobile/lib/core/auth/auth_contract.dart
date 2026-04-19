@@ -5,6 +5,9 @@ final class AuthCanonicalPaths {
 
   static const String otpSend = '/api/app/auth/otp/send';
   static const String otpLogin = '/api/app/auth/otp/login';
+  static const String passwordLogin = '/api/app/auth/password/login';
+  static const String passwordSet = '/api/app/auth/password/set';
+  static const String passwordReset = '/api/app/auth/password/reset';
   static const String refresh = '/api/app/auth/refresh';
   static const String logout = '/api/app/auth/logout';
 }
