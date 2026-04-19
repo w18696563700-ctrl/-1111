@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_board_surface.dart';
 
 class EnterpriseSectionCard extends StatelessWidget {
   const EnterpriseSectionCard({
@@ -99,77 +100,206 @@ class EnterpriseCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final summaryText = enterpriseBoardCardSummaryText(item);
+    final chips = enterpriseBoardCardSummaryChips(item);
+    final title = enterpriseBoardDisplayTitle(item);
+    final companyLine = enterpriseBoardCompanyLine(item);
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(20),
         onTap: onPressed,
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
+          padding: const EdgeInsets.all(14),
+          child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  CircleAvatar(
-                    radius: 22,
-                    child: Text(item.name.characters.first),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          item.name,
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text('${item.provinceName} · ${item.cityName}'),
-                        const SizedBox(height: 6),
-                        Wrap(
-                          spacing: 8,
-                          runSpacing: 8,
-                          children: <Widget>[
-                            Chip(label: Text(item.primaryBoardLabel)),
-                            Chip(label: Text(item.certificationLabel)),
-                            Chip(label: Text('案例 ${item.caseCount}')),
-                            if (item.avgScore != null)
-                              Chip(label: Text('评分 ${item.avgScore!.toStringAsFixed(1)}')),
-                          ],
-                        ),
-                      ],
+              _EnterpriseCardLogo(
+                label: title.characters.first,
+                logoUrl: item.logoUrl,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Text(
-                item.shortIntro,
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
-              ),
-              const SizedBox(height: 12),
-              CapabilityTagGroup(
-                tags: item.secondaryCapabilityLabels.followedBy(item.keywordTags).toSet().toList(),
-                emptyLabel: '当前未返回轻标签',
-              ),
-              const SizedBox(height: 12),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton.tonal(
-                  onPressed: onPressed,
-                  child: const Text('查看详情'),
+                    if (companyLine != null) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Text(
+                        companyLine,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 4),
+                    Text(
+                      '${item.provinceName} / ${item.cityName}',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    if (summaryText != null) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text(
+                        summaryText,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          height: 1.45,
+                        ),
+                      ),
+                    ],
+                    if (chips.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 10),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: chips
+                            .map(
+                              (String chip) => _EnterpriseMetaPill(label: chip),
+                            )
+                            .toList(growable: false),
+                      ),
+                    ],
+                  ],
                 ),
               ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: colorScheme.onSurfaceVariant,
+              ),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EnterpriseCardLogo extends StatelessWidget {
+  const _EnterpriseCardLogo({required this.label, this.logoUrl});
+
+  final String label;
+  final String? logoUrl;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: SizedBox(
+        width: 68,
+        height: 68,
+        child: _buildEnterpriseCardLogoImage(
+          logoUrl,
+          fallback: label,
+          backgroundColor: colorScheme.surfaceContainerHighest,
+        ),
+      ),
+    );
+  }
+}
+
+Widget _buildEnterpriseCardLogoImage(
+  String? imageUrl, {
+  required String fallback,
+  required Color backgroundColor,
+}) {
+  final url = imageUrl?.trim();
+  if (url != null && url.isNotEmpty) {
+    return Image.network(
+      url,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      loadingBuilder:
+          (BuildContext context, Widget child, ImageChunkEvent? progress) {
+            if (progress == null) {
+              return child;
+            }
+            return _enterpriseCardLogoPlaceholder(
+              fallback: fallback,
+              backgroundColor: backgroundColor,
+            );
+          },
+      errorBuilder:
+          (BuildContext context, Object error, StackTrace? stackTrace) {
+            return _enterpriseCardLogoPlaceholder(
+              fallback: fallback,
+              backgroundColor: backgroundColor,
+            );
+          },
+    );
+  }
+  return _enterpriseCardLogoPlaceholder(
+    fallback: fallback,
+    backgroundColor: backgroundColor,
+  );
+}
+
+Widget _enterpriseCardLogoPlaceholder({
+  required String fallback,
+  required Color backgroundColor,
+}) {
+  return ColoredBox(
+    color: backgroundColor,
+    child: Center(
+      child: Builder(
+        builder: (BuildContext context) {
+          return Text(
+            fallback,
+            style: Theme.of(
+              context,
+            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800),
+          );
+        },
+      ),
+    ),
+  );
+}
+
+class _EnterpriseMetaPill extends StatelessWidget {
+  const _EnterpriseMetaPill({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        child: Text(
+          label,
+          style: theme.textTheme.labelMedium?.copyWith(
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ),
@@ -212,11 +342,7 @@ class BoardFilterBar extends StatelessWidget {
           ),
           if (boardSpecificFilters.isNotEmpty) ...<Widget>[
             const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: boardSpecificFilters,
-            ),
+            Wrap(spacing: 12, runSpacing: 12, children: boardSpecificFilters),
           ],
         ],
       ),
@@ -328,7 +454,11 @@ class RecommendationSlotBanner extends StatelessWidget {
               (EnterpriseHubListItem item) => ListTile(
                 contentPadding: EdgeInsets.zero,
                 title: Text(item.name),
-                subtitle: Text(item.shortIntro, maxLines: 2, overflow: TextOverflow.ellipsis),
+                subtitle: Text(
+                  item.shortIntro,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
                 trailing: Text(item.primaryBoardLabel),
               ),
             )
@@ -342,47 +472,73 @@ class EnterpriseHeaderSection extends StatelessWidget {
   const EnterpriseHeaderSection({
     super.key,
     required this.header,
-    required this.onApplyPressed,
+    this.boardProfile,
+    this.onApplyPressed,
   });
 
   final EnterpriseHubHeader header;
-  final VoidCallback onApplyPressed;
+  final Map<String, Object?>? boardProfile;
+  final VoidCallback? onApplyPressed;
 
   @override
   Widget build(BuildContext context) {
+    final title = enterpriseBoardHeaderTitle(
+      boardType: header.primaryBoardType,
+      fallbackName: header.name,
+      boardProfile: boardProfile,
+    );
+    final companyLine = enterpriseBoardHeaderCompanyLine(
+      boardType: header.primaryBoardType,
+      companyName: header.name,
+      boardProfile: boardProfile,
+    );
     return EnterpriseSectionCard(
       title: 'header',
       subtitle: '${header.provinceName} · ${header.cityName}',
-      actions: <Widget>[
-        FilledButton.tonal(
-          onPressed: onApplyPressed,
-          child: Text(header.primaryBoardType.applyTitle),
-        ),
-      ],
+      actions: onApplyPressed == null
+          ? const <Widget>[]
+          : <Widget>[
+              FilledButton.tonal(
+                onPressed: onApplyPressed,
+                child: Text(header.primaryBoardType.applyTitle),
+              ),
+            ],
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              CircleAvatar(radius: 28, child: Text(header.name.characters.first)),
+              CircleAvatar(
+                radius: 28,
+                child: Text(title.characters.first),
+              ),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
                     Text(
-                      header.name,
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                      title,
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
                     ),
+                    if (companyLine != null) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text(
+                        companyLine,
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     CapabilityTagGroup(
                       tags: <String>[
                         header.primaryBoardType.title,
-                        ...header.secondaryCapabilities.map((EnterpriseBoardType item) => item.title),
-                        if (header.verificationStatus != null) '认证 ${header.verificationStatus}',
+                        ...header.secondaryCapabilities.map(
+                          (EnterpriseBoardType item) => item.title,
+                        ),
+                        if (header.verificationStatus != null)
+                          '认证 ${header.verificationStatus}',
                       ],
                     ),
                   ],
@@ -391,7 +547,12 @@ class EnterpriseHeaderSection extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 12),
-          Text(header.shortIntro, style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45)),
+          Text(
+            header.shortIntro,
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(height: 1.45),
+          ),
         ],
       ),
     );

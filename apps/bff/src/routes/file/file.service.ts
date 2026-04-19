@@ -1,13 +1,15 @@
-import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
-import type { IncomingHttpHeaders } from 'http';
-import { AuthContextService } from '../../core/auth/auth-context.service';
-import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
-import { ServerClientService } from '../../core/http/server-client.service';
-import { IdempotencyService } from '../../core/idempotency/idempotency.service';
-import { ForumCommandContextService } from '../forum/forum-command-context.service';
+import { BadRequestException, HttpException, Injectable } from "@nestjs/common";
+import type { IncomingHttpHeaders } from "http";
+import { AuthContextService } from "../../core/auth/auth-context.service";
+import { ErrorNormalizerService } from "../../core/errors/error-normalizer.service";
+import { ServerClientService } from "../../core/http/server-client.service";
+import { IdempotencyService } from "../../core/idempotency/idempotency.service";
+import { ForumCommandContextService } from "../forum/forum-command-context.service";
 
-const FILE_UPLOAD_CONFIRM_ENDPOINT = '/api/app/file/upload/confirm';
-const FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE = 'forum_draft_attachment';
+const FILE_UPLOAD_CONFIRM_ENDPOINT = "/api/app/file/upload/confirm";
+const FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE = "forum_draft_attachment";
+const PROJECT_UPLOAD_BUSINESS_TYPE = "project";
+const PROJECT_ATTACHMENT_FILE_KIND = "project_attachment";
 
 type UploadInitCommand = {
   businessType: string;
@@ -38,8 +40,15 @@ export class FileService {
     private readonly forumCommandContext: ForumCommandContextService,
   ) {}
 
-  async initUpload(payload: Record<string, unknown>, headers: IncomingHttpHeaders, idempotencyKey?: string) {
-    const cached = await this.idempotencyService.getCached('upload-init', idempotencyKey);
+  async initUpload(
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const cached = await this.idempotencyService.getCached(
+      "upload-init",
+      idempotencyKey,
+    );
     if (cached) {
       return cached;
     }
@@ -47,46 +56,82 @@ export class FileService {
     const commandPayload = this.toUploadInitCommand(payload);
     try {
       this.ensureUploadInitCommand(commandPayload);
-      const forwardHeaders = await this.buildInitHeaders(commandPayload, headers);
-      const result = await this.serverClient.post<Record<string, unknown>>('/server/uploads/init', commandPayload, {
-        headers: forwardHeaders,
-      });
+      const forwardHeaders = await this.buildInitHeaders(
+        commandPayload,
+        headers,
+      );
+      const result = await this.serverClient.post<Record<string, unknown>>(
+        "/server/uploads/init",
+        commandPayload,
+        {
+          headers: forwardHeaders,
+        },
+      );
       const viewModel = this.toUploadInitViewModel(result);
-      await this.idempotencyService.remember('upload-init', idempotencyKey, viewModel);
+      await this.idempotencyService.remember(
+        "upload-init",
+        idempotencyKey,
+        viewModel,
+      );
       return viewModel;
     } catch (error) {
-      throw this.normalizeInitError(error, commandPayload.businessType);
+      throw this.normalizeInitError(error, commandPayload);
     }
   }
 
-  async confirmUpload(payload: Record<string, unknown>, headers: IncomingHttpHeaders, idempotencyKey?: string) {
-    const cached = await this.idempotencyService.getCached('upload-confirm', idempotencyKey);
+  async confirmUpload(
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const cached = await this.idempotencyService.getCached(
+      "upload-confirm",
+      idempotencyKey,
+    );
     if (cached) {
       return cached;
     }
 
     try {
       const commandPayload = this.toUploadConfirmCommand(payload);
-      const result = await this.serverClient.post('/server/uploads/confirm', commandPayload, {
-        headers: this.authContext.buildForwardHeaders(headers),
-      });
-      await this.idempotencyService.remember('upload-confirm', idempotencyKey, result);
+      const forwardHeaders =
+        await this.forumCommandContext.buildCommandHeaders(headers);
+      const result = await this.serverClient.post(
+        "/server/uploads/confirm",
+        commandPayload,
+        {
+          headers: forwardHeaders,
+        },
+      );
+      await this.idempotencyService.remember(
+        "upload-confirm",
+        idempotencyKey,
+        result,
+      );
       return result;
     } catch (error) {
       throw this.normalizeConfirmError(error);
     }
   }
 
-  async getAccess(headers: IncomingHttpHeaders, fileAssetId?: string, mode?: string) {
+  async getAccess(
+    headers: IncomingHttpHeaders,
+    fileAssetId?: string,
+    mode?: string,
+  ) {
     try {
-      const forwardHeaders = await this.forumCommandContext.buildCommandHeaders(headers);
-      const result = await this.serverClient.get<Record<string, unknown>>('/server/file/access', {
-        headers: forwardHeaders,
-        params: {
-          fileAssetId: this.asOptionalString(fileAssetId),
-          mode: this.asOptionalString(mode),
+      const forwardHeaders =
+        await this.forumCommandContext.buildCommandHeaders(headers);
+      const result = await this.serverClient.get<Record<string, unknown>>(
+        "/server/file/access",
+        {
+          headers: forwardHeaders,
+          params: {
+            fileAssetId: this.asOptionalString(fileAssetId),
+            mode: this.asOptionalString(mode),
+          },
         },
-      });
+      );
       return this.toAccessViewModel(result);
     } catch (error) {
       throw this.normalizeAccessError(error);
@@ -95,20 +140,23 @@ export class FileService {
 
   getSkeleton() {
     return {
-      group: 'file',
-      status: 'skeleton_only',
-      truthOwner: 'Server.evidence',
-      note: 'BFF only orchestrates init, direct upload handoff, and confirm.',
+      group: "file",
+      status: "skeleton_only",
+      truthOwner: "Server.evidence",
+      note: "BFF only orchestrates init, direct upload handoff, and confirm.",
     };
   }
 
-  private toUploadInitCommand(payload: Record<string, unknown>): UploadInitCommand {
-    if (!Object.prototype.hasOwnProperty.call(payload, 'businessId')) {
+  private toUploadInitCommand(
+    payload: Record<string, unknown>,
+  ): UploadInitCommand {
+    if (!Object.prototype.hasOwnProperty.call(payload, "businessId")) {
       throw new BadRequestException({
         statusCode: 400,
-        code: 'FILE_UPLOAD_INIT_INVALID',
-        message: 'Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.',
-        source: 'bff',
+        code: "FILE_UPLOAD_INIT_INVALID",
+        message:
+          "Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.",
+        source: "bff",
       });
     }
     return {
@@ -121,8 +169,14 @@ export class FileService {
     };
   }
 
-  private async buildInitHeaders(command: UploadInitCommand, headers: IncomingHttpHeaders) {
-    if (command.businessType === FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE) {
+  private async buildInitHeaders(
+    command: UploadInitCommand,
+    headers: IncomingHttpHeaders,
+  ) {
+    if (
+      command.businessType === FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE ||
+      command.businessType === "enterprise_display"
+    ) {
       return this.forumCommandContext.buildCommandHeaders(headers);
     }
     return this.authContext.buildForwardHeaders(headers);
@@ -131,8 +185,8 @@ export class FileService {
   private normalizeConfirmError(error: unknown) {
     const normalized = this.errors.toHttpException(
       error,
-      'FILE_UPLOAD_CONFIRM_REQUIRED',
-      '当前附件上传确认失败，请稍后再试。',
+      "FILE_UPLOAD_CONFIRM_REQUIRED",
+      "当前附件上传确认失败，请稍后再试。",
     );
 
     const statusCode = normalized.getStatus();
@@ -143,7 +197,10 @@ export class FileService {
       return normalized;
     }
 
-    const translatedMessage = this.translateConfirmMessage(code, originalMessage);
+    const translatedMessage = this.translateConfirmMessage(
+      code,
+      originalMessage,
+    );
     if (translatedMessage === originalMessage) {
       return normalized;
     }
@@ -162,33 +219,38 @@ export class FileService {
   }
 
   private translateConfirmMessage(code: string, message: string) {
-    if (code === 'AUTH_SESSION_INVALID') {
-      return '当前登录状态已失效，请重新登录后再试。';
+    if (code === "AUTH_SESSION_INVALID") {
+      return "当前登录状态已失效，请重新登录后再试。";
     }
-    if (code === 'FILE_UPLOAD_CONFIRM_REQUIRED') {
-      if (message.includes('uploadSessionId is required')) {
-        return '当前附件上传确认参数不完整，请检查后再试。';
+    if (code === "FILE_UPLOAD_CONFIRM_REQUIRED") {
+      if (message.includes("uploadSessionId is required")) {
+        return "当前附件上传确认参数不完整，请检查后再试。";
       }
-      if (message.includes('Upload session does not exist')) {
-        return '当前附件上传会话已失效，请重新上传后再试。';
+      if (message.includes("Upload session does not exist")) {
+        return "当前附件上传会话已失效，请重新上传后再试。";
       }
-      if (message.includes('missing FileAsset truth')) {
-        return '当前附件上传确认结果异常，请重新上传后再试。';
+      if (message.includes("missing FileAsset truth")) {
+        return "当前附件上传确认结果异常，请重新上传后再试。";
       }
-      return '当前附件上传尚未确认完成，请重新上传后再试。';
+      return "当前附件上传尚未确认完成，请重新上传后再试。";
     }
 
-    return '当前附件上传确认失败，请稍后再试。';
+    return "当前附件上传确认失败，请稍后再试。";
   }
 
-  private normalizeInitError(error: unknown, businessType: string) {
+  private normalizeInitError(error: unknown, command: UploadInitCommand) {
     const normalized = this.errors.toHttpException(
       error,
-      'FILE_UPLOAD_INIT_FAILED',
-      '上传初始化暂时失败，请稍后再试。',
+      "FILE_UPLOAD_INIT_FAILED",
+      "上传初始化暂时失败，请稍后再试。",
     );
-    if (businessType !== FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE) {
-      return normalized;
+
+    const projectAttachmentError = this.rewriteProjectAttachmentInitError(
+      normalized,
+      command,
+    );
+    if (projectAttachmentError) {
+      return projectAttachmentError;
     }
 
     const statusCode = normalized.getStatus();
@@ -199,7 +261,12 @@ export class FileService {
       return normalized;
     }
 
-    const translatedMessage = this.translateForumDraftAttachmentInitMessage(code, originalMessage);
+    const translatedMessage =
+      command.businessType === FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE
+        ? this.translateForumDraftAttachmentInitMessage(code, originalMessage)
+        : command.businessType === "enterprise_display"
+          ? this.translateEnterpriseDisplayInitMessage(code, originalMessage)
+          : this.translateGenericInitMessage(code, originalMessage);
     if (translatedMessage === originalMessage) {
       return normalized;
     }
@@ -217,33 +284,164 @@ export class FileService {
     );
   }
 
-  private translateForumDraftAttachmentInitMessage(code: string, message: string) {
-    if (code === 'AUTH_SESSION_INVALID') {
-      return '当前登录状态已失效，请重新登录后再试。';
+  private rewriteProjectAttachmentInitError(
+    normalized: HttpException,
+    command: UploadInitCommand,
+  ) {
+    if (
+      command.businessType !== PROJECT_UPLOAD_BUSINESS_TYPE ||
+      command.fileKind !== PROJECT_ATTACHMENT_FILE_KIND
+    ) {
+      return null;
     }
-    if (code === 'FILE_UPLOAD_INIT_INVALID') {
+
+    const statusCode = normalized.getStatus();
+    const payload = this.asRecord(normalized.getResponse()) ?? {};
+    const code = this.asString(payload.code);
+    const originalMessage = this.asString(payload.message);
+
+    if (
+      statusCode === 401 &&
+      code === "AUTH_SESSION_INVALID" &&
+      originalMessage
+    ) {
+      return new HttpException(
+        {
+          ...payload,
+          statusCode,
+          source: payload.source === "server" ? "server" : "bff",
+          message: "当前登录状态已失效，请重新登录后再试。",
+        },
+        statusCode,
+      );
+    }
+
+    if (
+      statusCode === 400 &&
+      code === "FILE_UPLOAD_INIT_INVALID" &&
+      originalMessage.includes(
+        "Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.",
+      )
+    ) {
+      return normalized;
+    }
+
+    if (
+      !originalMessage ||
+      !this.isProjectAttachmentUnsupportedMessage(originalMessage)
+    ) {
+      return null;
+    }
+
+    const details = this.asRecord(payload.details) ?? {};
+    details.originalMessage = originalMessage;
+    return new HttpException(
+      {
+        ...payload,
+        statusCode,
+        code: "FILE_UPLOAD_INIT_FAILED",
+        source: payload.source === "server" ? "server" : "bff",
+        message: "当前项目资料上传初始化暂不可用，请稍后再试。",
+        details,
+      },
+      statusCode,
+    );
+  }
+
+  private isProjectAttachmentUnsupportedMessage(message: string) {
+    return (
+      message.includes(
+        "Current upload init only supports project/evidence, project/project_attachment, profile/avatar, profile/business_license, or enterprise_display image bindings.",
+      ) ||
+      message.includes(
+        "Current upload init only supports project/evidence, profile/avatar, profile/business_license, or enterprise_display image bindings.",
+      )
+    );
+  }
+
+  private translateForumDraftAttachmentInitMessage(
+    code: string,
+    message: string,
+  ) {
+    if (code === "AUTH_SESSION_INVALID") {
+      return "当前登录状态已失效，请重新登录后再试。";
+    }
+    if (code === "FILE_UPLOAD_INIT_INVALID") {
       if (
-        message.includes('image or video media only') ||
-        message.includes('bounded document attachments only')
+        message.includes("image or video media only") ||
+        message.includes("bounded document attachments only")
       ) {
-        return '论坛附件目前只支持图片、视频以及 PDF/文档文件。';
+        return "论坛附件目前只支持图片、视频以及 PDF/文档文件。";
       }
-      if (message.includes('20 MiB')) {
-        return '论坛文档附件单个文件不能超过 20 MiB。';
+      if (message.includes("20 MiB")) {
+        return "论坛文档附件单个文件不能超过 20 MiB。";
       }
-      if (message.includes('businessType, businessId, fileKind, mimeType, size, and checksum')) {
-        return '当前附件上传参数不完整，请检查后再试。';
+      if (
+        message.includes(
+          "businessType, businessId, fileKind, mimeType, size, and checksum",
+        )
+      ) {
+        return "当前附件上传参数不完整，请检查后再试。";
       }
-      return '当前附件上传参数无效，请检查后再试。';
+      return "当前附件上传参数无效，请检查后再试。";
     }
-    if (code === 'FORUM_DRAFT_UNAVAILABLE') {
-      if (message.includes('not editable for attachment binding')) {
-        return '当前草稿状态不允许继续绑定附件。';
+    if (code === "FORUM_DRAFT_UNAVAILABLE") {
+      if (message.includes("not editable for attachment binding")) {
+        return "当前草稿状态不允许继续绑定附件。";
       }
-      if (message.includes('attachment binding')) {
-        return '当前草稿暂不可用于绑定附件，请刷新后再试。';
+      if (message.includes("attachment binding")) {
+        return "当前草稿暂不可用于绑定附件，请刷新后再试。";
       }
-      return '当前论坛草稿暂不可用于附件上传，请稍后再试。';
+      return "当前论坛草稿暂不可用于附件上传，请稍后再试。";
+    }
+    return message;
+  }
+
+  private translateEnterpriseDisplayInitMessage(code: string, message: string) {
+    if (code === "AUTH_SESSION_INVALID") {
+      return "当前登录状态已失效，请重新登录后再试。";
+    }
+    if (code === "FILE_UPLOAD_INIT_INVALID") {
+      if (
+        message.includes(
+          "businessType, businessId, fileKind, mimeType, size, and checksum",
+        )
+      ) {
+        return "当前企业展示图片上传参数不完整，请稍后再试。";
+      }
+      if (message.includes("listing id")) {
+        return "当前企业展示图片上传缺少企业草稿，请先创建草稿后再试。";
+      }
+      if (message.includes("active organization scope")) {
+        return "当前缺少组织上下文，暂时无法上传企业展示图片。";
+      }
+      if (message.includes("owned by the current organization")) {
+        return "当前企业展示图片只能绑定到本组织自己的展示草稿。";
+      }
+      if (message.includes("supports project/evidence")) {
+        return "当前上传通道还未切到企业展示图片绑定，请先联调最新后端。";
+      }
+      if (message.includes("image mime types")) {
+        return "当前企业展示图片只支持常见图片格式。";
+      }
+      return "当前企业展示图片上传参数无效，请稍后再试。";
+    }
+    return "当前企业展示图片上传初始化失败，请稍后再试。";
+  }
+
+  private translateGenericInitMessage(code: string, message: string) {
+    if (code === "AUTH_SESSION_INVALID") {
+      return "当前登录状态已失效，请重新登录后再试。";
+    }
+    if (code === "FILE_UPLOAD_INIT_INVALID") {
+      if (
+        message.includes(
+          "businessType, businessId, fileKind, mimeType, size, and checksum",
+        )
+      ) {
+        return "当前上传参数不完整，请检查后再试。";
+      }
+      return "当前上传初始化参数无效，请检查后再试。";
     }
     return message;
   }
@@ -251,8 +449,8 @@ export class FileService {
   private normalizeAccessError(error: unknown) {
     const normalized = this.errors.toHttpException(
       error,
-      'FILE_ACCESS_FAILED',
-      '当前附件暂时无法读取，请稍后再试。',
+      "FILE_ACCESS_FAILED",
+      "当前附件暂时无法读取，请稍后再试。",
     );
 
     const statusCode = normalized.getStatus();
@@ -263,7 +461,10 @@ export class FileService {
       return normalized;
     }
 
-    const translatedMessage = this.translateAccessMessage(code, originalMessage);
+    const translatedMessage = this.translateAccessMessage(
+      code,
+      originalMessage,
+    );
     if (translatedMessage === originalMessage) {
       return normalized;
     }
@@ -282,28 +483,28 @@ export class FileService {
   }
 
   private translateAccessMessage(code: string, message: string) {
-    if (code === 'AUTH_SESSION_INVALID') {
-      return '当前登录状态已失效，请重新登录后再试。';
+    if (code === "AUTH_SESSION_INVALID") {
+      return "当前登录状态已失效，请重新登录后再试。";
     }
-    if (code === 'FILE_ACCESS_INVALID') {
-      if (message.includes('fileAssetId is required')) {
-        return '请先选择要读取的附件。';
+    if (code === "FILE_ACCESS_INVALID") {
+      if (message.includes("fileAssetId is required")) {
+        return "请先选择要读取的附件。";
       }
-      if (message.includes('mode must be preview or download')) {
-        return '当前附件读取方式无效，请检查后再试。';
+      if (message.includes("mode must be preview or download")) {
+        return "当前附件读取方式无效，请检查后再试。";
       }
-      return '当前附件读取参数无效，请检查后再试。';
+      return "当前附件读取参数无效，请检查后再试。";
     }
-    if (code === 'FILE_ACCESS_NOT_FOUND') {
-      return '当前附件不存在或暂不可用。';
+    if (code === "FILE_ACCESS_NOT_FOUND") {
+      return "当前附件不存在或暂不可用。";
     }
-    if (code === 'FILE_ACCESS_PERMISSION_DENIED') {
-      return '当前账号没有权限读取这个附件。';
+    if (code === "FILE_ACCESS_PERMISSION_DENIED") {
+      return "当前账号没有权限读取这个附件。";
     }
-    if (code === 'FILE_ACCESS_UNAVAILABLE') {
-      return '当前附件暂时不能读取。';
+    if (code === "FILE_ACCESS_UNAVAILABLE") {
+      return "当前附件暂时不能读取。";
     }
-    return '当前附件暂时无法读取，请稍后再试。';
+    return "当前附件暂时无法读取，请稍后再试。";
   }
 
   private ensureUploadInitCommand(command: UploadInitCommand) {
@@ -316,21 +517,23 @@ export class FileService {
     ) {
       throw new BadRequestException({
         statusCode: 400,
-        code: 'FILE_UPLOAD_INIT_INVALID',
-        message: 'Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.',
-        source: 'bff',
+        code: "FILE_UPLOAD_INIT_INVALID",
+        message:
+          "Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.",
+        source: "bff",
       });
     }
   }
 
   private readBusinessId(value: unknown): string | null {
     if (value === null) return null;
-    if (typeof value !== 'string') {
+    if (typeof value !== "string") {
       throw new BadRequestException({
         statusCode: 400,
-        code: 'FILE_UPLOAD_INIT_INVALID',
-        message: 'Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.',
-        source: 'bff',
+        code: "FILE_UPLOAD_INIT_INVALID",
+        message:
+          "Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.",
+        source: "bff",
       });
     }
     const normalized = value.trim();
@@ -342,9 +545,9 @@ export class FileService {
     if (!uploadSessionId) {
       throw new BadRequestException({
         statusCode: 400,
-        code: 'FILE_UPLOAD_CONFIRM_REQUIRED',
-        message: 'uploadSessionId is required for upload confirm.',
-        source: 'bff',
+        code: "FILE_UPLOAD_CONFIRM_REQUIRED",
+        message: "uploadSessionId is required for upload confirm.",
+        source: "bff",
       });
     }
     return { uploadSessionId };
@@ -357,7 +560,9 @@ export class FileService {
     const method = this.asString(directUpload.method).toUpperCase();
 
     if (!uploadSessionId || !url || !method) {
-      throw new Error('Upload init response is missing uploadSessionId or direct upload directive.');
+      throw new Error(
+        "Upload init response is missing uploadSessionId or direct upload directive.",
+      );
     }
 
     return {
@@ -383,7 +588,14 @@ export class FileService {
     const expiresAt = this.asOptionalString(body.expiresAt);
     const contentLengthBytes = this.asOptionalNumber(body.contentLengthBytes);
 
-    if (!fileAssetId || !mode || !accessUrl || !fileName || !mimeType || !expiresAt) {
+    if (
+      !fileAssetId ||
+      !mode ||
+      !accessUrl ||
+      !fileName ||
+      !mimeType ||
+      !expiresAt
+    ) {
       return result;
     }
 
@@ -413,18 +625,18 @@ export class FileService {
   }
 
   private asRecord(value: unknown): Record<string, unknown> | null {
-    return value !== null && typeof value === 'object' && !Array.isArray(value)
+    return value !== null && typeof value === "object" && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
   }
 
   private asString(value: unknown): string {
-    if (typeof value !== 'string') {
-      return '';
+    if (typeof value !== "string") {
+      return "";
     }
 
     const normalized = value.trim();
-    return normalized.length > 0 ? normalized : '';
+    return normalized.length > 0 ? normalized : "";
   }
 
   private asOptionalString(value: unknown): string | undefined {
@@ -434,13 +646,21 @@ export class FileService {
 
   private asOptionalNumber(value: unknown): number | undefined {
     const normalized =
-      typeof value === 'number' ? value : typeof value === 'string' && value.trim().length > 0 ? Number(value) : NaN;
+      typeof value === "number"
+        ? value
+        : typeof value === "string" && value.trim().length > 0
+          ? Number(value)
+          : NaN;
     return Number.isFinite(normalized) ? normalized : undefined;
   }
 
   private asPositiveNumber(value: unknown): number {
     const normalized =
-      typeof value === 'number' ? value : typeof value === 'string' && value.trim().length > 0 ? Number(value) : NaN;
+      typeof value === "number"
+        ? value
+        : typeof value === "string" && value.trim().length > 0
+          ? Number(value)
+          : NaN;
     return Number.isFinite(normalized) && normalized > 0 ? normalized : 0;
   }
 }

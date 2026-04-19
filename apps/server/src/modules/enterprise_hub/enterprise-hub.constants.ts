@@ -28,6 +28,25 @@ export const ENTERPRISE_HUB_REQUIRED_REVIEW_ACTIONS = [
   'revision_required',
   'rejected'
 ] as const;
+export const ENTERPRISE_HUB_CHANGE_REQUEST_STATUSES = [
+  'draft',
+  'submitted',
+  'under_review',
+  'revision_required',
+  'approved',
+  'rejected',
+  'applied'
+] as const;
+export const ENTERPRISE_HUB_ACTIVE_CHANGE_REQUEST_STATUSES = [
+  'draft',
+  'submitted',
+  'under_review',
+  'revision_required'
+] as const;
+export const ENTERPRISE_HUB_EDITABLE_CHANGE_REQUEST_STATUSES = [
+  'draft',
+  'revision_required'
+] as const;
 
 export const BOARD_LABELS: Record<string, string> = {
   company: '优秀公司',

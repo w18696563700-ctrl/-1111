@@ -1,4 +1,4 @@
-import { Body, Controller, Headers, HttpCode, HttpStatus, Post } from '@nestjs/common';
+import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
 import { FileService } from './file.service';
 
@@ -24,5 +24,14 @@ export class AppFileUploadController {
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
     return this.fileService.confirmUpload(payload, headers, idempotencyKey);
+  }
+
+  @Get('access')
+  getAccess(
+    @Headers() headers: IncomingHttpHeaders,
+    @Query('fileAssetId') fileAssetId?: string,
+    @Query('mode') mode?: string,
+  ) {
+    return this.fileService.getAccess(headers, fileAssetId, mode);
   }
 }

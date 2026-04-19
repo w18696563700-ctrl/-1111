@@ -76,7 +76,9 @@ extension _EnterpriseWorkbenchPageLoad on _EnterpriseApplicationPageState {
         _workbenchResult = EnterpriseHubLoadResult<EnterpriseHubWorkbenchData>(
           state: AppPageState.errorNonRetryable,
           method: 'GET',
-          path: '/api/app/exhibition/enterprise-hub/workbench',
+          path: EnterpriseHubBoardCanonicalFamily.forBoard(
+            _boardType,
+          ).workbench,
           message: '$error',
         );
       });
@@ -94,10 +96,12 @@ extension _EnterpriseWorkbenchPageLoad on _EnterpriseApplicationPageState {
       final results = await Future.wait<Object>(<Future<Object>>[
         EnterpriseHubPublishedChangeConsumerLayer.instance
             .loadCurrentChangeWorkbench(
+              boardType: _boardType,
               enterpriseId: normalizedEnterpriseId ?? '',
             ),
         EnterpriseHubPublishedChangeConsumerLayer.instance
             .loadCurrentChangeStatus(
+              boardType: _boardType,
               enterpriseId: normalizedEnterpriseId ?? '',
             ),
         EnterpriseHubConsumerLayer.instance.loadEnterpriseDetail(
@@ -161,7 +165,10 @@ extension _EnterpriseWorkbenchPageLoad on _EnterpriseApplicationPageState {
               state: AppPageState.errorNonRetryable,
               method: 'GET',
               path:
-                  '/api/app/exhibition/enterprise-hub/enterprises/${normalizedEnterpriseId ?? '{enterpriseId}'}/changes/current',
+                  EnterpriseHubPublishedChangeCanonicalPaths.workbenchWithEnterpriseId(
+                    _boardType,
+                    normalizedEnterpriseId ?? '{enterpriseId}',
+                  ),
               message: '$error',
             );
         _publishedLiveDetailResult = null;

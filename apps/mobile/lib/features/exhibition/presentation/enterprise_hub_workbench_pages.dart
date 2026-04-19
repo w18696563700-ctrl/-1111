@@ -370,9 +370,12 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
 
   void _hydrateRouteContext() {
     final routeUri = _currentRouteUri();
-    final routeBoardType = EnterpriseBoardType.fromRaw(
-      routeUri.queryParameters['boardType'],
+    final fixedBoardType = EnterpriseBoardType.fromRaw(
+      ExhibitionRoutes.enterpriseBoardTypeFromPrivatePath(routeUri.path),
     );
+    final routeBoardType =
+        fixedBoardType ??
+        EnterpriseBoardType.fromRaw(routeUri.queryParameters['boardType']);
     final publishedChangeRoute =
         routeUri.queryParameters['mode']?.trim() ==
         _enterprisePublishedChangeRouteMode;
@@ -382,7 +385,7 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
     _routeEnterpriseId = _normalizedText(
       routeUri.queryParameters['enterpriseId'],
     );
-    if (routeUri.path == ExhibitionRoutes.enterpriseCaseEditor) {
+    if (ExhibitionRoutes.isEnterpriseCaseEditorPath(routeUri.path)) {
       _surfaceMode = _EnterpriseWorkbenchSurfaceMode.caseEditor;
       _routeCaseId = _normalizedText(routeUri.queryParameters['caseId']);
       if (!publishedChangeRoute) {
@@ -439,7 +442,7 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
         boardType: _boardType.contractName,
       );
     }
-    return ExhibitionRoutes.enterpriseApplyWithBoardType(
+    return ExhibitionRoutes.enterpriseWorkbenchForBoard(
       _boardType.contractName,
     );
   }

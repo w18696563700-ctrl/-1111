@@ -417,14 +417,9 @@ void main() {
           'status': 'approved',
         },
       ],
-      'reviewSummary': <String, Object?>{
-        'keywordTags': <String>[],
-      },
+      'reviewSummary': <String, Object?>{'keywordTags': <String>[]},
       'contacts': <Object?>[
-        <String, Object?>{
-          'contactName': '王伟伟',
-          'mobile': '13800000000',
-        },
+        <String, Object?>{'contactName': '王伟伟', 'mobile': '13800000000'},
       ],
     };
   }
@@ -438,12 +433,100 @@ void main() {
     );
   }
 
+  EnterpriseBoardType resolveEnterpriseBoardType(
+    String? raw, {
+    EnterpriseBoardType fallback = EnterpriseBoardType.company,
+  }) {
+    return EnterpriseBoardType.fromRaw(raw) ?? fallback;
+  }
+
+  EnterpriseHubBoardCanonicalFamily boardFamily(EnterpriseBoardType boardType) {
+    return EnterpriseHubBoardCanonicalFamily.forBoard(boardType);
+  }
+
+  String boardEnterprisesPath(EnterpriseBoardType boardType) {
+    return boardFamily(boardType).enterprises;
+  }
+
+  String boardRecommendationsPath(EnterpriseBoardType boardType) {
+    return boardFamily(boardType).recommendations;
+  }
+
+  String boardWorkbenchPath(EnterpriseBoardType boardType) {
+    return boardFamily(boardType).workbench;
+  }
+
+  String boardEnterpriseDetailPath(
+    EnterpriseBoardType boardType,
+    String enterpriseId,
+  ) {
+    return boardFamily(boardType).enterpriseDetail(enterpriseId);
+  }
+
+  String boardEnsureShellPath(EnterpriseBoardType boardType) {
+    return boardFamily(boardType).ensureShell;
+  }
+
+  String boardUpdateBasicPath(
+    EnterpriseBoardType boardType,
+    String enterpriseId,
+  ) {
+    return boardFamily(boardType).updateBasic(enterpriseId);
+  }
+
+  String boardSubmitApplicationPath(
+    EnterpriseBoardType boardType,
+    String applicationId,
+  ) {
+    return boardFamily(boardType).submitApplication(applicationId);
+  }
+
+  String boardApplicationStatusPath(
+    EnterpriseBoardType boardType,
+    String applicationId,
+  ) {
+    return boardFamily(boardType).applicationStatus(applicationId);
+  }
+
+  String boardPublishedChangeWorkbenchPath(
+    EnterpriseBoardType boardType,
+    String enterpriseId,
+  ) {
+    return boardFamily(boardType).publishedChangeWorkbench(enterpriseId);
+  }
+
+  String boardPublishedChangeStatusPath(
+    EnterpriseBoardType boardType,
+    String enterpriseId,
+  ) {
+    return boardFamily(boardType).publishedChangeStatus(enterpriseId);
+  }
+
+  String boardPublishedChangeBasicPath(
+    EnterpriseBoardType boardType,
+    String enterpriseId,
+  ) {
+    return boardFamily(boardType).publishedChangeBasic(enterpriseId);
+  }
+
+  String boardPublishedChangeSubmitPath(
+    EnterpriseBoardType boardType,
+    String enterpriseId,
+  ) {
+    return boardFamily(boardType).publishedChangeSubmit(enterpriseId);
+  }
+
   void installEnterpriseWorkbenchApplyDependencies({
+    EnterpriseBoardType boardType = EnterpriseBoardType.company,
     Map<String, Object?>? workbenchPayload,
     String? organizationCityCode = '510100',
     String? certificationLicenseFileId = 'license-1',
     Map<String, Object?>? certificationOcrBody,
   }) {
+    final resolvedBoardType = resolveEnterpriseBoardType(
+      workbenchPayload?['boardType'] as String?,
+      fallback: boardType,
+    );
     EnterpriseHubWorkbenchConsumerLayer.install(
       EnterpriseHubWorkbenchConsumerLayer(
         client: AppApiClient(
@@ -453,7 +536,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/workbench':
+                  'GET ${boardWorkbenchPath(resolvedBoardType)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -555,6 +638,7 @@ void main() {
   }
 
   void installPublishedChangeWorkbenchDependencies({
+    EnterpriseBoardType boardType = EnterpriseBoardType.company,
     Map<String, Object?>? workbenchPayload,
     Map<String, Object?>? statusPayload,
     Map<String, Object?>? liveDetailPayload,
@@ -563,6 +647,10 @@ void main() {
     Map<String, Object?>? certificationOcrBody,
     bool installConsumer = true,
   }) {
+    final resolvedBoardType = resolveEnterpriseBoardType(
+      workbenchPayload?['boardType'] as String?,
+      fallback: boardType,
+    );
     if (installConsumer) {
       EnterpriseHubPublishedChangeConsumerLayer.install(
         EnterpriseHubPublishedChangeConsumerLayer(
@@ -573,7 +661,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                    'GET ${boardPublishedChangeWorkbenchPath(resolvedBoardType, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -583,7 +671,7 @@ void main() {
                                 buildPublishedChangeWorkbenchPayload(),
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(resolvedBoardType, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -608,7 +696,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1':
+                  'GET ${boardEnterpriseDetailPath(resolvedBoardType, 'ent-published-1')}':
                       (AppApiRequest request) async {
                         final boardType =
                             workbenchPayload?['boardType'] as String? ??
@@ -935,7 +1023,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/enterprises':
+                  'GET ${boardEnterprisesPath(EnterpriseBoardType.company)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -970,7 +1058,7 @@ void main() {
                           },
                         );
                       },
-                  'GET /api/app/exhibition/enterprise-hub/recommendations':
+                  'GET ${boardRecommendationsPath(EnterpriseBoardType.company)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -1024,7 +1112,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/enterprises':
+                  'GET ${boardEnterprisesPath(EnterpriseBoardType.supplier)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -1061,7 +1149,7 @@ void main() {
                           },
                         );
                       },
-                  'GET /api/app/exhibition/enterprise-hub/recommendations':
+                  'GET ${boardRecommendationsPath(EnterpriseBoardType.supplier)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -1109,7 +1197,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises':
+                    'GET ${boardEnterprisesPath(EnterpriseBoardType.factory)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1145,7 +1233,7 @@ void main() {
                             },
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/recommendations':
+                    'GET ${boardRecommendationsPath(EnterpriseBoardType.factory)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1179,7 +1267,7 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('华南数字制作工厂'), findsOneWidget);
-      expect(find.textContaining('配送'), findsWidgets);
+      expect(find.text('木作'), findsWidgets);
     },
   );
 
@@ -1196,7 +1284,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises':
+                    'GET ${boardEnterprisesPath(EnterpriseBoardType.factory)}':
                         (AppApiRequest request) async {
                           seenUri = request.uri;
                           return AppApiResponse(
@@ -1233,7 +1321,6 @@ void main() {
       );
 
       expect(seenUri?.queryParameters, <String, String>{
-        'boardType': 'factory',
         'keyword': '木作',
         'provinceCode': '500000',
         'cityCode': '500100',
@@ -1256,7 +1343,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises':
+                    'GET ${boardEnterprisesPath(EnterpriseBoardType.company)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1273,7 +1360,7 @@ void main() {
                             },
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/recommendations':
+                    'GET ${boardRecommendationsPath(EnterpriseBoardType.company)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1319,7 +1406,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/workbench':
+                    'GET ${boardWorkbenchPath(EnterpriseBoardType.company)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1360,7 +1447,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/enterprises':
+                  'GET ${boardEnterprisesPath(EnterpriseBoardType.company)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 403,
@@ -1370,7 +1457,7 @@ void main() {
                           },
                         );
                       },
-                  'GET /api/app/exhibition/enterprise-hub/recommendations':
+                  'GET ${boardRecommendationsPath(EnterpriseBoardType.company)}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -1406,7 +1493,7 @@ void main() {
         client: AppApiClient(
           transport: FakeAppApiTransport(
             handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/exhibition/enterprise-hub/enterprises/ent-company-1':
+              'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.company, 'ent-company-1')}':
                   (AppApiRequest request) async {
                     return AppApiResponse(
                       statusCode: 200,
@@ -1557,10 +1644,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('地址与服务区域'), findsOneWidget);
     expect(find.text('四川省成都市高新区天府大道 1 号'), findsOneWidget);
-    expect(
-      find.text('地图能力暂未接通。当前公开详情未返回经纬度或地图链接，先以地址与服务区域说明企业位置。'),
-      findsOneWidget,
-    );
+    expect(find.text('当前公开详情还没有返回可用坐标，先按文字地址展示企业位置。'), findsOneWidget);
     expect(find.text('查看地图'), findsNothing);
 
     expect(find.text('核心能力'), findsNothing);
@@ -1610,7 +1694,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-factory-1':
+                    'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.factory, 'ent-factory-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1827,7 +1911,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-factory-case-1':
+                    'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.factory, 'ent-factory-case-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -1998,7 +2082,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-map-1':
+                    'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.company, 'ent-map-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -2071,7 +2155,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('地图位置已接通'), findsOneWidget);
+      expect(find.text('当前已解析出可展示坐标，地图预览已接通。'), findsOneWidget);
       expect(find.text('重庆市渝北区金开大道 1 号'), findsWidgets);
       expect(find.byType(Image), findsWidgets);
       expect(find.textContaining('地图能力暂未接通'), findsNothing);
@@ -2090,7 +2174,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/enterprises/ent-missing':
+                  'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.company, 'ent-missing')}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 404,
@@ -2137,72 +2221,33 @@ void main() {
           client: AppApiClient(
             transport: FakeAppApiTransport(
               handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/exhibition/enterprise-hub/enterprises':
+                'GET ${boardEnterprisesPath(EnterpriseBoardType.company)}':
                     (AppApiRequest request) async {
-                      final boardType =
-                          request.uri.queryParameters['boardType'] ?? 'company';
-                      final item = switch (boardType) {
-                        'company' => const <String, Object?>{
-                          'enterpriseId':
-                              'e2a016f4-0b6a-497d-902c-409413858ca9',
-                          'boardType': 'company',
-                          'name': '西南会展搭建有限公司',
-                          'provinceName': '四川',
-                          'cityName': '成都',
-                          'primaryBoardLabel': '优秀公司',
-                          'secondaryCapabilityLabels': <String>['主场服务'],
-                          'shortIntro': '承接展台搭建与活动执行。',
-                          'certificationLabel': '已认证',
-                          'caseCount': 12,
-                          'boardHighlights': <String, Object?>{
-                            'company': <String, Object?>{
-                              'exhibitionTypes': <String>['特装展台'],
-                            },
-                          },
-                        },
-                        'factory' => const <String, Object?>{
-                          'enterpriseId':
-                              'bf5ff83a-26e7-4138-8157-042fb38a5f46',
-                          'boardType': 'factory',
-                          'name': '华南数字制作工厂',
-                          'provinceName': '广东',
-                          'cityName': '佛山',
-                          'primaryBoardLabel': '优秀工厂',
-                          'secondaryCapabilityLabels': <String>['木作制作'],
-                          'shortIntro': '覆盖木作、喷绘与仓储配套。',
-                          'certificationLabel': '已认证',
-                          'caseCount': 8,
-                          'boardHighlights': <String, Object?>{
-                            'factory': <String, Object?>{
-                              'processTypes': <String>['木作'],
-                            },
-                          },
-                        },
-                        _ => const <String, Object?>{
-                          'enterpriseId':
-                              'c0576f5c-854c-4b78-9f93-6d57e55d8b47',
-                          'boardType': 'supplier',
-                          'name': '华东会展物料供应商',
-                          'provinceName': '江苏',
-                          'cityName': '苏州',
-                          'primaryBoardLabel': '优秀供应商',
-                          'secondaryCapabilityLabels': <String>['家具租赁'],
-                          'shortIntro': '供应展具、家具与多媒体设备。',
-                          'certificationLabel': '已认证',
-                          'caseCount': 6,
-                          'boardHighlights': <String, Object?>{
-                            'supplier': <String, Object?>{
-                              'supplyCategories': <String>['家具租赁'],
-                            },
-                          },
-                        },
-                      };
                       return AppApiResponse(
                         statusCode: 200,
                         uri: request.uri,
-                        body: <String, Object?>{
+                        body: const <String, Object?>{
                           'recommended': <Object?>[],
-                          'items': <Object?>[item],
+                          'items': <Object?>[
+                            <String, Object?>{
+                              'enterpriseId':
+                                  'e2a016f4-0b6a-497d-902c-409413858ca9',
+                              'boardType': 'company',
+                              'name': '西南会展搭建有限公司',
+                              'provinceName': '四川',
+                              'cityName': '成都',
+                              'primaryBoardLabel': '优秀公司',
+                              'secondaryCapabilityLabels': <String>['主场服务'],
+                              'shortIntro': '承接展台搭建与活动执行。',
+                              'certificationLabel': '已认证',
+                              'caseCount': 12,
+                              'boardHighlights': <String, Object?>{
+                                'company': <String, Object?>{
+                                  'exhibitionTypes': <String>['特装展台'],
+                                },
+                              },
+                            },
+                          ],
                           'pagination': <String, Object?>{
                             'page': 1,
                             'pageSize': 10,
@@ -2212,7 +2257,79 @@ void main() {
                         },
                       );
                     },
-                'GET /api/app/exhibition/enterprise-hub/enterprises/e2a016f4-0b6a-497d-902c-409413858ca9':
+                'GET ${boardEnterprisesPath(EnterpriseBoardType.factory)}':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'recommended': <Object?>[],
+                          'items': <Object?>[
+                            <String, Object?>{
+                              'enterpriseId':
+                                  'bf5ff83a-26e7-4138-8157-042fb38a5f46',
+                              'boardType': 'factory',
+                              'name': '华南数字制作工厂',
+                              'provinceName': '广东',
+                              'cityName': '佛山',
+                              'primaryBoardLabel': '优秀工厂',
+                              'secondaryCapabilityLabels': <String>['木作制作'],
+                              'shortIntro': '覆盖木作、喷绘与仓储配套。',
+                              'certificationLabel': '已认证',
+                              'caseCount': 8,
+                              'boardHighlights': <String, Object?>{
+                                'factory': <String, Object?>{
+                                  'processTypes': <String>['木作'],
+                                },
+                              },
+                            },
+                          ],
+                          'pagination': <String, Object?>{
+                            'page': 1,
+                            'pageSize': 10,
+                            'total': 1,
+                            'hasMore': false,
+                          },
+                        },
+                      );
+                    },
+                'GET ${boardEnterprisesPath(EnterpriseBoardType.supplier)}':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'recommended': <Object?>[],
+                          'items': <Object?>[
+                            <String, Object?>{
+                              'enterpriseId':
+                                  'c0576f5c-854c-4b78-9f93-6d57e55d8b47',
+                              'boardType': 'supplier',
+                              'name': '华东会展物料供应商',
+                              'provinceName': '江苏',
+                              'cityName': '苏州',
+                              'primaryBoardLabel': '优秀供应商',
+                              'secondaryCapabilityLabels': <String>['家具租赁'],
+                              'shortIntro': '供应展具、家具与多媒体设备。',
+                              'certificationLabel': '已认证',
+                              'caseCount': 6,
+                              'boardHighlights': <String, Object?>{
+                                'supplier': <String, Object?>{
+                                  'supplyCategories': <String>['家具租赁'],
+                                },
+                              },
+                            },
+                          ],
+                          'pagination': <String, Object?>{
+                            'page': 1,
+                            'pageSize': 10,
+                            'total': 1,
+                            'hasMore': false,
+                          },
+                        },
+                      );
+                    },
+                'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.company, 'e2a016f4-0b6a-497d-902c-409413858ca9')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -2239,7 +2356,7 @@ void main() {
                         },
                       );
                     },
-                'GET /api/app/exhibition/enterprise-hub/enterprises/bf5ff83a-26e7-4138-8157-042fb38a5f46':
+                'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.factory, 'bf5ff83a-26e7-4138-8157-042fb38a5f46')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -2266,7 +2383,7 @@ void main() {
                         },
                       );
                     },
-                'GET /api/app/exhibition/enterprise-hub/enterprises/c0576f5c-854c-4b78-9f93-6d57e55d8b47':
+                'GET ${boardEnterpriseDetailPath(EnterpriseBoardType.supplier, 'c0576f5c-854c-4b78-9f93-6d57e55d8b47')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -2387,7 +2504,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/workbench':
+                    'GET ${boardWorkbenchPath(EnterpriseBoardType.company)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -2553,7 +2670,7 @@ void main() {
         ),
         findsOneWidget,
       );
-      expect(find.text('优秀公司工作台'), findsOneWidget);
+      expect(find.text('公司展示工作台'), findsWidgets);
       expect(find.text('企业认证'), findsNothing);
       expect(
         find.byKey(
@@ -2569,13 +2686,12 @@ void main() {
       final sectionTitles = await collectEnterpriseSectionTitles(
         tester,
         <String>[
-          '优秀公司工作台',
+          '公司展示工作台',
           '展示标识',
           '企业画册',
           '地图 / 位置',
           '基础资料',
           '联系人',
-          '案例编辑器',
           '案例库',
           '提交申请',
         ],
@@ -2583,13 +2699,12 @@ void main() {
       expect(
         sectionTitles,
         containsAllInOrder(<String>[
-          '优秀公司工作台',
+          '公司展示工作台',
           '展示标识',
           '企业画册',
           '地图 / 位置',
           '基础资料',
           '联系人',
-          '案例编辑器',
           '案例库',
           '提交申请',
         ]),
@@ -2664,7 +2779,7 @@ void main() {
       var shellReady = false;
       final actionTransport = FakeAppApiTransport(
         handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-          'POST /api/app/exhibition/enterprise-hub/enterprises/ensure-shell':
+          'POST ${boardEnsureShellPath(EnterpriseBoardType.company)}':
               (AppApiRequest request) async {
                 shellReady = true;
                 return AppApiResponse(
@@ -2677,7 +2792,7 @@ void main() {
                   },
                 );
               },
-          'PUT /api/app/exhibition/enterprise-hub/enterprises/ent-shell-1/basic':
+          'PUT ${boardUpdateBasicPath(EnterpriseBoardType.company, 'ent-shell-1')}':
               (AppApiRequest request) async {
                 return AppApiResponse(
                   statusCode: 200,
@@ -2695,7 +2810,7 @@ void main() {
             transport: FakeAppApiTransport(
               handlers:
                   <String, Future<AppApiResponse> Function(AppApiRequest)>{
-                    'GET /api/app/exhibition/enterprise-hub/workbench':
+                    'GET ${boardWorkbenchPath(EnterpriseBoardType.company)}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -2741,19 +2856,32 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
 
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey<String>('enterprise-workbench-save-basic')),
-        240,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey<String>('enterprise-workbench-save-basic')),
-      );
-      await tester.pumpAndSettle();
+      for (var index = 0; index < 20; index += 1) {
+        if (find
+            .byKey(const ValueKey<String>('enterprise-workbench-save-basic'))
+            .evaluate()
+            .isNotEmpty) {
+          break;
+        }
+        await tester.pump(const Duration(milliseconds: 100));
+      }
 
-      await tester.tap(
-        find.byKey(const ValueKey<String>('enterprise-workbench-save-basic')),
+      final saveBasicButton = find.byKey(
+        const ValueKey<String>('enterprise-workbench-save-basic'),
       );
+      final scrollable = find.byType(Scrollable).first;
+      for (var index = 0; index < 8; index += 1) {
+        if (saveBasicButton.evaluate().isNotEmpty) {
+          break;
+        }
+        await tester.drag(scrollable, const Offset(0, -320));
+        await tester.pump(const Duration(milliseconds: 100));
+      }
+      expect(saveBasicButton, findsOneWidget);
+      await tester.ensureVisible(saveBasicButton);
+      await tester.pump(const Duration(milliseconds: 100));
+
+      await tester.tap(saveBasicButton);
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
@@ -2767,17 +2895,15 @@ void main() {
       expect(
         requestKeys,
         containsAllInOrder(<String>[
-          'POST /api/app/exhibition/enterprise-hub/enterprises/ensure-shell',
-          'PUT /api/app/exhibition/enterprise-hub/enterprises/ent-shell-1/basic',
+          'POST ${boardEnsureShellPath(EnterpriseBoardType.company)}',
+          'PUT ${boardUpdateBasicPath(EnterpriseBoardType.company, 'ent-shell-1')}',
         ]),
       );
       expect(
         requestKeys,
         isNot(contains('POST /api/app/exhibition/enterprise-hub/applications')),
       );
-      expect(actionTransport.requests.first.body, <String, Object?>{
-        'boardType': 'company',
-      });
+      expect(actionTransport.requests.first.body, const <String, Object?>{});
       expect(state.debugCurrentEnterpriseIdForTest, 'ent-shell-1');
       expect(find.textContaining('请先填写联系人姓名和手机号'), findsNothing);
     },
@@ -2885,7 +3011,7 @@ void main() {
   );
 
   testWidgets(
-    'enterprise workbench case editor uses save-case language and removes create-case jargon',
+    'enterprise case editor create route starts in save-case mode without nested case library actions',
     (WidgetTester tester) async {
       installEnterpriseWorkbenchApplyDependencies(
         workbenchPayload: buildWorkbenchPayload(
@@ -2906,28 +3032,22 @@ void main() {
 
       await tester.pumpWidget(
         ExhibitionMobileApp(
-          initialRoute: ExhibitionRoutes.enterpriseApplyWithBoardType(
+          initialRoute: ExhibitionRoutes.enterpriseCaseEditorWithBoardType(
             'company',
           ),
           bootstrapShellContext: buildEnterpriseShellContext(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
 
-      await tester.scrollUntilVisible(
-        find.byKey(const ValueKey<String>('enterprise-workbench-save-case')),
-        220,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.ensureVisible(
-        find.byKey(const ValueKey<String>('enterprise-workbench-save-case')),
-      );
-      await tester.pump(const Duration(milliseconds: 100));
-
+      final dynamic state = tester.state(find.byType(EnterpriseApplicationPage));
+      expect(state.debugIsPublishedChangeModeForTest, isFalse);
+      expect(state.debugCaseSaveActionLabelForTest, '保存案例');
       expect(find.text('案例编辑器'), findsOneWidget);
-      expect(find.text('保存案例'), findsOneWidget);
-      expect(find.text('新增案例'), findsNothing);
-      expect(find.text('已有案例'), findsNothing);
+      expect(find.text('公司案例编辑工作台'), findsOneWidget);
+      expect(find.text('返回企业工作台'), findsOneWidget);
+      expect(find.text('案例库'), findsNothing);
+      expect(find.text('继续编辑'), findsNothing);
     },
   );
 
@@ -3164,6 +3284,84 @@ void main() {
     },
   );
 
+  testWidgets(
+    'enterprise case editor workbench does not nest case library actions',
+    (WidgetTester tester) async {
+      installEnterpriseWorkbenchApplyDependencies(
+        workbenchPayload: buildWorkbenchPayload(
+          boardType: 'factory',
+          enterpriseId: 'ent-published-1',
+          latestApplicationStatus: 'submitted',
+          cases: const <Object?>[
+            <String, Object?>{
+              'caseId': 'case-1',
+              'boardType': 'factory',
+              'title': 'live snapshot',
+              'summary': '当前线上案例摘要',
+              'caseCoverFileAssetId': 'file-live-cover-1',
+              'caseMediaFileAssetIds': <String>['file-live-cover-1'],
+              'caseImageUrlMap': <String, String>{
+                'file-live-cover-1': 'https://example.com/live-cover-1.png',
+              },
+              'isFeatured': false,
+              'caseStatus': 'approved',
+            },
+          ],
+        ),
+      );
+      installPublishedChangeWorkbenchDependencies(
+        workbenchPayload: buildPublishedChangeWorkbenchPayload(
+          enterpriseId: 'ent-published-1',
+          boardType: 'factory',
+          cases: const <Object?>[
+            <String, Object?>{
+              'caseId': 'case-1',
+              'boardType': 'factory',
+              'title': 'current change snapshot',
+              'exhibitionType': '机械展',
+              'city': '重庆',
+              'eventTime': '2026-04-12',
+              'summary': '当前变更中的工厂案例',
+              'caseCoverFileAssetId': 'file-draft-cover-1',
+              'caseMediaFileAssetIds': <String>[
+                'file-draft-cover-1',
+                'file-draft-media-1',
+              ],
+              'caseImageUrlMap': <String, String>{
+                'file-draft-cover-1': 'https://example.com/draft-cover-1.png',
+                'file-draft-media-1': 'https://example.com/draft-media-1.png',
+              },
+              'isFeatured': true,
+              'caseStatus': 'draft',
+            },
+          ],
+        ),
+      );
+
+      await tester.pumpWidget(
+        ExhibitionMobileApp(
+          initialRoute: ExhibitionRoutes.enterpriseCaseEditorWithBoardType(
+            'factory',
+            enterpriseId: 'ent-published-1',
+            caseId: 'case-1',
+          ),
+          bootstrapShellContext: buildEnterpriseShellContext(),
+        ),
+      );
+      await tester.pump();
+      await tester.pump(const Duration(seconds: 1));
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
+
+      expect(find.text('工厂案例编辑工作台'), findsOneWidget);
+      expect(find.text('案例编辑器'), findsOneWidget);
+      expect(find.text('返回变更工作台'), findsOneWidget);
+      expect(find.text('案例库'), findsNothing);
+      expect(find.text('继续编辑'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '新增案例'), findsNothing);
+    },
+  );
+
   test(
     'enterprise workbench case update body matches direct continuation contract',
     () {
@@ -3289,7 +3487,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                    'GET ${boardPublishedChangeWorkbenchPath(EnterpriseBoardType.factory, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           publishedWorkbenchCalls += 1;
                           return AppApiResponse(
@@ -3301,7 +3499,7 @@ void main() {
                             ),
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.factory, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -3342,7 +3540,7 @@ void main() {
       expect(state.debugIsPublishedChangeModeForTest, isTrue);
       expect(state.debugHasPublishedWorkbenchDataForTest, isTrue);
       expect(state.debugWorkbenchStateForTest, isNull);
-      expect(find.text('优秀工厂变更工作台'), findsOneWidget);
+      expect(find.text('工厂展示变更工作台'), findsOneWidget);
       expect(
         find.byKey(
           const ValueKey<String>(
@@ -3375,7 +3573,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                    'GET ${boardPublishedChangeWorkbenchPath(EnterpriseBoardType.factory, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -3405,7 +3603,7 @@ void main() {
                             ),
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.factory, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -3796,7 +3994,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                    'GET ${boardPublishedChangeWorkbenchPath(EnterpriseBoardType.company, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           seenWorkbenchRequest = request;
                           return AppApiResponse(
@@ -3805,7 +4003,7 @@ void main() {
                             body: buildPublishedChangeWorkbenchPayload(),
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.company, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           seenStatusRequest = request;
                           return AppApiResponse(
@@ -3840,11 +4038,17 @@ void main() {
       );
       expect(
         seenWorkbenchRequest?.canonicalPath,
-        '/api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current',
+        boardPublishedChangeWorkbenchPath(
+          EnterpriseBoardType.company,
+          'ent-published-1',
+        ),
       );
       expect(
         seenStatusRequest?.canonicalPath,
-        '/api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status',
+        boardPublishedChangeStatusPath(
+          EnterpriseBoardType.company,
+          'ent-published-1',
+        ),
       );
       expect(state.debugIsPublishedChangeModeForTest, isTrue);
       expect(state.debugCurrentEnterpriseIdForTest, 'ent-published-1');
@@ -3854,7 +4058,7 @@ void main() {
         reason: state.debugPublishedWorkbenchMessageForTest,
       );
       expect(state.debugHasPublishedWorkbenchDataForTest, isTrue);
-      expect(find.text('优秀公司变更工作台'), findsOneWidget);
+      expect(find.text('公司展示变更工作台'), findsOneWidget);
       expect(
         find.byKey(
           const ValueKey<String>(
@@ -3865,7 +4069,9 @@ void main() {
       );
       expect(
         find.byKey(
-          const ValueKey<String>('enterprise-published-change-current-snapshot'),
+          const ValueKey<String>(
+            'enterprise-published-change-current-snapshot',
+          ),
         ),
         findsNothing,
       );
@@ -3883,7 +4089,9 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.byKey(
-          const ValueKey<String>('enterprise-published-change-current-snapshot'),
+          const ValueKey<String>(
+            'enterprise-published-change-current-snapshot',
+          ),
         ),
         findsOneWidget,
       );
@@ -3921,10 +4129,7 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('当前变更稿预览'), findsOneWidget);
-      expect(
-        find.textContaining('当前变更稿预览优先使用已解析到的 Logo'),
-        findsNothing,
-      );
+      expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsNothing);
       final previewToggle = find.byKey(
         const ValueKey<String>('enterprise-published-change-preview-toggle'),
       );
@@ -3932,22 +4137,21 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(previewToggle);
       await tester.pumpAndSettle();
-      expect(
-        find.textContaining('当前变更稿预览优先使用已解析到的 Logo'),
-        findsOneWidget,
-      );
+      expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsOneWidget);
       expect(find.textContaining('待 apply'), findsNothing);
-      final sectionTitles =
-          await collectEnterpriseSectionTitles(tester, <String>[
-            '当前变更稿预览',
-            '展示标识',
-            '企业画册',
-            '地图 / 位置',
-            '基础资料',
-            '联系人',
-            '案例库',
-            '提交变更',
-          ]);
+      final sectionTitles = await collectEnterpriseSectionTitles(
+        tester,
+        <String>[
+          '当前变更稿预览',
+          '展示标识',
+          '企业画册',
+          '地图 / 位置',
+          '基础资料',
+          '联系人',
+          '案例库',
+          '提交变更',
+        ],
+      );
       expect(
         sectionTitles,
         containsAll(<String>[
@@ -3974,7 +4178,7 @@ void main() {
           client: AppApiClient(
             transport: FakeAppApiTransport(
               handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                'GET ${boardPublishedChangeWorkbenchPath(EnterpriseBoardType.company, 'ent-published-1')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -3982,7 +4186,7 @@ void main() {
                         body: buildPublishedChangeWorkbenchPayload(),
                       );
                     },
-                'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.company, 'ent-published-1')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -3990,7 +4194,7 @@ void main() {
                         body: buildPublishedChangeStatusPayload(),
                       );
                     },
-                'PUT /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/basic':
+                'PUT ${boardPublishedChangeBasicPath(EnterpriseBoardType.company, 'ent-published-1')}':
                     (AppApiRequest request) async {
                       seenSaveRequest = request;
                       return AppApiResponse(
@@ -4034,7 +4238,10 @@ void main() {
 
       expect(
         seenSaveRequest?.canonicalPath,
-        '/api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/basic',
+        boardPublishedChangeBasicPath(
+          EnterpriseBoardType.company,
+          'ent-published-1',
+        ),
       );
       expect(find.text('基础资料已保存到当前变更内容，线上展示暂未更新。'), findsOneWidget);
       expect(find.textContaining('已立即上线'), findsNothing);
@@ -4053,7 +4260,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                    'GET ${boardPublishedChangeWorkbenchPath(EnterpriseBoardType.company, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -4061,7 +4268,7 @@ void main() {
                             body: buildPublishedChangeWorkbenchPayload(),
                           );
                         },
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.company, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -4118,7 +4325,7 @@ void main() {
           client: AppApiClient(
             transport: FakeAppApiTransport(
               handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+                'GET ${boardPublishedChangeWorkbenchPath(EnterpriseBoardType.company, 'ent-published-1')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -4130,7 +4337,7 @@ void main() {
                         ),
                       );
                     },
-                'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.company, 'ent-published-1')}':
                     (AppApiRequest request) async {
                       return AppApiResponse(
                         statusCode: 200,
@@ -4142,7 +4349,7 @@ void main() {
                         ),
                       );
                     },
-                'POST /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/submit':
+                'POST ${boardPublishedChangeSubmitPath(EnterpriseBoardType.company, 'ent-published-1')}':
                     (AppApiRequest request) async {
                       submitCount += 1;
                       return AppApiResponse(
@@ -4262,7 +4469,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.company, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -4307,7 +4514,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+                    'GET ${boardPublishedChangeStatusPath(EnterpriseBoardType.company, 'ent-published-1')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -4630,7 +4837,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/applications/app-1':
+                  'GET ${boardApplicationStatusPath(EnterpriseBoardType.company, 'app-1')}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 200,
@@ -4675,7 +4882,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/applications/c1e83c6f-4637-407f-8d41-5c1413821874':
+                    'GET ${boardApplicationStatusPath(EnterpriseBoardType.factory, 'c1e83c6f-4637-407f-8d41-5c1413821874')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 200,
@@ -4728,7 +4935,7 @@ void main() {
                     String,
                     Future<AppApiResponse> Function(AppApiRequest request)
                   >{
-                    'GET /api/app/exhibition/enterprise-hub/applications/app-401':
+                    'GET ${boardApplicationStatusPath(EnterpriseBoardType.company, 'app-401')}':
                         (AppApiRequest request) async {
                           return AppApiResponse(
                             statusCode: 401,
@@ -4774,7 +4981,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/applications/app-404':
+                  'GET ${boardApplicationStatusPath(EnterpriseBoardType.company, 'app-404')}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 404,
@@ -4817,7 +5024,7 @@ void main() {
                   String,
                   Future<AppApiResponse> Function(AppApiRequest request)
                 >{
-                  'GET /api/app/exhibition/enterprise-hub/applications/app-403':
+                  'GET ${boardApplicationStatusPath(EnterpriseBoardType.company, 'app-403')}':
                       (AppApiRequest request) async {
                         return AppApiResponse(
                           statusCode: 403,

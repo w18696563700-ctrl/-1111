@@ -3,19 +3,25 @@ import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
+import { normalizeEnterpriseAlbumFileAssetIds } from './enterprise-hub-album-truth';
+import { EnterpriseHubCertificationSyncService } from './enterprise-hub-certification-sync.service';
+import { EnterpriseHubContactWriteService } from './enterprise-hub-contact-write.service';
+import { EnterpriseHubListingWriteSupportService } from './enterprise-hub-listing-write-support.service';
+import { EnterpriseHubLocationService } from './enterprise-hub-location.service';
+import { EnterpriseHubMediaTruthService } from './enterprise-hub-media-truth.service';
+import { EnterpriseHubAutoReviewService } from './enterprise-hub-auto-review.service';
+import { EnterpriseHubAutoSlotService } from './enterprise-hub-auto-slot.service';
 import {
   BOARD_LABELS,
   ENTERPRISE_HUB_BOARD_TYPES
 } from './enterprise-hub.constants';
 import {
   applicationNotFound,
+  caseNotFound,
   caseRequired,
   certificationRequired,
-  contactRequired,
-  enterpriseNotFound,
   invalidBoardType,
   missingRequiredFields,
-  permissionDenied,
   profileNotCompleted
 } from './enterprise-hub.errors';
 import { EnterpriseApplicationEntity } from './entities/enterprise-application.entity';
@@ -31,6 +37,8 @@ import { EnterpriseServiceAreaEntity } from './entities/enterprise-service-area.
 
 @Injectable()
 export class EnterpriseHubWriteService {
+  private readonly autoReviewService = new EnterpriseHubAutoReviewService();
+
   constructor(
     @InjectRepository(EnterpriseListingEntity)
     private readonly listingRepository: Repository<EnterpriseListingEntity>,
@@ -51,43 +59,64 @@ export class EnterpriseHubWriteService {
     @InjectRepository(EnterpriseServiceAreaEntity)
     private readonly serviceAreaRepository: Repository<EnterpriseServiceAreaEntity>,
     @InjectRepository(EnterpriseReviewSummaryEntity)
-    private readonly reviewSummaryRepository: Repository<EnterpriseReviewSummaryEntity>
+    private readonly reviewSummaryRepository: Repository<EnterpriseReviewSummaryEntity>,
+    private readonly certificationSyncService: EnterpriseHubCertificationSyncService,
+    private readonly contactWriteService: EnterpriseHubContactWriteService,
+    private readonly listingWriteSupportService: EnterpriseHubListingWriteSupportService,
+    private readonly locationService: EnterpriseHubLocationService,
+    private readonly autoSlotService: EnterpriseHubAutoSlotService,
+    private readonly mediaTruthService: EnterpriseHubMediaTruthService,
   ) {}
 
+  async resolveLocation(
+    payload: Record<string, unknown>,
+    context: RequestContext,
+  ) {
+    return this.locationService.resolve(payload, context);
+  }
+
+  async ensureShell(payload: Record<string, unknown>, context: RequestContext) {
+    const boardType = this.readBoardType(payload.boardType);
+    const ensured = await this.ensureOwnedListingShell(boardType, context);
+    return {
+      enterpriseId: ensured.listing.id,
+      boardType: ensured.listing.primaryBoardType,
+      shellStatus: ensured.shellStatus,
+    };
+  }
+
   async createApplication(payload: Record<string, unknown>, context: RequestContext) {
-    this.requireOrganizationContext(context);
     const boardType = this.readBoardType(payload.applyBoardType);
     const applicantName = this.readText(payload.applicantName, 'applicantName');
     const applicantMobile = this.readText(payload.applicantMobile, 'applicantMobile');
+    const { listing } = await this.ensureOwnedListingShell(boardType, context);
+    await this.contactWriteService.upsertPrimaryContactFromApplication(
+      listing.id,
+      applicantName,
+      applicantMobile,
+    );
 
-    let listing = await this.listingRepository.findOneBy({ organizationId: context.organizationId });
-    if (!listing) {
-      listing = this.listingRepository.create({
-        id: randomUUID(),
-        organizationId: context.organizationId,
-        primaryBoardType: boardType,
-        secondaryCapabilities: [],
-        name: '',
-        shortIntro: '',
-        provinceCode: '',
-        provinceName: '',
-        cityCode: '',
-        cityName: '',
-        cooperationModes: [],
-        enterpriseStatus: 'unpublished',
-        displayStatus: 'hidden',
-        contactVisible: false
-      });
-      await this.listingRepository.save(listing);
-      await this.reviewSummaryRepository.save(
-        this.reviewSummaryRepository.create({
-          enterpriseId: listing.id,
-          keywordTags: []
-        })
-      );
+    const existingDraft = await this.applicationRepository.findOne({
+      where: {
+        enterpriseId: listing.id,
+        applicationStatus: 'draft'
+      },
+      order: { updatedAt: 'DESC', createdAt: 'DESC' }
+    });
+    if (existingDraft) {
+      if (existingDraft.applicantName !== applicantName) {
+        existingDraft.applicantName = applicantName;
+      }
+      if (existingDraft.applicantMobile !== applicantMobile) {
+        existingDraft.applicantMobile = applicantMobile;
+      }
+      await this.applicationRepository.save(existingDraft);
+      return {
+        applicationId: existingDraft.id,
+        enterpriseId: listing.id,
+        applicationStatus: existingDraft.applicationStatus
+      };
     }
-
-    await this.upsertPrimaryContact(listing.id, applicantName, applicantMobile);
 
     const application = this.applicationRepository.create({
       id: randomUUID(),
@@ -106,20 +135,72 @@ export class EnterpriseHubWriteService {
     };
   }
 
+  private async ensureOwnedListingShell(
+    boardType: string,
+    context: RequestContext,
+  ): Promise<{ listing: EnterpriseListingEntity; shellStatus: 'created' | 'existing' }> {
+    const organizationId =
+      await this.listingWriteSupportService.resolveOrganizationContext(context);
+    let listing = await this.listingRepository.findOneBy({
+      organizationId,
+      primaryBoardType: boardType,
+    });
+    let shellStatus: 'created' | 'existing' = 'existing';
+    if (!listing) {
+      shellStatus = 'created';
+      listing = this.listingRepository.create({
+        id: randomUUID(),
+        organizationId,
+        primaryBoardType: boardType,
+        secondaryCapabilities: [],
+        name: '',
+        shortIntro: '',
+        provinceCode: '',
+        provinceName: '',
+        cityCode: '',
+        cityName: '',
+        cooperationModes: [],
+        enterpriseStatus: 'unpublished',
+        displayStatus: 'hidden',
+        contactVisible: false
+      });
+      await this.listingRepository.save(listing);
+    }
+    await this.ensureReviewSummaryShell(listing.id);
+    await this.certificationSyncService.syncForListing(listing);
+    return { listing, shellStatus };
+  }
+
+  private async ensureReviewSummaryShell(enterpriseId: string) {
+    const existing = await this.reviewSummaryRepository.findOneBy({ enterpriseId });
+    if (existing) {
+      return existing;
+    }
+    return this.reviewSummaryRepository.save(
+      this.reviewSummaryRepository.create({
+        enterpriseId,
+        keywordTags: []
+      }),
+    );
+  }
+
   async updateBasic(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
-    const listing = await this.loadOwnedListing(enterpriseId, context);
+    const listing = await this.listingWriteSupportService.loadOwnedListing(enterpriseId, context);
     const patch = payload ?? {};
 
     if (typeof patch.name === 'string') listing.name = patch.name.trim();
     if (typeof patch.logoFileAssetId === 'string' || patch.logoFileAssetId === null) {
       listing.logoFileAssetId = this.readNullableString(patch.logoFileAssetId);
     }
-    if (typeof patch.coverFileAssetId === 'string' || patch.coverFileAssetId === null) {
-      listing.coverFileAssetId = this.readNullableString(patch.coverFileAssetId);
+    if (Array.isArray(patch.albumImageFileAssetIds)) {
+      listing.coverFileAssetId = null;
+      listing.albumImageFileAssetIds = normalizeEnterpriseAlbumFileAssetIds(
+        patch.albumImageFileAssetIds,
+      );
     }
     if (typeof patch.shortIntro === 'string') listing.shortIntro = patch.shortIntro.trim();
     if (typeof patch.fullIntro === 'string' || patch.fullIntro === null) {
-      listing.fullIntro = this.readNullableString(patch.fullIntro);
+      listing.fullIntro = this.readNullableString(patch.fullIntro)?.slice(0, 2000) ?? null;
     }
     if (typeof patch.provinceCode === 'string') listing.provinceCode = patch.provinceCode.trim();
     if (typeof patch.provinceName === 'string') listing.provinceName = patch.provinceName.trim();
@@ -141,15 +222,42 @@ export class EnterpriseHubWriteService {
       listing.contactVisible = patch.contactVisible;
     }
 
+    const normalizedLocation = this.locationService.normalizeWriteLocation(
+      patch.location,
+      {
+        addressText: this.readNullableString(patch.address) ?? listing.address,
+        provinceCode:
+          this.readNullableString(patch.provinceCode) ?? listing.provinceCode,
+        provinceName:
+          this.readNullableString(patch.provinceName) ?? listing.provinceName,
+        cityCode: this.readNullableString(patch.cityCode) ?? listing.cityCode,
+        cityName: this.readNullableString(patch.cityName) ?? listing.cityName,
+      },
+    );
+    this.locationService.applyToListing(listing, normalizedLocation);
+
+    await this.mediaTruthService.validateListingBasicMedia(listing, {
+      logoFileAssetId: listing.logoFileAssetId,
+      albumImageFileAssetIds: listing.albumImageFileAssetIds,
+    });
     await this.listingRepository.save(listing);
-    await this.upsertRegisteredArea(listing);
+    await this.mediaTruthService.syncListingBasicRefs(listing, {
+      logoFileAssetId: listing.logoFileAssetId,
+      albumImageFileAssetIds: listing.albumImageFileAssetIds,
+    });
+    await this.contactWriteService.upsertPrimaryContactFromBasic(listing.id, {
+      contactName: this.readNullableString(patch.contactName),
+      contactMobile: this.readNullableString(patch.contactMobile),
+      defaultVisibleToPublic: listing.contactVisible,
+    });
+    await this.listingWriteSupportService.upsertRegisteredArea(listing);
     return this.ack(context.traceId);
   }
 
   async updateCompanyProfile(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
-    const listing = await this.loadOwnedListing(enterpriseId, context);
+    const listing = await this.listingWriteSupportService.loadOwnedListing(enterpriseId, context);
     if (listing.primaryBoardType !== 'company') {
-      throw invalidBoardType('Current enterprise primary board type is not company.');
+      throw invalidBoardType('当前企业主板块不是优秀公司。');
     }
     const entity = await this.companyRepository.findOneBy({ enterpriseId });
     const profile = this.companyRepository.create({
@@ -170,34 +278,73 @@ export class EnterpriseHubWriteService {
   }
 
   async updateFactoryProfile(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
-    const listing = await this.loadOwnedListing(enterpriseId, context);
+    const listing = await this.listingWriteSupportService.loadOwnedListing(enterpriseId, context);
     if (listing.primaryBoardType !== 'factory') {
-      throw invalidBoardType('Current enterprise primary board type is not factory.');
+      throw invalidBoardType('当前企业主板块不是优秀工厂。');
     }
     const entity = await this.factoryRepository.findOneBy({ enterpriseId });
+    const hasField = (field: string) => Object.prototype.hasOwnProperty.call(payload, field);
     const profile = this.factoryRepository.create({
       ...(entity ?? { enterpriseId }),
-      processTypes: this.readStringArray(payload.processTypes),
-      coreProducts: this.readStringArray(payload.coreProducts),
-      equipmentList: this.readStringArray(payload.equipmentList),
-      plantAreaSqm: this.readNullableNumber(payload.plantAreaSqm),
-      monthlyCapacityDesc: this.readNullableString(payload.monthlyCapacityDesc),
-      urgentOrderCapability: this.readNullableString(payload.urgentOrderCapability),
-      urgentCycleDesc: this.readNullableString(payload.urgentCycleDesc),
-      warehouseCapability: this.readNullableBoolean(payload.warehouseCapability),
-      transportCapability: this.readNullableString(payload.transportCapability),
-      maxOrderCapacityDesc: this.readNullableString(payload.maxOrderCapacityDesc),
-      productionQualificationDesc: this.readNullableString(payload.productionQualificationDesc),
-      deliveryRadiusDesc: this.readNullableString(payload.deliveryRadiusDesc)
+      factoryName: hasField('factoryName')
+        ? this.readNullableString(payload.factoryName)
+        : entity?.factoryName ?? null,
+      processTypes: hasField('processTypes')
+        ? this.readStringArray(payload.processTypes)
+        : entity?.processTypes ?? [],
+      coreProducts: hasField('coreProducts')
+        ? this.readStringArray(payload.coreProducts)
+        : entity?.coreProducts ?? [],
+      equipmentList: hasField('equipmentList')
+        ? this.readStringArray(payload.equipmentList)
+        : entity?.equipmentList ?? [],
+      showcaseImageFileAssetIds: hasField('showcaseImageFileAssetIds')
+        ? this.readStringArray(payload.showcaseImageFileAssetIds).slice(0, 6)
+        : entity?.showcaseImageFileAssetIds ?? [],
+      plantAreaSqm: hasField('plantAreaSqm')
+        ? this.readNullableNumber(payload.plantAreaSqm)
+        : entity?.plantAreaSqm ?? null,
+      monthlyCapacityDesc: hasField('monthlyCapacityDesc')
+        ? this.readNullableString(payload.monthlyCapacityDesc)
+        : entity?.monthlyCapacityDesc ?? null,
+      urgentOrderCapability: hasField('urgentOrderCapability')
+        ? this.readNullableString(payload.urgentOrderCapability)
+        : entity?.urgentOrderCapability ?? null,
+      urgentCycleDesc: hasField('urgentCycleDesc')
+        ? this.readNullableString(payload.urgentCycleDesc)
+        : entity?.urgentCycleDesc ?? null,
+      warehouseCapability: hasField('warehouseCapability')
+        ? this.readNullableBoolean(payload.warehouseCapability)
+        : entity?.warehouseCapability ?? null,
+      transportCapability: hasField('transportCapability')
+        ? this.readNullableString(payload.transportCapability)
+        : entity?.transportCapability ?? null,
+      maxOrderCapacityDesc: hasField('maxOrderCapacityDesc')
+        ? this.readNullableString(payload.maxOrderCapacityDesc)
+        : entity?.maxOrderCapacityDesc ?? null,
+      productionQualificationDesc: hasField('productionQualificationDesc')
+        ? this.readNullableString(payload.productionQualificationDesc)
+        : entity?.productionQualificationDesc ?? null,
+      deliveryRadiusDesc: hasField('deliveryRadiusDesc')
+        ? this.readNullableString(payload.deliveryRadiusDesc)
+        : entity?.deliveryRadiusDesc ?? null
     });
+    await this.mediaTruthService.validateFactoryShowcaseMedia(
+      listing,
+      profile.showcaseImageFileAssetIds ?? [],
+    );
     await this.factoryRepository.save(profile);
+    await this.mediaTruthService.syncFactoryShowcaseRefs(
+      listing,
+      profile.showcaseImageFileAssetIds ?? [],
+    );
     return this.ack(context.traceId);
   }
 
   async updateSupplierProfile(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
-    const listing = await this.loadOwnedListing(enterpriseId, context);
+    const listing = await this.listingWriteSupportService.loadOwnedListing(enterpriseId, context);
     if (listing.primaryBoardType !== 'supplier') {
-      throw invalidBoardType('Current enterprise primary board type is not supplier.');
+      throw invalidBoardType('当前企业主板块不是优秀供应商。');
     }
     const entity = await this.supplierRepository.findOneBy({ enterpriseId });
     const profile = this.supplierRepository.create({
@@ -217,11 +364,23 @@ export class EnterpriseHubWriteService {
   }
 
   async createCase(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
-    const listing = await this.loadOwnedListing(enterpriseId, context);
+    const listing = await this.listingWriteSupportService.loadOwnedListing(enterpriseId, context);
     const boardType = this.readBoardType(payload.boardType);
+    const caseMediaFileAssetIds = this.readStringArray(payload.caseMediaFileAssetIds).slice(0, 6);
+    const caseCoverFileAssetId =
+      this.readNullableString(payload.caseCoverFileAssetId) ?? caseMediaFileAssetIds[0] ?? null;
     if (listing.primaryBoardType !== boardType) {
       throw invalidBoardType('Case boardType must match current enterprise primary board type.');
     }
+    if (!caseCoverFileAssetId) {
+      throw missingRequiredFields(
+        'Field `caseCoverFileAssetId` is required unless caseMediaFileAssetIds provides at least one image.'
+      );
+    }
+    await this.mediaTruthService.validateCaseMedia(listing, {
+      caseCoverFileAssetId,
+      caseMediaFileAssetIds,
+    });
     const entity = this.caseRepository.create({
       id: randomUUID(),
       enterpriseId,
@@ -231,20 +390,50 @@ export class EnterpriseHubWriteService {
       city: this.readNullableString(payload.city),
       eventTime: this.readNullableString(payload.eventTime),
       summary: this.readText(payload.summary, 'summary'),
-      caseCoverFileAssetId: this.readText(payload.caseCoverFileAssetId, 'caseCoverFileAssetId'),
-      caseMediaFileAssetIds: this.readStringArray(payload.caseMediaFileAssetIds),
+      caseCoverFileAssetId,
+      caseMediaFileAssetIds,
       isFeatured: payload.isFeatured === true,
       caseStatus: 'draft'
     });
     await this.caseRepository.save(entity);
+    await this.mediaTruthService.syncCaseRefs(listing, 'enterprise_case', entity.id, {
+      caseCoverFileAssetId: entity.caseCoverFileAssetId,
+      caseMediaFileAssetIds: entity.caseMediaFileAssetIds,
+    });
     return {
       caseId: entity.id,
       caseStatus: entity.caseStatus
     };
   }
 
+  async deleteCase(caseId: string, context: RequestContext) {
+    const entity = await this.caseRepository.findOneBy({ id: caseId });
+    if (!entity) {
+      throw caseNotFound();
+    }
+    const listing = await this.listingWriteSupportService.loadOwnedListing(entity.enterpriseId, context);
+    await this.caseRepository.delete({ id: caseId });
+    await this.mediaTruthService.clearCaseRefs(listing.id, 'enterprise_case', caseId);
+    return this.ack(context.traceId);
+  }
+
+  async deleteEnterprise(enterpriseId: string, context: RequestContext) {
+    const listing = await this.listingWriteSupportService.loadOwnedListing(enterpriseId, context);
+    await this.applicationRepository.delete({ enterpriseId: listing.id });
+    await this.caseRepository.delete({ enterpriseId: listing.id });
+    await this.contactRepository.delete({ enterpriseId: listing.id });
+    await this.serviceAreaRepository.delete({ enterpriseId: listing.id });
+    await this.certificationRepository.delete({ enterpriseId: listing.id });
+    await this.companyRepository.delete({ enterpriseId: listing.id });
+    await this.factoryRepository.delete({ enterpriseId: listing.id });
+    await this.supplierRepository.delete({ enterpriseId: listing.id });
+    await this.reviewSummaryRepository.delete({ enterpriseId: listing.id });
+    await this.mediaTruthService.clearEnterpriseRefs(listing.id);
+    await this.listingRepository.delete({ id: listing.id });
+    return this.ack(context.traceId);
+  }
+
   async submitApplication(applicationId: string, payload: Record<string, unknown>, context: RequestContext) {
-    this.requireOrganizationContext(context);
     if (payload.confirm !== true) {
       throw missingRequiredFields('Field `confirm` must be true for enterprise hub application submit.');
     }
@@ -252,22 +441,68 @@ export class EnterpriseHubWriteService {
     if (!application) {
       throw applicationNotFound();
     }
-    const listing = await this.loadOwnedListing(application.enterpriseId, context);
+    const listing = await this.listingWriteSupportService.loadOwnedListing(application.enterpriseId, context);
+    await this.certificationSyncService.syncForListing(listing);
 
     this.ensureListingMinimum(listing);
-    await this.ensureContactMinimum(listing.id);
-    await this.ensureCertificationMinimum(listing.id);
-    await this.ensureCaseMinimum(listing.id);
+    await this.contactWriteService.ensureContactMinimum(listing.id);
+    await this.ensureCertificationMinimum(listing);
     await this.ensurePrimaryProfileMinimum(listing);
+    await this.ensureCaseMinimum(listing.id);
+    const enterpriseCases = await this.caseRepository.findBy({ enterpriseId: listing.id });
+    const reviewDecision = this.autoReviewService.evaluate({
+      application,
+      listing,
+      cases: enterpriseCases,
+    });
+    const reviewNote = this.autoReviewService.readReviewNote(
+      {
+        application,
+        listing,
+        cases: enterpriseCases,
+      },
+      reviewDecision,
+    );
+    const decidedAt = new Date();
 
-    application.applicationStatus = 'submitted';
-    application.submittedAt = new Date();
+    application.applicationStatus =
+      reviewDecision === 'manual_review_required' ? 'submitted' : reviewDecision;
+    application.submittedAt = decidedAt;
     application.submittedMaterialSnapshot = {
       boardLabel: BOARD_LABELS[listing.primaryBoardType] ?? listing.primaryBoardType,
       enterpriseStatus: listing.enterpriseStatus
     };
+    application.rejectionReason =
+      reviewDecision === 'revision_required' ? 'case_incomplete' : null;
+    application.reviewedAt =
+      reviewDecision === 'manual_review_required' ? null : decidedAt;
+    application.reviewerId =
+      reviewDecision === 'manual_review_required' ? null : 'system:auto-review';
+    application.reviewNote = reviewNote;
+    if (reviewDecision === 'approved') {
+      listing.enterpriseStatus = 'published';
+      listing.displayStatus = 'visible';
+      listing.publishedAt = decidedAt;
+      await this.promoteCasesToApproved(enterpriseCases);
+    }
     await this.applicationRepository.save(application);
+    if (reviewDecision === 'approved') {
+      await this.listingRepository.save(listing);
+      if (listing.primaryBoardType === 'factory') {
+        await this.autoSlotService.ensureFactoryRecommendationSlot(listing, decidedAt);
+      }
+    }
     return this.ack(context.traceId);
+  }
+
+  private async promoteCasesToApproved(cases: EnterpriseCaseEntity[]) {
+    for (const item of cases) {
+      if (item.caseStatus === 'approved') {
+        continue;
+      }
+      item.caseStatus = 'approved';
+      await this.caseRepository.save(item);
+    }
   }
 
   private async ensurePrimaryProfileMinimum(listing: EnterpriseListingEntity) {
@@ -291,29 +526,25 @@ export class EnterpriseHubWriteService {
     }
   }
 
-  private async ensureContactMinimum(enterpriseId: string) {
-    const count = await this.contactRepository.count({
-      where: [
-        { enterpriseId, isPrimary: true },
-        { enterpriseId, visibleToPublic: true }
-      ]
+  private async ensureCaseMinimum(enterpriseId: string) {
+    const count = await this.caseRepository.count({
+      where: { enterpriseId }
     });
     if (count === 0) {
-      throw contactRequired('At least one primary or public contact is required before submit.');
-    }
-  }
-
-  private async ensureCertificationMinimum(enterpriseId: string) {
-    const count = await this.certificationRepository.countBy({ enterpriseId });
-    if (count === 0) {
-      throw certificationRequired('At least one certification snapshot is required before submit.');
-    }
-  }
-
-  private async ensureCaseMinimum(enterpriseId: string) {
-    const count = await this.caseRepository.countBy({ enterpriseId });
-    if (count === 0) {
       throw caseRequired('At least one enterprise case is required before submit.');
+    }
+  }
+
+  private async ensureCertificationMinimum(listing: EnterpriseListingEntity) {
+    if (listing.verificationStatusSnapshot !== 'verified') {
+      throw certificationRequired('Current organization certification is not approved for enterprise hub submit.');
+    }
+    const count = await this.certificationRepository.countBy({
+      enterpriseId: listing.id,
+      certStatus: 'approved'
+    });
+    if (count === 0) {
+      throw certificationRequired('At least one approved certification snapshot is required before submit.');
     }
   }
 
@@ -322,62 +553,11 @@ export class EnterpriseHubWriteService {
       !listing.name.trim() ||
       !listing.primaryBoardType.trim() ||
       !listing.shortIntro.trim() ||
-      !listing.provinceCode.trim() ||
       !listing.provinceName.trim() ||
-      !listing.cityCode.trim() ||
       !listing.cityName.trim()
     ) {
       throw missingRequiredFields('Enterprise hub basic listing minimum submit fields are incomplete.');
     }
-  }
-
-  private async loadOwnedListing(enterpriseId: string, context: RequestContext) {
-    this.requireOrganizationContext(context);
-    const listing = await this.listingRepository.findOneBy({ id: enterpriseId });
-    if (!listing) {
-      throw enterpriseNotFound();
-    }
-    if (listing.organizationId !== context.organizationId) {
-      throw permissionDenied('Current actor organization scope cannot mutate this enterprise listing.');
-    }
-    return listing;
-  }
-
-  private requireOrganizationContext(context: RequestContext) {
-    if (context.actorId && context.organizationId) {
-      return;
-    }
-    throw permissionDenied('Current actor must carry organization context for enterprise hub write truth.');
-  }
-
-  private async upsertPrimaryContact(enterpriseId: string, applicantName: string, applicantMobile: string) {
-    const existing = await this.contactRepository.findOne({
-      where: { enterpriseId, isPrimary: true },
-      order: { id: 'ASC' }
-    });
-    const contact = this.contactRepository.create({
-      ...(existing ?? { id: randomUUID(), enterpriseId }),
-      contactName: applicantName,
-      mobile: applicantMobile,
-      isPrimary: true,
-      visibleToPublic: true
-    });
-    await this.contactRepository.save(contact);
-  }
-
-  private async upsertRegisteredArea(listing: EnterpriseListingEntity) {
-    const existing = await this.serviceAreaRepository.findOneBy({
-      enterpriseId: listing.id,
-      areaType: 'registered_location'
-    });
-    const entity = this.serviceAreaRepository.create({
-      ...(existing ?? { id: randomUUID(), enterpriseId: listing.id, areaType: 'registered_location' }),
-      provinceCode: listing.provinceCode,
-      provinceName: listing.provinceName,
-      cityCode: listing.cityCode,
-      cityName: listing.cityName
-    });
-    await this.serviceAreaRepository.save(entity);
   }
 
   private readBoardType(value: unknown) {

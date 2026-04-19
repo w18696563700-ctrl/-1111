@@ -5,6 +5,9 @@ export class EnterpriseProfileFactoryEntity {
   @PrimaryColumn({ name: 'enterprise_id', type: 'varchar', length: 64 })
   enterpriseId!: string;
 
+  @Column({ name: 'factory_name', type: 'varchar', length: 128, nullable: true })
+  factoryName!: string | null;
+
   @Column({ name: 'process_types', type: 'jsonb', default: () => "'[]'" })
   processTypes!: string[];
 
@@ -13,6 +16,13 @@ export class EnterpriseProfileFactoryEntity {
 
   @Column({ name: 'equipment_list', type: 'jsonb', default: () => "'[]'" })
   equipmentList!: string[];
+
+  @Column({
+    name: 'showcase_image_file_asset_ids',
+    type: 'jsonb',
+    default: () => "'[]'",
+  })
+  showcaseImageFileAssetIds!: string[];
 
   @Column({ name: 'plant_area_sqm', type: 'integer', nullable: true })
   plantAreaSqm!: number | null;

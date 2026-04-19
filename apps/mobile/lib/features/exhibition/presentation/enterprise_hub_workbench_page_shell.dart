@@ -6,10 +6,10 @@ extension _EnterpriseWorkbenchPageShell on _EnterpriseApplicationPageState {
     return EnterpriseSectionCard(
       key: const ValueKey<String>('enterprise-workbench-header-section'),
       title: _isCaseEditorWorkbench
-          ? '案例编辑工作台'
+          ? '${_boardType.displayLabel}案例编辑工作台'
           : (_isPublishedChangeMode
-                ? '${_boardType.title}变更工作台'
-                : '${_boardType.title}工作台'),
+                ? '${_boardType.displayLabel}变更工作台'
+                : '${_boardType.displayLabel}工作台'),
       subtitle: _workbenchHeaderStatus(),
       actions: _isCaseEditorWorkbench
           ? <Widget>[
@@ -39,27 +39,18 @@ extension _EnterpriseWorkbenchPageShell on _EnterpriseApplicationPageState {
               spacing: 8,
               runSpacing: 8,
               children: <Widget>[
-                Chip(label: Text(_boardType.title)),
+                Chip(label: Text(_boardType.displayLabel)),
                 Chip(label: Text(_isCaseEditing ? '编辑已有案例' : '新增案例')),
               ],
             )
           else
-            SegmentedButton<EnterpriseBoardType>(
-              segments: EnterpriseBoardType.values
-                  .map(
-                    (item) => ButtonSegment<EnterpriseBoardType>(
-                      value: item,
-                      label: Text(item.title),
-                    ),
-                  )
-                  .toList(growable: false),
-              selected: <EnterpriseBoardType>{_boardType},
-              onSelectionChanged:
-                  !_isPublishedChangeMode &&
-                      _workbenchResult?.data?.boardType == null
-                  ? (value) =>
-                        _updateWorkbenchState(() => _boardType = value.first)
-                  : null,
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                Chip(label: Text(_boardType.displayLabel)),
+                Chip(label: Text(_isPublishedChangeMode ? '正式变更通道' : '固定板块入口')),
+              ],
             ),
           if (hasEnterprise && _draftStatusMessage != null) ...<Widget>[
             const SizedBox(height: 10),
@@ -297,21 +288,6 @@ extension _EnterpriseWorkbenchPageShell on _EnterpriseApplicationPageState {
         _buildWorkbenchHeaderSection(),
         const SizedBox(height: 16),
         _buildCaseComposerSection(),
-        const SizedBox(height: 16),
-        EnterpriseWorkbenchCaseListCard(
-          items: _currentCases,
-          onContinueEdit: _submittingAction
-              ? null
-              : (caseId) => _openCaseEditorWorkbench(
-                  caseId: caseId,
-                  replaceCurrent: true,
-                ),
-          onDelete: _submittingAction ? null : _deleteCase,
-          onCreateCase: _submittingAction
-              ? null
-              : () => _openCaseEditorWorkbench(replaceCurrent: true),
-          createActionLabel: '新增案例',
-        ),
       ],
     );
   }

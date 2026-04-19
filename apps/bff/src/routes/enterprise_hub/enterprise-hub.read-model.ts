@@ -38,11 +38,13 @@ export function toEnterpriseHubDetailResponse(
   const boardType =
     readBoardType(headerSource.primaryBoardType, payload.primaryBoardType) ??
     options.boardType;
+  const location = toPublicLocation(asRecord(payload.location));
+  const boardProfile = toBoardProfile(payload, boardType);
 
   return {
     header: {
       enterpriseId: readString(headerSource.enterpriseId, payload.enterpriseId, payload.id),
-      name: readString(headerSource.name, payload.name),
+      name: readDetailDisplayName(headerSource, payload, boardProfile, boardType),
       logoUrl: readDisplayUrl(headerSource, payload, 'logoUrl', 'logoPreviewUrl', 'logo'),
       primaryBoardType: boardType,
       secondaryCapabilities: readBoardTypes(
@@ -50,8 +52,16 @@ export function toEnterpriseHubDetailResponse(
         payload.secondaryCapabilities,
       ),
       shortIntro: readString(headerSource.shortIntro, payload.shortIntro),
-      provinceName: readString(headerSource.provinceName, payload.provinceName),
-      cityName: readString(headerSource.cityName, payload.cityName),
+      provinceName: readString(
+        location.provinceName,
+        headerSource.provinceName,
+        payload.provinceName,
+      ),
+      cityName: readString(
+        location.cityName,
+        headerSource.cityName,
+        payload.cityName,
+      ),
       verificationStatus: readNullableString(
         headerSource.verificationStatus,
         payload.verificationStatusSnapshot,
@@ -63,14 +73,78 @@ export function toEnterpriseHubDetailResponse(
       foundedAt: readNullableString(basicInfoSource.foundedAt, payload.foundedAt),
       teamSizeRange: readNullableString(basicInfoSource.teamSizeRange, payload.teamSizeRange),
       fullIntro: readNullableString(basicInfoSource.fullIntro, payload.fullIntro),
-      address: readNullableString(basicInfoSource.address, payload.address),
+      address: readNullableString(
+        location.publicDisplayAddress,
+        basicInfoSource.address,
+        payload.address,
+      ),
     },
-    boardProfile: toBoardProfile(payload, boardType),
+    visualGallery: toVisualGallery(payload, boardProfile),
+    location,
+    boardProfile,
     serviceAreas: toServiceAreas(payload.serviceAreas),
+    casesState: readCasesState(payload.casesState, payload.cases),
     cases: toCaseCards(payload.cases),
     certifications: toCertificationCards(payload.certifications),
     reviewSummary: toReviewSummary(payload.reviewSummary),
     contacts: toContactCards(payload.contacts),
+  };
+}
+
+function toLocation(record: Record<string, unknown> | null) {
+  if (!record) {
+    return {
+      addressText: null,
+      publicDisplayAddress: null,
+      provinceCode: null,
+      provinceName: null,
+      cityCode: null,
+      cityName: null,
+      districtCode: null,
+      districtName: null,
+      latitude: null,
+      longitude: null,
+      geoSource: 'unknown',
+      geoStatus: 'not_provided',
+      lastGeocodedAt: null,
+      mapProvider: null,
+      mapPreviewUrl: null,
+      mapLinkUrl: null,
+    };
+  }
+  return {
+    addressText: readNullableString(record.addressText, record.address),
+    publicDisplayAddress: readNullableString(record.publicDisplayAddress),
+    provinceCode: readNullableString(record.provinceCode),
+    provinceName: readNullableString(record.provinceName),
+    cityCode: readNullableString(record.cityCode),
+    cityName: readNullableString(record.cityName),
+    districtCode: readNullableString(record.districtCode),
+    districtName: readNullableString(record.districtName),
+    latitude: readNullableNumber(record.latitude),
+    longitude: readNullableNumber(record.longitude),
+    geoSource: readNullableString(record.geoSource) ?? 'unknown',
+    geoStatus: readNullableString(record.geoStatus) ?? 'not_provided',
+    lastGeocodedAt: readNullableString(record.lastGeocodedAt),
+    mapProvider: readNullableString(record.mapProvider),
+    mapPreviewUrl: readNullableString(record.mapPreviewUrl),
+    mapLinkUrl: readNullableString(record.mapLinkUrl),
+  };
+}
+
+function toPublicLocation(record: Record<string, unknown> | null) {
+  const location = toLocation(record);
+  return {
+    provinceName: location.provinceName,
+    cityName: location.cityName,
+    districtName: location.districtName,
+    publicDisplayAddress: location.publicDisplayAddress,
+    latitude: location.latitude,
+    longitude: location.longitude,
+    geoStatus: location.geoStatus,
+    mapProvider: location.mapProvider,
+    mapPreviewUrl: location.mapPreviewUrl,
+    mapLinkUrl: location.mapLinkUrl,
   };
 }
 
@@ -94,7 +168,52 @@ export function toEnterpriseHubCreateApplicationResponse(
   };
 }
 
+export function toEnterpriseHubEnsureShellResponse(
+  payload: Record<string, unknown>,
+) {
+  return {
+    enterpriseId: readString(payload.enterpriseId, payload.id),
+    boardType: readBoardType(payload.boardType) ?? 'company',
+    shellStatus: readShellStatus(payload.shellStatus),
+  };
+}
+
 export function toEnterpriseHubCaseCreateResponse(
+  payload: Record<string, unknown>,
+) {
+  return {
+    caseId: readString(payload.caseId, payload.id),
+    caseStatus: readNullableString(payload.caseStatus) ?? 'draft',
+  };
+}
+
+export function toEnterpriseHubCaseDetailResponse(
+  payload: Record<string, unknown>,
+) {
+  return {
+    caseId: readString(payload.caseId, payload.id),
+    enterpriseId: readString(payload.enterpriseId),
+    boardType: readBoardType(payload.boardType, payload.primaryBoardType),
+    title: readString(payload.title),
+    exhibitionType: readNullableString(payload.exhibitionType),
+    city: readNullableString(payload.city),
+    eventTime: readNullableString(payload.eventTime),
+    summary: readString(payload.summary),
+    caseCoverFileAssetId: readNullableString(
+      payload.caseCoverFileAssetId,
+      payload.coverFileAssetId,
+    ),
+    caseMediaFileAssetIds: readStringArray(
+      payload.caseMediaFileAssetIds,
+      payload.mediaFileAssetIds,
+    ),
+    caseImageUrlMap: readStringMap(payload.caseImageUrlMap),
+    isFeatured: readBoolean(payload.isFeatured, false),
+    caseStatus: readNullableString(payload.caseStatus) ?? 'draft',
+  };
+}
+
+export function toEnterpriseHubCaseUpdateResponse(
   payload: Record<string, unknown>,
 ) {
   return {
@@ -122,6 +241,7 @@ export function toEnterpriseHubApplicationStatusResponse(
     applyBoardType: readBoardType(payload.applyBoardType) ?? 'company',
     applicationStatus: readApplicationStatus(payload.applicationStatus),
     rejectionReason: readNullableString(payload.rejectionReason),
+    reviewNote: readNullableString(payload.reviewNote),
     submittedAt: readNullableString(payload.submittedAt),
     reviewedAt: readNullableString(payload.reviewedAt),
   };
@@ -154,7 +274,9 @@ function toListItem(
     boardType,
     name: readString(record.name),
     logoUrl: readDisplayUrl(record, undefined, 'logoUrl', 'logoPreviewUrl', 'logo'),
+    provinceCode: readNullableString(record.provinceCode),
     provinceName: readString(record.provinceName),
+    cityCode: readNullableString(record.cityCode),
     cityName: readString(record.cityName),
     primaryBoardLabel:
       readNullableString(record.primaryBoardLabel) ?? BOARD_LABELS[boardType],
@@ -162,15 +284,38 @@ function toListItem(
     shortIntro: readString(record.shortIntro),
     certificationLabel: toCertificationLabel(record),
     caseCount: readNumber(record.caseCount, readArray(record.cases).length),
-    avgScore: readNullableNumber(
-      record.avgScore,
-      asRecord(record.reviewSummary)?.avgScore,
-    ),
-    keywordTags: readStringArray(
-      record.keywordTags,
-      asRecord(record.reviewSummary)?.keywordTags,
-    ),
+    avgScore: null,
+    keywordTags: [],
     boardHighlights: toBoardHighlights(record, boardType),
+  };
+}
+
+function toVisualGallery(
+  payload: Record<string, unknown>,
+  boardProfile: Record<string, unknown>,
+) {
+  const record = asRecord(payload.visualGallery) ?? {};
+  const showcaseImageUrls = readStringArray(
+    boardProfile.showcaseImageUrls,
+    payload.showcaseImageUrls,
+  )
+    .map((item) => item.trim())
+    .filter((item) => item.length > 0)
+    .filter((item, index, all) => all.indexOf(item) === index)
+    .slice(0, 6);
+  const albumImageUrls = readArray(record.albumImageUrls)
+    .map((item): string | null => readNullableString(item))
+    .filter((item): item is string => item !== null && item.length > 0)
+    .filter((item: string, index: number, all: string[]) => all.indexOf(item) === index)
+    .slice(0, 6);
+  const source =
+    showcaseImageUrls.length > 0
+      ? 'showcase'
+      : readNullableString(record.source) ??
+        (albumImageUrls.length > 0 ? 'enterprise_album' : 'empty');
+  return {
+    albumImageUrls,
+    source,
   };
 }
 
@@ -194,7 +339,7 @@ function toBoardProfile(
   boardType: EnterpriseHubBoardType,
 ) {
   const explicitBoardProfile = asRecord(payload.boardProfile);
-  if (explicitBoardProfile) {
+  if (explicitBoardProfile && boardType !== 'factory') {
     return stripUndefined(explicitBoardProfile);
   }
 
@@ -233,11 +378,24 @@ function toBoardProfile(
   }
 
   if (boardType === 'factory') {
-    const factoryProfile = asRecord(payload.factoryProfile) ?? {};
+    const factoryProfile =
+      explicitBoardProfile ??
+      asRecord(payload.factoryProfile) ??
+      {};
     return stripUndefined({
+      ...factoryProfile,
+      factoryName: readNullableString(payload.factoryName, factoryProfile.factoryName),
       processTypes: readStringArray(payload.processTypes, factoryProfile.processTypes),
       coreProducts: readStringArray(payload.coreProducts, factoryProfile.coreProducts),
       equipmentList: readStringArray(payload.equipmentList, factoryProfile.equipmentList),
+      showcaseImageUrls: readDisplayUrlArray(
+        factoryProfile.showcaseImageUrls,
+        payload.showcaseImageUrls,
+      ),
+      showcaseImageFileAssetIds: readStringArray(
+        payload.showcaseImageFileAssetIds,
+        factoryProfile.showcaseImageFileAssetIds,
+      ),
       plantAreaSqm: readNullableNumber(payload.plantAreaSqm, factoryProfile.plantAreaSqm),
       monthlyCapacityDesc: readNullableString(
         payload.monthlyCapacityDesc,
@@ -310,6 +468,53 @@ function toBoardProfile(
       supplierProfile.supplyQualificationDesc,
     ),
   });
+}
+
+function readCasesState(casesState: unknown, cases: unknown) {
+  const normalized = readNullableString(casesState);
+  if (normalized !== null) {
+    return normalized;
+  }
+  return readArray(cases).length > 0 ? 'available' : 'empty';
+}
+
+function readDetailDisplayName(
+  headerSource: Record<string, unknown>,
+  payload: Record<string, unknown>,
+  boardProfile: Record<string, unknown>,
+  boardType: EnterpriseHubBoardType,
+) {
+  if (boardType === 'factory') {
+    return readString(
+      boardProfile.factoryName,
+      payload.factoryName,
+      headerSource.name,
+      payload.name,
+    );
+  }
+  return readString(headerSource.name, payload.name);
+}
+
+function readDisplayUrlArray(...values: unknown[]) {
+  for (const value of values) {
+    if (!Array.isArray(value)) {
+      continue;
+    }
+
+    const items = value
+      .filter((item): item is string => typeof item === 'string')
+      .map((item) => item.trim())
+      .filter((item) => item.length > 0)
+      .filter((item, index, all) => all.indexOf(item) === index);
+    if (items.length > 0) {
+      return items;
+    }
+
+    if (value.length === 0) {
+      return [] as string[];
+    }
+  }
+  return [] as string[];
 }
 
 function toServiceAreas(value: unknown) {
@@ -420,6 +625,7 @@ function toBoardHighlights(
       boardType === 'company'
         ? {
             exhibitionTypes: readStringArray(record.exhibitionTypes),
+            serviceItems: readStringArray(record.serviceItems),
             serviceCities: readStringArray(record.serviceCities),
           }
         : null,
@@ -448,6 +654,10 @@ function stripUndefined(record: Record<string, unknown>) {
 
 function readApplicationStatus(value: unknown) {
   return readNullableString(value) ?? 'draft';
+}
+
+function readShellStatus(value: unknown) {
+  return value === 'created' ? 'created' : 'existing';
 }
 
 function readBoardTypes(...values: unknown[]) {
@@ -533,6 +743,21 @@ function readStringArray(...values: unknown[]) {
     }
   }
   return [] as string[];
+}
+
+function readStringMap(value: unknown) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {} as Record<string, string>;
+  }
+  const entries = Object.entries(value as Record<string, unknown>)
+    .filter(
+      ([key, item]) =>
+        key.trim().length > 0 &&
+        typeof item === 'string' &&
+        item.trim().length > 0,
+    )
+    .map(([key, item]) => [key.trim(), (item as string).trim()] as const);
+  return Object.fromEntries(entries) as Record<string, string>;
 }
 
 function readNumber(...values: unknown[]) {

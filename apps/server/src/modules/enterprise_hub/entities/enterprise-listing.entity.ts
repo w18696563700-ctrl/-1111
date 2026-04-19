@@ -5,7 +5,7 @@ export class EnterpriseListingEntity {
   @PrimaryColumn({ type: 'varchar', length: 64 })
   id!: string;
 
-  @Column({ name: 'organization_id', type: 'varchar', length: 64, unique: true })
+  @Column({ name: 'organization_id', type: 'varchar', length: 64 })
   organizationId!: string;
 
   @Column({ name: 'primary_board_type', type: 'varchar', length: 32 })
@@ -29,6 +29,13 @@ export class EnterpriseListingEntity {
   @Column({ name: 'cover_file_asset_id', type: 'varchar', length: 64, nullable: true })
   coverFileAssetId!: string | null;
 
+  @Column({
+    name: 'album_image_file_asset_ids',
+    type: 'jsonb',
+    default: () => "'[]'",
+  })
+  albumImageFileAssetIds!: string[];
+
   @Column({ name: 'province_code', type: 'varchar', length: 32, default: '' })
   provinceCode!: string;
 
@@ -41,8 +48,35 @@ export class EnterpriseListingEntity {
   @Column({ name: 'city_name', type: 'varchar', length: 64, default: '' })
   cityName!: string;
 
+  @Column({ name: 'district_code', type: 'varchar', length: 32, nullable: true })
+  districtCode!: string | null;
+
+  @Column({ name: 'district_name', type: 'varchar', length: 64, nullable: true })
+  districtName!: string | null;
+
   @Column({ type: 'text', nullable: true })
   address!: string | null;
+
+  @Column({ name: 'public_display_address', type: 'text', nullable: true })
+  publicDisplayAddress!: string | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  latitude!: number | null;
+
+  @Column({ type: 'double precision', nullable: true })
+  longitude!: number | null;
+
+  @Column({ name: 'geo_source', type: 'varchar', length: 64, nullable: true })
+  geoSource!: string | null;
+
+  @Column({ name: 'geo_status', type: 'varchar', length: 32, nullable: true })
+  geoStatus!: string | null;
+
+  @Column({ name: 'last_geocoded_at', type: 'timestamptz', nullable: true })
+  lastGeocodedAt!: Date | null;
+
+  @Column({ name: 'map_provider', type: 'varchar', length: 32, nullable: true })
+  mapProvider!: string | null;
 
   @Column({ name: 'founded_at', type: 'date', nullable: true })
   foundedAt!: string | null;

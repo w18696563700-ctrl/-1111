@@ -26,7 +26,7 @@ void main() {
 
     await _pumpWorkbench(
       tester,
-      initialRoute: ExhibitionRoutes.enterpriseApplyWithBoardType('company'),
+      initialRoute: ExhibitionRoutes.companyDisplayWorkbench,
     );
 
     final headerFinder = find.byKey(
@@ -95,6 +95,12 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(submitFinder, findsOneWidget);
+    expect(
+      find.byWidgetPredicate(
+        (widget) => widget is SegmentedButton<EnterpriseBoardType>,
+      ),
+      findsNothing,
+    );
   });
 
   testWidgets('published change mode keeps snapshot corridor after relayout', (
@@ -111,7 +117,7 @@ void main() {
           ),
     );
 
-    expect(find.text('优秀公司变更工作台'), findsOneWidget);
+    expect(find.text('公司展示变更工作台'), findsOneWidget);
     final snapshotFinder = find.byKey(
       const ValueKey<String>('enterprise-published-change-snapshot-section'),
     );
@@ -178,10 +184,7 @@ void main() {
     );
     expect(previewFinder, findsOneWidget);
     expect(find.text('当前变更稿预览'), findsOneWidget);
-    expect(
-      find.textContaining('当前变更稿预览优先使用已解析到的 Logo'),
-      findsNothing,
-    );
+    expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsNothing);
     final previewToggle = find.byKey(
       const ValueKey<String>('enterprise-published-change-preview-toggle'),
     );
@@ -189,10 +192,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.tap(previewToggle);
     await tester.pumpAndSettle();
-    expect(
-      find.textContaining('当前变更稿预览优先使用已解析到的 Logo'),
-      findsOneWidget,
-    );
+    expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsOneWidget);
     await tester.scrollUntilVisible(
       displayFinder,
       180,
@@ -261,7 +261,7 @@ void _installWorkbenchDependencies({Map<String, Object?>? workbenchPayload}) {
       client: AppApiClient(
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-            'GET /api/app/exhibition/enterprise-hub/workbench':
+            'GET /api/app/exhibition/enterprise-hub/company/workbench':
                 (AppApiRequest request) async => AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
@@ -285,7 +285,7 @@ void _installPublishedChangeDependencies({
       client: AppApiClient(
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-            'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current':
+            'GET /api/app/exhibition/enterprise-hub/company/enterprises/ent-published-1/changes/current':
                 (AppApiRequest request) async => AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
@@ -293,7 +293,7 @@ void _installPublishedChangeDependencies({
                       workbenchPayload ??
                       _buildPublishedChangeWorkbenchPayload(),
                 ),
-            'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/changes/current/status':
+            'GET /api/app/exhibition/enterprise-hub/company/enterprises/ent-published-1/changes/current/status':
                 (AppApiRequest request) async => AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
@@ -309,7 +309,7 @@ void _installPublishedChangeDependencies({
       client: AppApiClient(
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-            'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1':
+            'GET /api/app/exhibition/enterprise-hub/company/enterprises/ent-published-1':
                 (AppApiRequest request) async => AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
@@ -544,14 +544,9 @@ Map<String, Object?> _buildPublishedLiveDetailPayload() {
         'status': 'approved',
       },
     ],
-    'reviewSummary': <String, Object?>{
-      'keywordTags': <String>[],
-    },
+    'reviewSummary': <String, Object?>{'keywordTags': <String>[]},
     'contacts': <Object?>[
-      <String, Object?>{
-        'contactName': '王伟伟',
-        'mobile': '13800000000',
-      },
+      <String, Object?>{'contactName': '王伟伟', 'mobile': '13800000000'},
     ],
   };
 }

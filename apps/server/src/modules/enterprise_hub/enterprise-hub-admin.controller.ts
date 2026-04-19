@@ -1,20 +1,37 @@
 import { Body, Controller, Get, Headers, Param, Post, Query } from '@nestjs/common';
 import type { HeaderBag } from '../../shared/request-context';
 import { resolveRequestContext } from '../../shared/request-context';
+import { EnterpriseHubApplicationReviewAdminQueryService } from './enterprise-hub-application-review-admin.query.service';
+import { EnterpriseHubApplicationReviewAdminWriteService } from './enterprise-hub-application-review-admin.write.service';
 import { EnterpriseHubAdminService } from './enterprise-hub-admin.service';
+import { EnterpriseHubPublishedChangeAdminService } from './enterprise-hub-published-change-admin.service';
 
 @Controller('server/admin/exhibition/enterprise-hub')
 export class EnterpriseHubAdminController {
-  constructor(private readonly adminService: EnterpriseHubAdminService) {}
+  constructor(
+    private readonly applicationReviewQueryService: EnterpriseHubApplicationReviewAdminQueryService,
+    private readonly applicationReviewWriteService: EnterpriseHubApplicationReviewAdminWriteService,
+    private readonly adminService: EnterpriseHubAdminService,
+    private readonly publishedChangeAdminService: EnterpriseHubPublishedChangeAdminService,
+  ) {}
 
   @Get('applications')
-  listApplications(@Query() query: Record<string, unknown>) {
-    return this.adminService.listApplications(query);
+  listApplications(@Query() query: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.applicationReviewQueryService.listApplications(
+      query,
+      resolveRequestContext(headers),
+    );
   }
 
   @Get('applications/:applicationId')
-  getApplicationDetail(@Param('applicationId') applicationId: string) {
-    return this.adminService.getApplicationDetail(applicationId);
+  getApplicationDetail(
+    @Param('applicationId') applicationId: string,
+    @Headers() headers: HeaderBag,
+  ) {
+    return this.applicationReviewQueryService.getApplicationDetail(
+      applicationId,
+      resolveRequestContext(headers),
+    );
   }
 
   @Post('applications/:applicationId/review')
@@ -23,7 +40,11 @@ export class EnterpriseHubAdminController {
     @Body() body: Record<string, unknown>,
     @Headers() headers: HeaderBag
   ) {
-    return this.adminService.reviewApplication(applicationId, body, resolveRequestContext(headers));
+    return this.applicationReviewWriteService.reviewApplication(
+      applicationId,
+      body,
+      resolveRequestContext(headers),
+    );
   }
 
   @Post('enterprises/:enterpriseId/publish')
@@ -61,5 +82,48 @@ export class EnterpriseHubAdminController {
   @Post('recommendation-slots')
   createRecommendationSlot(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
     return this.adminService.createRecommendationSlot(body, resolveRequestContext(headers));
+  }
+
+  @Get('change-requests')
+  listChangeRequests(@Query() query: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.publishedChangeAdminService.listChangeRequests(
+      query,
+      resolveRequestContext(headers),
+    );
+  }
+
+  @Get('change-requests/:changeRequestId')
+  getChangeRequestDetail(
+    @Param('changeRequestId') changeRequestId: string,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.publishedChangeAdminService.getChangeRequestDetail(
+      changeRequestId,
+      resolveRequestContext(headers),
+    );
+  }
+
+  @Post('change-requests/:changeRequestId/review')
+  reviewChangeRequest(
+    @Param('changeRequestId') changeRequestId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.publishedChangeAdminService.reviewChangeRequest(
+      changeRequestId,
+      body,
+      resolveRequestContext(headers),
+    );
+  }
+
+  @Post('change-requests/:changeRequestId/apply')
+  applyChangeRequest(
+    @Param('changeRequestId') changeRequestId: string,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.publishedChangeAdminService.applyChangeRequest(
+      changeRequestId,
+      resolveRequestContext(headers),
+    );
   }
 }

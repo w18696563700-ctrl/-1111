@@ -4,22 +4,29 @@ import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_shared.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_workbench_overview.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_workbench_widgets.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 
-class EnterpriseApplicationPage extends StatefulWidget {
-  const EnterpriseApplicationPage({
-    super.key,
-    this.initialBoardType,
-  });
+/// Legacy compatibility surface.
+///
+/// The active enterprise display workbench route is implemented in
+/// `enterprise_hub_workbench_pages.dart`. This file is intentionally retained
+/// only as a fallback history surface and must not define the current
+/// route-bound page class names.
+class LegacyEnterpriseApplicationPage extends StatefulWidget {
+  const LegacyEnterpriseApplicationPage({super.key, this.initialBoardType});
 
   final EnterpriseBoardType? initialBoardType;
 
   @override
-  State<EnterpriseApplicationPage> createState() => _EnterpriseApplicationPageState();
+  State<LegacyEnterpriseApplicationPage> createState() =>
+      _LegacyEnterpriseApplicationPageState();
 }
 
-class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
+class _LegacyEnterpriseApplicationPageState
+    extends State<LegacyEnterpriseApplicationPage> {
   late EnterpriseBoardType _boardType;
   final TextEditingController _applicantNameController =
       TextEditingController();
@@ -32,9 +39,11 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
   final TextEditingController _provinceNameController = TextEditingController();
   final TextEditingController _cityNameController = TextEditingController();
   final TextEditingController _contactNameController = TextEditingController();
-  final TextEditingController _contactMobileController = TextEditingController();
-  final TextEditingController _profileOneController = TextEditingController();
+  final TextEditingController _contactMobileController =
+      TextEditingController();
   final TextEditingController _profileTwoController = TextEditingController();
+  Set<String> _selectedProfileOneOptions = <String>{};
+  Set<String> _selectedProfileTwoOptions = <String>{};
   final TextEditingController _caseTitleController = TextEditingController();
   final TextEditingController _caseSummaryController = TextEditingController();
   final TextEditingController _caseCoverAssetIdController =
@@ -65,7 +74,6 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
     _cityNameController.dispose();
     _contactNameController.dispose();
     _contactMobileController.dispose();
-    _profileOneController.dispose();
     _profileTwoController.dispose();
     _caseTitleController.dispose();
     _caseSummaryController.dispose();
@@ -109,6 +117,7 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
     });
 
     final result = await EnterpriseHubConsumerLayer.instance.updateBasic(
+      boardType: _boardType,
       enterpriseId: enterpriseId,
       body: <String, Object?>{
         'name': _emptyToNull(_enterpriseNameController.text),
@@ -145,17 +154,17 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
 
     final Map<String, Object?> body = switch (_boardType) {
       EnterpriseBoardType.company => <String, Object?>{
-        'exhibitionTypes': _csvList(_profileOneController.text),
-        'serviceItems': _csvList(_profileTwoController.text),
+        'exhibitionTypes': _selectedProfileOneOptions.toList(growable: false),
+        'serviceItems': _selectedProfileTwoOptions.toList(growable: false),
         'serviceCities': _csvList(_cityNameController.text),
       },
       EnterpriseBoardType.factory => <String, Object?>{
-        'processTypes': _csvList(_profileOneController.text),
+        'processTypes': _selectedProfileOneOptions.toList(growable: false),
         'coreProducts': _csvList(_profileTwoController.text),
       },
       EnterpriseBoardType.supplier => <String, Object?>{
-        'supplyCategories': _csvList(_profileOneController.text),
-        'supplyMode': _csvList(_profileTwoController.text),
+        'supplyCategories': _selectedProfileOneOptions.toList(growable: false),
+        'supplyMode': _selectedProfileTwoOptions.toList(growable: false),
         'coreProductsOrServices': _csvList(_shortIntroController.text),
       },
     };
@@ -203,9 +212,9 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
     });
 
     final result = await EnterpriseHubConsumerLayer.instance.createCase(
+      boardType: _boardType,
       enterpriseId: enterpriseId,
       body: <String, Object?>{
-        'boardType': _boardType.contractName,
         'title': _caseTitleController.text.trim(),
         'summary': _caseSummaryController.text.trim(),
         'caseCoverFileAssetId': _caseCoverAssetIdController.text.trim(),
@@ -238,6 +247,7 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
 
     final result = await EnterpriseHubConsumerLayer.instance.submitApplication(
       applicationId: applicationId,
+      boardType: _boardType,
     );
     if (!mounted) {
       return;
@@ -288,9 +298,17 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: <Widget>[
+        const EnterpriseSectionCard(
+          title: '历史兼容页',
+          subtitle: '当前正式企业展示工作台已迁移到新工作台页，这里仅保留为历史兼容面，避免旧入口直接失效。',
+          child: Text('如需继续维护企业展示，请优先使用当前正式工作台。'),
+        ),
+        const SizedBox(height: 16),
+        EnterpriseWorkbenchOverviewCard(boardType: _boardType),
+        const SizedBox(height: 16),
         EnterpriseSectionCard(
-          title: '企业入驻页',
-          subtitle: '入驻页继续绑定现有 organization 上下文与认证状态，不独立成新 building。',
+          title: '当前入驻草稿',
+          subtitle: '当前页继续绑定现有 organization 上下文与认证状态，不再作为公开展示入口。',
           actions: <Widget>[
             FilledButton(
               onPressed: _creatingDraft ? null : _createDraft,
@@ -315,16 +333,20 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
               SegmentedButton<EnterpriseBoardType>(
                 segments: EnterpriseBoardType.values
                     .map(
-                      (EnterpriseBoardType item) => ButtonSegment<EnterpriseBoardType>(
-                        value: item,
-                        label: Text(item.title),
-                      ),
+                      (EnterpriseBoardType item) =>
+                          ButtonSegment<EnterpriseBoardType>(
+                            value: item,
+                            label: Text(item.title),
+                          ),
                     )
                     .toList(growable: false),
                 selected: <EnterpriseBoardType>{_boardType},
                 onSelectionChanged: (Set<EnterpriseBoardType> value) {
                   setState(() {
                     _boardType = value.first;
+                    _selectedProfileOneOptions = <String>{};
+                    _selectedProfileTwoOptions = <String>{};
+                    _profileTwoController.clear();
                   });
                 },
               ),
@@ -349,8 +371,8 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
         ),
         const SizedBox(height: 16),
         EnterpriseSectionCard(
-          title: 'basic',
-          subtitle: '对应 PUT /enterprises/{enterpriseId}/basic',
+          title: '基础资料',
+          subtitle: '对应企业展示基础资料写链。',
           actions: <Widget>[
             FilledButton.tonal(
               onPressed: _draft == null || _savingBasic ? null : _saveBasic,
@@ -404,45 +426,57 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
         ),
         const SizedBox(height: 16),
         EnterpriseSectionCard(
-          title: 'boardProfile',
-          subtitle: '统一骨架下按公司 / 工厂 / 供应商切换对应 profile 接口。',
+          title: '板块画像',
+          subtitle: '旧页也统一使用和正式工作台相同的标准口径，不再允许自由乱填。',
           actions: <Widget>[
             FilledButton.tonal(
-              onPressed: _draft == null || _savingProfile ? null : _saveBoardProfile,
+              onPressed: _draft == null || _savingProfile
+                  ? null
+                  : _saveBoardProfile,
               child: Text(_savingProfile ? '保存中' : '保存板块画像'),
             ),
           ],
           child: Column(
             children: <Widget>[
-              TextField(
-                controller: _profileOneController,
-                decoration: InputDecoration(
-                  labelText: switch (_boardType) {
-                    EnterpriseBoardType.company => '展会类型（逗号分隔）',
-                    EnterpriseBoardType.factory => '工艺类型（逗号分隔）',
-                    EnterpriseBoardType.supplier => '供应品类（逗号分隔）',
-                  },
-                  border: const OutlineInputBorder(),
-                ),
+              EnterpriseWorkbenchMultiSelectField(
+                label: _profileOneLabel,
+                helperText: _profileOneHelper,
+                options: _profileOneOptions,
+                selectedValues: _selectedProfileOneOptions,
+                onChanged: (Set<String> next) {
+                  setState(() {
+                    _selectedProfileOneOptions = next;
+                  });
+                },
               ),
               const SizedBox(height: 12),
-              TextField(
-                controller: _profileTwoController,
-                decoration: InputDecoration(
-                  labelText: switch (_boardType) {
-                    EnterpriseBoardType.company => '服务项目（逗号分隔）',
-                    EnterpriseBoardType.factory => '核心产品（逗号分隔）',
-                    EnterpriseBoardType.supplier => '供应模式（逗号分隔）',
+              if (_usesProfileTwoOptions)
+                EnterpriseWorkbenchMultiSelectField(
+                  label: _profileTwoLabel,
+                  helperText: _profileTwoHelper,
+                  options: _profileTwoOptions,
+                  selectedValues: _selectedProfileTwoOptions,
+                  onChanged: (Set<String> next) {
+                    setState(() {
+                      _selectedProfileTwoOptions = next;
+                    });
                   },
-                  border: const OutlineInputBorder(),
+                )
+              else
+                TextField(
+                  controller: _profileTwoController,
+                  decoration: InputDecoration(
+                    labelText: _profileTwoLabel,
+                    helperText: _profileTwoHelper,
+                    border: const OutlineInputBorder(),
+                  ),
                 ),
-              ),
             ],
           ),
         ),
         const SizedBox(height: 16),
         EnterpriseSectionCard(
-          title: 'cases',
+          title: '新增案例',
           subtitle: '案例创建仍走独立 canonical path，不写死 file_url。',
           actions: <Widget>[
             FilledButton.tonal(
@@ -489,7 +523,9 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
           subtitle: '提交后进入 application-status 页面承接状态结果。',
           actions: <Widget>[
             FilledButton(
-              onPressed: _draft == null || _submitting ? null : _submitApplication,
+              onPressed: _draft == null || _submitting
+                  ? null
+                  : _submitApplication,
               child: Text(_submitting ? '提交中' : '提交入驻申请'),
             ),
           ],
@@ -527,7 +563,8 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
       );
     }
 
-    final certification = snapshot.shellContext.certificationStatus?.toLowerCase();
+    final certification = snapshot.shellContext.certificationStatus
+        ?.toLowerCase();
     if (certification != 'verified' && certification != 'approved') {
       return const EnterpriseSectionCard(
         title: '当前认证状态不足',
@@ -541,10 +578,48 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
 
     return null;
   }
+
+  String get _profileOneLabel => switch (_boardType) {
+    EnterpriseBoardType.company => '展会类型',
+    EnterpriseBoardType.factory => '工艺类型',
+    EnterpriseBoardType.supplier => '供应品类',
+  };
+
+  String get _profileTwoLabel => switch (_boardType) {
+    EnterpriseBoardType.company => '服务项目',
+    EnterpriseBoardType.factory => '核心产品',
+    EnterpriseBoardType.supplier => '供应模式',
+  };
+
+  String get _profileOneHelper => switch (_boardType) {
+    EnterpriseBoardType.company => '请按前台展示筛选口径选择展会类型。',
+    EnterpriseBoardType.factory => '请按工厂展示筛选口径选择工艺类型。',
+    EnterpriseBoardType.supplier => '请按供应商展示筛选口径选择供应品类。',
+  };
+
+  String get _profileTwoHelper => switch (_boardType) {
+    EnterpriseBoardType.company => '请按前台展示筛选口径选择服务项目。',
+    EnterpriseBoardType.factory => '核心产品保留自由表达，便于描述你的实际产物。',
+    EnterpriseBoardType.supplier => '请按前台展示筛选口径选择供应模式。',
+  };
+
+  bool get _usesProfileTwoOptions => _boardType != EnterpriseBoardType.factory;
+
+  List<MapEntry<String, String>> get _profileOneOptions => switch (_boardType) {
+    EnterpriseBoardType.company => enterpriseWorkbenchCompanyExhibitionOptions,
+    EnterpriseBoardType.factory => enterpriseWorkbenchFactoryProcessOptions,
+    EnterpriseBoardType.supplier => enterpriseWorkbenchSupplierCategoryOptions,
+  };
+
+  List<MapEntry<String, String>> get _profileTwoOptions => switch (_boardType) {
+    EnterpriseBoardType.company => enterpriseWorkbenchCompanyServiceItemOptions,
+    EnterpriseBoardType.factory => enterpriseWorkbenchFactoryProcessOptions,
+    EnterpriseBoardType.supplier => enterpriseWorkbenchSupplierModeOptions,
+  };
 }
 
-class EnterpriseApplicationStatusPage extends StatefulWidget {
-  const EnterpriseApplicationStatusPage({
+class LegacyEnterpriseApplicationStatusPage extends StatefulWidget {
+  const LegacyEnterpriseApplicationStatusPage({
     super.key,
     required this.applicationId,
     this.boardType,
@@ -554,12 +629,12 @@ class EnterpriseApplicationStatusPage extends StatefulWidget {
   final EnterpriseBoardType? boardType;
 
   @override
-  State<EnterpriseApplicationStatusPage> createState() =>
-      _EnterpriseApplicationStatusPageState();
+  State<LegacyEnterpriseApplicationStatusPage> createState() =>
+      _LegacyEnterpriseApplicationStatusPageState();
 }
 
-class _EnterpriseApplicationStatusPageState
-    extends State<EnterpriseApplicationStatusPage> {
+class _LegacyEnterpriseApplicationStatusPageState
+    extends State<LegacyEnterpriseApplicationStatusPage> {
   EnterpriseHubLoadResult<EnterpriseHubApplicationStatusData>? _result;
   bool _loading = false;
 
@@ -576,7 +651,8 @@ class _EnterpriseApplicationStatusPageState
         _result = EnterpriseHubLoadResult<EnterpriseHubApplicationStatusData>(
           state: AppPageState.errorNonRetryable,
           method: 'GET',
-          path: '/api/app/exhibition/enterprise-hub/applications/{applicationId}',
+          path:
+              '/api/app/exhibition/enterprise-hub/applications/{applicationId}',
           message: '缺少 applicationId，当前无法读取申请状态。',
         );
       });
@@ -587,9 +663,11 @@ class _EnterpriseApplicationStatusPageState
       _loading = true;
     });
 
-    final result = await EnterpriseHubConsumerLayer.instance.loadApplicationStatus(
-      applicationId: applicationId,
-    );
+    final result = await EnterpriseHubConsumerLayer.instance
+        .loadApplicationStatus(
+          applicationId: applicationId,
+          boardType: widget.boardType,
+        );
     if (!mounted) {
       return;
     }
@@ -606,6 +684,12 @@ class _EnterpriseApplicationStatusPageState
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: <Widget>[
+        const EnterpriseSectionCard(
+          title: '历史状态兼容页',
+          subtitle: '当前正式企业展示状态页已迁移到新工作台链路，这里仅保留为历史兼容面。',
+          child: Text('若后续继续维护企业展示，请回到当前正式工作台。'),
+        ),
+        const SizedBox(height: 16),
         EnterpriseSectionCard(
           title: '入驻提交成功或状态页',
           subtitle: '当前承接 GET /applications/{applicationId}。',
@@ -652,6 +736,10 @@ class _EnterpriseApplicationStatusPageState
                       const SizedBox(height: 8),
                       Text('驳回原因：${data.rejectionReason}'),
                     ],
+                    if (data.reviewNote != null) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Text('审核说明：${data.reviewNote}'),
+                    ],
                   ],
                 ),
         ),
@@ -661,10 +749,7 @@ class _EnterpriseApplicationStatusPageState
 }
 
 class _GuardAction extends StatelessWidget {
-  const _GuardAction({
-    required this.actionLabel,
-    required this.routeName,
-  });
+  const _GuardAction({required this.actionLabel, required this.routeName});
 
   final String actionLabel;
   final String routeName;
