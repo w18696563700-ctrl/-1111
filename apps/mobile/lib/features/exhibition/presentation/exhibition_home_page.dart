@@ -9,12 +9,21 @@ import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
+import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 
 part 'exhibition_home_page_sections.dart';
+part 'exhibition_home_page_actions.dart';
 part 'exhibition_home_recommendation_section.dart';
+part 'exhibition_home_module_deck.dart';
+part 'exhibition_home_module_panels.dart';
+part 'exhibition_home_channel_rails.dart';
+part 'exhibition_home_channel_support.dart';
+part 'exhibition_home_project_forum_panels.dart';
+part 'exhibition_home_enterprise_panels.dart';
 part 'exhibition_home_location_options.dart';
 part 'exhibition_home_support.dart';
 part 'exhibition_home_weather_card.dart';
@@ -36,10 +45,12 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
   ExhibitionLoadResult? _homeResult;
   ExhibitionLoadResult? _projectResult;
   DeviceLocationSnapshot? _locationSnapshot;
+  ExhibitionHomeLocationSelectRequest? _manualLocationSelection;
   bool _refreshing = false;
   bool _locating = false;
   bool _showScrollToTop = false;
   bool _weatherExpanded = false;
+  _HomeModuleTab _selectedModuleTab = _HomeModuleTab.project;
 
   @override
   void initState() {
@@ -72,395 +83,143 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
     });
   }
 
-  Future<void> _refreshWholePage({required bool useRefreshPath}) async {
-    if (_refreshing) {
-      return;
-    }
-
+  void _markRefreshStarted() {
     setState(() {
       _refreshing = true;
       _locating = true;
     });
+  }
 
-    final locationSnapshot = await DeviceLocationService.instance
-        .resolveCurrentPosition();
-    if (!mounted) {
-      return;
-    }
-
+  void _applyResolvedLocation(DeviceLocationSnapshot locationSnapshot) {
     setState(() {
+      _manualLocationSelection = null;
       _locationSnapshot = locationSnapshot;
       _locating = false;
     });
+  }
 
-    final locationContext = _homeLocationContextFromSnapshot(locationSnapshot);
-    final homeFuture = _loadHomeResult(
-      useRefreshPath: useRefreshPath,
-      locationContext: locationContext,
-    );
-    final projectFuture = ExhibitionConsumerLayer.instance.loadProjectList(
-      forceRefresh: true,
-    );
-
-    final results = await Future.wait<ExhibitionLoadResult>(
-      <Future<ExhibitionLoadResult>>[homeFuture, projectFuture],
-    );
-    if (!mounted) {
-      return;
-    }
-
+  void _applyRefreshResults(List<ExhibitionLoadResult> results) {
     setState(() {
       _homeResult = results[0];
       _projectResult = results[1];
       _refreshing = false;
+      _locating = false;
     });
   }
 
-  Future<ExhibitionLoadResult> _loadHomeResult({
-    required bool useRefreshPath,
-    required ExhibitionHomeLocationContextRequest? locationContext,
-  }) async {
-    if (!useRefreshPath) {
-      return ExhibitionHomeAggregationClient.instance.load(
-        locationContext: locationContext,
-      );
-    }
-
-    final refreshResult = await ExhibitionHomeAggregationClient.instance
-        .refresh(locationContext: locationContext);
-    if (refreshResult.state != AppPageState.unauthorized) {
-      return refreshResult;
-    }
-
-    // Public home remains readable. If refresh requires session, immediately
-    // fall back to the canonical public GET /home instead of surfacing 401.
-    return ExhibitionHomeAggregationClient.instance.load(
-      locationContext: locationContext,
-    );
+  void _applyProjectRefreshResult(ExhibitionLoadResult projectResult) {
+    setState(() {
+      _projectResult = projectResult;
+      _refreshing = false;
+      _locating = false;
+    });
   }
 
-  void _openProjectCreate() {
-    if (_redirectToLoginForPrivateAction(actionLabel: '发布项目')) {
-      return;
-    }
-    Navigator.of(context).pushNamed(ExhibitionRoutes.projectCreate);
-  }
-
-  void _openShowcase() {
-    Navigator.of(context).pushNamed(ExhibitionRoutes.showcase);
-  }
-
-  void _openMyProjects() {
-    if (_redirectToLoginForPrivateAction(actionLabel: '进入我的项目')) {
-      return;
-    }
-    Navigator.of(context).pushNamed(ExhibitionRoutes.myProjectList);
-  }
-
-  void _openProjectDetail(String projectId) {
-    Navigator.of(
-      context,
-    ).pushNamed(ExhibitionRoutes.projectDetailWithProjectId(projectId));
-  }
-
-  void _openEnterpriseRecommendationItem(
-    _HomeEnterpriseRecommendationItem item,
-  ) {
-    final routeName = _homeEnterpriseRecommendationRoute(item);
-    if (routeName == null) {
-      return;
-    }
-    Navigator.of(context).pushNamed(routeName);
-  }
-
-  void _openEnterpriseBoard(EnterpriseBoardType boardType) {
-    final routeName = switch (boardType) {
-      EnterpriseBoardType.company => ExhibitionRoutes.companies,
-      EnterpriseBoardType.factory => ExhibitionRoutes.factories,
-      EnterpriseBoardType.supplier => ExhibitionRoutes.suppliers,
-    };
-    Navigator.of(context).pushNamed(routeName);
-  }
-
-  bool _redirectToLoginForPrivateAction({required String actionLabel}) {
-    final blockingState = AppShellScope.read(context).snapshot.blockingState;
-    if (blockingState != GlobalShellState.unauthenticated) {
-      return false;
-    }
-
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(SnackBar(content: Text('$actionLabel 需要先登录，当前先进入登录入口。')));
-    Navigator.of(context).pushNamed(ProfileIdentityRoutes.login);
-    return true;
-  }
-
-  Future<void> _openManualLocationSelect() async {
-    final catalog = await ChinaRegionCatalogLoader.load();
-    if (!mounted) {
-      return;
-    }
-    final currentLocation = _homeWeatherProjectionFromResult(_homeResult);
-    final currentCity = catalog.cityByName(currentLocation?.displayName);
-    final picked = await showChinaCityPicker(
-      context: context,
-      catalog: catalog,
-      title: '选择城市',
-      initialProvinceCode: currentCity?.provinceCode,
-      initialCityCode: currentCity?.cityCode,
-    );
-    final selected = picked == null
-        ? null
-        : ExhibitionHomeLocationSelectRequest(
-            provinceCode: picked.provinceCode,
-            provinceName: picked.provinceName,
-            cityName: picked.cityName,
-            displayName: picked.shortCityName,
-          );
-
-    if (!mounted || selected == null) {
-      return;
-    }
-    if (_refreshing) {
-      return;
-    }
-
+  void _markManualLocationRefreshStarted() {
     setState(() {
       _refreshing = true;
     });
+  }
 
-    final results =
-        await Future.wait<ExhibitionLoadResult>(<Future<ExhibitionLoadResult>>[
-          ExhibitionHomeAggregationClient.instance.selectLocation(
-            selection: selected,
-          ),
-          ExhibitionConsumerLayer.instance.loadProjectList(forceRefresh: true),
-        ]);
-    if (!mounted) {
-      return;
-    }
-
+  void _applyManualLocationSelection(
+    ExhibitionHomeLocationSelectRequest selection,
+  ) {
     setState(() {
-      _homeResult = results[0];
-      _projectResult = results[1];
-      _refreshing = false;
+      _manualLocationSelection = selection;
+      _locationSnapshot = DeviceLocationSnapshot(
+        permissionState:
+            _locationSnapshot?.permissionState ??
+            DeviceLocationPermissionState.unknown,
+        provinceCode: selection.provinceCode,
+        provinceName: selection.provinceName,
+      );
+      _locating = false;
     });
-
-    final homeState = results[0].state;
-    if (homeState != AppPageState.content && homeState != AppPageState.empty) {
-      final message = _homeManualLocationSelectFailureMessage(results[0]);
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(SnackBar(content: Text(message)));
-    }
-  }
-
-  void _openManualSelectionPlaceholder() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (BuildContext context) {
-        final theme = Theme.of(context);
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  '手动选择地区入口',
-                  style: theme.textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '这里先提供地区选择说明入口；如需立即切换地区，请使用顶部天气卡里的“手动选择地区”按钮。',
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
-                ),
-                const SizedBox(height: 10),
-                Text(
-                  '当前地区选择以页面实时展示为准。',
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
-                ),
-                const SizedBox(height: 18),
-                FilledButton.tonal(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('关闭占位入口'),
-                ),
-              ],
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  void _scrollToTop() {
-    if (!_scrollController.hasClients) {
-      return;
-    }
-
-    _scrollController.animateTo(
-      0,
-      duration: const Duration(milliseconds: 280),
-      curve: Curves.easeOutCubic,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     final projectItems = _homeProjectItemsFromPayload(_projectResult?.payload);
     final weatherProjection = _homeWeatherProjectionFromResult(_homeResult);
-    final areaLabel = _homeRecommendationAreaLabel(weatherProjection);
-    final companyFactoryRecommendationItems =
-        _homeCompanyFactoryRecommendationItemsFromPayload(_homeResult?.payload);
-    final companyModule = _homeModuleProjectionFromPayload(
-      _homeResult?.payload,
-      'excellent_company',
-      fallbackTitle: '优秀公司',
-      fallbackSummary: '首页当前先保留公司入口承接；真实企业列表与详情以进入后的 app-facing 返回为准。',
-      fallbackStatusLabel: '入口承接',
-      fallbackActionLabel: '进入列表',
-    );
-    final factoryModule = _homeModuleProjectionFromPayload(
-      _homeResult?.payload,
-      'excellent_factory',
-      fallbackTitle: '优秀工厂',
-      fallbackSummary: '首页当前先保留工厂入口承接；真实企业列表与详情以进入后的 app-facing 返回为准。',
-      fallbackStatusLabel: '入口承接',
-      fallbackActionLabel: '进入列表',
-    );
-    final supplierModule = _homeModuleProjectionFromPayload(
-      _homeResult?.payload,
-      'excellent_supplier',
-      fallbackTitle: '优秀供应商',
-      fallbackSummary: '首页当前先保留供应商入口承接；真实企业列表与详情以进入后的 app-facing 返回为准。',
-      fallbackStatusLabel: '入口承接',
-      fallbackActionLabel: '进入列表',
-    );
 
-    return Stack(
-      children: <Widget>[
-        ListView(
-          controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 120),
-          children: <Widget>[
-            _HomeWeatherCard(
-              expanded: _weatherExpanded,
-              refreshing: _refreshing,
-              locating: _locating,
-              locationSnapshot: _locationSnapshot,
-              homeResult: _homeResult,
-              weatherProjection: weatherProjection,
-              onToggleExpanded: () {
-                setState(() {
-                  _weatherExpanded = !_weatherExpanded;
-                });
-              },
-              onRefreshPressed: () => _refreshWholePage(useRefreshPath: true),
-              onRelocatePressed: () => _refreshWholePage(useRefreshPath: true),
-              onManualSelectionPressed: _openManualLocationSelect,
-            ),
-            const SizedBox(height: 16),
-            const _HomeSectionHeader(
-              title: '六模块入口',
-              summary: '首页保留六大入口，便于快速进入项目展示、论坛与后续能力模块。',
-            ),
-            const SizedBox(height: 12),
-            _HomeModuleGrid(
-              onShowcasePressed: _openShowcase,
-              onForumPressed: () =>
-                  Navigator.of(context).pushNamed(ExhibitionRoutes.forum),
-              companyModule: companyModule,
-              factoryModule: factoryModule,
-              supplierModule: supplierModule,
-              onCompanyPressed: () =>
-                  _openEnterpriseBoard(EnterpriseBoardType.company),
-              onFactoryPressed: () =>
-                  _openEnterpriseBoard(EnterpriseBoardType.factory),
-              onSupplierPressed: () =>
-                  _openEnterpriseBoard(EnterpriseBoardType.supplier),
-              onTeamPlaceholderPressed: (String title) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('$title 功能正在完善中，当前先展示基础入口说明。')),
-                );
-              },
-            ),
-            const SizedBox(height: 16),
-            const _HomeSectionHeader(
-              title: '本省推荐',
-              summary: '结合当前地区展示项目推荐，支持手动刷新获取最新公开内容。',
-            ),
-            const SizedBox(height: 12),
-            _HomeProjectRecommendationSection(
-              areaLabel: areaLabel,
-              loading: _refreshing,
-              result: _projectResult,
-              projectItems: projectItems,
-              onRetry: () => _refreshWholePage(useRefreshPath: true),
-              onOpenShowcase: _openShowcase,
-              onOpenMyProjects: _openMyProjects,
-              onOpenProjectCreate: _openProjectCreate,
-              onOpenProjectDetail: _openProjectDetail,
-            ),
-            const SizedBox(height: 16),
-            _HomePlaceholderRecommendationSection(
-              title: '2. 本省论坛热帖',
-              summary: '论坛继续保持独立入口；首页这里只保留推荐区位，不把天气、论坛和项目链混成一面说明墙。',
-              actionLabel: '去论坛看看',
-              onPressed: () =>
-                  Navigator.of(context).pushNamed(ExhibitionRoutes.forum),
-            ),
-            const SizedBox(height: 12),
-            _HomeCompanyFactoryRecommendationSection(
-              areaLabel: areaLabel,
-              items: companyFactoryRecommendationItems,
-              onOpenItem: _openEnterpriseRecommendationItem,
-              onRetry: () => _refreshWholePage(useRefreshPath: true),
-              onFallbackPressed: _openManualSelectionPlaceholder,
-            ),
-            const SizedBox(height: 12),
-            _HomePlaceholderRecommendationSection(
-              title: '4. 本省优秀团队员工',
-              summary: '团队与员工推荐位持续完善中，当前先提供模块入口说明。',
-              actionLabel: '查看当前说明',
-              onPressed: _openManualSelectionPlaceholder,
-            ),
-            const SizedBox(height: 16),
-            const _HomeBoundaryNoteCard(),
-          ],
-        ),
-        Positioned(
-          right: 20,
-          bottom: 28,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+    return ColoredBox(
+      color: Colors.white,
+      child: Stack(
+        children: <Widget>[
+          ListView(
+            controller: _scrollController,
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
             children: <Widget>[
-              FloatingActionButton.small(
-                heroTag: 'home-publish-fab',
-                tooltip: '发布项目入口',
-                onPressed: _openProjectCreate,
-                child: const Icon(Icons.add_task_outlined),
+              _HomeWeatherCard(
+                expanded: _weatherExpanded,
+                refreshing: _refreshing,
+                locating: _locating,
+                locationSnapshot: _locationSnapshot,
+                homeResult: _homeResult,
+                weatherProjection: weatherProjection,
+                onToggleExpanded: () {
+                  setState(() {
+                    _weatherExpanded = !_weatherExpanded;
+                  });
+                },
+                onRefreshPressed: () => _refreshWholePage(useRefreshPath: true),
+                onRelocatePressed: () => _refreshWholePage(
+                  useRefreshPath: true,
+                  forceDeviceRelocation: true,
+                ),
+                onManualSelectionPressed: _openManualLocationSelect,
               ),
               const SizedBox(height: 12),
-              IgnorePointer(
-                ignoring: !_showScrollToTop,
-                child: AnimatedOpacity(
-                  duration: const Duration(milliseconds: 180),
-                  opacity: _showScrollToTop ? 1 : 0.48,
-                  child: FloatingActionButton.small(
-                    heroTag: 'home-scroll-top-fab',
-                    tooltip: '回到顶部',
-                    onPressed: _scrollToTop,
-                    child: const Icon(Icons.vertical_align_top),
-                  ),
-                ),
+              const _HomeSectionHeader(eyebrow: '公开入口', title: '推荐频道'),
+              const SizedBox(height: 8),
+              _HomeModuleDeck(
+                selectedTab: _selectedModuleTab,
+                onTabSelected: (_HomeModuleTab tab) {
+                  setState(() {
+                    _selectedModuleTab = tab;
+                  });
+                },
+                loading: _refreshing,
+                locationSnapshot: _locationSnapshot,
+                projectResult: _projectResult,
+                projectItems: projectItems,
+                onRefreshHome: () => _refreshWholePage(useRefreshPath: true),
+                onOpenProjectList: _openShowcase,
+                onOpenProjectCreate: _openProjectCreate,
+                onOpenProjectDetail: _openProjectDetail,
+                onOpenForum: _openForum,
+                onOpenForumPublish: _openForumPublish,
+                onOpenForumPost: _openForumPost,
+                onOpenCompanyBoard: () =>
+                    _openEnterpriseBoard(EnterpriseBoardType.company),
+                onOpenFactoryBoard: () =>
+                    _openEnterpriseBoard(EnterpriseBoardType.factory),
+                onOpenSupplierBoard: () =>
+                    _openEnterpriseBoard(EnterpriseBoardType.supplier),
+                onOpenEnterpriseItem: _openEnterpriseListItem,
+                onOpenTeamExplanation: _openTeamPlaceholderExplanation,
               ),
             ],
           ),
-        ),
-      ],
+          Positioned(
+            right: 20,
+            bottom: 28,
+            child: IgnorePointer(
+              ignoring: !_showScrollToTop,
+              child: AnimatedOpacity(
+                duration: const Duration(milliseconds: 180),
+                opacity: _showScrollToTop ? 1 : 0,
+                child: FloatingActionButton.small(
+                  heroTag: 'home-scroll-top-fab',
+                  tooltip: '回到顶部',
+                  onPressed: _scrollToTop,
+                  child: const Icon(Icons.vertical_align_top),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -307,7 +307,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHigh,
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),

@@ -747,7 +747,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byTooltip('发布项目入口'));
+      await tester.tap(find.widgetWithText(TextButton, '去发布项目'));
       await tester.pumpAndSettle();
 
       expect(find.text('登录入口'), findsWidgets);
@@ -1246,55 +1246,30 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    final scrollable = find.byType(Scrollable).first;
-
     expect(find.text('天气与定位'), findsOneWidget);
     expect(find.text('秩序化首页'), findsNothing);
     expect(find.text('展览首页'), findsNothing);
     expect(find.text('当前定位：重庆'), findsNothing);
     expect(find.text('当前环境：联调环境'), findsNothing);
     expect(find.text('地区识别中'), findsWidgets);
-    expect(find.byTooltip('发布项目入口'), findsOneWidget);
+    expect(find.text('公开入口'), findsOneWidget);
+    expect(find.text('推荐频道'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
     expect(find.byTooltip('回到顶部'), findsOneWidget);
     expect(find.byTooltip('整页刷新'), findsOneWidget);
     expect(find.text('手动选择地区'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('优秀团队员工'),
-      200,
-      scrollable: scrollable,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('项目展示'), findsOneWidget);
-    expect(find.text('优秀公司'), findsOneWidget);
-    expect(find.text('优秀工厂'), findsOneWidget);
-    expect(find.text('优秀供应商'), findsOneWidget);
-    expect(find.text('展览论坛'), findsOneWidget);
-    expect(find.text('优秀团队员工'), findsOneWidget);
+    expect(find.text('项目'), findsOneWidget);
+    expect(find.text('论坛'), findsOneWidget);
+    expect(find.text('公司'), findsOneWidget);
+    expect(find.text('工厂'), findsOneWidget);
+    expect(find.text('供应商'), findsOneWidget);
+    expect(find.text('团队'), findsOneWidget);
+    expect(find.text('进入项目列表'), findsWidgets);
     expect(find.text('进入发布项目工作台'), findsNothing);
     expect(find.text('发布项目'), findsNothing);
     expect(find.text('当前进度'), findsNothing);
     expect(find.text('继续当前工作'), findsNothing);
     expect(find.text('创建项目'), findsNothing);
-
-    await tester.scrollUntilVisible(
-      find.text('本省推荐'),
-      200,
-      scrollable: scrollable,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('本省推荐'), findsOneWidget);
-    expect(find.text('1. 本省搭建项目'), findsOneWidget);
-
-    await tester.scrollUntilVisible(
-      find.textContaining('首页现在改成天气卡壳层、六模块入口、本省推荐和私域导流的干净首页'),
-      200,
-      scrollable: scrollable,
-    );
-    await tester.pumpAndSettle();
-    expect(
-      find.textContaining('首页现在改成天气卡壳层、六模块入口、本省推荐和私域导流的干净首页'),
-      findsOneWidget,
-    );
     expect(find.textContaining('BFF base URL'), findsNothing);
     expect(find.textContaining('开发工作面'), findsNothing);
   });

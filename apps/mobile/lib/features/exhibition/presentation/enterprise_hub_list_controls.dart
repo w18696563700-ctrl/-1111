@@ -105,7 +105,7 @@ class EnterpriseActionFilterButton extends StatelessWidget {
         decoration: BoxDecoration(
           color: enabled
               ? colorScheme.surface
-              : colorScheme.surfaceContainerHighest,
+              : colorScheme.surfaceContainerLowest,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: colorScheme.outline),
         ),
@@ -114,10 +114,7 @@ class EnterpriseActionFilterButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                displayText,
-                style: TextStyle(color: foregroundColor),
-              ),
+              Text(displayText, style: TextStyle(color: foregroundColor)),
               const SizedBox(width: 4),
               Icon(
                 Icons.keyboard_arrow_down_rounded,
@@ -212,10 +209,7 @@ class EnterpriseListMessageCard extends StatelessWidget {
             Text(message, textAlign: TextAlign.center),
             if (actionLabel != null && onPressed != null) ...<Widget>[
               const SizedBox(height: 12),
-              FilledButton.tonal(
-                onPressed: onPressed,
-                child: Text(actionLabel!),
-              ),
+              OutlinedButton(onPressed: onPressed, child: Text(actionLabel!)),
             ],
           ],
         ),

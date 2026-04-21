@@ -24,9 +24,16 @@ class _SummaryCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(28),
         border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.04),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
       ),
       child: Padding(
         padding: const EdgeInsets.all(22),
@@ -104,8 +111,8 @@ class _ActionCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final backgroundColor = switch (tone) {
       _ActionCardTone.standard => colorScheme.surface,
-      _ActionCardTone.emphasis => colorScheme.surfaceContainerHigh,
-      _ActionCardTone.muted => colorScheme.surfaceContainerLow,
+      _ActionCardTone.emphasis => colorScheme.surface,
+      _ActionCardTone.muted => colorScheme.surfaceContainerLowest,
     };
     final borderColor = switch (tone) {
       _ActionCardTone.standard => colorScheme.outlineVariant,
@@ -167,20 +174,26 @@ class _StatusPill extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final backgroundColor = switch (tone) {
-      _ActionCardTone.standard => colorScheme.surfaceContainerHighest,
+      _ActionCardTone.standard => colorScheme.surface,
       _ActionCardTone.emphasis => colorScheme.primaryContainer,
-      _ActionCardTone.muted => colorScheme.surfaceContainerLow,
+      _ActionCardTone.muted => colorScheme.surfaceContainerLowest,
     };
     final foregroundColor = switch (tone) {
-      _ActionCardTone.standard => colorScheme.onSurfaceVariant,
-      _ActionCardTone.emphasis => colorScheme.onPrimaryContainer,
+      _ActionCardTone.standard => colorScheme.onSurface,
+      _ActionCardTone.emphasis => colorScheme.primary,
       _ActionCardTone.muted => colorScheme.onSurfaceVariant,
+    };
+    final borderColor = switch (tone) {
+      _ActionCardTone.standard => colorScheme.outlineVariant,
+      _ActionCardTone.emphasis => colorScheme.primary.withValues(alpha: 0.18),
+      _ActionCardTone.muted => colorScheme.outlineVariant,
     };
 
     return DecoratedBox(
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: borderColor),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
@@ -252,7 +265,7 @@ class _EntityCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
@@ -292,7 +305,7 @@ class _EntityCard extends StatelessWidget {
               const SizedBox(height: 14),
               DecoratedBox(
                 decoration: BoxDecoration(
-                  color: colorScheme.surface,
+                  color: colorScheme.surfaceContainerLowest,
                   borderRadius: BorderRadius.circular(16),
                   border: Border.all(color: colorScheme.outlineVariant),
                 ),
@@ -322,13 +335,13 @@ class _EntityCard extends StatelessWidget {
                 runSpacing: 12,
                 children: <Widget>[
                   if (actionLabel != null && onPressed != null)
-                    FilledButton.tonal(
+                    FilledButton(
                       onPressed: onPressed,
                       child: Text(actionLabel!),
                     ),
                   if (secondaryActionLabel != null &&
                       onSecondaryPressed != null)
-                    FilledButton.tonal(
+                    OutlinedButton(
                       onPressed: onSecondaryPressed,
                       child: Text(secondaryActionLabel!),
                     ),
@@ -352,7 +365,7 @@ class _EmptyNotice extends StatelessWidget {
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),

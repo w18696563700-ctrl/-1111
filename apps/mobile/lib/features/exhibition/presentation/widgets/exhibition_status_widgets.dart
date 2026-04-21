@@ -41,6 +41,7 @@ class _LoadStateCard extends StatelessWidget {
     };
 
     return Card(
+      color: Theme.of(context).colorScheme.surface,
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -121,89 +122,89 @@ class _SubmissionResultPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final color = result.isSuccess
-        ? theme.colorScheme.primaryContainer
-        : theme.colorScheme.errorContainer;
-    final textColor = result.isSuccess
-        ? theme.colorScheme.onPrimaryContainer
-        : theme.colorScheme.onErrorContainer;
+    final colorScheme = theme.colorScheme;
+    final borderColor = result.isSuccess
+        ? colorScheme.primary.withValues(alpha: 0.18)
+        : colorScheme.outlineVariant;
     final entityState = _stateFromPayload(result.payload);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(18),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: color,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: borderColor),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Wrap(
-            spacing: 10,
-            runSpacing: 10,
-            children: <Widget>[
-              _StatusPill(
-                label: result.isSuccess ? '结果已返回' : '需要处理反馈',
-                tone: result.isSuccess
-                    ? _ActionCardTone.emphasis
-                    : _ActionCardTone.standard,
-              ),
-              if (entityState != null)
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(18),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
                 _StatusPill(
-                  label: '业务状态：${_frontStageStateLabel(entityState)}',
-                  tone: _ActionCardTone.muted,
+                  label: result.isSuccess ? '结果已返回' : '需要处理反馈',
+                  tone: result.isSuccess
+                      ? _ActionCardTone.emphasis
+                      : _ActionCardTone.muted,
                 ),
+                if (entityState != null)
+                  _StatusPill(
+                    label: '业务状态：${_frontStageStateLabel(entityState)}',
+                    tone: _ActionCardTone.muted,
+                  ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Text(
+              result.isSuccess ? '当前动作已完成' : '当前动作未完成',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              result.isSuccess
+                  ? _frontStageSuccessMessage(path: result.path)
+                  : _userFacingActionFailureMessage(result),
+              style: theme.textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 10),
+            Text(
+              _actionFollowUpMessage(result),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
+            if (!result.isSuccess) ...<Widget>[
+              const SizedBox(height: 12),
+              _RecoveryActions(path: result.path),
             ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            result.isSuccess ? '当前动作已完成' : '当前动作未完成',
-            style: theme.textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              color: textColor,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            result.isSuccess
-                ? _frontStageSuccessMessage(path: result.path)
-                : _userFacingActionFailureMessage(result),
-            style: theme.textTheme.bodyMedium?.copyWith(color: textColor),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            _actionFollowUpMessage(result),
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: textColor.withValues(alpha: 0.92),
-              height: 1.45,
-            ),
-          ),
-          if (!result.isSuccess) ...<Widget>[
-            const SizedBox(height: 12),
-            _RecoveryActions(path: result.path),
-          ],
-          if (showTechnicalDisclosure) ...<Widget>[
-            const SizedBox(height: 12),
-            Theme(
-              data: theme.copyWith(
-                dividerColor: Colors.transparent,
-                splashColor: Colors.transparent,
-                highlightColor: Colors.transparent,
+            if (showTechnicalDisclosure) ...<Widget>[
+              const SizedBox(height: 12),
+              Theme(
+                data: theme.copyWith(
+                  dividerColor: Colors.transparent,
+                  splashColor: Colors.transparent,
+                  highlightColor: Colors.transparent,
+                ),
+                child: _TechnicalDisclosure(
+                  method: result.method,
+                  path: result.path,
+                  payload: <String, Object?>{
+                    if (result.controlledState != null)
+                      'controlledState': result.controlledState!.contractName,
+                    if (result.errorCode != null) 'errorCode': result.errorCode,
+                    if (result.payload != null) 'payload': result.payload,
+                  },
+                ),
               ),
-              child: _TechnicalDisclosure(
-                method: result.method,
-                path: result.path,
-                payload: <String, Object?>{
-                  if (result.controlledState != null)
-                    'controlledState': result.controlledState!.contractName,
-                  if (result.errorCode != null) 'errorCode': result.errorCode,
-                  if (result.payload != null) 'payload': result.payload,
-                },
-              ),
-            ),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -253,15 +254,29 @@ class _RecoveryActions extends StatelessWidget {
       runSpacing: 12,
       children: <Widget>[
         if (onRetry != null)
-          FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
-        FilledButton.tonal(
-          onPressed: () {
-            Navigator.of(context).pushReplacementNamed(
-              routeOverride ?? _recoveryRouteForPath(path),
-            );
-          },
-          child: Text(buttonLabelOverride ?? _recoveryButtonLabelForPath(path)),
-        ),
+          FilledButton(onPressed: onRetry, child: const Text('重试')),
+        if (onRetry != null)
+          OutlinedButton(
+            onPressed: () {
+              Navigator.of(context).pushReplacementNamed(
+                routeOverride ?? _recoveryRouteForPath(path),
+              );
+            },
+            child: Text(
+              buttonLabelOverride ?? _recoveryButtonLabelForPath(path),
+            ),
+          )
+        else
+          FilledButton(
+            onPressed: () {
+              Navigator.of(context).pushReplacementNamed(
+                routeOverride ?? _recoveryRouteForPath(path),
+              );
+            },
+            child: Text(
+              buttonLabelOverride ?? _recoveryButtonLabelForPath(path),
+            ),
+          ),
       ],
     );
   }
@@ -331,46 +346,50 @@ class _UploadStatePanel extends StatelessWidget {
     );
     final nextStep = _userFacingUploadNextStep(state!);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
+    return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            uploadTitle,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
-          ),
-          const SizedBox(height: 8),
-          Text(uploadMessage),
-          const SizedBox(height: 12),
-          Text(
-            nextStep,
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-          ),
-          const SizedBox(height: 12),
-          _TechnicalDisclosure(
-            title: '开发辅助（默认收起）',
-            payload: <String, Object?>{
-              if (path != null) 'path': path,
-              if (errorCode != null) 'errorCode': errorCode,
-              if (uploadDirective != null)
-                'uploadSessionId': uploadDirective!.uploadSessionId,
-              if (uploadDirective != null)
-                'directMethod': uploadDirective!.directUploadMethod,
-              if (uploadDirective != null)
-                'confirmEndpoint': uploadDirective!.confirmEndpoint,
-            },
-          ),
-        ],
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(20)),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              uploadTitle,
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Text(uploadMessage),
+            const SizedBox(height: 12),
+            Text(
+              nextStep,
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 12),
+            _TechnicalDisclosure(
+              title: '开发辅助（默认收起）',
+              payload: <String, Object?>{
+                if (path != null) 'path': path,
+                if (errorCode != null) 'errorCode': errorCode,
+                if (uploadDirective != null)
+                  'uploadSessionId': uploadDirective!.uploadSessionId,
+                if (uploadDirective != null)
+                  'directMethod': uploadDirective!.directUploadMethod,
+                if (uploadDirective != null)
+                  'confirmEndpoint': uploadDirective!.confirmEndpoint,
+              },
+            ),
+          ],
+        ),
       ),
     );
   }

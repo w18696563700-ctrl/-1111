@@ -24,6 +24,7 @@ part 'models/milestone_link.dart';
 part 'pages/project_list_page.dart';
 part 'pages/my_project_list_page.dart';
 part 'pages/project_detail_page.dart';
+part 'pages/minimal_visual_spec_page.dart';
 part 'pages/my_project_detail_page.dart';
 part 'pages/trading_im_project_clarification_page.dart';
 part 'pages/trading_im_bid_thread_page.dart';

@@ -50,6 +50,29 @@ class _HomeWeatherProjection {
   final String? nightRainTimeLabel;
   final List<String> officialAlerts;
   final List<String> constructionSuggestions;
+
+  bool get isControlledPlaceholder =>
+      currentWeather.trim() == '待同步' &&
+      currentTemperature == 0 &&
+      highTemperature == 0 &&
+      lowTemperature == 0 &&
+      precipitationProbability == 0 &&
+      riskTags.isEmpty &&
+      officialAlerts.isEmpty &&
+      hourlyForecast.isEmpty &&
+      dailyForecast.isEmpty;
+
+  bool get isWeatherDegraded =>
+      currentWeather.trim() == '天气暂不可用' &&
+      currentTemperature == 0 &&
+      highTemperature == 0 &&
+      lowTemperature == 0 &&
+      precipitationProbability == 0 &&
+      hourlyForecast.isEmpty &&
+      dailyForecast.isEmpty;
+
+  bool get isWeatherUnavailable =>
+      isControlledPlaceholder || isWeatherDegraded;
 }
 
 class _HomeForecastItem {
@@ -66,40 +89,6 @@ class _HomeForecastItem {
   final String precipitationLabel;
 }
 
-class _HomeModuleProjection {
-  const _HomeModuleProjection({
-    required this.title,
-    required this.summary,
-    required this.statusLabel,
-    required this.actionLabel,
-    required this.enabled,
-    required this.placeholder,
-  });
-
-  final String title;
-  final String summary;
-  final String statusLabel;
-  final String actionLabel;
-  final bool enabled;
-  final bool placeholder;
-}
-
-class _HomeEnterpriseRecommendationItem {
-  const _HomeEnterpriseRecommendationItem({
-    required this.itemType,
-    required this.title,
-    required this.summary,
-    required this.badgeLabel,
-    this.entityId,
-  });
-
-  final String itemType;
-  final String title;
-  final String summary;
-  final String badgeLabel;
-  final String? entityId;
-}
-
 ExhibitionHomeLocationContextRequest? _homeLocationContextFromSnapshot(
   DeviceLocationSnapshot? snapshot,
 ) {
@@ -113,6 +102,21 @@ ExhibitionHomeLocationContextRequest? _homeLocationContextFromSnapshot(
     provinceCode: snapshot.provinceCode,
     provinceName: snapshot.provinceName,
     locationPermissionState: snapshot.permissionState.contractName,
+  );
+}
+
+ExhibitionHomeLocationContextRequest _homeLocationContextFromSelection(
+  ExhibitionHomeLocationSelectRequest selection, {
+  required DeviceLocationPermissionState permissionState,
+}) {
+  return ExhibitionHomeLocationContextRequest(
+    latitude: selection.latitude,
+    longitude: selection.longitude,
+    provinceCode: selection.provinceCode,
+    provinceName: selection.provinceName,
+    cityName: selection.cityName,
+    districtName: selection.districtName,
+    locationPermissionState: permissionState.contractName,
   );
 }
 
@@ -305,53 +309,6 @@ int? _homeHourFromTimeLabel(String label) {
   return int.tryParse(match.group(1)!);
 }
 
-String _homeRecommendationAreaLabel(_HomeWeatherProjection? projection) {
-  if (projection == null) {
-    return '当前位置';
-  }
-
-  return projection.provinceName;
-}
-
-_HomeModuleProjection _homeModuleProjectionFromPayload(
-  Object? payload,
-  String moduleKey, {
-  required String fallbackTitle,
-  required String fallbackSummary,
-  required String fallbackStatusLabel,
-  required String fallbackActionLabel,
-}) {
-  final root = _homeMap(payload);
-  final modules = root?['modules'];
-  if (modules is List) {
-    for (final item in modules.whereType<Map>()) {
-      final map = item.map(
-        (Object? key, Object? value) => MapEntry('$key', value),
-      );
-      if (_homeString(map['moduleKey']) != moduleKey) {
-        continue;
-      }
-      return _HomeModuleProjection(
-        title: _homeString(map['title']) ?? fallbackTitle,
-        summary: _homeString(map['summary']) ?? fallbackSummary,
-        statusLabel: _homeString(map['statusLabel']) ?? fallbackStatusLabel,
-        actionLabel: _homeString(map['actionLabel']) ?? fallbackActionLabel,
-        enabled: _homeBool(map['enabled']) ?? true,
-        placeholder: _homeBool(map['placeholder']) ?? false,
-      );
-    }
-  }
-
-  return _HomeModuleProjection(
-    title: fallbackTitle,
-    summary: fallbackSummary,
-    statusLabel: fallbackStatusLabel,
-    actionLabel: fallbackActionLabel,
-    enabled: true,
-    placeholder: false,
-  );
-}
-
 List<Map<String, Object?>> _homeProjectItemsFromPayload(Object? payload) {
   if (payload is! Map) {
     return const <Map<String, Object?>>[];
@@ -369,98 +326,6 @@ List<Map<String, Object?>> _homeProjectItemsFromPayload(Object? payload) {
             item.map((Object? key, Object? value) => MapEntry('$key', value)),
       )
       .toList();
-}
-
-List<_HomeEnterpriseRecommendationItem>
-_homeCompanyFactoryRecommendationItemsFromPayload(Object? payload) {
-  final root = _homeMap(payload);
-  final sections = root?['recommendationSections'];
-  if (sections is! List) {
-    return const <_HomeEnterpriseRecommendationItem>[];
-  }
-
-  for (final rawSection in sections.whereType<Map>()) {
-    final section = rawSection.map(
-      (Object? key, Object? value) => MapEntry('$key', value),
-    );
-    if (_homeTrimmedString(section['sectionKey']) !=
-        'company_factory_recommendations') {
-      continue;
-    }
-
-    final rawItems = section['items'];
-    if (rawItems is! List) {
-      return const <_HomeEnterpriseRecommendationItem>[];
-    }
-
-    return rawItems
-        .whereType<Map>()
-        .map<_HomeEnterpriseRecommendationItem?>(
-          (Map rawItem) => _homeEnterpriseRecommendationItemFromMap(
-            rawItem.map(
-              (Object? key, Object? value) => MapEntry('$key', value),
-            ),
-          ),
-        )
-        .whereType<_HomeEnterpriseRecommendationItem>()
-        .toList(growable: false);
-  }
-
-  return const <_HomeEnterpriseRecommendationItem>[];
-}
-
-_HomeEnterpriseRecommendationItem? _homeEnterpriseRecommendationItemFromMap(
-  Map<String, Object?> item,
-) {
-  final itemType = _homeTrimmedString(item['itemType']);
-  final title = _homeTrimmedString(item['title']);
-  if (itemType == null || title == null) {
-    return null;
-  }
-  if (itemType != 'company' && itemType != 'factory') {
-    return null;
-  }
-
-  return _HomeEnterpriseRecommendationItem(
-    itemType: itemType,
-    entityId: _homeTrimmedString(item['entityId']),
-    title: title,
-    summary: _homeTrimmedString(item['summary']) ?? '当前实体已进入首页推荐区。',
-    badgeLabel:
-        _homeTrimmedString(item['badgeLabel']) ??
-        _homeEnterpriseRecommendationBadge(itemType),
-  );
-}
-
-String _homeEnterpriseRecommendationBadge(String itemType) =>
-    switch (itemType) {
-      'company' => '优秀公司',
-      'factory' => '优秀工厂',
-      _ => '推荐实体',
-    };
-
-String _homeEnterpriseRecommendationActionLabel(
-  _HomeEnterpriseRecommendationItem item,
-) => switch (item.itemType) {
-  'company' => item.entityId == null ? '查看优秀公司' : '查看公司详情',
-  'factory' => item.entityId == null ? '查看优秀工厂' : '查看工厂详情',
-  _ => '查看详情',
-};
-
-String? _homeEnterpriseRecommendationRoute(
-  _HomeEnterpriseRecommendationItem item,
-) {
-  return switch (item.itemType) {
-    'company' =>
-      item.entityId == null
-          ? ExhibitionRoutes.companies
-          : ExhibitionRoutes.companyDetailWithEnterpriseId(item.entityId!),
-    'factory' =>
-      item.entityId == null
-          ? ExhibitionRoutes.factories
-          : ExhibitionRoutes.factoryDetailWithEnterpriseId(item.entityId!),
-    _ => null,
-  };
 }
 
 Map<String, Object?>? _homeMap(Object? payload) {
@@ -554,50 +419,6 @@ String _homeProjectGuidance(String? state) {
     'converted_to_order' => '当前项目已被承接，首页只保留公开说明，不混入后续履约动作。',
     null => '当前项目已经进入推荐区，可先查看详情，再确认下一步。',
     _ => '当前项目处于 ${_homeFrontStateLabel(state)}，先看清详情，再决定后续承接。',
-  };
-}
-
-String _homeSectionTag({
-  required bool loading,
-  required ExhibitionLoadResult? result,
-}) {
-  if (loading && result == null) {
-    return '正在读取';
-  }
-
-  return switch (result?.state) {
-    AppPageState.content => '已接通内容',
-    AppPageState.empty => '当前为空',
-    AppPageState.errorRetryable => '待重试',
-    AppPageState.errorNonRetryable => '受控失败',
-    AppPageState.unauthorized => '待恢复登录',
-    AppPageState.forbidden => '当前未开放',
-    AppPageState.notFound => '暂未承接',
-    _ => loading ? '正在刷新' : '准备中',
-  };
-}
-
-String _homeSectionMessage({
-  required String areaLabel,
-  required bool loading,
-  required ExhibitionLoadResult? result,
-}) {
-  if (loading && result == null) {
-    return '正在读取$areaLabel项目推荐。页面会继续保持整页刷新节奏，不会只刷新天气卡。';
-  }
-
-  return switch (result?.state) {
-    AppPageState.content => '当前优先承接的是$areaLabel项目推荐。天气聚合未接通时，本区仍继续保留现有推荐消费层。',
-    AppPageState.empty =>
-      '$areaLabel当前还没有公开项目。可以先发布项目或回到工作台继续；页面不会用本地演示项目补齐这个区域。',
-    AppPageState.errorRetryable =>
-      '$areaLabel项目推荐暂时没有刷新成功。你可以重试整页刷新；在恢复前，页面不会用本地演示项目把这里填满。',
-    AppPageState.errorNonRetryable =>
-      '$areaLabel项目推荐当前不能继续承接。页面会停在受控状态，不会把未接通内容伪装成已完成。',
-    AppPageState.unauthorized => '$areaLabel项目推荐当前需要先恢复登录或授权状态，页面不会继续假装可进入。',
-    AppPageState.forbidden => '$areaLabel项目推荐当前未开放，页面会明确说明边界，不会伪装成只是“还没做完”。',
-    AppPageState.notFound => '$areaLabel项目推荐当前还没有稳定承接到这一页，所以先停留在受控状态。',
-    _ => '当前推荐区正在准备中。',
   };
 }
 

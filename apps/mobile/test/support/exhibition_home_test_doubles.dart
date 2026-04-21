@@ -5,6 +5,39 @@ import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 
+String _clockLabel(DateTime value) {
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+List<Object?> _futureHourlyForecastPayload() {
+  final now = DateTime.now();
+  final first = DateTime(
+    now.year,
+    now.month,
+    now.day,
+    now.hour,
+    now.minute == 59 ? 59 : now.minute + 1,
+  );
+  final second = first.add(const Duration(hours: 2));
+
+  return <Object?>[
+    <String, Object?>{
+      'timeLabel': _clockLabel(first),
+      'weather': '多云',
+      'temperature': 21,
+      'precipitationProbability': 20,
+    },
+    <String, Object?>{
+      'timeLabel': _clockLabel(second),
+      'weather': '晴间多云',
+      'temperature': 24,
+      'precipitationProbability': 10,
+    },
+  ];
+}
+
 class FakeDeviceLocationService implements DeviceLocationService {
   FakeDeviceLocationService({
     FutureOr<DeviceLocationSnapshot> Function()? resolver,
@@ -177,20 +210,7 @@ ExhibitionLoadResult contentHomeResult({
       'nightRainTimeLabel': nightRainTimeLabel,
       'officialAlerts': officialAlerts,
       'constructionSuggestions': constructionSuggestions,
-      'hourlyForecast': <Object?>[
-        <String, Object?>{
-          'timeLabel': '10:00',
-          'weather': '多云',
-          'temperature': 21,
-          'precipitationProbability': 20,
-        },
-        <String, Object?>{
-          'timeLabel': '13:00',
-          'weather': '晴间多云',
-          'temperature': 24,
-          'precipitationProbability': 10,
-        },
-      ],
+      'hourlyForecast': _futureHourlyForecastPayload(),
       'dailyForecast': <Object?>[
         <String, Object?>{
           'dateLabel': '今天',
@@ -216,6 +236,64 @@ ExhibitionLoadResult contentHomeResult({
       'refreshable': true,
       'modules': const <Object?>[],
       'recommendationSections': recommendationSections,
+    },
+  );
+}
+
+ExhibitionLoadResult degradedWeatherHomeResult({
+  String displayName = '成都市成华区',
+  String provinceName = '四川',
+  double latitude = 30.5728,
+  double longitude = 104.0668,
+  String selectionScope = 'request_only',
+  String selectionNotice = '当前定位仅用于本次首页聚合',
+  String sourceLabel = '当前首页按定位地区返回天气受控降级',
+  String constructionRiskLevel = 'medium',
+  String constructionRiskSummary = '今日施工重点：当前地区已同步，天气暂不可用，请按保守方案安排露天施工并稍后刷新重试。',
+  List<String> constructionSuggestions = const <String>[
+    '优先按保守天气方案安排露天、高处和吊装作业，避免连续重载施工。',
+    '现场先复核临时用电、防滑、防潮和排水条件，再决定是否放开室外工序。',
+    '天气恢复后再刷新首页，确认小时预报、每日预报和官方预警是否变化。',
+  ],
+  String updatedAt = '2026-04-21T09:30:00Z',
+}) {
+  return ExhibitionLoadResult(
+    state: AppPageState.content,
+    method: 'GET',
+    path: ExhibitionCanonicalPaths.exhibitionHome,
+    payload: <String, Object?>{
+      'currentLocation': <String, Object?>{
+        'displayName': displayName,
+        'provinceName': provinceName,
+        'latitude': latitude,
+        'longitude': longitude,
+        'source': 'device_location',
+        'persisted': false,
+      },
+      'selectionScope': selectionScope,
+      'isUsingDeviceLocation': true,
+      'currentWeather': '天气暂不可用',
+      'currentTemperature': 0,
+      'highTemperature': 0,
+      'lowTemperature': 0,
+      'precipitationProbability': 0,
+      'constructionRiskLevel': constructionRiskLevel,
+      'constructionRiskSummary': constructionRiskSummary,
+      'riskTags': const <String>[],
+      'riskTimeLabel': null,
+      'nightRainExpected': false,
+      'nightRainTimeLabel': null,
+      'officialAlerts': const <String>[],
+      'constructionSuggestions': constructionSuggestions,
+      'hourlyForecast': const <Object?>[],
+      'dailyForecast': const <Object?>[],
+      'updatedAt': updatedAt,
+      'sourceLabel': sourceLabel,
+      'selectionNotice': selectionNotice,
+      'canExpand': true,
+      'refreshable': true,
+      'modules': const <Object?>[],
+      'recommendationSections': const <Object?>[],
     },
   );
 }

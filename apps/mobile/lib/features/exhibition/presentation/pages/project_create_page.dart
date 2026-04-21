@@ -79,6 +79,68 @@ class _ProjectCreateValidationResult {
   String? get formMessage => _projectCreateValidationSummary(errors);
 }
 
+class ProjectCreateFailureBarrier {
+  const ProjectCreateFailureBarrier({
+    required this.title,
+    required this.message,
+    required this.actionLabel,
+    required this.actionRouteName,
+  });
+
+  final String title;
+  final String message;
+  final String actionLabel;
+  final String actionRouteName;
+}
+
+ProjectCreateFailureBarrier? resolveProjectCreateFailureBarrier({
+  required AppPageState? state,
+  required String? errorCode,
+  required bool shellReportsNoOrganization,
+  required bool missingOrganizationId,
+  String? message,
+}) {
+  final normalizedErrorCode = errorCode?.trim();
+  if (state == AppPageState.unauthorized ||
+      normalizedErrorCode == 'AUTH_SESSION_INVALID') {
+    return const ProjectCreateFailureBarrier(
+      title: '请先登录',
+      message: '当前登录状态已失效，先重新登录后再创建项目。',
+      actionLabel: '去登录',
+      actionRouteName: ProfileIdentityRoutes.login,
+    );
+  }
+
+  final normalizedMessage = message?.trim().toLowerCase();
+  final likelyOrganizationUnavailable =
+      shellReportsNoOrganization ||
+      missingOrganizationId ||
+      normalizedMessage?.contains('组织') == true ||
+      normalizedMessage?.contains('organization') == true ||
+      normalizedMessage?.contains('org ') == true;
+  if (normalizedErrorCode == 'AUTH_RESOURCE_UNAVAILABLE' &&
+      likelyOrganizationUnavailable) {
+    return const ProjectCreateFailureBarrier(
+      title: '请先加入组织',
+      message: '当前账号缺少组织信息，先完成组织承接后再创建项目。',
+      actionLabel: '去完善组织',
+      actionRouteName: ProfileIdentityRoutes.organizationHandoff,
+    );
+  }
+
+  if (state == AppPageState.forbidden &&
+      normalizedErrorCode == 'AUTH_PERMISSION_INSUFFICIENT') {
+    return const ProjectCreateFailureBarrier(
+      title: '当前角色不允许创建项目',
+      message: '当前组织角色暂不允许创建项目，请先返回我的项目查看当前可继续入口。',
+      actionLabel: '返回我的项目',
+      actionRouteName: ExhibitionRoutes.myProjectList,
+    );
+  }
+
+  return null;
+}
+
 class _ProjectCreatePageState extends State<ProjectCreatePage> {
   static const String _roundABuildingType = 'exhibition';
   static const List<String> _projectTypeOptions = <String>[
@@ -340,9 +402,14 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       return;
     }
 
+    final failureGuard = _guardFromCreateFailure(result);
     setState(() {
       _submitting = false;
       _lastResult = result;
+      if (failureGuard != null) {
+        _guardLoading = false;
+        _accessGuard = failureGuard;
+      }
     });
 
     final failureMessage = result.message?.trim();
@@ -400,6 +467,30 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     Navigator.of(
       context,
     ).pushNamed(ExhibitionRoutes.projectEditWithProjectId(projectId));
+  }
+
+  _ProjectCreateAccessGuard? _guardFromCreateFailure(
+    ExhibitionActionResult result,
+  ) {
+    final snapshot = AppShellScope.read(context).snapshot;
+    final barrier = resolveProjectCreateFailureBarrier(
+      state: result.controlledState,
+      errorCode: result.errorCode,
+      shellReportsNoOrganization:
+          snapshot.blockingState == GlobalShellState.noOrganization,
+      missingOrganizationId:
+          snapshot.shellContext.organizationId?.trim().isEmpty ?? true,
+      message: result.message,
+    );
+    if (barrier == null) {
+      return null;
+    }
+    return _ProjectCreateAccessGuard.blocked(
+      title: barrier.title,
+      message: barrier.message,
+      actionLabel: barrier.actionLabel,
+      actionRouteName: barrier.actionRouteName,
+    );
   }
 
   Future<void> _loadProjectForEdit({bool forceRefresh = false}) async {
@@ -806,11 +897,11 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                       onPressed: () => _openMyProjectDetail(projectId),
                       child: const Text('下一步：进入我的项目详情'),
                     ),
-                    FilledButton.tonal(
+                    OutlinedButton(
                       onPressed: () => _openProjectDetail(projectId),
                       child: const Text('查看公域项目详情'),
                     ),
-                    FilledButton.tonal(
+                    OutlinedButton(
                       onPressed: _openMyProjectList,
                       child: const Text('返回我的项目'),
                     ),
@@ -820,11 +911,11 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                       onPressed: () => _openMyProjectDetail(projectId),
                       child: const Text('下一步：进入我的项目详情'),
                     ),
-                    FilledButton.tonal(
+                    OutlinedButton(
                       onPressed: () => _openProjectEdit(projectId),
                       child: const Text('继续编辑项目'),
                     ),
-                    FilledButton.tonal(
+                    OutlinedButton(
                       onPressed: _openMyProjectList,
                       child: const Text('返回我的项目'),
                     ),
@@ -871,7 +962,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                   onPressed: () => _loadProjectForEdit(forceRefresh: true),
                   child: const Text('重新载入'),
                 ),
-                FilledButton.tonal(
+                OutlinedButton(
                   onPressed: () => Navigator.of(
                     context,
                   ).pushNamed(ExhibitionRoutes.myProjectList),
@@ -921,8 +1012,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         formErrorMessage: _formErrorMessage,
         selectedProjectTypeLabel: _selectedProjectTypeLabel,
         selectedStandardizedLocationLabel: _selectedStandardizedLocationLabel,
-        hasStandardizedLocationSelection:
-            _selectedStandardizedLocation != null,
+        hasStandardizedLocationSelection: _selectedStandardizedLocation != null,
         districtSelectionEnabled:
             _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
         exhibitionNameController: _titleController,
@@ -1002,23 +1092,23 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     };
     final actionButtons = switch (state) {
       'submitted' => <Widget>[
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: () => _openMyProjectDetail(projectId),
           child: const Text('查看预发布列表详情'),
         ),
       ],
       'published' => <Widget>[
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: () => _openProjectDetail(projectId),
           child: const Text('查看公域项目详情'),
         ),
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: () => _openMyProjectDetail(projectId),
           child: const Text('查看我的项目详情'),
         ),
       ],
       _ => <Widget>[
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: () => _openMyProjectDetail(projectId),
           child: const Text('查看我的项目详情'),
         ),
@@ -1493,11 +1583,11 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           onPressed: _submitting ? null : _submitProject,
           child: const Text('保存到预发布列表'),
         ),
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: _submitting ? null : _saveProject,
           child: const Text('仅保存草稿'),
         ),
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: _submitting ? null : () => _openMyProjectDetail(projectId),
           child: const Text('查看我的项目详情'),
         ),
@@ -1507,7 +1597,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           onPressed: _submitting ? null : () => _openMyProjectDetail(projectId),
           child: const Text('返回预发布列表详情'),
         ),
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: _submitting
               ? null
               : () => _scrollToField(_ProjectCreateFieldId.title),
@@ -1519,17 +1609,17 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           onPressed: _submitting ? null : () => _openProjectDetail(projectId),
           child: const Text('查看公域项目详情'),
         ),
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: _submitting ? null : () => _openMyProjectDetail(projectId),
           child: const Text('查看我的项目详情'),
         ),
       ],
       _ => <Widget>[
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: _submitting ? null : _saveProject,
           child: const Text('仅保存草稿'),
         ),
-        FilledButton.tonal(
+        OutlinedButton(
           onPressed: _submitting ? null : () => _openMyProjectDetail(projectId),
           child: const Text('查看我的项目详情'),
         ),

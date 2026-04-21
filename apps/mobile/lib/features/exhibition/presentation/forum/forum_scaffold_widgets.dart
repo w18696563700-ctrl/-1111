@@ -80,11 +80,13 @@ class ForumSectionCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: emphasis
-            ? colorScheme.surfaceContainerHigh
-            : colorScheme.surface,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: colorScheme.outlineVariant),
+        border: Border.all(
+          color: emphasis
+              ? colorScheme.primary.withValues(alpha: 0.18)
+              : colorScheme.outlineVariant,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -142,9 +144,14 @@ class ForumInfoPill extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: highlighted
-            ? colorScheme.primaryContainer
-            : colorScheme.surfaceContainerHighest,
+            ? colorScheme.surface
+            : colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(
+          color: highlighted
+              ? colorScheme.primary.withValues(alpha: 0.18)
+              : colorScheme.outlineVariant,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -153,7 +160,7 @@ class ForumInfoPill extends StatelessWidget {
           style: theme.textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: highlighted
-                ? colorScheme.onPrimaryContainer
+                ? colorScheme.primary
                 : colorScheme.onSurfaceVariant,
           ),
         ),
@@ -183,9 +190,9 @@ class ForumShortcutCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.primaryContainer.withValues(alpha: 0.35),
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.16)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -204,7 +211,7 @@ class ForumShortcutCard extends StatelessWidget {
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
             ),
             const SizedBox(height: 12),
-            FilledButton.tonal(onPressed: onPressed, child: Text(actionLabel)),
+            OutlinedButton(onPressed: onPressed, child: Text(actionLabel)),
           ],
         ),
       ),

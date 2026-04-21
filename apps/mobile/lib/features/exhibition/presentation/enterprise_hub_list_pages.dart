@@ -282,13 +282,9 @@ class _EnterpriseBoardListPageState extends State<EnterpriseBoardListPage> {
       setState(() {
         _cityFilterNotice = '城市筛选当前不可用，请稍后重试。';
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '当前城市筛选暂不可用，请稍后重试。',
-          ),
-        ),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('当前城市筛选暂不可用，请稍后重试。')));
     }
   }
 
@@ -397,7 +393,7 @@ class _EnterpriseBoardListPageState extends State<EnterpriseBoardListPage> {
           if (listData != null) ...<Widget>[
             const SizedBox(height: 16),
             Center(
-              child: FilledButton.tonal(
+              child: OutlinedButton(
                 onPressed: listData.pagination.hasMore && !_loadingMore
                     ? _loadMore
                     : null,

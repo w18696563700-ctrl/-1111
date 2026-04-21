@@ -87,7 +87,7 @@ class _ForumTopScopeNav extends StatelessWidget {
     final theme = Theme.of(context);
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
+        color: theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
@@ -103,7 +103,7 @@ class _ForumTopScopeNav extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(vertical: 11),
                 decoration: BoxDecoration(
                   color: selected
-                      ? theme.colorScheme.primaryContainer
+                      ? theme.colorScheme.surfaceContainerLowest
                       : Colors.transparent,
                   borderRadius: BorderRadius.circular(18),
                 ),
@@ -117,7 +117,7 @@ class _ForumTopScopeNav extends StatelessWidget {
                             ? FontWeight.w900
                             : FontWeight.w700,
                         color: selected
-                            ? theme.colorScheme.onPrimaryContainer
+                            ? theme.colorScheme.primary
                             : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
@@ -166,13 +166,30 @@ class _ForumTopicFilterBar extends StatelessWidget {
             const SizedBox(width: 6),
         itemBuilder: (BuildContext context, int index) {
           final chip = chips[index];
+          final selected = _isFilterSelected(selectedFilterKey, chip);
+          final theme = Theme.of(context);
           return FilterChip(
-            selected: _isFilterSelected(selectedFilterKey, chip),
+            selected: selected,
             onSelected: (_) => onSelectTopic(chip.filterKey),
             label: Text(chip.label),
             showCheckmark: false,
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            backgroundColor: theme.colorScheme.surface,
+            selectedColor: theme.colorScheme.primaryContainer.withValues(
+              alpha: 0.42,
+            ),
+            side: BorderSide(
+              color: selected
+                  ? theme.colorScheme.primary.withValues(alpha: 0.18)
+                  : theme.colorScheme.outlineVariant,
+            ),
+            labelStyle: theme.textTheme.labelLarge?.copyWith(
+              color: selected
+                  ? theme.colorScheme.primary
+                  : theme.colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
           );
         },
       ),

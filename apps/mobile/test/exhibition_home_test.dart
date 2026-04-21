@@ -66,6 +66,14 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _selectHomeTab(WidgetTester tester, String tabName) async {
+  final finder = find.byKey(ValueKey<String>('home-tab-$tabName'));
+  await tester.ensureVisible(finder);
+  await tester.pumpAndSettle();
+  await tester.tap(finder);
+  await tester.pumpAndSettle();
+}
+
 ForumConsumerLayer _forumConsumer() {
   return ForumConsumerLayer(
     client: AppApiClient(
@@ -73,6 +81,42 @@ ForumConsumerLayer _forumConsumer() {
       transport: FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/feed': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'items': <Object?>[
+                      <String, Object?>{
+                        'postId': 'post-1',
+                        'topicId': 'expo-materials',
+                        'topicLabel': '展台材料分享',
+                        'title': '重庆进场材料怎么提前锁仓',
+                        'excerpt': '最近一轮西洽会项目里，先锁仓再排车明显更稳。',
+                        'state': 'published',
+                        'author': <String, Object?>{
+                          'authorId': 'member-1',
+                          'displayName': '赵工',
+                          'organizationName': '重庆布展组',
+                        },
+                        'engagement': <String, Object?>{
+                          'replyCount': 8,
+                          'likeCount': 12,
+                          'viewCount': 45,
+                        },
+                        'publishedAt': '2026-03-27T09:30:00Z',
+                        'viewerHasLiked': false,
+                        'viewerHasBookmarked': false,
+                        'viewerFollowsTopic': false,
+                      },
+                    ],
+                    'page': <String, Object?>{
+                      'nextCursor': null,
+                      'hasMore': false,
+                    },
+                  },
+                );
+              },
               'GET /api/app/forum/me/index': (AppApiRequest request) async {
                 return AppApiResponse(
                   statusCode: 200,
@@ -140,6 +184,194 @@ ForumConsumerLayer _forumConsumer() {
   );
 }
 
+Map<String, Object?> _enterpriseItem({
+  required String enterpriseId,
+  required String boardType,
+  required String name,
+  String provinceCode = '500000',
+  String provinceName = '重庆市',
+  String cityCode = '500100',
+  String cityName = '重庆市',
+  String primaryBoardLabel = '优选展示',
+  String shortIntro = '当前样本已接入公开展示。',
+}) {
+  return <String, Object?>{
+    'enterpriseId': enterpriseId,
+    'boardType': boardType,
+    'name': name,
+    'provinceCode': provinceCode,
+    'provinceName': provinceName,
+    'cityCode': cityCode,
+    'cityName': cityName,
+    'primaryBoardLabel': primaryBoardLabel,
+    'secondaryCapabilityLabels': <Object?>['展陈', '搭建'],
+    'shortIntro': shortIntro,
+    'certificationLabel': '已认证',
+    'caseCount': 6,
+    'avgScore': 4.8,
+    'keywordTags': <Object?>['本地'],
+    'boardHighlights': <String, Object?>{},
+  };
+}
+
+void _installEnterpriseHubConsumer({
+  bool companyFeaturedEmpty = false,
+  bool supplierFeaturedEmpty = false,
+}) {
+  EnterpriseHubConsumerLayer.install(
+    EnterpriseHubConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/exhibition/enterprise-hub/company/enterprises':
+                    (AppApiRequest request) async {
+                      final isProvinceScoped =
+                          request.uri.queryParameters['provinceCode'] ==
+                          '500000';
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'recommended': <Object?>[],
+                          'items': <Object?>[
+                            _enterpriseItem(
+                              enterpriseId: 'company-1',
+                              boardType: 'company',
+                              name: isProvinceScoped ? '重庆展陈公司样本' : '全国展陈公司样本',
+                              primaryBoardLabel: '公司展示',
+                            ),
+                          ],
+                          'pagination': <String, Object?>{
+                            'page': 1,
+                            'pageSize': 10,
+                            'total': 1,
+                            'hasMore': false,
+                          },
+                        },
+                      );
+                    },
+                'GET /api/app/exhibition/enterprise-hub/company/recommendations':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'boardType': 'company',
+                          'items': companyFeaturedEmpty
+                              ? const <Object?>[]
+                              : <Object?>[
+                                  _enterpriseItem(
+                                    enterpriseId: 'company-r1',
+                                    boardType: 'company',
+                                    name: '公司优选样本',
+                                    primaryBoardLabel: '优选公司',
+                                  ),
+                                ],
+                        },
+                      );
+                    },
+                'GET /api/app/exhibition/enterprise-hub/factory/enterprises':
+                    (AppApiRequest request) async {
+                      final isProvinceScoped =
+                          request.uri.queryParameters['provinceCode'] ==
+                          '500000';
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'recommended': <Object?>[],
+                          'items': <Object?>[
+                            _enterpriseItem(
+                              enterpriseId: 'factory-1',
+                              boardType: 'factory',
+                              name: isProvinceScoped ? '重庆坤特工厂样本' : '全国工厂样本',
+                              primaryBoardLabel: '工厂展示',
+                              shortIntro: '展台制作与木作工厂样本',
+                            ),
+                          ],
+                          'pagination': <String, Object?>{
+                            'page': 1,
+                            'pageSize': 10,
+                            'total': 1,
+                            'hasMore': false,
+                          },
+                        },
+                      );
+                    },
+                'GET /api/app/exhibition/enterprise-hub/factory/recommendations':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'boardType': 'factory',
+                          'items': <Object?>[
+                            _enterpriseItem(
+                              enterpriseId: 'factory-r1',
+                              boardType: 'factory',
+                              name: '工厂优选样本',
+                              primaryBoardLabel: '优选工厂',
+                            ),
+                          ],
+                        },
+                      );
+                    },
+                'GET /api/app/exhibition/enterprise-hub/supplier/enterprises':
+                    (AppApiRequest request) async {
+                      final isProvinceScoped =
+                          request.uri.queryParameters['provinceCode'] ==
+                          '500000';
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'recommended': <Object?>[],
+                          'items': <Object?>[
+                            _enterpriseItem(
+                              enterpriseId: 'supplier-1',
+                              boardType: 'supplier',
+                              name: isProvinceScoped ? '重庆供应商样本' : '全国供应商样本',
+                              primaryBoardLabel: '供应商展示',
+                            ),
+                          ],
+                          'pagination': <String, Object?>{
+                            'page': 1,
+                            'pageSize': 10,
+                            'total': 1,
+                            'hasMore': false,
+                          },
+                        },
+                      );
+                    },
+                'GET /api/app/exhibition/enterprise-hub/supplier/recommendations':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'boardType': 'supplier',
+                          'items': supplierFeaturedEmpty
+                              ? const <Object?>[]
+                              : <Object?>[
+                                  _enterpriseItem(
+                                    enterpriseId: 'supplier-r1',
+                                    boardType: 'supplier',
+                                    name: '供应商优选样本',
+                                    primaryBoardLabel: '优选供应商',
+                                  ),
+                                ],
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    ),
+  );
+}
+
 ExhibitionConsumerLayer _projectListConsumer({
   List<Object?> items = const <Object?>[],
 }) {
@@ -163,6 +395,10 @@ ExhibitionConsumerLayer _projectListConsumer({
 }
 
 void main() {
+  setUp(() {
+    _installEnterpriseHubConsumer();
+  });
+
   tearDown(() {
     EnterpriseHubConsumerLayer.reset();
   });
@@ -225,16 +461,15 @@ void main() {
 
       expect(find.text('天气与定位'), findsOneWidget);
       await _scrollTo(tester, find.text('重庆春季展台项目'));
-      expect(find.text('当前位置项目推荐'), findsOneWidget);
       expect(find.text('重庆春季展台项目'), findsOneWidget);
-      expect(find.byTooltip('发布项目入口'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
       expect(find.byTooltip('回到顶部'), findsOneWidget);
       expect(requestCount, 1);
       expect(homeClient.loadCount, 1);
       expect(homeClient.refreshCount, 0);
       expect(locationService.requestCount, 1);
 
-      await tester.tap(find.widgetWithText(OutlinedButton, '刷新首页'));
+      await tester.tap(find.widgetWithText(TextButton, '刷新'));
       await tester.pump();
       await tester.pumpAndSettle();
 
@@ -243,30 +478,62 @@ void main() {
       expect(locationService.requestCount, 2);
       await _scrollTo(tester, find.text('重庆春季展台项目（刷新）'));
       expect(find.text('重庆春季展台项目（刷新）'), findsOneWidget);
-      expect(find.text('查看全部项目展示'), findsOneWidget);
+      expect(find.text('进入项目列表'), findsOneWidget);
     },
   );
 
+  testWidgets('exhibition home switches unified module deck content by tab', (
+    WidgetTester tester,
+  ) async {
+    final homeClient = FakeExhibitionHomeAggregationClient(
+      onLoad: (_) => contentHomeResult(),
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        initialRoute: '/',
+        exhibitionConsumerLayer: _projectListConsumer(),
+        exhibitionHomeAggregationClient: homeClient,
+        forumConsumerLayer: _forumConsumer(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(
+      find.byKey(const ValueKey<String>('home-tab-project')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('home-tab-forum')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('home-tab-company')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('home-tab-factory')),
+      findsOneWidget,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('home-tab-supplier')),
+      findsOneWidget,
+    );
+    expect(find.byKey(const ValueKey<String>('home-tab-team')), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
+
+    await _selectHomeTab(tester, 'forum');
+
+    expect(find.text('打开论坛'), findsOneWidget);
+    expect(find.text('重庆进场材料怎么提前锁仓'), findsOneWidget);
+    expect(find.text('去发布项目'), findsNothing);
+  });
+
   testWidgets(
-    'exhibition home renders real company factory recommendation items from aggregation section',
+    'exhibition home factory tab renders truthful list items from enterprise surface',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
-        onLoad: (_) => contentHomeResult(
-          recommendationSections: const <Object?>[
-            <String, Object?>{
-              'sectionKey': 'company_factory_recommendations',
-              'items': <Object?>[
-                <String, Object?>{
-                  'itemType': 'factory',
-                  'entityId': 'bf5ff83a-26e7-4138-8157-042fb38a5f46',
-                  'title': '重庆坤特工厂样本',
-                  'summary': '展台制作与木作工厂样本',
-                  'badgeLabel': '优秀工厂',
-                },
-              ],
-            },
-          ],
-        ),
+        onLoad: (_) => contentHomeResult(),
       );
 
       await tester.pumpWidget(
@@ -279,43 +546,22 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('重庆坤特工厂样本'));
-      expect(find.text('3. 本省优秀公司与工厂'), findsOneWidget);
-      expect(find.text('重庆坤特工厂样本'), findsOneWidget);
+      await _selectHomeTab(tester, 'factory');
+      await _scrollTo(tester, find.text('全国工厂样本'));
+      expect(find.text('全国工厂样本'), findsOneWidget);
       expect(find.text('展台制作与木作工厂样本'), findsOneWidget);
-      expect(find.text('优秀工厂'), findsOneWidget);
-      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsNothing);
+      expect(find.text('工厂展示'), findsWidgets);
+      expect(find.widgetWithText(OutlinedButton, '进入工厂列表'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'exhibition home automatic location handoff carries province scope into default home load',
+    'exhibition home automatic location handoff enables truthful province filter on factory channel',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
-        onLoad: (locationContext) {
-          final hasProvinceScope =
-              locationContext?.provinceCode == '500000' &&
-              locationContext?.provinceName == '重庆市';
-          return contentHomeResult(
-            provinceName: locationContext?.provinceName ?? '重庆市',
-            recommendationSections: <Object?>[
-              <String, Object?>{
-                'sectionKey': 'company_factory_recommendations',
-                'items': hasProvinceScope
-                    ? <Object?>[
-                        const <String, Object?>{
-                          'itemType': 'factory',
-                          'entityId': 'bf5ff83a-26e7-4138-8157-042fb38a5f46',
-                          'title': '重庆坤特工厂样本',
-                          'summary': '展台制作与木作工厂样本',
-                          'badgeLabel': '优秀工厂',
-                        },
-                      ]
-                    : <Object?>[],
-              },
-            ],
-          );
-        },
+        onLoad: (locationContext) => contentHomeResult(
+          provinceName: locationContext?.provinceName ?? '重庆市',
+        ),
       );
       final locationService = FakeDeviceLocationService(
         resolver: () => const DeviceLocationSnapshot(
@@ -340,24 +586,20 @@ void main() {
 
       expect(homeClient.lastLoadLocationContext?.provinceCode, '500000');
       expect(homeClient.lastLoadLocationContext?.provinceName, '重庆市');
+      await _selectHomeTab(tester, 'factory');
+      await tester.tap(find.text('本省').last);
+      await tester.pumpAndSettle();
       await _scrollTo(tester, find.text('重庆坤特工厂样本'));
       expect(find.text('重庆坤特工厂样本'), findsOneWidget);
-      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '进入工厂列表'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'exhibition home keeps controlled placeholder when company factory recommendation items are empty',
+    'exhibition home company channel switches between comprehensive and featured sources',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
-        onLoad: (_) => contentHomeResult(
-          recommendationSections: const <Object?>[
-            <String, Object?>{
-              'sectionKey': 'company_factory_recommendations',
-              'items': <Object?>[],
-            },
-          ],
-        ),
+        onLoad: (_) => contentHomeResult(),
       );
 
       await tester.pumpWidget(
@@ -370,25 +612,20 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('3. 本省优秀公司与工厂'));
-      expect(find.text('3. 本省优秀公司与工厂'), findsOneWidget);
-      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsOneWidget);
-      expect(find.text('重庆坤特工厂样本'), findsNothing);
+      await _selectHomeTab(tester, 'company');
+      expect(find.text('全国展陈公司样本'), findsOneWidget);
+      await tester.tap(find.text('优选').last);
+      await tester.pumpAndSettle();
+      expect(find.text('进入公司列表'), findsOneWidget);
+      expect(find.text('公司优选样本'), findsOneWidget);
     },
   );
 
   testWidgets(
-    'exhibition home keeps controlled placeholder when automatic location has no province scope',
+    'exhibition home keeps controlled province notice when factory channel has no province scope',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
-        onLoad: (locationContext) => contentHomeResult(
-          recommendationSections: const <Object?>[
-            <String, Object?>{
-              'sectionKey': 'company_factory_recommendations',
-              'items': <Object?>[],
-            },
-          ],
-        ),
+        onLoad: (locationContext) => contentHomeResult(),
       );
       final locationService = FakeDeviceLocationService(
         resolver: () => const DeviceLocationSnapshot(
@@ -411,74 +648,19 @@ void main() {
 
       expect(homeClient.lastLoadLocationContext?.provinceCode, isNull);
       expect(homeClient.lastLoadLocationContext?.provinceName, isNull);
-      await _scrollTo(tester, find.text('3. 本省优秀公司与工厂'));
-      expect(find.text('公司与工厂推荐位持续完善中，当前先提供模块入口说明。'), findsOneWidget);
+      await _selectHomeTab(tester, 'factory');
+      await tester.tap(find.text('本省').last);
+      await tester.pumpAndSettle();
+      expect(find.text('当前还没拿到本省定位'), findsOneWidget);
       expect(find.text('重庆坤特工厂样本'), findsNothing);
     },
   );
 
   testWidgets(
-    'exhibition home company factory recommendation item opens existing enterprise detail route',
+    'exhibition home factory channel keeps featured recommendation detail CTA visible',
     (WidgetTester tester) async {
-      EnterpriseHubConsumerLayer.install(
-        EnterpriseHubConsumerLayer(
-          client: AppApiClient(
-            transport: FakeAppApiTransport(
-              handlers:
-                  <
-                    String,
-                    Future<AppApiResponse> Function(AppApiRequest request)
-                  >{
-                    'GET /api/app/exhibition/enterprise-hub/enterprises/bf5ff83a-26e7-4138-8157-042fb38a5f46':
-                        (AppApiRequest request) async {
-                          return AppApiResponse(
-                            statusCode: 200,
-                            uri: request.uri,
-                            body: const <String, Object?>{
-                              'header': <String, Object?>{
-                                'enterpriseId':
-                                    'bf5ff83a-26e7-4138-8157-042fb38a5f46',
-                                'name': '重庆坤特工厂样本',
-                                'primaryBoardType': 'factory',
-                                'shortIntro': '展台制作与木作工厂样本',
-                                'provinceName': '重庆',
-                                'cityName': '重庆',
-                              },
-                              'basicInfo': <String, Object?>{
-                                'fullIntro': '工厂详情已接通',
-                              },
-                              'boardProfile': <String, Object?>{
-                                'factoryName': '重庆坤特工厂样本',
-                              },
-                              'serviceAreas': <Object?>[],
-                              'cases': <Object?>[],
-                              'certifications': <Object?>[],
-                              'contacts': <Object?>[],
-                            },
-                          );
-                        },
-                  },
-            ),
-          ),
-        ),
-      );
       final homeClient = FakeExhibitionHomeAggregationClient(
-        onLoad: (_) => contentHomeResult(
-          recommendationSections: const <Object?>[
-            <String, Object?>{
-              'sectionKey': 'company_factory_recommendations',
-              'items': <Object?>[
-                <String, Object?>{
-                  'itemType': 'factory',
-                  'entityId': 'bf5ff83a-26e7-4138-8157-042fb38a5f46',
-                  'title': '重庆坤特工厂样本',
-                  'summary': '展台制作与木作工厂样本',
-                  'badgeLabel': '优秀工厂',
-                },
-              ],
-            },
-          ],
-        ),
+        onLoad: (_) => contentHomeResult(),
       );
 
       await tester.pumpWidget(
@@ -491,13 +673,76 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('重庆坤特工厂样本'));
-      await tester.tap(find.widgetWithText(FilledButton, '查看工厂详情'));
+      await _selectHomeTab(tester, 'factory');
+      await tester.tap(find.text('优选').last);
+      await tester.pumpAndSettle();
+      await _scrollTo(tester, find.text('工厂优选样本'));
+      expect(find.widgetWithText(OutlinedButton, '查看工厂详情'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'exhibition home supplier and team channels stay actionable without fake content',
+    (WidgetTester tester) async {
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+        ),
+      );
       await tester.pumpAndSettle();
 
-      expect(find.text('header'), findsNothing);
-      expect(find.text('重庆坤特工厂样本'), findsWidgets);
-      expect(find.text('工厂详情已接通'), findsOneWidget);
+      await _selectHomeTab(tester, 'supplier');
+      expect(find.text('进入供应商列表'), findsOneWidget);
+      expect(find.text('全国供应商样本'), findsOneWidget);
+      expect(find.text('优选'), findsOneWidget);
+
+      await _selectHomeTab(tester, 'team');
+      expect(find.text('查看说明'), findsWidgets);
+      expect(find.text('敬请期待'), findsOneWidget);
+      expect(find.text('团队频道保持受控建设态'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'exhibition home hides featured filter when company and supplier recommendations are empty',
+    (WidgetTester tester) async {
+      _installEnterpriseHubConsumer(
+        companyFeaturedEmpty: true,
+        supplierFeaturedEmpty: true,
+      );
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _selectHomeTab(tester, 'company');
+      expect(find.text('进入公司列表'), findsOneWidget);
+      expect(find.text('全国展陈公司样本'), findsOneWidget);
+      expect(find.text('优选'), findsNothing);
+
+      await _selectHomeTab(tester, 'supplier');
+      expect(find.text('进入供应商列表'), findsOneWidget);
+      expect(find.text('全国供应商样本'), findsOneWidget);
+      expect(find.text('优选'), findsNothing);
+
+      await _selectHomeTab(tester, 'factory');
+      expect(find.text('优选'), findsOneWidget);
     },
   );
 
@@ -532,11 +777,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('当前位置项目推荐暂时没有刷新成功'));
-      expect(find.text('当前位置项目推荐暂时没有刷新成功'), findsOneWidget);
+      await _scrollTo(tester, find.text('当前项目推荐暂时没有刷新成功'));
+      expect(find.text('当前项目推荐暂时没有刷新成功'), findsOneWidget);
       expect(find.textContaining('当前不会用本地演示项目替代云端推荐'), findsOneWidget);
       expect(find.text('重庆春季展台项目'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '重试整页刷新'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '刷新当前频道'), findsOneWidget);
       expect(homeClient.loadCount, 1);
     },
   );

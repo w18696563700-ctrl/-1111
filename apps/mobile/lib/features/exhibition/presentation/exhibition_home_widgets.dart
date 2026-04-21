@@ -1,87 +1,5 @@
 part of 'exhibition_home_page.dart';
 
-class _HomeModuleCard extends StatelessWidget {
-  const _HomeModuleCard({
-    super.key,
-    required this.title,
-    required this.description,
-    required this.statusLabel,
-    required this.actionLabel,
-    required this.onPressed,
-    this.highlighted = false,
-  });
-
-  final String title;
-  final String description;
-  final String statusLabel;
-  final String actionLabel;
-  final VoidCallback onPressed;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final backgroundColor = highlighted
-        ? colorScheme.secondaryContainer
-        : colorScheme.surfaceContainerLow;
-    final foregroundColor = highlighted
-        ? colorScheme.onSecondaryContainer
-        : colorScheme.onSurface;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: backgroundColor,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _HomePill(
-              label: statusLabel,
-              backgroundColor: foregroundColor.withValues(alpha: 0.12),
-              foregroundColor: foregroundColor,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: foregroundColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Expanded(
-              child: Text(
-                description,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  height: 1.35,
-                  color: foregroundColor,
-                ),
-              ),
-            ),
-            const SizedBox(height: 10),
-            FilledButton.tonal(
-              onPressed: onPressed,
-              style: FilledButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 8,
-                ),
-              ),
-              child: Text(actionLabel),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 class _HomeProjectCard extends StatelessWidget {
   const _HomeProjectCard({
     required this.title,
@@ -108,50 +26,67 @@ class _HomeProjectCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHigh,
-        borderRadius: BorderRadius.circular(20),
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               title,
-              style: theme.textTheme.titleMedium?.copyWith(
+              style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               summary,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: 8,
+              runSpacing: 8,
               children: <Widget>[
                 _HomePill(
                   label: projectNo,
-                  backgroundColor: colorScheme.surface,
+                  backgroundColor: colorScheme.surfaceContainerLowest,
                   foregroundColor: colorScheme.onSurface,
+                  borderColor: colorScheme.outlineVariant,
+                  dense: true,
                 ),
                 _HomePill(
                   label: stateLabel,
                   backgroundColor: colorScheme.primaryContainer,
                   foregroundColor: colorScheme.onPrimaryContainer,
+                  dense: true,
                 ),
                 _HomePill(
                   label: '预算 $budgetLabel',
-                  backgroundColor: colorScheme.tertiaryContainer,
-                  foregroundColor: colorScheme.onTertiaryContainer,
+                  backgroundColor: colorScheme.surfaceContainerLowest,
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                  borderColor: colorScheme.outlineVariant,
+                  dense: true,
                 ),
               ],
             ),
-            const SizedBox(height: 14),
-            FilledButton.tonal(onPressed: onPressed, child: Text(actionLabel)),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+              ),
+              child: Text(actionLabel),
+            ),
           ],
         ),
       ),
@@ -207,18 +142,113 @@ class _HomeStateNotice extends StatelessWidget {
 }
 
 class _HomeLoadingNotice extends StatelessWidget {
-  const _HomeLoadingNotice();
+  const _HomeLoadingNotice({required this.message});
+
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return const Card(
+    return Card(
       child: Padding(
-        padding: EdgeInsets.all(16),
+        padding: const EdgeInsets.all(16),
         child: Row(
           children: <Widget>[
-            CircularProgressIndicator(),
-            SizedBox(width: 16),
-            Expanded(child: Text('正在读取当前项目推荐')),
+            const CircularProgressIndicator(),
+            const SizedBox(width: 16),
+            Expanded(child: Text(message)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _HomeForumFeedCard extends StatelessWidget {
+  const _HomeForumFeedCard({
+    required this.topicLabel,
+    required this.title,
+    required this.excerpt,
+    required this.metaLabel,
+    required this.statLabel,
+    required this.onPressed,
+  });
+
+  final String topicLabel;
+  final String title;
+  final String excerpt;
+  final String metaLabel;
+  final String statLabel;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _HomePill(
+              label: topicLabel,
+              backgroundColor: colorScheme.primaryContainer,
+              foregroundColor: colorScheme.onPrimaryContainer,
+              dense: true,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              title,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              excerpt,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              crossAxisAlignment: WrapCrossAlignment.center,
+              children: <Widget>[
+                Text(
+                  metaLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                _HomePill(
+                  label: statLabel,
+                  backgroundColor: colorScheme.surfaceContainerLowest,
+                  foregroundColor: colorScheme.onSurface,
+                  borderColor: colorScheme.outlineVariant,
+                  dense: true,
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            OutlinedButton(
+              onPressed: onPressed,
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
+              ),
+              child: const Text('查看帖子'),
+            ),
           ],
         ),
       ),
@@ -231,11 +261,15 @@ class _HomePill extends StatelessWidget {
     required this.label,
     required this.backgroundColor,
     required this.foregroundColor,
+    this.borderColor,
+    this.dense = false,
   });
 
   final String label;
   final Color backgroundColor;
   final Color foregroundColor;
+  final Color? borderColor;
+  final bool dense;
 
   @override
   Widget build(BuildContext context) {
@@ -243,15 +277,23 @@ class _HomePill extends StatelessWidget {
       decoration: BoxDecoration(
         color: backgroundColor,
         borderRadius: BorderRadius.circular(999),
+        border: borderColor == null ? null : Border.all(color: borderColor!),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: EdgeInsets.symmetric(
+          horizontal: dense ? 10 : 12,
+          vertical: dense ? 5 : 6,
+        ),
         child: Text(
           label,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: foregroundColor,
-            fontWeight: FontWeight.w700,
-          ),
+          style:
+              (dense
+                      ? Theme.of(context).textTheme.labelSmall
+                      : Theme.of(context).textTheme.labelMedium)
+                  ?.copyWith(
+                    color: foregroundColor,
+                    fontWeight: FontWeight.w700,
+                  ),
         ),
       ),
     );

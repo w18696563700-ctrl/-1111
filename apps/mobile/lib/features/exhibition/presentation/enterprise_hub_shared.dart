@@ -25,7 +25,7 @@ class EnterpriseSectionCard extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLowest,
+        color: colorScheme.surface,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
@@ -80,7 +80,7 @@ class CapabilityTagGroup extends StatelessWidget {
       spacing: 8,
       runSpacing: 8,
       children: tags
-          .map((String tag) => Chip(label: Text(tag)))
+          .map((String tag) => _EnterpriseMetaPill(label: tag))
           .toList(growable: false),
     );
   }
@@ -205,8 +205,9 @@ class _EnterpriseCardLogo extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: SizedBox(
         width: 68,
@@ -214,7 +215,7 @@ class _EnterpriseCardLogo extends StatelessWidget {
         child: _buildEnterpriseCardLogoImage(
           logoUrl,
           fallback: label,
-          backgroundColor: colorScheme.surfaceContainerHighest,
+          backgroundColor: colorScheme.surfaceContainerLowest,
         ),
       ),
     );
@@ -291,8 +292,9 @@ class _EnterpriseMetaPill extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
+        color: colorScheme.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -498,7 +500,7 @@ class EnterpriseHeaderSection extends StatelessWidget {
       actions: onApplyPressed == null
           ? const <Widget>[]
           : <Widget>[
-              FilledButton.tonal(
+              FilledButton(
                 onPressed: onApplyPressed,
                 child: Text(header.primaryBoardType.applyTitle),
               ),
@@ -509,10 +511,7 @@ class EnterpriseHeaderSection extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              CircleAvatar(
-                radius: 28,
-                child: Text(title.characters.first),
-              ),
+              CircleAvatar(radius: 28, child: Text(title.characters.first)),
               const SizedBox(width: 14),
               Expanded(
                 child: Column(
@@ -608,7 +607,9 @@ class EnterpriseCertificationSection extends StatelessWidget {
               children: items
                   .map(
                     (EnterpriseHubCertificationCard item) =>
-                        Chip(label: Text('${item.name} · ${item.status}')),
+                        _EnterpriseMetaPill(
+                          label: '${item.name} · ${item.status}',
+                        ),
                   )
                   .toList(growable: false),
             ),

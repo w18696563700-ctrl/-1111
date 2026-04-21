@@ -94,9 +94,9 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 12),
-                FilledButton.tonal(
+                OutlinedButton(
                   onPressed: onPressed,
-                  style: FilledButton.styleFrom(
+                  style: OutlinedButton.styleFrom(
                     minimumSize: const Size(0, 40),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 14,

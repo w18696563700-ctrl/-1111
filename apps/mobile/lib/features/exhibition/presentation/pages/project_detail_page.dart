@@ -270,7 +270,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 ),
               ] else if (_canReadBidResultFromState(state)) ...<Widget>[
                 const SizedBox(height: 12),
-                FilledButton.tonal(
+                OutlinedButton(
                   onPressed: () => _openBidResultWithGuard(projectId),
                   child: const Text('查看竞标结果'),
                 ),
@@ -307,7 +307,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
           spacing: 12,
           runSpacing: 12,
           children: <Widget>[
-            FilledButton.tonalIcon(
+            OutlinedButton.icon(
               onPressed: () => Navigator.of(context).pushNamed(
                 ExhibitionRoutes.projectClarificationWithProjectId(projectId),
               ),
@@ -315,7 +315,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               label: const Text('项目澄清'),
             ),
             if (bidId != null)
-              FilledButton.tonalIcon(
+              OutlinedButton.icon(
                 onPressed: () => Navigator.of(context).pushNamed(
                   ExhibitionRoutes.bidThreadWithIds(
                     projectId: projectId,

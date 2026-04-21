@@ -90,7 +90,7 @@ class _EnterpriseDetailPageState extends State<EnterpriseDetailPage> {
             title: widget.boardType.detailTitle,
             subtitle: '当前还没有读取到真实企业详情；页面保持受控阻断，不把空态或错误态伪装成实体已接通。',
             actions: <Widget>[
-              FilledButton.tonal(
+              FilledButton(
                 onPressed: _loading ? null : _load,
                 child: Text(_loading ? '读取中' : '重试'),
               ),

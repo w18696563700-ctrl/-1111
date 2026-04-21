@@ -15,6 +15,9 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isWeatherDegraded = weatherProjection?.isWeatherDegraded == true;
+    final isWeatherUnavailable =
+        weatherProjection?.isWeatherUnavailable == true;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -28,7 +31,7 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '今日施工天气总览',
+              isWeatherUnavailable ? '当前地区天气总览' : '今日施工天气总览',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
@@ -42,17 +45,27 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
                     (locationSnapshot?.hasCoordinates == true
                         ? '所在地区识别中'
                         : '待获取');
-                final weatherValue = weatherProjection != null
-                    ? '${weatherProjection!.currentWeather} ${weatherProjection!.highTemperature.toStringAsFixed(0)}°/${weatherProjection!.lowTemperature.toStringAsFixed(0)}°'
-                    : '同步中';
-                final riskValue = weatherProjection != null
+                final weatherValue = weatherProjection == null
+                    ? '天气待更新'
+                    : isWeatherDegraded
+                    ? '天气暂不可用'
+                    : weatherProjection!.isControlledPlaceholder
+                    ? '天气待更新'
+                    : '${weatherProjection!.currentWeather} ${weatherProjection!.highTemperature.toStringAsFixed(0)}°/${weatherProjection!.lowTemperature.toStringAsFixed(0)}°';
+                final riskValue = weatherProjection == null
+                    ? '待评估'
+                    : isWeatherUnavailable
                     ? _homeConstructionRiskLevelLabel(
                         weatherProjection!.constructionRiskLevel,
                       )
-                    : '待评估';
-                final tagsValue = weatherProjection != null
+                    : _homeConstructionRiskLevelLabel(
+                        weatherProjection!.constructionRiskLevel,
+                      );
+                final tagsValue = weatherProjection == null
+                    ? '待确认'
+                    : isWeatherUnavailable
                     ? _homeRiskTagsLabel(weatherProjection!.riskTags)
-                    : '待确认';
+                    : _homeRiskTagsLabel(weatherProjection!.riskTags);
 
                 return Wrap(
                   spacing: 8,
@@ -92,7 +105,7 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             _HomeCompactOverviewTile(
-              title: '位置与同步状态',
+              title: isWeatherUnavailable ? '地区与天气状态' : '位置与同步状态',
               value: weatherProjection != null
                   ? _homeLocationSyncStatus(weatherProjection!)
                   : _homeUnavailableMessage(homeResult),
@@ -130,15 +143,24 @@ class _HomeUnavailableForecastPanel extends StatelessWidget {
   const _HomeUnavailableForecastPanel({
     required this.locationSnapshot,
     required this.homeResult,
+    this.weatherProjection,
   });
 
   final DeviceLocationSnapshot? locationSnapshot;
   final ExhibitionLoadResult? homeResult;
+  final _HomeWeatherProjection? weatherProjection;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
+    final isWeatherUnavailable =
+        weatherProjection?.isWeatherUnavailable == true;
+    final summary = isWeatherUnavailable
+        ? '已同步到 ${weatherProjection!.displayName}。${_homeUnavailableWeatherSummary(weatherProjection!)}'
+        : (locationSnapshot?.hasCoordinates == true
+              ? '当前位置已获取，但当前还未拿到可展示的天气结果。'
+              : _homeLocationUnavailableGuidance(locationSnapshot));
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -152,33 +174,40 @@ class _HomeUnavailableForecastPanel extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '施工天气预警模块',
+              '天气与施工说明',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 12),
             Text(
-              '天气信息正在更新',
+              isWeatherUnavailable ? '地区已同步，天气暂不可用' : '当前地区说明尚未就绪',
               style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              locationSnapshot?.hasCoordinates == true
-                  ? '正在识别所在地区，并同步施工天气与风险建议。'
-                  : _homeLocationUnavailableGuidance(locationSnapshot),
+              summary,
               style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
             ),
             const SizedBox(height: 12),
             _HomeInfoLine(
               title: '当前状态',
-              value: _homeUnavailableMessage(homeResult),
+              value: isWeatherUnavailable && weatherProjection != null
+                  ? _homeLocationSyncStatus(weatherProjection!)
+                  : _homeUnavailableMessage(homeResult),
             ),
+            if (isWeatherUnavailable && weatherProjection != null)
+              _HomeInfoLine(
+                title: '地区来源',
+                value: weatherProjection!.sourceLabel,
+              ),
             _HomeInfoLine(
               title: '建议操作',
-              value: '可点击“重新定位并刷新”或“手动选择地区”继续查看施工天气信息。',
+              value: isWeatherUnavailable
+                  ? '可点击“整页刷新”更新当前地区说明；如需切换地区，可使用“重新定位并刷新”或“手动选择地区”。'
+                  : '可点击“重新定位并刷新”或“手动选择地区”继续查看当前地区说明。',
             ),
           ],
         ),
@@ -388,40 +417,41 @@ class _HomeInfoLine extends StatelessWidget {
 
 String _homeUnavailableMessage(ExhibitionLoadResult? result) {
   if (result == null) {
-    return '正在同步施工天气信息，请稍候。';
+    return '当前地区说明同步中，请稍候。';
   }
 
   switch (result.errorCode) {
     case 'AUTH_SESSION_INVALID':
-      return '登录状态已失效，请先登录后再刷新天气信息。';
+      return '登录状态已失效，请先登录后再刷新当前地区说明。';
     case 'LOCATION_REQUIRED':
     case 'LOCATION_PERMISSION_UNAVAILABLE':
-      return '请先开启定位或手动选择地区，再查看施工天气建议。';
+      return '请先开启定位或手动选择地区，再查看当前地区说明。';
     case 'HOME_WEATHER_UPSTREAM_UNAVAILABLE':
+      return '当前地区已同步，但天气暂不可用，请稍后再试。';
     case 'HOME_AGGREGATION_UNAVAILABLE':
     case 'HOME_REFRESH_TIMEOUT':
-      return '天气服务暂时繁忙，请稍后再试。';
+      return '地区说明服务暂时繁忙，请稍后再试。';
   }
 
   return switch (result.state) {
-    AppPageState.content => '天气信息已同步完成。',
-    AppPageState.empty => '当前地区暂未获取天气信息，请稍后再试。',
-    AppPageState.errorRetryable => '天气信息更新失败，可点击“整页刷新”重试。',
-    AppPageState.errorNonRetryable => '天气服务暂不可用，请稍后再试。',
+    AppPageState.content => '当前地区说明已同步，但天气暂不可用。',
+    AppPageState.empty => '当前地区暂未获取到地区说明，请稍后再试。',
+    AppPageState.errorRetryable => '当前地区说明更新失败，可点击“整页刷新”重试。',
+    AppPageState.errorNonRetryable => '地区说明服务暂不可用，请稍后再试。',
     AppPageState.unauthorized => '登录状态已失效，请先登录后再试。',
     AppPageState.forbidden => '当前账号暂不可使用该能力。',
-    AppPageState.notFound => '当前地区天气信息暂未开放。',
-    _ => '天气信息同步中。',
+    AppPageState.notFound => '当前地区说明暂未开放。',
+    _ => '当前地区说明同步中。',
   };
 }
 
 String _homeLocationUnavailableGuidance(DeviceLocationSnapshot? snapshot) {
   return switch (snapshot?.permissionState) {
-    DeviceLocationPermissionState.denied => '定位权限未开启，可先授权定位或手动选择地区查看施工天气信息。',
-    DeviceLocationPermissionState.unavailable => '当前设备定位暂不可用，可先手动选择地区查看施工天气信息。',
-    DeviceLocationPermissionState.granted => '暂未获取到稳定定位，可先手动选择地区查看施工天气信息。',
+    DeviceLocationPermissionState.denied => '定位权限未开启，可先授权定位或手动选择地区查看当前地区说明。',
+    DeviceLocationPermissionState.unavailable => '当前设备定位暂不可用，可先手动选择地区查看当前地区说明。',
+    DeviceLocationPermissionState.granted => '暂未获取到稳定定位，可先手动选择地区查看当前地区说明。',
     DeviceLocationPermissionState.unknown ||
-    null => '暂未获取当前位置，可先手动选择地区查看施工天气信息。',
+    null => '暂未获取当前位置，可先手动选择地区查看当前地区说明。',
   };
 }
 
@@ -435,10 +465,27 @@ String _homeManualLocationSelectFailureMessage(ExhibitionLoadResult result) {
 }
 
 String _homeLocationSyncStatus(_HomeWeatherProjection projection) {
-  return switch (projection.selectionScope) {
+  final scopeNotice = projection.selectionNotice.trim();
+  final fallbackNotice = switch (projection.selectionScope) {
     'persisted' => '当前地区已作为常用地区生效，可随时重新定位或手动切换。',
-    'session_only' => '当前地区仅用于本次天气查看，可重新定位或手动切换，不影响长期设置。',
-    'request_only' => '当前地区仅用于本次天气查看，可重新定位或手动切换，不影响长期设置。',
-    _ => '当前地区仅用于本次天气查看，可重新定位或手动切换。',
+    'session_only' => '当前地区仅用于当前会话，可重新定位或手动切换，不影响长期设置。',
+    'request_only' => '当前地区仅用于当前首页聚合，可重新定位或手动切换。',
+    _ => '当前地区仅用于当前首页聚合，可重新定位或手动切换。',
   };
+  final effectiveNotice = scopeNotice.isEmpty ? fallbackNotice : scopeNotice;
+  final capabilityNotice = projection.isWeatherDegraded
+      ? '天气暂不可用，当前已切到受控降级展示。'
+      : projection.isControlledPlaceholder
+      ? '天气仍在更新中，请以现场实时天气和官方预警为准。'
+      : '天气与施工建议已按当前地区同步。';
+  return '$effectiveNotice 来源：${projection.sourceLabel}。$capabilityNotice';
+}
+
+String _homeUnavailableWeatherSummary(_HomeWeatherProjection projection) {
+  final notice = projection.selectionNotice.trim();
+  final selectionNotice = notice.isEmpty ? '当前地区仅用于当前首页聚合' : notice;
+  if (projection.isWeatherDegraded) {
+    return '$selectionNotice 当前地区已同步，但天气服务暂不可用；施工前请以现场实时天气和官方预警为准。';
+  }
+  return '$selectionNotice 当前天气仍在更新中；施工前请以现场实时天气和官方预警为准。';
 }

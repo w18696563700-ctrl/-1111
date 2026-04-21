@@ -32,36 +32,18 @@ class _HomeWeatherCard extends StatelessWidget {
     final title = _cardTitle();
     final summary = _cardSummary();
     final statusLabel = _statusLabel();
-    final riskLevel = weatherProjection == null
-        ? '待评估'
-        : _homeConstructionRiskLevelLabel(
-            weatherProjection!.constructionRiskLevel,
-          );
-    final tonightRainLabel = weatherProjection == null
-        ? '待判断'
-        : _homeNightRainLabel(
-            expected: weatherProjection!.nightRainExpected,
-            timeLabel: weatherProjection!.nightRainTimeLabel,
-          );
-    final warningLabel = weatherProjection == null
-        ? '待判断'
-        : (weatherProjection!.officialAlerts.isEmpty ? '无预警' : '有预警');
+    final isWeatherUnavailable =
+        weatherProjection?.isWeatherUnavailable == true;
+    final isWeatherDegraded = weatherProjection?.isWeatherDegraded == true;
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: <Color>[
-            colorScheme.surfaceContainerHighest,
-            colorScheme.secondaryContainer.withValues(alpha: 0.92),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
+        color: colorScheme.surfaceContainerLow,
         borderRadius: BorderRadius.circular(24),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -69,8 +51,9 @@ class _HomeWeatherCard extends StatelessWidget {
               children: <Widget>[
                 _HomePill(
                   label: '天气与定位',
-                  backgroundColor: colorScheme.surface,
+                  backgroundColor: colorScheme.surfaceContainerLowest,
                   foregroundColor: colorScheme.onSurface,
+                  borderColor: colorScheme.outlineVariant,
                 ),
                 const SizedBox(width: 6),
                 _HomePill(
@@ -98,17 +81,19 @@ class _HomeWeatherCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Text(
               title,
               maxLines: expanded ? 2 : 1,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
+              style:
+                  (expanded
+                          ? theme.textTheme.titleLarge
+                          : theme.textTheme.titleMedium)
+                      ?.copyWith(fontWeight: FontWeight.w800),
             ),
             if (expanded) ...<Widget>[
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               Text(
                 summary,
                 maxLines: 2,
@@ -116,66 +101,109 @@ class _HomeWeatherCard extends StatelessWidget {
                 style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
               ),
             ],
+            const SizedBox(height: 6),
+            Wrap(
+              spacing: 6,
+              runSpacing: 6,
+              children: expanded
+                  ? <Widget>[
+                      _HomePill(
+                        label: '地区：${_locationLabel()}',
+                        backgroundColor: colorScheme.surfaceContainerLowest,
+                        foregroundColor: colorScheme.onSurface,
+                        borderColor: colorScheme.outlineVariant,
+                      ),
+                      if (isWeatherUnavailable)
+                        _HomePill(
+                          label: isWeatherDegraded ? '天气：暂不可用' : '天气：待更新',
+                          backgroundColor: colorScheme.surfaceContainerLowest,
+                          foregroundColor: colorScheme.onSurface,
+                          borderColor: colorScheme.outlineVariant,
+                        )
+                      else ...<Widget>[
+                        _HomePill(
+                          label:
+                              '风险：${_homeConstructionRiskLevelLabel(weatherProjection?.constructionRiskLevel)}',
+                          backgroundColor: colorScheme.surfaceContainerLowest,
+                          foregroundColor: colorScheme.onSurface,
+                          borderColor: colorScheme.outlineVariant,
+                        ),
+                        _HomePill(
+                          label:
+                              '今夜降雨：${_homeNightRainLabel(expected: weatherProjection?.nightRainExpected, timeLabel: weatherProjection?.nightRainTimeLabel)}',
+                          backgroundColor: colorScheme.surfaceContainerLowest,
+                          foregroundColor: colorScheme.onSurface,
+                          borderColor: colorScheme.outlineVariant,
+                        ),
+                        _HomePill(
+                          label:
+                              '官方预警：${weatherProjection == null ? '待判断' : (weatherProjection!.officialAlerts.isEmpty ? '无预警' : '有预警')}',
+                          backgroundColor: colorScheme.surfaceContainerLowest,
+                          foregroundColor: colorScheme.onSurface,
+                          borderColor: colorScheme.outlineVariant,
+                        ),
+                      ],
+                    ]
+                  : <Widget>[
+                      _HomePill(
+                        label: '地区：${_locationLabel()}',
+                        backgroundColor: colorScheme.surfaceContainerLowest,
+                        foregroundColor: colorScheme.onSurface,
+                        borderColor: colorScheme.outlineVariant,
+                      ),
+                      if (isWeatherUnavailable)
+                        _HomePill(
+                          label: isWeatherDegraded ? '天气：暂不可用' : '天气：待更新',
+                          backgroundColor: colorScheme.surfaceContainerLowest,
+                          foregroundColor: colorScheme.onSurface,
+                          borderColor: colorScheme.outlineVariant,
+                        )
+                      else if (weatherProjection != null)
+                        _HomePill(
+                          label:
+                              '风险：${_homeConstructionRiskLevelLabel(weatherProjection?.constructionRiskLevel)}',
+                          backgroundColor: colorScheme.surfaceContainerLowest,
+                          foregroundColor: colorScheme.onSurface,
+                          borderColor: colorScheme.outlineVariant,
+                        ),
+                    ],
+            ),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              runSpacing: 6,
+              runSpacing: 8,
               children: <Widget>[
-                _HomePill(
-                  label: '地区：${_locationLabel()}',
-                  backgroundColor: colorScheme.onSecondaryContainer.withValues(
-                    alpha: 0.12,
-                  ),
-                  foregroundColor: colorScheme.onSecondaryContainer,
-                ),
-                _HomePill(
-                  label: '风险：$riskLevel',
-                  backgroundColor: colorScheme.tertiaryContainer,
-                  foregroundColor: colorScheme.onTertiaryContainer,
-                ),
-                _HomePill(
-                  label: '今夜降雨：$tonightRainLabel',
-                  backgroundColor: colorScheme.surface,
-                  foregroundColor: colorScheme.onSurface,
-                ),
-                _HomePill(
-                  label: '官方预警：$warningLabel',
-                  backgroundColor: colorScheme.surface,
-                  foregroundColor: colorScheme.onSurface,
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: refreshing ? null : onRelocatePressed,
-                    style: OutlinedButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ),
+                TextButton.icon(
+                  onPressed: refreshing ? null : onRelocatePressed,
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.onSurfaceVariant,
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
                     ),
-                    icon: const Icon(Icons.my_location_outlined, size: 16),
-                    label: Text(_locationActionLabel(), maxLines: 1),
                   ),
+                  icon: const Icon(Icons.my_location_outlined, size: 16),
+                  label: Text(_locationActionLabel(), maxLines: 1),
                 ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: onManualSelectionPressed,
-                    style: FilledButton.styleFrom(
-                      visualDensity: VisualDensity.compact,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 10,
-                      ),
+                OutlinedButton.icon(
+                  onPressed: onManualSelectionPressed,
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor: colorScheme.primaryContainer.withValues(
+                      alpha: 0.58,
                     ),
-                    icon: const Icon(Icons.map_outlined, size: 16),
-                    label: const Text('手动选择地区', maxLines: 1),
+                    foregroundColor: colorScheme.onPrimaryContainer,
+                    side: BorderSide(
+                      color: colorScheme.primary.withValues(alpha: 0.14),
+                    ),
+                    visualDensity: VisualDensity.compact,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
                   ),
+                  icon: const Icon(Icons.map_outlined, size: 16),
+                  label: const Text('手动选择地区', maxLines: 1),
                 ),
               ],
             ),
@@ -187,12 +215,14 @@ class _HomeWeatherCard extends StatelessWidget {
                 weatherProjection: weatherProjection,
               ),
               const SizedBox(height: 12),
-              if (weatherProjection != null)
+              if (weatherProjection != null &&
+                  !weatherProjection!.isControlledPlaceholder)
                 _HomeForecastPanel(weatherProjection: weatherProjection!)
               else
                 _HomeUnavailableForecastPanel(
                   locationSnapshot: locationSnapshot,
                   homeResult: homeResult,
+                  weatherProjection: weatherProjection,
                 ),
             ],
           ],
@@ -203,28 +233,40 @@ class _HomeWeatherCard extends StatelessWidget {
 
   String _cardTitle() {
     if (refreshing) {
-      return '今日施工重点：正在更新全页天气信息';
+      return '当前地区说明：正在刷新地区与天气卡片';
     }
     if (locating) {
-      return '今日施工重点：正在定位当前施工地区';
+      return '当前地区说明：正在定位当前地区';
     }
     if (weatherProjection != null) {
+      if (weatherProjection!.isWeatherDegraded) {
+        return '当前地区说明：地区已同步，天气暂不可用';
+      }
+      if (weatherProjection!.isControlledPlaceholder) {
+        return '当前地区说明：地区已同步，天气待更新';
+      }
       return '今日施工重点：${_homeConstructionFocusSummary(weatherProjection!)}';
     }
     if (locationSnapshot?.hasCoordinates == true) {
-      return '今日施工重点：正在识别所在地区并同步施工天气';
+      return '当前地区说明：正在识别所在地区';
     }
-    return '今日施工重点：请先定位或手动选择地区';
+    return '当前地区说明：请先定位或手动选择地区';
   }
 
   String _cardSummary() {
     if (refreshing) {
-      return '正在刷新首页天气与推荐信息，请稍候查看最新施工建议。';
+      return '正在刷新首页地区说明与推荐频道，请稍候。';
     }
     if (locating) {
-      return '正在获取当前位置，用于生成更准确的施工天气提示。';
+      return '正在获取当前位置，用于同步首页当前地区说明。';
     }
     if (weatherProjection != null) {
+      if (weatherProjection!.isWeatherDegraded) {
+        return '当前位置 ${weatherProjection!.displayName}。地区已同步，但天气服务暂不可用；当前按受控降级返回施工建议。更新时间 ${_homeUpdatedAtLabel(weatherProjection!.updatedAt)}。';
+      }
+      if (weatherProjection!.isControlledPlaceholder) {
+        return '当前位置 ${weatherProjection!.displayName}。地区已同步，天气仍在更新中；施工前请以现场实时天气和官方预警为准。';
+      }
       final risk = _homeConstructionRiskLevelLabel(
         weatherProjection!.constructionRiskLevel,
       );
@@ -237,7 +279,7 @@ class _HomeWeatherCard extends StatelessWidget {
       return '当前位置 ${weatherProjection!.displayName}。$risk（$riskTime），$tonightRain，官方$warning。更新时间 ${_homeUpdatedAtLabel(weatherProjection!.updatedAt)}。';
     }
     if (locationSnapshot?.hasCoordinates == true) {
-      return '正在识别所在地区并同步今日天气与施工建议，请稍候。';
+      return '正在识别所在地区；当前还未拿到可展示的天气结果。';
     }
     return _homeLocationUnavailableGuidance(locationSnapshot);
   }
@@ -250,9 +292,13 @@ class _HomeWeatherCard extends StatelessWidget {
       return '正在定位';
     }
     if (weatherProjection != null) {
-      return _homeConstructionRiskLevelLabel(
-        weatherProjection!.constructionRiskLevel,
-      );
+      if (weatherProjection!.isWeatherDegraded) {
+        return '天气降级';
+      }
+      if (weatherProjection!.isControlledPlaceholder) {
+        return '天气待更新';
+      }
+      return '天气已同步';
     }
     if (locationSnapshot?.hasCoordinates == true) {
       return '地区识别中';

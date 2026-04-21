@@ -44,24 +44,19 @@ void main() {
     expect(find.text('展览首页'), findsNothing);
     expect(find.text('当前定位：重庆'), findsNothing);
     expect(find.text('当前环境：联调环境'), findsNothing);
-    expect(find.text('六模块入口'), findsOneWidget);
-    expect(find.byTooltip('发布项目入口'), findsOneWidget);
+    expect(find.text('公开入口'), findsOneWidget);
+    expect(find.text('推荐频道'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
     expect(find.byTooltip('回到顶部'), findsOneWidget);
     expect(find.byTooltip('整页刷新'), findsOneWidget);
     expect(find.text('手动选择地区'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('优秀团队员工'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('优秀公司'), findsOneWidget);
-    expect(find.text('优秀工厂'), findsOneWidget);
-    expect(find.text('优秀供应商'), findsOneWidget);
-    expect(find.text('展览论坛'), findsOneWidget);
-    expect(find.text('优秀团队员工'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '进入模块'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '进入列表'), findsNWidgets(3));
+    expect(find.text('项目'), findsOneWidget);
+    expect(find.text('论坛'), findsOneWidget);
+    expect(find.text('公司'), findsOneWidget);
+    expect(find.text('工厂'), findsOneWidget);
+    expect(find.text('供应商'), findsOneWidget);
+    expect(find.text('团队'), findsOneWidget);
+    expect(find.text('进入项目列表'), findsWidgets);
     expect(homeClient.loadCount, 1);
     expect(homeClient.refreshCount, 0);
     expect(locationService.requestCount, 1);
