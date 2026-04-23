@@ -19,7 +19,9 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
       );
 
   ExhibitionStageLoadSnapshot? _snapshot;
+  ExhibitionLoadResult? _myBidResult;
   bool _loading = true;
+  bool _myBidLoading = false;
   _MyProjectWorkspaceBucket _selectedWorkspace =
       _MyProjectWorkspaceBucket.published;
   _MyProjectStageBucket _selectedStage = _MyProjectStageBucket.draft;
@@ -53,6 +55,9 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
       return;
     }
     await _load(forceRefresh: true);
+    if (_selectedWorkspace == _MyProjectWorkspaceBucket.bids) {
+      await _loadMyBidList(forceRefresh: true);
+    }
   }
 
   Future<bool?> _confirmLifecycleAction({
@@ -166,9 +171,7 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
           const SizedBox(height: 16),
           _buildMyProjectWorkspaceTabsCard(
             selectedWorkspace: _selectedWorkspace,
-            onSelected: (value) {
-              setState(() => _selectedWorkspace = value);
-            },
+            onSelected: _selectWorkspace,
           ),
           const SizedBox(height: 16),
           if (_selectedWorkspace == _MyProjectWorkspaceBucket.published) ...[
@@ -177,10 +180,20 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
             _buildStageSection(context, result.payload),
             ..._buildArchivedSection(context, result.payload),
           ] else
-            _buildMyProjectBidPlaceholderSection(context),
+            _buildMyBidWorkspaceSection(context),
         ];
       },
     );
+  }
+
+  void _selectWorkspace(_MyProjectWorkspaceBucket value) {
+    if (_selectedWorkspace == value) {
+      return;
+    }
+    setState(() => _selectedWorkspace = value);
+    if (value == _MyProjectWorkspaceBucket.bids) {
+      _loadMyBidList();
+    }
   }
 
   Widget _buildStageTabsCard(Object? payload) {

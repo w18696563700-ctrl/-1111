@@ -295,13 +295,16 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     required String? bidId,
     required bool canStartBid,
   }) {
+    final messageBody = bidId != null
+        ? '项目澄清面向当前项目；沟通与投标承接当前 bidId。'
+        : canStartBid
+        ? '项目澄清面向当前项目；沟通与投标需要先完成竞标并生成 bidId，当前请使用上方主入口继续参与竞标。'
+        : '项目澄清面向当前项目；沟通与投标需要承接具体 bidId。';
+
     return _ActionCard(
       title: '项目沟通',
       children: <Widget>[
-        const _StateMessage(
-          title: '当前对象',
-          body: '项目澄清面向当前项目；沟通与投标需要承接具体 bidId。',
-        ),
+        _StateMessage(title: '当前对象', body: messageBody),
         const SizedBox(height: 12),
         Wrap(
           spacing: 12,
@@ -324,12 +327,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                 ),
                 icon: const Icon(Icons.handshake_rounded),
                 label: const Text('沟通与投标'),
-              )
-            else if (canStartBid)
-              OutlinedButton.icon(
-                onPressed: () => _continueBidWithGuard(projectId),
-                icon: const Icon(Icons.handshake_rounded),
-                label: const Text('先参与竞标'),
               ),
           ],
         ),

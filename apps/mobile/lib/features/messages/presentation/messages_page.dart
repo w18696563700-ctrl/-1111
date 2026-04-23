@@ -77,8 +77,11 @@ class _MessagesPageState extends State<MessagesPage> {
       return;
     }
     _lastRefreshTick = tick;
-    _load();
-    _loadRoundAReminders();
+    _refreshAll();
+  }
+
+  Future<void> _refreshAll() async {
+    await Future.wait<void>(<Future<void>>[_load(), _loadRoundAReminders()]);
   }
 
   Future<void> _load() async {
@@ -123,7 +126,7 @@ class _MessagesPageState extends State<MessagesPage> {
     final roundAReminders = _roundAReminders(_remindersResult);
 
     return RefreshIndicator(
-      onRefresh: _load,
+      onRefresh: _refreshAll,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
@@ -136,7 +139,7 @@ class _MessagesPageState extends State<MessagesPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            '这里集中查看别人对你的回复、点赞、关注，以及项目协作提醒。',
+            '这里集中查看别人对你的回复、点赞、关注，以及项目沟通提醒。',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(height: 1.45),
@@ -197,10 +200,7 @@ class _MessagesPageState extends State<MessagesPage> {
       return const <MessagesTodoItem>[];
     }
     return result!.items
-        .where((MessagesTodoItem item) {
-          return item.actionKey == 'project_clarification.open' ||
-              item.actionKey == 'bid_thread.open';
-        })
+        .where((MessagesTodoItem item) => item.isProjectCommunicationReminder)
         .toList(growable: false);
   }
 

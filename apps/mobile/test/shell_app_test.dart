@@ -15,9 +15,11 @@ import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/trading_im_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
+import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
@@ -127,6 +129,139 @@ Map<String, Object?> _orderPayload({
     'state': state,
     'summary': _summary(summaryHeading),
     'milestones': milestones,
+  };
+}
+
+Map<String, Object?> _myProjectPrivateSummary({
+  bool hasAcceptedOrder = false,
+  String? orderStatus,
+  String? contractStatus,
+  String? fulfillmentStatus,
+  String? acceptanceStatus,
+  String? afterSalesOrDisputeStatus,
+  String formalCompletionStatus = 'not_formally_completed',
+  String evaluationStatus = 'not_eligible',
+}) {
+  return <String, Object?>{
+    'hasAcceptedOrder': hasAcceptedOrder,
+    'orderStatus': orderStatus,
+    'contractStatus': contractStatus,
+    'fulfillmentStatus': fulfillmentStatus,
+    'acceptanceStatus': acceptanceStatus,
+    'afterSalesOrDisputeStatus': afterSalesOrDisputeStatus,
+    'formalCompletionStatus': formalCompletionStatus,
+    'evaluationStatus': evaluationStatus,
+  };
+}
+
+Map<String, Object?> _myProjectListItem({
+  required String projectId,
+  required String title,
+  String state = 'published',
+}) {
+  return <String, Object?>{
+    'publicProject': _projectPayload(
+      projectId: projectId,
+      title: title,
+      state: state,
+      viewerProjectRelation: 'owner',
+    ),
+    'privateSummary': _myProjectPrivateSummary(),
+  };
+}
+
+Map<String, Object?> _myBidItem({
+  required String bidId,
+  required String projectId,
+  required String projectNo,
+  required String projectTitle,
+  required num quoteAmount,
+  required String proposalSummaryPreview,
+  required String submittedAt,
+  required String outcomeState,
+  required bool canOpenBidThread,
+  required bool canOpenBidResult,
+}) {
+  return <String, Object?>{
+    'bidId': bidId,
+    'projectId': projectId,
+    'projectNo': projectNo,
+    'projectTitle': projectTitle,
+    'quoteAmount': quoteAmount,
+    'proposalSummaryPreview': proposalSummaryPreview,
+    'submittedAt': submittedAt,
+    'outcomeState': outcomeState,
+    'canOpenBidThread': canOpenBidThread,
+    'canOpenBidResult': canOpenBidResult,
+  };
+}
+
+Map<String, Object?> _messageTodoItem({
+  required String todoId,
+  required String actionKey,
+  required String title,
+  required String summary,
+  required Map<String, String> instanceRef,
+  required Map<String, String> routeParams,
+}) {
+  final definition = messagesRegisteredEntryByActionKey[actionKey]!;
+  return <String, Object?>{
+    'todoId': todoId,
+    'messageType': 'instance_todo',
+    'instanceRef': instanceRef,
+    'actionKey': actionKey,
+    'title': title,
+    'summary': summary,
+    'state': 'pending',
+    'routeTarget': <String, Object?>{
+      'canonicalPath': definition.canonicalPath,
+      'localEntryKey': definition.localEntryKey,
+      'requiredParams': definition.requiredParams,
+      'state': definition.state,
+      'routeParams': routeParams,
+    },
+  };
+}
+
+Map<String, Object?> _bidThreadDetailPayload({
+  required String threadId,
+  required String projectId,
+  required String bidId,
+}) {
+  return <String, Object?>{
+    'threadId': threadId,
+    'projectId': projectId,
+    'bidId': bidId,
+    'participants': const <Object?>[
+      <String, Object?>{
+        'participantRole': 'project_owner',
+        'organizationId': 'org-owner-1',
+      },
+      <String, Object?>{
+        'participantRole': 'bidder',
+        'organizationId': 'org-bidder-1',
+      },
+    ],
+    'viewerParticipantRole': 'project_owner',
+    'state': 'open',
+    'availability': const <String, Object?>{
+      'canSendMessage': true,
+      'canCreateConfirmation': true,
+      'reason': 'participant_allowed',
+    },
+    'messages': const <Object?>[
+      <String, Object?>{
+        'messageId': 'message-1',
+        'threadId': 'thread-1',
+        'projectId': 'project-1',
+        'bidId': 'bid-1',
+        'senderRole': 'bidder',
+        'body': '报价单已更新。',
+        'attachmentFileAssetIds': <Object?>[],
+        'createdAt': '2026-04-16T00:01:00Z',
+      },
+    ],
+    'confirmationCards': const <Object?>[],
   };
 }
 
@@ -335,6 +470,7 @@ void main() {
     FakeAppApiTransport? forumTransport,
     FakeAppApiTransport? messagesTransport,
     FakeAppApiTransport? profileTransport,
+    TradingImConsumerLayer? tradingImConsumerLayer,
     AuthConsumerLayer? authConsumerLayer,
     ProfileIdentityConsumerLayer? profileIdentityConsumerLayer,
     ExhibitionHomeAggregationClient? exhibitionHomeAggregationClient,
@@ -470,6 +606,7 @@ void main() {
           transport: resolvedForumTransport,
         ),
       ),
+      tradingImConsumerLayer: tradingImConsumerLayer,
       messagesConsumerLayer: MessagesConsumerLayer(
         client: AppApiClient(
           config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
@@ -1302,6 +1439,256 @@ void main() {
       expect(find.text('当前环境：联调环境'), findsNothing);
       expect(find.textContaining('127.0.0.1'), findsNothing);
       expect(find.textContaining('/api/app'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'shell keeps my bids and messages reminders refreshed across building switches',
+    (WidgetTester tester) async {
+      var messageIndexRequestCount = 0;
+      final exhibitionTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/my/projects': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'ongoingProjects': <Object?>[
+                      _myProjectListItem(
+                        projectId: 'project-1',
+                        title: '我的发布项目',
+                      ),
+                    ],
+                    'historicalProjects': const <Object?>[],
+                  },
+                );
+              },
+              'GET /api/app/my/bids': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'items': <Object?>[
+                      _myBidItem(
+                        bidId: 'bid-1',
+                        projectId: 'project-1',
+                        projectNo: 'BID-PROJ-1',
+                        projectTitle: '供应商竞标记录',
+                        quoteAmount: 8800,
+                        proposalSummaryPreview: '报价方案已提交，等待后续沟通。',
+                        submittedAt: '2026-04-20T10:00:00Z',
+                        outcomeState: 'published',
+                        canOpenBidThread: true,
+                        canOpenBidResult: false,
+                      ),
+                    ],
+                  },
+                );
+              },
+            },
+      );
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/index': (AppApiRequest request) async {
+                messageIndexRequestCount += 1;
+                final title = messageIndexRequestCount == 1
+                    ? '第一次项目沟通提醒'
+                    : '第二次项目沟通提醒';
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'items': <Object?>[
+                      _messageTodoItem(
+                        todoId: 'todo-clarification-$messageIndexRequestCount',
+                        actionKey: 'project_clarification.open',
+                        title: title,
+                        summary: '回到项目澄清查看更新。',
+                        instanceRef: const <String, String>{
+                          'objectType': 'project_clarification',
+                          'instanceId': 'clarification-1',
+                        },
+                        routeParams: const <String, String>{
+                          'projectId': 'project-1',
+                        },
+                      ),
+                    ],
+                  },
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: ExhibitionRoutes.myProjectList,
+          transport: exhibitionTransport,
+          messagesTransport: messagesTransport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollAndTap(tester, find.widgetWithText(ChoiceChip, '我的竞标'));
+      expect(find.text('供应商竞标记录'), findsOneWidget);
+      expect(find.text('沟通与投标'), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('消息'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('项目沟通提醒'), findsOneWidget);
+      expect(find.text('第一次项目沟通提醒'), findsOneWidget);
+
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('展览'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('消息'),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(messageIndexRequestCount, greaterThanOrEqualTo(2));
+      expect(find.text('第二次项目沟通提醒'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'messages reminders jump stably to project clarification and bid thread routes',
+    (WidgetTester tester) async {
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'items': <Object?>[
+                      _messageTodoItem(
+                        todoId: 'todo-clarification-1',
+                        actionKey: 'project_clarification.open',
+                        title: '重庆馆项目新增公开澄清',
+                        summary: '请回到项目澄清查看最新补充说明。',
+                        instanceRef: const <String, String>{
+                          'objectType': 'project_clarification',
+                          'instanceId': 'clarification-1',
+                        },
+                        routeParams: const <String, String>{
+                          'projectId': 'project-1',
+                        },
+                      ),
+                      _messageTodoItem(
+                        todoId: 'todo-thread-1',
+                        actionKey: 'bid_thread.open',
+                        title: 'A 馆投标线程有新消息',
+                        summary: '项目方在沟通与投标里回复了新的交付问题。',
+                        instanceRef: const <String, String>{
+                          'objectType': 'bid_thread',
+                          'instanceId': 'thread-1',
+                        },
+                        routeParams: const <String, String>{
+                          'projectId': 'project-1',
+                          'bidId': 'bid-1',
+                        },
+                      ),
+                    ],
+                  },
+                );
+              },
+            },
+      );
+      final tradingImConsumerLayer = TradingImConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/project/clarification/list':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'projectId': 'project-1',
+                            'availability': <String, Object?>{
+                              'canCreate': true,
+                              'reason': 'participant_allowed',
+                            },
+                            'items': <Object?>[
+                              <String, Object?>{
+                                'clarificationId': 'clarification-1',
+                                'projectId': 'project-1',
+                                'authorRole': 'project_owner',
+                                'body': '请确认进场时间。',
+                                'attachmentFileAssetIds': <Object?>[],
+                                'state': 'active',
+                                'createdAt': '2026-04-16T00:00:00Z',
+                              },
+                            ],
+                          },
+                        );
+                      },
+                  'GET /api/app/bid/thread/detail':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: _bidThreadDetailPayload(
+                            threadId: 'thread-1',
+                            projectId: 'project-1',
+                            bidId: 'bid-1',
+                          ),
+                        );
+                      },
+                },
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: AppBuilding.messages.routePath,
+          messagesTransport: messagesTransport,
+          tradingImConsumerLayer: tradingImConsumerLayer,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('项目沟通提醒'), findsOneWidget);
+
+      await _scrollAndTap(
+        tester,
+        find.widgetWithText(FilledButton, '回到对象').first,
+      );
+      expect(find.text('项目澄清'), findsWidgets);
+      expect(find.text('新增澄清'), findsOneWidget);
+
+      await tester.pageBack();
+      await tester.pumpAndSettle();
+
+      await _scrollAndTap(
+        tester,
+        find.widgetWithText(FilledButton, '回到对象').last,
+      );
+      expect(find.text('沟通与投标'), findsWidgets);
+      expect(find.text('发送消息'), findsWidgets);
     },
   );
 

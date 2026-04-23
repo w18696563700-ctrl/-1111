@@ -51,6 +51,7 @@ part 'presentation_support/bid_award_support.dart';
 part 'presentation_support/exhibition_payload_support.dart';
 part 'presentation_support/my_project_stage_support.dart';
 part 'presentation_support/my_project_workspace_support.dart';
+part 'presentation_support/my_bid_workspace_support.dart';
 part 'presentation_support/my_project_private_progress_support.dart';
 part 'presentation_support/project_standardized_location_options.dart';
 part 'presentation_support/project_attachment_support.dart';

@@ -14,7 +14,7 @@ List<Widget> _buildBidSubmitResultSections({
     const SizedBox(height: 16),
     _ActionCard(
       title: '竞标已提交',
-      summary: '当前竞标已经完成提交，页面只保留最小结果回执与返回入口。',
+      summary: '当前竞标已经完成提交，页面保留最小结果回执，并允许直接进入沟通与投标。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         _InstanceSummaryLine(title: '竞标 ID', value: bidId),
@@ -24,16 +24,7 @@ List<Widget> _buildBidSubmitResultSections({
           runSpacing: 12,
           children: <Widget>[
             if (projectId != null)
-              FilledButton(
-                onPressed: () {
-                  Navigator.of(context).pushNamed(
-                    ExhibitionRoutes.projectDetailWithProjectId(projectId),
-                  );
-                },
-                child: const Text('回到项目详情'),
-              ),
-            if (projectId != null)
-              FilledButton.tonalIcon(
+              FilledButton.icon(
                 onPressed: () {
                   Navigator.of(context).pushNamed(
                     ExhibitionRoutes.bidThreadWithIds(
@@ -44,6 +35,15 @@ List<Widget> _buildBidSubmitResultSections({
                 },
                 icon: const Icon(Icons.handshake_rounded),
                 label: const Text('沟通与投标'),
+              ),
+            if (projectId != null)
+              FilledButton.tonal(
+                onPressed: () {
+                  Navigator.of(context).pushNamed(
+                    ExhibitionRoutes.projectDetailWithProjectId(projectId),
+                  );
+                },
+                child: const Text('回到项目详情'),
               ),
             FilledButton.tonal(
               onPressed: () {

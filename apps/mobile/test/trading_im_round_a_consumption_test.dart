@@ -1,14 +1,35 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/trading_im_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/trading_im_models.dart';
+import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
 
 AppApiClient _client(FakeAppApiTransport transport) {
   return AppApiClient(
     config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
     transport: transport,
   );
+}
+
+Map<String, Object?> _projectDetailPayload({
+  required String projectId,
+  required String state,
+  String? bidId,
+}) {
+  return <String, Object?>{
+    'projectId': projectId,
+    'projectNo': 'PROJ-1',
+    'title': '展览项目 1',
+    'buildingType': 'exhibition',
+    'budgetAmount': 1888,
+    'state': state,
+    'viewerProjectRelation': 'public_viewer',
+    'summary': const <String, Object?>{'heading': '当前项目说明'},
+    if (bidId != null) 'bidId': bidId,
+  };
 }
 
 void main() {
@@ -134,5 +155,46 @@ void main() {
 
     expect(result.state, AppPageState.errorNonRetryable);
     expect(result.message, contains('outside frozen contract'));
+  });
+
+  testWidgets('project detail keeps a single bid CTA before bidId exists', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/project/detail': (AppApiRequest request) async {
+              expect(request.uri.queryParameters['projectId'], 'project-1');
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _projectDetailPayload(
+                  projectId: 'project-1',
+                  state: 'published',
+                ),
+              );
+            },
+          },
+    );
+    ExhibitionConsumerLayer.install(
+      ExhibitionConsumerLayer(client: _client(transport)),
+    );
+    addTearDown(ExhibitionConsumerLayer.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: ProjectDetailPage(projectId: 'project-1')),
+    );
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.text('项目沟通'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
+    expect(find.text('先参与竞标'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '项目澄清'), findsOneWidget);
+    expect(find.textContaining('当前请使用上方主入口继续参与竞标'), findsOneWidget);
   });
 }

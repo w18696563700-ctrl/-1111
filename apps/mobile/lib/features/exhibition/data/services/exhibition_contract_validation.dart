@@ -25,6 +25,9 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
   if (canonicalPath == ExhibitionCanonicalPaths.myProjectList) {
     return _validateMyProjectListPayload(canonicalPath, payload);
   }
+  if (canonicalPath == ExhibitionCanonicalPaths.myBidList) {
+    return _validateMyBidListPayload(canonicalPath, payload);
+  }
   if (ExhibitionCanonicalPaths.isMyProjectDetail(canonicalPath)) {
     return requestMethod == 'DELETE'
         ? _validateProjectDeleteAcceptedPayload(canonicalPath, payload)

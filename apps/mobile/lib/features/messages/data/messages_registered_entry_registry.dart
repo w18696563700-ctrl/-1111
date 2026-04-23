@@ -80,6 +80,11 @@ const Set<String> messagesAllowedActionKeys = <String>{
   'bid_thread.open',
 };
 
+const Set<String> messagesProjectCommunicationActionKeys = <String>{
+  'project_clarification.open',
+  'bid_thread.open',
+};
+
 const Map<String, String> messagesActionKeyToObjectType = <String, String>{
   'inspection.submit': 'inspection',
   'dispute.open': 'dispute',

@@ -29,22 +29,3 @@ Widget _buildMyProjectWorkspaceTabsCard({
     ],
   );
 }
-
-Widget _buildMyProjectBidPlaceholderSection(BuildContext context) {
-  return _ActionCard(
-    title: '我的竞标',
-    summary: '当前只保留清晰分类，不把发布项目误当成竞标记录。',
-    children: <Widget>[
-      const _EmptyNotice(
-        title: '当前竞标列表暂未接通',
-        message: '当前还没有开放我的竞标列表。竞标提交成功后，本页不会把它混入我的发布；可先从项目详情进入竞标结果读取入口。',
-      ),
-      const SizedBox(height: 12),
-      FilledButton.tonal(
-        onPressed: () =>
-            Navigator.of(context).pushNamed(ExhibitionRoutes.showcase),
-        child: const Text('去项目展示查看'),
-      ),
-    ],
-  );
-}

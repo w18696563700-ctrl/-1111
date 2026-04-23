@@ -48,6 +48,9 @@ class MessagesTodoItem {
   final String summary;
   final MessagesRouteTarget routeTarget;
   final String state;
+
+  bool get isProjectCommunicationReminder =>
+      messagesProjectCommunicationActionKeys.contains(actionKey);
 }
 
 class MessagesIndexResult {

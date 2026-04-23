@@ -32,11 +32,14 @@ part 'services/exhibition_action_service.dart';
 part 'services/exhibition_canonical_paths.dart';
 part 'services/exhibition_contract_mapper.dart';
 part 'services/my_project_contract_mapper.dart';
+part 'services/my_bid_contract_mapper.dart';
 part 'services/exhibition_entry_contract_validation.dart';
 part 'services/exhibition_contract_validation.dart';
 part 'services/my_project_contract_validation.dart';
+part 'services/my_bid_contract_validation.dart';
 part 'services/exhibition_contract_validation_base.dart';
 part 'services/exhibition_load_service.dart';
+part 'services/my_bid_load_service.dart';
 part 'services/exhibition_upload_service.dart';
 part 'services/project_attachment_action_service.dart';
 part 'services/project_attachment_contract_mapper.dart';
@@ -117,6 +120,10 @@ class ExhibitionConsumerLayer {
 
   Future<ExhibitionLoadResult> loadMyProjectList({bool forceRefresh = false}) {
     return _loadService.loadMyProjectList(forceRefresh: forceRefresh);
+  }
+
+  Future<ExhibitionLoadResult> loadMyBidList({bool forceRefresh = false}) {
+    return _loadService.loadMyBidList(forceRefresh: forceRefresh);
   }
 
   void invalidateMyProjectList() {

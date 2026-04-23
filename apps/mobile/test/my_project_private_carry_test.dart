@@ -125,6 +125,32 @@ Map<String, Object?> _myProjectItem({
   };
 }
 
+Map<String, Object?> _myBidItem({
+  required String bidId,
+  required String projectId,
+  required String projectNo,
+  required String projectTitle,
+  required num quoteAmount,
+  required String proposalSummaryPreview,
+  required String submittedAt,
+  required String outcomeState,
+  required bool canOpenBidThread,
+  required bool canOpenBidResult,
+}) {
+  return <String, Object?>{
+    'bidId': bidId,
+    'projectId': projectId,
+    'projectNo': projectNo,
+    'projectTitle': projectTitle,
+    'quoteAmount': quoteAmount,
+    'proposalSummaryPreview': proposalSummaryPreview,
+    'submittedAt': submittedAt,
+    'outcomeState': outcomeState,
+    'canOpenBidThread': canOpenBidThread,
+    'canOpenBidResult': canOpenBidResult,
+  };
+}
+
 Map<String, Object?> _attachmentListResponse(
   String projectId,
   List<Map<String, Object?>> attachments,
@@ -416,6 +442,7 @@ typedef _AppHandler = Future<AppApiResponse> Function(AppApiRequest request);
 
 Map<String, _AppHandler> _mutableMyProjectHandlers({
   required Map<String, String> projectStates,
+  List<Map<String, Object?>> myBidItems = const <Map<String, Object?>>[],
   String? failingLifecyclePath,
   String? failingLifecycleCode,
   String? failingLifecycleMessage,
@@ -475,6 +502,11 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
       statusCode: 200,
       uri: request.uri,
       body: _myProjectListBodyFromStates(projectStates),
+    ),
+    'GET /api/app/my/bids': (AppApiRequest request) async => AppApiResponse(
+      statusCode: 200,
+      uri: request.uri,
+      body: <String, Object?>{'items': myBidItems},
     ),
     'GET /api/app/project/public-resources': (AppApiRequest request) async =>
         AppApiResponse(
@@ -657,6 +689,20 @@ void main() {
         'project-draft-1': 'draft',
         'project-published-1': 'published',
       },
+      myBidItems: <Map<String, Object?>>[
+        _myBidItem(
+          bidId: 'bid-1',
+          projectId: 'project-published-1',
+          projectNo: 'BID-PROJECT-1',
+          projectTitle: '供应商竞标记录',
+          quoteAmount: 8800,
+          proposalSummaryPreview: '报价方案已提交，等待后续沟通。',
+          submittedAt: '2026-04-20T10:00:00Z',
+          outcomeState: 'published',
+          canOpenBidThread: true,
+          canOpenBidResult: false,
+        ),
+      ],
     );
 
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
@@ -669,7 +715,9 @@ void main() {
     await tester.tap(find.widgetWithText(ChoiceChip, '我的竞标'));
     await tester.pumpAndSettle();
 
-    expect(find.text('当前竞标列表暂未接通'), findsOneWidget);
+    expect(find.text('当前竞标列表暂未接通'), findsNothing);
+    expect(find.text('供应商竞标记录'), findsOneWidget);
+    expect(find.text('沟通与投标'), findsOneWidget);
     expect(find.text('草稿 · 1'), findsNothing);
 
     await tester.tap(find.widgetWithText(ChoiceChip, '我的发布'));

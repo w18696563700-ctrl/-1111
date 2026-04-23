@@ -10,6 +10,7 @@ final class ExhibitionCanonicalPaths {
       '/api/app/exhibition/home/location/select';
   static const String projectList = '/api/app/project/list';
   static const String myProjectList = '/api/app/my/projects';
+  static const String myBidList = '/api/app/my/bids';
   static const String myProjectDetailPattern =
       '/api/app/my/projects/{projectId}';
   static const String myProjectAttachmentsPattern =

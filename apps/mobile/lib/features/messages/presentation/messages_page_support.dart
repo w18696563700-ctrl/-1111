@@ -190,7 +190,7 @@ class _MessagesRoundAReminderSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '项目协作提醒',
+              '项目沟通提醒',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w900,
               ),

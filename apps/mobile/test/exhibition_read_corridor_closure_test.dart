@@ -95,6 +95,13 @@ void main() {
         );
         expect(bidThreadOpen.canonicalPath, '/api/app/bid/thread/detail');
         expect(
+          clarificationOpen.localEntryKey,
+          'registered.project_clarification.open',
+        );
+        expect(bidThreadOpen.localEntryKey, 'registered.bid_thread.open');
+        expect(clarificationOpen.requiredParams, <String>['projectId']);
+        expect(bidThreadOpen.requiredParams, <String>['projectId', 'bidId']);
+        expect(
           inspectionSubmit.buildRouteLocation(const <String, String>{
             'milestoneId': 'milestone-1',
           }),
