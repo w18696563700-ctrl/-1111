@@ -576,7 +576,7 @@ class AppRouter {
     final title = switch (routePath) {
       ProfileIdentityRoutes.login => '登录入口',
       ProfileIdentityRoutes.organizationHandoff => '公司与组织',
-      ProfileIdentityRoutes.organizationSwitch => '切换当前公司/组织',
+      ProfileIdentityRoutes.organizationSwitch => '切换当前主体',
       ProfileIdentityRoutes.organizationCreate => '组织资料',
       ProfileIdentityRoutes.organizationJoin => '加入组织',
       ProfileIdentityRoutes.certificationCurrent => '公司认证与我的身份',

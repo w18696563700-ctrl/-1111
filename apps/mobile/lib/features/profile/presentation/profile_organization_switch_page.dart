@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
+import 'package:mobile/features/profile/presentation/profile_organization_capability_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_scope_visibility.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
@@ -74,7 +75,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
         method: result.method,
         path: result.path,
         data: AppShellScope.of(context).snapshot.shellContext,
-        message: '当前公司/组织已切换，当前页已按最新组织上下文完成回读确认。',
+        message: '当前主体已切换，当前页已按最新组织上下文完成回读确认。',
       );
       final canPop =
           ModalRoute.of(context)?.canPop ?? Navigator.of(context).canPop();
@@ -147,7 +148,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
         else if (_loading)
           const _OrganizationSwitchCard(
             title: '正在读取组织列表',
-            child: Text('正在同步当前公司/组织与可切换列表。'),
+            child: Text('正在同步当前主体与可切换列表。'),
           )
         else if (_result?.state == AppPageState.content &&
             switchable.isNotEmpty)
@@ -161,7 +162,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
           )
         else
           _OrganizationSwitchCard(
-            title: '当前没有其他公司/组织可切换',
+            title: '当前没有其他主体可切换',
             child: Text(
               _organizationSwitchMessage(_result?.state, _result?.message),
             ),
@@ -180,7 +181,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
       return _organizationSwitchMessage(_result!.state, _result!.message);
     }
     if (current == null) {
-      return '当前还没有公司/组织';
+      return '当前还没有主体';
     }
     return '当前主体：${profileDisplayOrganizationName(current.name)}';
   }
@@ -195,8 +196,8 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
     if (current == null) {
       return '先返回公司与组织建立主体，再回来切换。';
     }
-    return '${profileDisplayOrganizationType(current.organizationType)} · '
-        '${profileBuildOrganizationStatusBadges(roleKeys: current.roleKeys, membershipStatus: current.membershipStatus, certificationStatus: current.certificationStatus).join(' · ')}';
+    return '${profileDisplayOrganizationCapabilitySummary(current.organizationType)} · '
+        '${profileBuildOrganizationCapabilityStatusBadges(certificationStatus: current.certificationStatus, membershipStatus: current.membershipStatus).join(' · ')}';
   }
 
   String _currentSupportingText(MyOrganizationItemView? current) {
@@ -211,7 +212,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
     if (current == null) {
       return '建立组织主体后，这里会显示当前主体，并在下方列出可切换目标。';
     }
-    return '从下方选择目标主体后，会立即切换整个 App 的组织上下文。';
+    return '从下方选择目标主体后，整个 App 的组织上下文，以及可发布 / 可竞标能力都会一起切换。';
   }
 
   static MyOrganizationItemView? _resolveCurrent(
@@ -238,7 +239,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
     ProfileIdentityResult<AppShellContextData> result,
   ) {
     if (result.state == AppPageState.content) {
-      return '当前公司/组织已切换，后续读取会按新的组织上下文继续承接。';
+      return '当前主体已切换，后续读取会按新的组织上下文继续承接。';
     }
     return _organizationSwitchMessage(result.state, result.message);
   }
@@ -402,8 +403,8 @@ class _OrganizationSwitchRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '类型：${profileDisplayOrganizationType(item.organizationType)}；'
-                    '认证：${profileDisplayCertificationStatus(item.certificationStatus)}；'
+                    '能力：${profileDisplayOrganizationCapabilitySummary(item.organizationType)}；'
+                    '企业认证：${profileDisplayCertificationStatus(item.certificationStatus)}；'
                     '成员：${profileDisplayMembershipStatus(item.membershipStatus)}',
                     style: subtitleStyle,
                   ),

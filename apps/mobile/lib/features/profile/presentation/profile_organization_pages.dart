@@ -5,6 +5,7 @@ import 'package:mobile/core/location/china_region_picker.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/features/profile/presentation/profile_certification_truth_support.dart';
+import 'package:mobile/features/profile/presentation/profile_organization_capability_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_scope_visibility.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
@@ -77,11 +78,13 @@ class _OrganizationHandoffPageState extends State<OrganizationHandoffPage> {
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: <Widget>[
         const _OrganizationCard(
-          child: Text('在这里继续创建公司/组织、加入公司/组织或切换当前公司/组织，不扩成治理后台。'),
+          child: Text(
+            '先在这里确认当前主体，再继续创建组织、加入组织或切换当前主体；项目归属、认证主体与可发布 / 可竞标能力都会跟随这里。',
+          ),
         ),
         const SizedBox(height: 16),
         _OrganizationCard(
-          title: '当前公司/组织',
+          title: '当前主体',
           child: _buildCurrentOrganization(current, currentCertification),
         ),
         const SizedBox(height: 16),
@@ -137,7 +140,7 @@ class _OrganizationHandoffPageState extends State<OrganizationHandoffPage> {
       if (canSwitch)
         _OrganizationActionSpec(
           key: const ValueKey<String>('organization-action-switch'),
-          label: '切换当前公司/组织',
+          label: '切换当前主体',
           description: '切换当前生效主体',
           onPressed: () => _openRoute(ProfileIdentityRoutes.organizationSwitch),
           tonal: true,
@@ -148,7 +151,7 @@ class _OrganizationHandoffPageState extends State<OrganizationHandoffPage> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '先确定你当前以哪个公司/组织身份在 App 内工作。项目归属、成员权限、认证主体与后续发布上下文都跟随这里。',
+          '先确定你当前以哪个主体在 App 内工作。项目归属、成员权限、认证主体，以及可发布 / 可竞标能力都跟随这里。',
           style: Theme.of(context).textTheme.bodyMedium,
         ),
         const SizedBox(height: 14),
@@ -195,11 +198,11 @@ class _OrganizationHandoffPageState extends State<OrganizationHandoffPage> {
     }
     if (current == null) {
       return const _OrganizationCurrentSummaryPanel(
-        title: '当前还没有公司/组织',
+        title: '当前还没有主体',
         subtitle: '先创建组织或加入已有组织',
         statusText: '组织上下文未建立',
         statusBadges: <String>[],
-        message: '完成创建或加入后，这里会同步当前组织摘要，并继续承接后续组织动作。',
+        message: '完成创建或加入后，这里会同步当前主体摘要，并继续承接后续组织动作。',
         avatarLabel: '组',
         truthFields: <ProfileCertificationTruthField>[],
       );
@@ -210,16 +213,17 @@ class _OrganizationHandoffPageState extends State<OrganizationHandoffPage> {
         certification?.certificationStatus ?? current.certificationStatus;
     return _OrganizationCurrentSummaryPanel(
       title: profileDisplayOrganizationName(current.name),
-      subtitle: profileDisplayOrganizationType(current.organizationType),
+      subtitle: profileDisplayOrganizationCapabilitySummary(
+        current.organizationType,
+      ),
       statusText: '',
-      statusBadges: profileBuildOrganizationStatusBadges(
-        roleKeys: current.roleKeys,
-        membershipStatus: current.membershipStatus,
+      statusBadges: profileBuildOrganizationCapabilityStatusBadges(
         certificationStatus: resolvedCertificationStatus,
+        membershipStatus: current.membershipStatus,
       ),
       message: truthFields.isEmpty
-          ? '当前组织已创建，可继续编辑基础资料、再创建一个组织、加入组织或切换当前主体。正式认证资料会在通过认证后同步到这里。'
-          : '当前组织已创建，下面显示的是当前生效的正式认证资料，用于确认主体真值与后续发布上下文。',
+          ? '当前主体已建立，可继续编辑基础资料、再创建一个组织、加入组织或切换当前主体。正式认证资料会在通过认证后同步到这里。'
+          : '当前主体已建立，下面显示的是当前生效的正式认证资料，用于确认主体真值、企业认证与后续能力上下文。',
       avatarLabel: '组',
       truthFields: truthFields,
     );

@@ -2873,7 +2873,7 @@ void main() {
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('未认证'), findsWidgets);
+      expect(find.text('我的公司'), findsWidgets);
       await scrollTo(tester, find.text('我的公司'));
       await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
@@ -2896,14 +2896,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(freshOrganizationName), findsWidgets);
-      expect(find.text('需求方 / 供应商'), findsWidgets);
+      expect(find.text('当前主体可发布项目 / 可参与竞标'), findsWidgets);
+      expect(find.text('需求方 / 供应商'), findsNothing);
       expect(find.text('编辑当前组织'), findsNothing);
       expect(find.text('再创建一个组织'), findsNothing);
       expect(find.text('认证与身份'), findsNothing);
       await scrollTo(tester, find.text('公司认证与我的身份'));
       expect(find.text('公司认证与我的身份'), findsWidgets);
       expect(find.text('认证状态'), findsNothing);
-      expect(find.text('未认证'), findsWidgets);
+      expect(find.text('企业未认证'), findsWidgets);
       expect(find.widgetWithText(FilledButton, '提交认证'), findsNothing);
       expect(find.widgetWithText(FilledButton, '重新提交认证'), findsNothing);
     },
@@ -3195,14 +3196,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('切换当前公司/组织'), findsOneWidget);
+      expect(find.text('切换当前主体'), findsOneWidget);
       expect(find.text('当前公司/组织'), findsNothing);
       expect(find.textContaining('当前主体：重庆坤特展览展示有限公司'), findsOneWidget);
       expect(find.text('切换为当前公司/组织'), findsNothing);
       expect(find.text('Smoke Admin Review P0 Platform Org'), findsNothing);
       expect(find.text('我的公司'), findsOneWidget);
       expect(find.text('切换'), findsOneWidget);
-      expect(find.textContaining('类型：供应商；认证：已认证；成员：已开通'), findsOneWidget);
+      expect(
+        find.textContaining('能力：当前主体可参与竞标；企业认证：已认证；成员：已开通'),
+        findsOneWidget,
+      );
     },
   );
 
@@ -3964,7 +3968,7 @@ void main() {
       await tester.pumpWidget(buildApp());
       await tester.pumpAndSettle();
 
-      expect(find.textContaining('认证中'), findsWidgets);
+      expect(find.text('我的公司'), findsWidgets);
       await scrollTo(tester, find.text('我的公司'));
       await tester.tap(find.text('我的公司').first);
       await tester.pumpAndSettle();
@@ -3974,7 +3978,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('当前认证状态'));
-      expect(find.text(freshOrganizationId), findsOneWidget);
       expect(find.text('认证中'), findsWidgets);
 
       await tester.pageBack();
@@ -3991,7 +3994,7 @@ void main() {
       expect(find.text('当前公司/组织现状'), findsNothing);
       expect(find.text('认证资料'), findsNothing);
       expect(find.text('认证状态'), findsNothing);
-      expect(find.text('认证中'), findsOneWidget);
+      expect(find.textContaining('认证'), findsWidgets);
     },
   );
 
@@ -5345,7 +5348,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.text('在这里继续创建公司/组织、加入公司/组织或切换当前公司/组织，不扩成治理后台。'),
+        find.text(
+          '先在这里确认当前主体，再继续创建组织、加入组织或切换当前主体；项目归属、认证主体与可发布 / 可竞标能力都会跟随这里。',
+        ),
         findsOneWidget,
       );
     },

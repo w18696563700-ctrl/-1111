@@ -17,6 +17,7 @@ import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/features/profile/presentation/profile_avatar_edit_confirmation_page.dart';
 import 'package:mobile/features/profile/presentation/profile_avatar_picker.dart';
 import 'package:mobile/features/profile/presentation/profile_feature_status_copy.dart';
+import 'package:mobile/features/profile/presentation/profile_organization_capability_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_personal_edit_support.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';

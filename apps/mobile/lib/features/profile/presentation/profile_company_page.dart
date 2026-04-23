@@ -104,21 +104,22 @@ class _ProfileCompanyPageState extends State<ProfileCompanyPage> {
               : profileDisplayOrganizationName(organization.name),
           subtitle: organization == null
               ? '创建组织或加入已有组织后，这里会成为当前公司工作台'
-              : profileDisplayOrganizationType(organization.organizationType),
+              : profileDisplayOrganizationCapabilitySummary(
+                  organization.organizationType,
+                ),
           statusText: organization == null
               ? (primaryMessage ?? '当前还没有可见的公司主体，可先创建组织或加入已有组织。')
               : '',
           avatarLabel: '企',
           statusBadges: organization == null
               ? <String>[certificationStatusLabel, membershipStatusLabel]
-              : profileBuildOrganizationStatusBadges(
-                  roleKeys: organization.roleKeys,
-                  membershipStatus: organization.membershipStatus,
+              : profileBuildOrganizationCapabilityStatusBadges(
                   certificationStatus: resolvedCertificationStatus,
+                  membershipStatus: organization.membershipStatus,
                 ),
           message: organization == null
-              ? '这里保留当前公司摘要入口，并从公司与组织、公司认证与我的身份继续后续办理。创建或加入成功后，组织与认证详情统一在后续页面查看。'
-              : '这里保留当前公司摘要入口；组织现状与认证资料统一放到公司与组织、公司认证与我的身份页查看，避免同一信息重复铺开。',
+              ? '这里先保留当前主体摘要入口；组织、企业认证与我的认证统一放到后续页面继续办理。创建或加入成功后，这里会显示当前主体与可继续能力。'
+              : '这里先展示当前主体摘要；企业认证、我的认证与可发布 / 可竞标能力统一从下方入口继续查看，不再用需求方 / 供应商标签重复铺开。',
         ),
         if (organization != null &&
             routeIsFirst &&
@@ -315,9 +316,9 @@ class _ProfileCompanyPageState extends State<ProfileCompanyPage> {
     required bool organizationExists,
   }) {
     if (!organizationExists) {
-      return '从这里进入公司与组织，继续创建组织、加入组织或确认当前主体。';
+      return '从这里进入公司与组织，继续创建主体、加入组织或确认当前主体。';
     }
-    return '从这里进入公司与组织，继续编辑当前组织、再创建一个组织、加入组织或切换当前公司/组织。';
+    return '从这里进入公司与组织，继续编辑当前主体、再创建一个组织、加入组织或切换当前主体。';
   }
 
   static bool _canRenderCompanyWorkspace(
