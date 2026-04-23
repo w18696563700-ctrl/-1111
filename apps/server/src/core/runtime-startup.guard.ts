@@ -1,7 +1,24 @@
+import { existsSync, readFileSync } from 'fs';
 import { Logger } from '@nestjs/common';
+import { resolve } from 'path';
 import { RuntimeConfigService } from './runtime-config.service';
 
 type HostKind = 'loopback' | 'private' | 'public' | 'invalid';
+type ServerRuntimeBoundaryOptions = {
+  artifactRootOverride?: string | null;
+};
+
+const REQUIRED_WEATHER_ARTIFACTS = [
+  'core/redis-client.service.js',
+  'modules/weather/weather.module.js',
+  'modules/weather/weather-lookup.service.js',
+  'modules/exhibition_home/exhibition-home-aggregation.service.js',
+  'modules/exhibition_home/exhibition-home.module.js',
+  'modules/exhibition_home/exhibition-home.presenter.js',
+  'modules/exhibition_home/exhibition-home.types.js',
+];
+
+const WEATHER_PLACEHOLDER_MARKERS = ['待同步', '最小真值'];
 
 function readExplicitEnv(name: string): string | null {
   const value = process.env[name]?.trim();
@@ -43,9 +60,75 @@ function isCompiledRuntime(): boolean {
   return /(^|\/)dist(\/|$)/.test(entrypoint);
 }
 
+function resolveArtifactRoot(options?: ServerRuntimeBoundaryOptions) {
+  const explicitRoot = options?.artifactRootOverride?.trim();
+  return explicitRoot ? explicitRoot : resolve(__dirname, '..');
+}
+
+function readArtifact(artifactRoot: string, relativePath: string) {
+  const fullPath = resolve(artifactRoot, relativePath);
+  if (!existsSync(fullPath)) {
+    return null;
+  }
+  return readFileSync(fullPath, 'utf8');
+}
+
+function assertWeatherReleaseIntegrity(
+  config: RuntimeConfigService,
+  strictRuntime: boolean,
+  options?: ServerRuntimeBoundaryOptions,
+) {
+  if (!strictRuntime || !config.qweatherEnabled) {
+    return;
+  }
+
+  const artifactRoot = resolveArtifactRoot(options);
+  const missingArtifacts = REQUIRED_WEATHER_ARTIFACTS.filter(
+    (relativePath) => readArtifact(artifactRoot, relativePath) == null,
+  );
+
+  if (missingArtifacts.length > 0) {
+    throw new Error(
+      'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
+        `because weather release artifacts are missing: ${missingArtifacts.join(', ')}.`,
+    );
+  }
+
+  const exhibitionHomeModule = readArtifact(
+    artifactRoot,
+    'modules/exhibition_home/exhibition-home.module.js',
+  );
+  if (
+    exhibitionHomeModule == null ||
+    !exhibitionHomeModule.includes('WeatherModule') ||
+    !exhibitionHomeModule.includes('ExhibitionHomeAggregationService')
+  ) {
+    throw new Error(
+      'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
+        'because exhibition-home is not wired to the admitted weather aggregation chain.',
+    );
+  }
+
+  const presenter = readArtifact(
+    artifactRoot,
+    'modules/exhibition_home/exhibition-home.presenter.js',
+  );
+  const placeholderMarker = WEATHER_PLACEHOLDER_MARKERS.find((marker) =>
+    presenter?.includes(marker),
+  );
+
+  if (placeholderMarker) {
+    throw new Error(
+      'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
+        `because compiled exhibition-home presenter still contains placeholder marker "${placeholderMarker}".`,
+    );
+  }
+}
+
 export function assertServerRuntimeBoundary(
   config: RuntimeConfigService,
   logger = new Logger('ServerBootstrap'),
+  options?: ServerRuntimeBoundaryOptions,
 ) {
   const bootSurface = isCompiledRuntime() ? 'compiled' : 'dev';
   const strictRuntime = bootSurface === 'compiled' || config.isProduction;
@@ -108,6 +191,12 @@ export function assertServerRuntimeBoundary(
     if (!config.isIsolatedRuntime && !readExplicitEnv('UPLOAD_S3_PUBLIC_ENDPOINT')) {
       missing.push('UPLOAD_S3_PUBLIC_ENDPOINT');
     }
+    if (config.qweatherEnabled && !readExplicitEnv('QWEATHER_API_HOST')) {
+      missing.push('QWEATHER_API_HOST');
+    }
+    if (config.qweatherEnabled && !readExplicitEnv('QWEATHER_API_KEY')) {
+      missing.push('QWEATHER_API_KEY');
+    }
     if (!readExplicitEnv('UPLOAD_BUCKET')) missing.push('UPLOAD_BUCKET');
     if (!readExplicitEnv('UPLOAD_S3_ACCESS_KEY_ID') && !readExplicitEnv('MINIO_ROOT_USER')) {
       missing.push('UPLOAD_S3_ACCESS_KEY_ID or MINIO_ROOT_USER');
@@ -124,6 +213,8 @@ export function assertServerRuntimeBoundary(
     );
   }
 
+  assertWeatherReleaseIntegrity(config, strictRuntime, options);
+
   const message =
     `runtime_boundary service=${config.appName} runtime_entry=${config.runtimeEntryLabel} ` +
     `boot_surface=${bootSurface} node_env=${config.nodeEnv} ` +
@@ -132,6 +223,7 @@ export function assertServerRuntimeBoundary(
     `redis=${config.redisEnabled ? config.redisUrl : 'disabled'} redis_source=${redisSource} ` +
     `redis_host_kind=${redisHostKind} upload_transport=${config.uploadS3Endpoint} ` +
     `upload_transport_source=${uploadEndpointSource} upload_transport_host_kind=${uploadEndpointHostKind} ` +
+    `qweather_enabled=${config.qweatherEnabled} qweather_host=${config.qweatherApiHost} ` +
     `upload_public=${config.uploadS3PublicEndpoint || 'missing'} upload_public_source=${uploadPublicSource} ` +
     `upload_public_host_kind=${uploadPublicHostKind}`;
 
