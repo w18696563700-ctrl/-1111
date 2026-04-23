@@ -177,6 +177,30 @@ void main() {
     );
     expect(livePreviewFinder, findsOneWidget);
     expect(find.text('线上公开展示'), findsOneWidget);
+    await tester.ensureVisible(
+      find
+          .byKey(
+            const ValueKey<String>(
+              'enterprise-target-enterprise-info-entry-card',
+            ),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .byKey(
+            const ValueKey<String>(
+              'enterprise-target-enterprise-info-entry-card',
+            ),
+          )
+          .first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('企业信息'), findsOneWidget);
+    expect(find.text('认证主体'), findsOneWidget);
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       previewFinder,
       180,
@@ -193,6 +217,32 @@ void main() {
     await tester.tap(previewToggle);
     await tester.pumpAndSettle();
     expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find
+          .byKey(
+            const ValueKey<String>(
+              'enterprise-target-enterprise-info-entry-card',
+            ),
+          )
+          .last,
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find
+          .byKey(
+            const ValueKey<String>(
+              'enterprise-target-enterprise-info-entry-card',
+            ),
+          )
+          .last,
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('企业信息'), findsOneWidget);
+    expect(find.text('认证主体'), findsOneWidget);
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
       displayFinder,
       180,
@@ -314,6 +364,12 @@ void _installPublishedChangeDependencies({
                   statusCode: 200,
                   uri: request.uri,
                   body: liveDetailPayload ?? _buildPublishedLiveDetailPayload(),
+                ),
+            'GET /api/app/exhibition/enterprise-hub/enterprises/ent-published-1/formal-info':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _buildPublishedTargetEnterpriseFormalInfoPayload(),
                 ),
           },
         ),
@@ -548,5 +604,21 @@ Map<String, Object?> _buildPublishedLiveDetailPayload() {
     'contacts': <Object?>[
       <String, Object?>{'contactName': '王伟伟', 'mobile': '13800000000'},
     ],
+  };
+}
+
+Map<String, Object?> _buildPublishedTargetEnterpriseFormalInfoPayload() {
+  return const <String, Object?>{
+    'enterpriseId': 'ent-published-1',
+    'legalName': '西南会展搭建有限公司',
+    'uscc': '91510100TEST12345',
+    'legalPerson': '李工',
+    'businessType': '有限责任公司',
+    'address': '四川省成都市高新区天府大道 1 号',
+    'registeredCapital': '500 万元',
+    'establishedAt': '2019-09-09',
+    'businessTerm': '2019-09-09 至 2039-09-09',
+    'businessScope': '展陈搭建、活动执行、空间设计。',
+    'certificationStatus': 'approved',
   };
 }

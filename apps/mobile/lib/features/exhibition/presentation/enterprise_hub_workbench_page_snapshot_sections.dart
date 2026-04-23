@@ -2,6 +2,22 @@ part of 'enterprise_hub_workbench_pages.dart';
 
 extension _EnterpriseWorkbenchPageSnapshotSections
     on _EnterpriseApplicationPageState {
+  Future<void> _openPreviewTargetEnterpriseInfoSheet(
+    EnterpriseHubDetailData data,
+  ) async {
+    final enterpriseId =
+        _normalizedText(data.header.enterpriseId) ?? _currentEnterpriseId;
+    final enterpriseName = _normalizedText(data.header.name);
+    if (enterpriseId == null || enterpriseName == null) {
+      return;
+    }
+    await showEnterpriseTargetEnterpriseInfoSheet(
+      context,
+      enterpriseId: enterpriseId,
+      enterpriseName: enterpriseName,
+    );
+  }
+
   Widget _buildPublishedChangeSnapshotSection(
     EnterpriseHubPublishedChangeWorkbenchData? data,
   ) {
@@ -208,7 +224,11 @@ extension _EnterpriseWorkbenchPageSnapshotSections
                   data: liveData,
                   boardType: liveData.header.primaryBoardType,
                   shellContext: shellContext,
-                  onOpenTargetEnterpriseInfo: () {},
+                  onOpenTargetEnterpriseInfo: () {
+                    unawaited(
+                      _openPreviewTargetEnterpriseInfoSheet(liveData),
+                    );
+                  },
                 ),
                 const SizedBox(height: 12),
                 Text(
@@ -221,8 +241,7 @@ extension _EnterpriseWorkbenchPageSnapshotSections
               enterprisePublishedChangeVisibleMessage(
                 state: liveResult.state,
                 errorCode: liveResult.errorCode,
-                fallbackMessage:
-                    liveResult.message ?? '当前无法读取线上公开展示。',
+                fallbackMessage: liveResult.message ?? '当前无法读取线上公开展示。',
               ),
             ),
     );
@@ -246,9 +265,7 @@ extension _EnterpriseWorkbenchPageSnapshotSections
       title: '当前变更稿预览',
       subtitle: '当前变更稿只用于核对待发布内容，不代表线上公开展示。',
       child: previewData == null
-          ? const Text(
-              '当前变更稿还不足以拼出最小预览，请先补齐基础信息。',
-            )
+          ? const Text('当前变更稿还不足以拼出最小预览，请先补齐基础信息。')
           : Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
@@ -280,7 +297,11 @@ extension _EnterpriseWorkbenchPageSnapshotSections
                     data: previewData,
                     boardType: previewData.header.primaryBoardType,
                     shellContext: shellContext,
-                    onOpenTargetEnterpriseInfo: () {},
+                    onOpenTargetEnterpriseInfo: () {
+                      unawaited(
+                        _openPreviewTargetEnterpriseInfoSheet(previewData),
+                      );
+                    },
                   ),
                   const SizedBox(height: 12),
                   Text(
