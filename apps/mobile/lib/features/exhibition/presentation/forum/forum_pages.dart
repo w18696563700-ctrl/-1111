@@ -28,6 +28,7 @@ part 'forum_publish_continuation_support.dart';
 part 'forum_media_upload_support.dart';
 part 'forum_asset_support.dart';
 part 'forum_draft_search_pages.dart';
+part 'forum_search_pages.dart';
 part 'forum_me_pages.dart';
 part 'forum_my_report_pages.dart';
 part 'forum_own_post_support.dart';
