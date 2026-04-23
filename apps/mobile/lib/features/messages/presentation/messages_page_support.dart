@@ -164,16 +164,18 @@ class _MessagesInteractionCard extends StatelessWidget {
   }
 }
 
-class _MessagesRoundAReminderSection extends StatelessWidget {
-  const _MessagesRoundAReminderSection({
+class _MessagesProjectCommunicationSection extends StatelessWidget {
+  const _MessagesProjectCommunicationSection({
     required this.loading,
+    required this.result,
     required this.items,
     required this.onOpen,
   });
 
   final bool loading;
-  final List<MessagesTodoItem> items;
-  final ValueChanged<MessagesTodoItem> onOpen;
+  final MessageInteractionListResult? result;
+  final List<MessageInteractionItemView> items;
+  final ValueChanged<MessageInteractionItemView> onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -190,7 +192,7 @@ class _MessagesRoundAReminderSection extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '项目沟通提醒',
+              '项目沟通',
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w900,
               ),
@@ -198,11 +200,27 @@ class _MessagesRoundAReminderSection extends StatelessWidget {
             if (loading) ...<Widget>[
               const SizedBox(height: 12),
               const LinearProgressIndicator(minHeight: 6),
+            ] else if (result?.state == AppPageState.errorRetryable ||
+                result?.state == AppPageState.errorNonRetryable ||
+                result?.state == AppPageState.unauthorized ||
+                result?.state == AppPageState.forbidden ||
+                result?.state == AppPageState.notFound) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                result?.message ?? '当前项目沟通入口暂不可用，请稍后再试。',
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              ),
+            ] else if (items.isEmpty) ...<Widget>[
+              const SizedBox(height: 12),
+              Text(
+                '当前还没有新的项目沟通会话。',
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              ),
             ] else
               ...items.map(
-                (MessagesTodoItem item) => Padding(
+                (MessageInteractionItemView item) => Padding(
                   padding: const EdgeInsets.only(top: 12),
-                  child: _MessagesRoundAReminderCard(
+                  child: _MessagesProjectCommunicationCard(
                     item: item,
                     onOpen: () => onOpen(item),
                   ),
@@ -215,10 +233,13 @@ class _MessagesRoundAReminderSection extends StatelessWidget {
   }
 }
 
-class _MessagesRoundAReminderCard extends StatelessWidget {
-  const _MessagesRoundAReminderCard({required this.item, required this.onOpen});
+class _MessagesProjectCommunicationCard extends StatelessWidget {
+  const _MessagesProjectCommunicationCard({
+    required this.item,
+    required this.onOpen,
+  });
 
-  final MessagesTodoItem item;
+  final MessageInteractionItemView item;
   final VoidCallback onOpen;
 
   @override
@@ -239,24 +260,32 @@ class _MessagesRoundAReminderCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: <Widget>[
-                _MessagesMetaPill(label: _todoActionLabel(item.actionKey)),
-                _MessagesMetaPill(label: item.state),
+                _MessagesMetaPill(label: _projectCounterpartRoleLabel(item.counterpart.role)),
+                _MessagesMetaPill(label: item.seedSummary.title),
               ],
             ),
             const SizedBox(height: 10),
             Text(
-              item.title,
+              item.counterpart.displayName,
               style: theme.textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
               ),
             ),
             const SizedBox(height: 8),
-            Text(item.summary, style: theme.textTheme.bodyMedium),
+            Text(item.seedSummary.summary, style: theme.textTheme.bodyMedium),
+            const SizedBox(height: 8),
+            Text(
+              item.lastMessageSummary?.text ?? '当前竞标已提交，可直接进入沟通。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
             const SizedBox(height: 12),
             FilledButton.tonalIcon(
               onPressed: onOpen,
-              icon: const Icon(Icons.open_in_new_rounded),
-              label: const Text('回到对象'),
+              icon: const Icon(Icons.chat_bubble_outline_rounded),
+              label: const Text('进入沟通'),
             ),
           ],
         ),
@@ -457,10 +486,10 @@ String _sourceActionLabel(String targetType) {
   return targetType == 'forum_comment' ? '查看说明' : '回到源对象';
 }
 
-String _todoActionLabel(String actionKey) {
-  return switch (actionKey) {
-    'project_clarification.open' => '项目澄清',
-    'bid_thread.open' => '沟通与投标',
-    _ => actionKey,
+String _projectCounterpartRoleLabel(String role) {
+  return switch (role) {
+    'project_owner' => '项目方',
+    'bidder' => '竞标方',
+    _ => role,
   };
 }

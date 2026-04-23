@@ -1,7 +1,9 @@
 part of '../exhibition_trade_pages.dart';
 
 class MyProjectListPage extends StatefulWidget {
-  const MyProjectListPage({super.key});
+  const MyProjectListPage({super.key, this.initialWorkspace});
+
+  final String? initialWorkspace;
 
   @override
   State<MyProjectListPage> createState() => _MyProjectListPageState();
@@ -22,15 +24,18 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
   ExhibitionLoadResult? _myBidResult;
   bool _loading = true;
   bool _myBidLoading = false;
-  _MyProjectWorkspaceBucket _selectedWorkspace =
-      _MyProjectWorkspaceBucket.published;
+  late _MyProjectWorkspaceBucket _selectedWorkspace;
   _MyProjectStageBucket _selectedStage = _MyProjectStageBucket.draft;
   String? _publishingProjectId;
 
   @override
   void initState() {
     super.initState();
+    _selectedWorkspace = _myProjectWorkspaceFromRoute(widget.initialWorkspace);
     _load();
+    if (_selectedWorkspace == _MyProjectWorkspaceBucket.bids) {
+      _loadMyBidList(forceRefresh: true);
+    }
   }
 
   Future<void> _load({bool forceRefresh = false}) async {
@@ -456,4 +461,10 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
       ),
     ];
   }
+}
+
+_MyProjectWorkspaceBucket _myProjectWorkspaceFromRoute(String? workspace) {
+  return workspace?.trim() == 'bids'
+      ? _MyProjectWorkspaceBucket.bids
+      : _MyProjectWorkspaceBucket.published;
 }

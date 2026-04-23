@@ -30,20 +30,20 @@ class _MessagesPageState extends State<MessagesPage> {
         ForumReadResult<ForumPagedCollectionView<ForumInteractionInboxItemView>>
       >{};
   _MessagesInteractionTab _selectedTab = _MessagesInteractionTab.replies;
-  MessagesIndexResult? _remindersResult;
+  MessageInteractionListResult? _projectCommunicationResult;
   ValueListenable<int>? _refreshSignal;
   int _lastRefreshTick = 0;
   int _latestLoadToken = 0;
   int _latestReminderLoadToken = 0;
   bool _loading = false;
-  bool _remindersLoading = false;
+  bool _projectCommunicationLoading = false;
 
   @override
   void initState() {
     super.initState();
     _bindRefreshSignal(widget.refreshSignal);
     _load();
-    _loadRoundAReminders();
+    _loadProjectCommunication();
   }
 
   @override
@@ -81,7 +81,7 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Future<void> _refreshAll() async {
-    await Future.wait<void>(<Future<void>>[_load(), _loadRoundAReminders()]);
+    await Future.wait<void>(<Future<void>>[_load(), _loadProjectCommunication()]);
   }
 
   Future<void> _load() async {
@@ -102,17 +102,17 @@ class _MessagesPageState extends State<MessagesPage> {
     });
   }
 
-  Future<void> _loadRoundAReminders() async {
+  Future<void> _loadProjectCommunication() async {
     final loadToken = ++_latestReminderLoadToken;
-    setState(() => _remindersLoading = true);
-    final result = await MessagesConsumerLayer.instance.loadIndex();
+    setState(() => _projectCommunicationLoading = true);
+    final result = await MessagesConsumerLayer.instance.loadInteractions();
     if (!mounted) {
       return;
     }
     setState(() {
       if (loadToken == _latestReminderLoadToken) {
-        _remindersResult = result;
-        _remindersLoading = false;
+        _projectCommunicationResult = result;
+        _projectCommunicationLoading = false;
       }
     });
   }
@@ -123,7 +123,9 @@ class _MessagesPageState extends State<MessagesPage> {
     final state = _loading ? AppPageState.loading : result?.state;
     final items =
         result?.data?.items ?? const <ForumInteractionInboxItemView>[];
-    final roundAReminders = _roundAReminders(_remindersResult);
+    final projectCommunicationItems = _projectCommunicationItems(
+      _projectCommunicationResult,
+    );
 
     return RefreshIndicator(
       onRefresh: _refreshAll,
@@ -139,17 +141,20 @@ class _MessagesPageState extends State<MessagesPage> {
           ),
           const SizedBox(height: 10),
           Text(
-            '这里集中查看别人对你的回复、点赞、关注，以及项目沟通提醒。',
+            '这里集中查看别人对你的回复、点赞、关注，以及项目沟通会话。',
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(height: 1.45),
           ),
           const SizedBox(height: 16),
-          if (_remindersLoading || roundAReminders.isNotEmpty) ...<Widget>[
-            _MessagesRoundAReminderSection(
-              loading: _remindersLoading,
-              items: roundAReminders,
-              onOpen: (MessagesTodoItem item) => _openReminder(context, item),
+          if (_projectCommunicationLoading ||
+              _projectCommunicationResult != null) ...<Widget>[
+            _MessagesProjectCommunicationSection(
+              loading: _projectCommunicationLoading,
+              result: _projectCommunicationResult,
+              items: projectCommunicationItems,
+              onOpen: (MessageInteractionItemView item) =>
+                  _openProjectCommunication(context, item),
             ),
             const SizedBox(height: 16),
           ],
@@ -195,16 +200,19 @@ class _MessagesPageState extends State<MessagesPage> {
     );
   }
 
-  List<MessagesTodoItem> _roundAReminders(MessagesIndexResult? result) {
+  List<MessageInteractionItemView> _projectCommunicationItems(
+    MessageInteractionListResult? result,
+  ) {
     if (result?.state != AppPageState.content) {
-      return const <MessagesTodoItem>[];
+      return const <MessageInteractionItemView>[];
     }
-    return result!.items
-        .where((MessagesTodoItem item) => item.isProjectCommunicationReminder)
-        .toList(growable: false);
+    return result!.items;
   }
 
-  void _openReminder(BuildContext context, MessagesTodoItem item) {
+  void _openProjectCommunication(
+    BuildContext context,
+    MessageInteractionItemView item,
+  ) {
     Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
   }
 

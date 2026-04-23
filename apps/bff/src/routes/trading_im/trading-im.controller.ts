@@ -55,3 +55,23 @@ export class AppBidThreadController {
     return this.service.createConfirmation(payload, headers);
   }
 }
+
+@Controller('api/app/exhibition/trading')
+export class AppTradingParticipantCardController {
+  constructor(private readonly service: TradingImService) {}
+
+  @Get('participant-card')
+  getParticipantCard(
+    @Query('projectId') projectId: string | undefined,
+    @Query('bidId') bidId: string | undefined,
+    @Query('participantOrganizationId') participantOrganizationId: string | undefined,
+    @Headers() headers: IncomingHttpHeaders
+  ) {
+    return this.service.getParticipantCard(
+      projectId,
+      bidId,
+      participantOrganizationId,
+      headers
+    );
+  }
+}

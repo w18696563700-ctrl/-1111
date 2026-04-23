@@ -286,8 +286,16 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
       },
     },
     {
-      toAcceptedResponse(bidId) {
-        return { bidId };
+      async createForSubmittedBid() {
+        return {
+          threadId: 'thread-1',
+          seedMessageId: 'seed-1',
+        };
+      },
+    },
+    {
+      toAcceptedResponse(input) {
+        return input;
       },
     },
   );
@@ -314,7 +322,12 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   assert.equal(savedAudit[0].objectType, 'bid');
   assert.equal(savedAudit[0].action, 'BidSubmitted');
   assert.equal(savedAudit[0].afterState, 'submitted');
-  assert.deepEqual(result, { bidId: savedBids[0].id });
+  assert.deepEqual(result, {
+    bidId: savedBids[0].id,
+    projectId: 'project-1',
+    threadId: 'thread-1',
+    seedMessageId: 'seed-1',
+  });
 });
 
 test('bid submit rejects same organization duplicate submission with controlled conflict', async () => {
@@ -393,8 +406,13 @@ test('bid submit rejects same organization duplicate submission with controlled 
       },
     },
     {
-      toAcceptedResponse(bidId) {
-        return { bidId };
+      async createForSubmittedBid() {
+        throw new Error('should not seed duplicate bid');
+      },
+    },
+    {
+      toAcceptedResponse(input) {
+        return input;
       },
     },
   );

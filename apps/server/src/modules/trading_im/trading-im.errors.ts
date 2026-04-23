@@ -48,3 +48,30 @@ export function threadConfirmationInvalid(message = 'Current thread confirmation
     message
   });
 }
+
+export function threadParticipantCardInvalid(
+  message = 'Current participant-card request is invalid.'
+) {
+  return new BadRequestException({
+    code: 'THREAD_PARTICIPANT_CARD_INVALID',
+    message
+  });
+}
+
+export function threadParticipantCardForbidden(
+  message = 'Current actor cannot access participant-card.'
+) {
+  return new ForbiddenException({
+    code: 'THREAD_PARTICIPANT_CARD_FORBIDDEN',
+    message
+  });
+}
+
+export function threadParticipantCardUnavailable(
+  message = 'Current participant-card is unavailable.'
+) {
+  return new NotFoundException({
+    code: 'THREAD_PARTICIPANT_CARD_UNAVAILABLE',
+    message
+  });
+}

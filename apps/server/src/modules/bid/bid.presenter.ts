@@ -1,10 +1,41 @@
 import { Injectable } from '@nestjs/common';
 import { BidSeatEntity } from './entities/bid-seat.entity';
+import {
+  buildBidSubmissionSnapshotAction,
+  buildBidThreadRouteTarget,
+  TRADING_IM_SYSTEM_SEED_TYPE_BID_SUBMITTED
+} from '../trading_im/trading-im-system-seed.support';
 
 @Injectable()
 export class BidPresenter {
-  toAcceptedResponse(bidId: string) {
-    return { bidId };
+  toAcceptedResponse(input: {
+    bidId: string;
+    projectId: string;
+    threadId: string;
+    seedMessageId?: string;
+  }) {
+    return {
+      bidId: input.bidId,
+      projectId: input.projectId,
+      threadId: input.threadId,
+      systemSeed: {
+        messageId: input.seedMessageId ?? null,
+        messageKind: 'system_seed',
+        systemSeedType: TRADING_IM_SYSTEM_SEED_TYPE_BID_SUBMITTED,
+        systemSeedAction: buildBidSubmissionSnapshotAction({
+          projectId: input.projectId,
+          bidId: input.bidId
+        })
+      },
+      interactionSeed: {
+        seedType: TRADING_IM_SYSTEM_SEED_TYPE_BID_SUBMITTED,
+        routeTarget: buildBidThreadRouteTarget({
+          threadId: input.threadId,
+          projectId: input.projectId,
+          bidId: input.bidId
+        })
+      }
+    };
   }
 
   toSeatLockResponse(seat: BidSeatEntity) {

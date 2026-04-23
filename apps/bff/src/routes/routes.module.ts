@@ -5,6 +5,8 @@ import { EnterpriseHubModule } from './enterprise_hub/enterprise-hub.module';
 import { ExhibitionHomeModule } from './exhibition_home/exhibition-home.module';
 import { FileUploadModule } from './file/file-upload.module';
 import { ForumModule } from './forum/forum.module';
+import { MessageInteractionModule } from './message_interaction/message-interaction.module';
+import { MyBidModule } from './my_bid/my-bid.module';
 import { MyProjectModule } from './my_project/my-project.module';
 import { ProfileReadModule } from './profile/profile-read.module';
 import { ProjectModule } from './project/project.module';
@@ -22,6 +24,8 @@ import { TradingImModule } from './trading_im/trading-im.module';
     EnterpriseHubModule,
     ExhibitionHomeModule,
     ForumModule,
+    MessageInteractionModule,
+    MyBidModule,
     MyProjectModule,
     ShellModule,
     ProfileReadModule,

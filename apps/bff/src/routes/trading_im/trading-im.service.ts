@@ -3,6 +3,8 @@ import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
+import { readParticipantCardReadModel } from './trading-im-participant-card.read-model';
+import { readBidThreadDetailReadModel } from './trading-im.read-model';
 
 type TradingImPayload = Record<string, unknown>;
 
@@ -58,9 +60,39 @@ export class TradingImService {
           }
         }
       );
-      return this.requireRecord(result, 'Bid thread detail response is invalid.');
+      return readBidThreadDetailReadModel(result);
     } catch (error) {
       throw this.normalizeBidThreadError(error);
+    }
+  }
+
+  async getParticipantCard(
+    projectId: string | undefined,
+    bidId: string | undefined,
+    participantOrganizationId: string | undefined,
+    headers: IncomingHttpHeaders
+  ) {
+    try {
+      const result = await this.serverClient.get<TradingImPayload>(
+        '/server/trading-im/bid/thread/participant-card',
+        {
+          headers: this.buildScopedHeaders(headers),
+          params: {
+            projectId: this.readRequiredQuery(
+              projectId,
+              'THREAD_PARTICIPANT_CARD_INVALID'
+            ),
+            bidId: this.readRequiredQuery(bidId, 'THREAD_PARTICIPANT_CARD_INVALID'),
+            participantOrganizationId: this.readRequiredQuery(
+              participantOrganizationId,
+              'THREAD_PARTICIPANT_CARD_INVALID'
+            )
+          }
+        }
+      );
+      return readParticipantCardReadModel(result);
+    } catch (error) {
+      throw this.normalizeParticipantCardError(error);
     }
   }
 
@@ -213,6 +245,41 @@ export class TradingImService {
     );
   }
 
+  private normalizeParticipantCardError(error: unknown) {
+    const normalized = this.errors.toHttpException(
+      error,
+      'THREAD_PARTICIPANT_CARD_UNAVAILABLE',
+      '当前合作方名片暂不可用，请稍后再试。',
+      {
+        400: 'THREAD_PARTICIPANT_CARD_INVALID',
+        401: 'AUTH_SESSION_INVALID',
+        403: 'THREAD_PARTICIPANT_CARD_FORBIDDEN',
+        404: 'THREAD_PARTICIPANT_CARD_UNAVAILABLE'
+      }
+    );
+
+    const status = normalized.getStatus();
+    const response = this.readErrorResponse(normalized);
+    const shouldHideUpstreamMessage =
+      status === 404 || this.isRawParticipantCardRouteMessage(response.message);
+    if (!shouldHideUpstreamMessage) {
+      return normalized;
+    }
+
+    return new HttpException(
+      {
+        statusCode: typeof response.statusCode === 'number' ? response.statusCode : status,
+        code:
+          typeof response.code === 'string'
+            ? response.code
+            : 'THREAD_PARTICIPANT_CARD_UNAVAILABLE',
+        message: '当前合作方名片暂不可用，请稍后再试。',
+        source: response.source === 'bff' ? 'bff' : 'server'
+      },
+      status
+    );
+  }
+
   private badRequest(code: string, message: string) {
     return new BadRequestException({
       statusCode: 400,
@@ -254,6 +321,14 @@ export class TradingImService {
       message: String(response),
       source: 'server'
     };
+  }
+
+  private isRawParticipantCardRouteMessage(message: unknown) {
+    return (
+      typeof message === 'string' &&
+      (message.includes('Cannot GET /server/trading-im/bid/thread/participant-card') ||
+        message.includes('/server/trading-im/bid/thread/participant-card'))
+    );
   }
 
   private isRawProjectClarificationRouteMessage(message: unknown) {

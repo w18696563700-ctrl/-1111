@@ -234,6 +234,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           ExhibitionConsumerLayer.instance.loadMyProjectList(
             forceRefresh: true,
           ),
+          ExhibitionConsumerLayer.instance.loadMyBidList(forceRefresh: true),
         ]);
       }
     }

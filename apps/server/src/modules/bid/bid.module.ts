@@ -5,6 +5,7 @@ import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { TradingImModule } from '../trading_im/trading-im.module';
 import { BidController } from './bid.controller';
 import { BidPackageCompletenessQueryService } from './bid-package-completeness.query.service';
 import { BidPackageController } from './bid-package.controller';
@@ -20,7 +21,8 @@ import { BidSeatEntity } from './entities/bid-seat.entity';
     TypeOrmModule.forFeature([BidEntity, BidSeatEntity, ProjectEntity, IdentityAuditLogEntity]),
     AuthModule,
     OrganizationModule,
-    ProjectPublishAuditModule
+    ProjectPublishAuditModule,
+    TradingImModule
   ],
   controllers: [BidController, BidPackageController],
   providers: [

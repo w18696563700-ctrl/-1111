@@ -3,6 +3,12 @@ import { BidThreadConfirmationCardEntity } from './entities/bid-thread-confirmat
 import { BidThreadMessageEntity } from './entities/bid-thread-message.entity';
 import { BidPrivateThreadEntity } from './entities/bid-private-thread.entity';
 import { ProjectClarificationEntity } from './entities/project-clarification.entity';
+import {
+  buildBidSubmissionSnapshotAction,
+  TRADING_IM_MESSAGE_KIND_ACTOR,
+  TRADING_IM_MESSAGE_KIND_SYSTEM_SEED,
+  TRADING_IM_SYSTEM_SEED_TYPE_BID_SUBMITTED
+} from './trading-im-system-seed.support';
 
 export type TradingImParticipantRole = 'project_owner' | 'bidder' | 'viewer';
 
@@ -69,6 +75,7 @@ export class TradingImPresenter {
   }
 
   toThreadMessage(message: BidThreadMessageEntity) {
+    const isSystemSeed = message.senderRole === TRADING_IM_MESSAGE_KIND_SYSTEM_SEED;
     return {
       messageId: message.id,
       threadId: message.threadId,
@@ -77,7 +84,19 @@ export class TradingImPresenter {
       senderRole: message.senderRole,
       body: message.body,
       attachmentFileAssetIds: message.attachmentFileAssetIds,
-      createdAt: message.createdAt.toISOString()
+      createdAt: message.createdAt.toISOString(),
+      messageKind: isSystemSeed
+        ? TRADING_IM_MESSAGE_KIND_SYSTEM_SEED
+        : TRADING_IM_MESSAGE_KIND_ACTOR,
+      ...(isSystemSeed
+        ? {
+            systemSeedType: TRADING_IM_SYSTEM_SEED_TYPE_BID_SUBMITTED,
+            systemSeedAction: buildBidSubmissionSnapshotAction({
+                projectId: message.projectId,
+                bidId: message.bidId
+              })
+          }
+        : {})
     };
   }
 
@@ -91,6 +110,45 @@ export class TradingImPresenter {
       summary: card.summary,
       sourceMessageId: card.sourceMessageId,
       createdAt: card.createdAt.toISOString()
+    };
+  }
+
+  toParticipantCard(params: {
+    projectId: string;
+    bidId: string;
+    participantOrganizationId: string;
+    participantRole: Exclude<TradingImParticipantRole, 'viewer'>;
+    enterpriseSummary: {
+      enterpriseId: string;
+      displayName: string;
+      logoUrl: string | null;
+      primaryBoardType: string;
+      provinceName: string;
+      cityName: string;
+      verificationStatus: string;
+    };
+    reviewSummary: {
+      avgScore: number | null;
+      reviewCount: number;
+      keywordTags: string[];
+    };
+    formalInfoSummary: {
+      legalName: string;
+      businessType: string | null;
+      registeredCapital: string | null;
+      establishedAt: string | null;
+      businessScope: string | null;
+      certificationStatus: string;
+    };
+  }) {
+    return {
+      projectId: params.projectId,
+      bidId: params.bidId,
+      participantOrganizationId: params.participantOrganizationId,
+      participantRole: params.participantRole,
+      enterpriseSummary: params.enterpriseSummary,
+      reviewSummary: params.reviewSummary,
+      formalInfoSummary: params.formalInfoSummary
     };
   }
 }

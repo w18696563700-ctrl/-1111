@@ -2,11 +2,15 @@ import { Body, Controller, Get, Headers, HttpCode, Post, Query, Req } from '@nes
 import type { Request } from 'express';
 import type { HeaderBag } from '../../shared/request-context';
 import { resolveRequestContext } from '../../shared/request-context';
+import { TradingImParticipantCardQueryService } from './trading-im-participant-card.query.service';
 import { TradingImService } from './trading-im.service';
 
 @Controller('server/trading-im')
 export class TradingImController {
-  constructor(private readonly service: TradingImService) {}
+  constructor(
+    private readonly service: TradingImService,
+    private readonly participantCardQueryService: TradingImParticipantCardQueryService
+  ) {}
 
   @Get('project/clarification/list')
   listClarifications(
@@ -42,6 +46,20 @@ export class TradingImController {
   ) {
     return this.service.getBidThreadDetail(
       { projectId, bidId },
+      resolveRequestContext(headers, this.toRequestExtras(request))
+    );
+  }
+
+  @Get('bid/thread/participant-card')
+  getParticipantCard(
+    @Query('projectId') projectId: string | undefined,
+    @Query('bidId') bidId: string | undefined,
+    @Query('participantOrganizationId') participantOrganizationId: string | undefined,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.participantCardQueryService.getParticipantCard(
+      { projectId, bidId, participantOrganizationId },
       resolveRequestContext(headers, this.toRequestExtras(request))
     );
   }

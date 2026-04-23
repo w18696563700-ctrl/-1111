@@ -122,6 +122,142 @@ void main() {
     },
   );
 
+  test('bid thread detail consumes bounded system seed supplement', () async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET ${TradingImCanonicalPaths.bidThreadDetail}':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'threadId': 'thread-1',
+                      'projectId': 'project-1',
+                      'bidId': 'bid-1',
+                      'participants': <Object?>[
+                        <String, Object?>{
+                          'participantRole': 'project_owner',
+                          'organizationId': 'org-owner-1',
+                        },
+                        <String, Object?>{
+                          'participantRole': 'bidder',
+                          'organizationId': 'org-bidder-1',
+                        },
+                      ],
+                      'viewerParticipantRole': 'project_owner',
+                      'state': 'open',
+                      'availability': <String, Object?>{
+                        'canSendMessage': true,
+                        'canCreateConfirmation': true,
+                        'reason': 'participant_allowed',
+                      },
+                      'messages': <Object?>[
+                        <String, Object?>{
+                          'messageId': 'message-seed-1',
+                          'threadId': 'thread-1',
+                          'projectId': 'project-1',
+                          'bidId': 'bid-1',
+                          'senderRole': 'system_seed',
+                          'messageKind': 'system_seed',
+                          'systemSeedType': 'bid_submitted',
+                          'systemSeedAction': <String, Object?>{
+                            'objectType': 'bid_submission_snapshot',
+                            'actionKey': 'bid_submission_snapshot.open',
+                            'canonicalPath': '/api/app/bid/submission/snapshot',
+                            'params': <String, Object?>{
+                              'projectId': 'project-1',
+                              'bidId': 'bid-1',
+                            },
+                          },
+                          'body': '杭州搭建公司已对当前项目提交竞标。',
+                          'attachmentFileAssetIds': <Object?>[],
+                          'createdAt': '2026-04-16T00:00:00Z',
+                        },
+                      ],
+                      'confirmationCards': <Object?>[],
+                    },
+                  );
+                },
+          },
+    );
+    final consumer = TradingImConsumerLayer(client: _client(transport));
+
+    final result = await consumer.loadBidThread(
+      projectId: 'project-1',
+      bidId: 'bid-1',
+    );
+
+    expect(result.state, AppPageState.content);
+    expect(result.data?.messages.single.messageKind, 'system_seed');
+    expect(result.data?.messages.single.systemSeedType, 'bid_submitted');
+    expect(
+      result.data?.messages.single.systemSeedAction?.actionKey,
+      'bid_submission_snapshot.open',
+    );
+  });
+
+  test('participant-card consumes bounded read-only contract', () async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET ${TradingImCanonicalPaths.participantCard}':
+                (AppApiRequest request) async {
+                  expect(request.uri.queryParameters['projectId'], 'project-1');
+                  expect(request.uri.queryParameters['bidId'], 'bid-1');
+                  expect(
+                    request.uri.queryParameters['participantOrganizationId'],
+                    'org-bidder-1',
+                  );
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'projectId': 'project-1',
+                      'bidId': 'bid-1',
+                      'participantOrganizationId': 'org-bidder-1',
+                      'participantRole': 'bidder',
+                      'enterpriseSummary': <String, Object?>{
+                        'enterpriseId': 'enterprise-1',
+                        'displayName': '杭州搭建公司',
+                        'logoUrl': null,
+                        'primaryBoardType': 'supplier',
+                        'provinceName': '浙江省',
+                        'cityName': '杭州市',
+                        'verificationStatus': 'approved',
+                      },
+                      'reviewSummary': <String, Object?>{
+                        'avgScore': 4.8,
+                        'reviewCount': 12,
+                        'keywordTags': <Object?>['响应快', '沟通顺'],
+                      },
+                      'formalInfoSummary': <String, Object?>{
+                        'legalName': '杭州搭建展示有限公司',
+                        'businessType': '有限责任公司',
+                        'registeredCapital': '500 万人民币',
+                        'establishedAt': '2020-04-09',
+                        'businessScope': '展览搭建',
+                        'certificationStatus': 'approved',
+                      },
+                    },
+                  );
+                },
+          },
+    );
+    final consumer = TradingImConsumerLayer(client: _client(transport));
+
+    final result = await consumer.loadParticipantCard(
+      projectId: 'project-1',
+      bidId: 'bid-1',
+      participantOrganizationId: 'org-bidder-1',
+    );
+
+    expect(result.state, AppPageState.content);
+    expect(result.data?.enterpriseSummary.displayName, '杭州搭建公司');
+    expect(result.data?.reviewSummary.keywordTags, <String>['响应快', '沟通顺']);
+    expect(result.data?.formalInfoSummary.legalName, '杭州搭建展示有限公司');
+  });
+
   test('unknown contract state enters controlled failure', () async {
     final transport = FakeAppApiTransport(
       handlers:
@@ -196,5 +332,250 @@ void main() {
     expect(find.text('先参与竞标'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '项目澄清'), findsOneWidget);
     expect(find.textContaining('当前请使用上方主入口继续参与竞标'), findsOneWidget);
+  });
+
+  testWidgets(
+    'bid thread renders a bounded system seed card and opens bid submission snapshot',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET ${TradingImCanonicalPaths.bidThreadDetail}':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'threadId': 'thread-1',
+                        'projectId': 'project-1',
+                        'bidId': 'bid-1',
+                        'participants': <Object?>[
+                          <String, Object?>{
+                            'participantRole': 'project_owner',
+                            'organizationId': 'org-owner-1',
+                          },
+                          <String, Object?>{
+                            'participantRole': 'bidder',
+                            'organizationId': 'org-bidder-1',
+                          },
+                        ],
+                        'viewerParticipantRole': 'project_owner',
+                        'state': 'open',
+                        'availability': <String, Object?>{
+                          'canSendMessage': true,
+                          'canCreateConfirmation': true,
+                          'reason': 'participant_allowed',
+                        },
+                        'messages': <Object?>[
+                          <String, Object?>{
+                            'messageId': 'message-seed-1',
+                            'threadId': 'thread-1',
+                            'projectId': 'project-1',
+                            'bidId': 'bid-1',
+                            'senderRole': 'system_seed',
+                            'messageKind': 'system_seed',
+                            'systemSeedType': 'bid_submitted',
+                            'systemSeedAction': <String, Object?>{
+                              'objectType': 'bid_submission_snapshot',
+                              'actionKey': 'bid_submission_snapshot.open',
+                              'canonicalPath':
+                                  '/api/app/bid/submission/snapshot',
+                              'params': <String, Object?>{
+                                'projectId': 'project-1',
+                                'bidId': 'bid-1',
+                              },
+                            },
+                            'body': '杭州搭建公司已对当前项目提交竞标。',
+                            'attachmentFileAssetIds': <Object?>[],
+                            'createdAt': '2026-04-16T00:00:00Z',
+                          },
+                        ],
+                        'confirmationCards': <Object?>[],
+                      },
+                    );
+                  },
+              'GET ${TradingImCanonicalPaths.bidSubmissionSnapshot}':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['projectId'],
+                      'project-1',
+                    );
+                    expect(request.uri.queryParameters['bidId'], 'bid-1');
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'projectId': 'project-1',
+                        'bidId': 'bid-1',
+                        'bidder': <String, Object?>{
+                          'organizationId': 'org-bidder-1',
+                          'displayName': '杭州搭建公司',
+                          'avatarUrl': null,
+                        },
+                        'submittedAt': '2026-04-16T00:00:00Z',
+                        'quoteAmount': 8800,
+                        'proposalSummary': '先做结构、灯光与现场安装。',
+                        'attachmentSummary': <String, Object?>{'count': 3},
+                        'availability': <String, Object?>{
+                          'canOpenBidThread': true,
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+      TradingImConsumerLayer.install(
+        TradingImConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(TradingImConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        const MaterialApp(
+          home: Scaffold(
+            body: BidThreadPage(projectId: 'project-1', bidId: 'bid-1'),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.scrollUntilVisible(
+        find.text('点击查看'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+
+      final viewSnapshotFinder = find.widgetWithText(FilledButton, '点击查看');
+      expect(viewSnapshotFinder, findsOneWidget);
+
+      await tester.ensureVisible(viewSnapshotFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(viewSnapshotFinder, warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('竞标摘要'), findsOneWidget);
+      expect(find.text('杭州搭建公司'), findsOneWidget);
+      expect(find.textContaining('报价金额：¥8800'), findsOneWidget);
+      expect(find.textContaining('附件摘要：已确认 3 份附件'), findsOneWidget);
+    },
+  );
+
+  testWidgets('bid thread participant click opens bounded participant-card', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET ${TradingImCanonicalPaths.bidThreadDetail}':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'threadId': 'thread-1',
+                      'projectId': 'project-1',
+                      'bidId': 'bid-1',
+                      'participants': <Object?>[
+                        <String, Object?>{
+                          'participantRole': 'project_owner',
+                          'organizationId': 'org-owner-1',
+                        },
+                        <String, Object?>{
+                          'participantRole': 'bidder',
+                          'organizationId': 'org-bidder-1',
+                        },
+                      ],
+                      'viewerParticipantRole': 'project_owner',
+                      'state': 'open',
+                      'availability': <String, Object?>{
+                        'canSendMessage': true,
+                        'canCreateConfirmation': true,
+                        'reason': 'participant_allowed',
+                      },
+                      'messages': <Object?>[],
+                      'confirmationCards': <Object?>[],
+                    },
+                  );
+                },
+            'GET ${TradingImCanonicalPaths.participantCard}':
+                (AppApiRequest request) async {
+                  final participantOrganizationId =
+                      request.uri.queryParameters['participantOrganizationId'];
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: <String, Object?>{
+                      'projectId': 'project-1',
+                      'bidId': 'bid-1',
+                      'participantOrganizationId': participantOrganizationId,
+                      'participantRole':
+                          participantOrganizationId == 'org-owner-1'
+                          ? 'project_owner'
+                          : 'bidder',
+                      'enterpriseSummary': <String, Object?>{
+                        'enterpriseId':
+                            participantOrganizationId == 'org-owner-1'
+                            ? 'enterprise-owner-1'
+                            : 'enterprise-bidder-1',
+                        'displayName':
+                            participantOrganizationId == 'org-owner-1'
+                            ? '重庆项目方'
+                            : '杭州搭建公司',
+                        'logoUrl': null,
+                        'primaryBoardType':
+                            participantOrganizationId == 'org-owner-1'
+                            ? 'company'
+                            : 'supplier',
+                        'provinceName':
+                            participantOrganizationId == 'org-owner-1'
+                            ? '重庆市'
+                            : '浙江省',
+                        'cityName':
+                            participantOrganizationId == 'org-owner-1'
+                            ? '重庆市'
+                            : '杭州市',
+                        'verificationStatus': 'approved',
+                      },
+                      'reviewSummary': <String, Object?>{
+                        'avgScore': 4.8,
+                        'reviewCount': 12,
+                        'keywordTags': <Object?>['响应快'],
+                      },
+                      'formalInfoSummary': <String, Object?>{
+                        'legalName':
+                            participantOrganizationId == 'org-owner-1'
+                            ? '重庆项目管理有限公司'
+                            : '杭州搭建展示有限公司',
+                        'businessType': '有限责任公司',
+                        'registeredCapital': '500 万人民币',
+                        'establishedAt': '2020-04-09',
+                        'businessScope': '展览搭建',
+                        'certificationStatus': 'approved',
+                      },
+                    },
+                  );
+                },
+          },
+    );
+    TradingImConsumerLayer.install(
+      TradingImConsumerLayer(client: _client(transport)),
+    );
+    addTearDown(TradingImConsumerLayer.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: BidThreadPage(projectId: 'project-1', bidId: 'bid-1')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('杭州搭建公司'), findsOneWidget);
+    await tester.tap(find.text('杭州搭建公司'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('合作方名片'), findsOneWidget);
+    expect(find.textContaining('法定名称：杭州搭建展示有限公司'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.textContaining('合作前建议查看对方的企查查信息'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.textContaining('合作前建议查看对方的企查查信息'), findsOneWidget);
   });
 }

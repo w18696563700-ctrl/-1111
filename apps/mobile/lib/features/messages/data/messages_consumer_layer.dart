@@ -7,65 +7,106 @@ import 'package:mobile/features/messages/data/messages_registered_entry_registry
 final class MessagesCanonicalPaths {
   const MessagesCanonicalPaths._();
 
-  static const String messageIndex = '/api/app/message/index';
+  static const String messageInteractions = '/api/app/message/interactions';
 }
 
-class MessagesRouteTarget {
-  const MessagesRouteTarget({
+final class MessageInteractionRouteTarget {
+  const MessageInteractionRouteTarget({
+    required this.objectType,
+    required this.actionKey,
     required this.canonicalPath,
-    required this.localEntryKey,
-    required this.requiredParams,
-    required this.state,
-    required this.routeParams,
+    required this.params,
     required this.routeLocation,
   });
 
+  final String objectType;
+  final String actionKey;
   final String canonicalPath;
-  final String localEntryKey;
-  final List<String> requiredParams;
-  final String state;
-  final Map<String, String> routeParams;
+  final Map<String, String> params;
   final String routeLocation;
 }
 
-class MessagesTodoItem {
-  const MessagesTodoItem({
-    required this.todoId,
-    required this.messageType,
-    required this.instanceRef,
-    required this.actionKey,
-    required this.title,
-    required this.summary,
-    required this.routeTarget,
-    required this.state,
+final class MessageInteractionCounterpartView {
+  const MessageInteractionCounterpartView({
+    required this.organizationId,
+    required this.displayName,
+    required this.avatarUrl,
+    required this.role,
   });
 
-  final String todoId;
-  final String messageType;
-  final Map<String, String> instanceRef;
-  final String actionKey;
-  final String title;
-  final String summary;
-  final MessagesRouteTarget routeTarget;
-  final String state;
-
-  bool get isProjectCommunicationReminder =>
-      messagesProjectCommunicationActionKeys.contains(actionKey);
+  final String organizationId;
+  final String displayName;
+  final String? avatarUrl;
+  final String role;
 }
 
-class MessagesIndexResult {
-  const MessagesIndexResult({
+final class MessageInteractionSeedSummaryView {
+  const MessageInteractionSeedSummaryView({
+    required this.seedType,
+    required this.title,
+    required this.summary,
+    required this.ctaLabel,
+  });
+
+  final String seedType;
+  final String title;
+  final String summary;
+  final String ctaLabel;
+}
+
+final class MessageInteractionLastMessageSummaryView {
+  const MessageInteractionLastMessageSummaryView({
+    required this.text,
+    required this.messageKind,
+    required this.createdAt,
+  });
+
+  final String text;
+  final String messageKind;
+  final String? createdAt;
+}
+
+final class MessageInteractionItemView {
+  const MessageInteractionItemView({
+    required this.interactionId,
+    required this.interactionType,
+    required this.threadId,
+    required this.projectId,
+    required this.bidId,
+    required this.counterpart,
+    required this.seedSummary,
+    required this.lastMessageSummary,
+    required this.updatedAt,
+    required this.routeTarget,
+  });
+
+  final String interactionId;
+  final String interactionType;
+  final String threadId;
+  final String projectId;
+  final String bidId;
+  final MessageInteractionCounterpartView counterpart;
+  final MessageInteractionSeedSummaryView seedSummary;
+  final MessageInteractionLastMessageSummaryView? lastMessageSummary;
+  final String updatedAt;
+  final MessageInteractionRouteTarget routeTarget;
+}
+
+final class MessageInteractionListResult {
+  const MessageInteractionListResult({
     required this.state,
     required this.method,
     required this.path,
-    this.items = const <MessagesTodoItem>[],
+    required this.lane,
+    this.items = const <MessageInteractionItemView>[],
     this.message,
   });
 
   final AppPageState state;
   final String method;
   final String path;
-  final List<MessagesTodoItem> items;
+  final String lane;
+  final List<MessageInteractionItemView> items;
   final String? message;
 }
 
@@ -93,310 +134,417 @@ class MessagesConsumerLayer {
   String get configuredEnvironmentLabel =>
       _client.config.userFacingEnvironmentLabel;
 
-  Future<MessagesIndexResult> loadIndex() async {
+  Future<MessageInteractionListResult> loadInteractions({
+    String lane = 'project_communication',
+  }) async {
     try {
-      final response = await _client.get(MessagesCanonicalPaths.messageIndex);
+      final response = await _client.get(
+        MessagesCanonicalPaths.messageInteractions,
+        queryParameters: <String, String>{'lane': lane},
+      );
       return _mapResponse(response);
     } on SocketException {
-      return const MessagesIndexResult(
+      return MessageInteractionListResult(
         state: AppPageState.errorRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
-        message: 'network error while loading instance_todo items',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: lane,
+        message: 'network error while loading message interactions',
       );
     } on HttpException {
-      return const MessagesIndexResult(
+      return MessageInteractionListResult(
         state: AppPageState.errorRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
-        message: 'http error while loading instance_todo items',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: lane,
+        message: 'http error while loading message interactions',
       );
     } on StateError {
-      return const MessagesIndexResult(
+      return MessageInteractionListResult(
         state: AppPageState.empty,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
-        message: 'current fake transport did not provide message index',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: lane,
+        message: 'current fake transport did not provide message interactions',
       );
-    } on FormatException {
-      return const MessagesIndexResult(
+    } on FormatException catch (error) {
+      return MessageInteractionListResult(
         state: AppPageState.errorNonRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
-        message: 'response decoding failed for instance_todo items',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: lane,
+        message: error.message,
       );
     }
   }
 
-  MessagesIndexResult _mapResponse(AppApiResponse response) {
+  @Deprecated('Use loadInteractions() instead.')
+  Future<MessageInteractionListResult> loadIndex() {
+    return loadInteractions();
+  }
+
+  MessageInteractionListResult _mapResponse(AppApiResponse response) {
     if (response.statusCode >= 500) {
-      return MessagesIndexResult(
+      return MessageInteractionListResult(
         state: AppPageState.errorRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
-        message: _extractMessage(response.body) ?? 'instance_todo index failed',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: 'project_communication',
+        message:
+            _extractMessage(response.body) ??
+            'message interactions temporarily unavailable',
       );
     }
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      return MessagesIndexResult(
+      return MessageInteractionListResult(
         state: AppPageState.errorNonRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: 'project_communication',
         message:
             _extractMessage(response.body) ??
-            'instance_todo index returned a controlled failure',
+            'message interactions returned a controlled failure',
       );
     }
 
     final payload = response.body;
     if (payload is! Map) {
-      return const MessagesIndexResult(
+      return const MessageInteractionListResult(
         state: AppPageState.errorNonRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: 'project_communication',
         message:
-            'instance_todo index response must be an object containing items',
+            'message interactions response must be an object containing lane and items',
+      );
+    }
+
+    final lane = _readRequiredString(payload, 'lane');
+    if (lane == null) {
+      return const MessageInteractionListResult(
+        state: AppPageState.errorNonRetryable,
+        method: 'GET',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: 'project_communication',
+        message:
+            'message interactions response is missing required field "lane"',
+      );
+    }
+    if (lane != 'project_communication') {
+      return MessageInteractionListResult(
+        state: AppPageState.errorNonRetryable,
+        method: 'GET',
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: lane,
+        message: 'message interactions response returned an unsupported lane',
       );
     }
 
     final rawItems = payload['items'];
     if (rawItems is! List) {
-      return const MessagesIndexResult(
+      return MessageInteractionListResult(
         state: AppPageState.errorNonRetryable,
         method: 'GET',
-        path: MessagesCanonicalPaths.messageIndex,
+        path: MessagesCanonicalPaths.messageInteractions,
+        lane: lane,
         message:
-            'instance_todo index response is missing required field "items"',
+            'message interactions response is missing required field "items"',
       );
     }
 
-    final items = <MessagesTodoItem>[];
+    final items = <MessageInteractionItemView>[];
     for (var index = 0; index < rawItems.length; index += 1) {
       final rawItem = rawItems[index];
       if (rawItem is! Map) {
-        return MessagesIndexResult(
+        return MessageInteractionListResult(
           state: AppPageState.errorNonRetryable,
           method: 'GET',
-          path: MessagesCanonicalPaths.messageIndex,
-          message: 'instance_todo items[$index] must be an object',
+          path: MessagesCanonicalPaths.messageInteractions,
+          lane: lane,
+          message: 'message interactions items[$index] must be an object',
         );
       }
-
-      final item = _parseTodoItem(
+      final item = _parseInteractionItem(
         rawItem.map((Object? key, Object? value) => MapEntry('$key', value)),
       );
       if (item is String) {
-        return MessagesIndexResult(
+        return MessageInteractionListResult(
           state: AppPageState.errorNonRetryable,
           method: 'GET',
-          path: MessagesCanonicalPaths.messageIndex,
+          path: MessagesCanonicalPaths.messageInteractions,
+          lane: lane,
           message: item,
         );
       }
-      items.add(item as MessagesTodoItem);
+      items.add(item as MessageInteractionItemView);
     }
 
-    return MessagesIndexResult(
+    return MessageInteractionListResult(
       state: items.isEmpty ? AppPageState.empty : AppPageState.content,
       method: 'GET',
-      path: MessagesCanonicalPaths.messageIndex,
+      path: MessagesCanonicalPaths.messageInteractions,
+      lane: lane,
       items: items,
     );
   }
 }
 
-Object _parseTodoItem(Map<String, Object?> raw) {
-  final todoId = _readRequiredString(raw, 'todoId');
-  final messageType = _readRequiredString(raw, 'messageType');
-  final actionKey = _readRequiredString(raw, 'actionKey');
-  final title = _readRequiredString(raw, 'title');
-  final summary = _readRequiredString(raw, 'summary');
-  final state = _readRequiredString(raw, 'state');
-  final instanceRef = _parseInstanceRef(raw['instanceRef']);
+Object _parseInteractionItem(Map<String, Object?> raw) {
+  final interactionId = _readRequiredString(raw, 'interactionId');
+  final interactionType = _readRequiredString(raw, 'interactionType');
+  final threadId = _readRequiredString(raw, 'threadId');
+  final projectId = _readRequiredString(raw, 'projectId');
+  final bidId = _readRequiredString(raw, 'bidId');
+  final updatedAt = _readRequiredString(raw, 'updatedAt');
 
-  if (todoId == null) {
-    return 'instance_todo is missing required field "todoId"';
+  if (interactionId == null) {
+    return 'message interaction is missing required field "interactionId"';
   }
-  if (messageType == null) {
-    return 'instance_todo is missing required field "messageType"';
+  if (interactionType == null) {
+    return 'message interaction is missing required field "interactionType"';
   }
-  if (messageType != 'instance_todo') {
-    return 'instance_todo item must carry messageType "instance_todo"';
+  if (interactionType != 'bid_thread') {
+    return 'message interaction returned an unsupported interactionType';
   }
-  if (actionKey == null) {
-    return 'instance_todo is missing required field "actionKey"';
+  if (threadId == null) {
+    return 'message interaction is missing required field "threadId"';
   }
-  if (!messagesAllowedActionKeys.contains(actionKey)) {
-    return 'instance_todo actionKey "$actionKey" is outside the frozen first batch';
+  if (projectId == null) {
+    return 'message interaction is missing required field "projectId"';
   }
-  if (title == null) {
-    return 'instance_todo is missing required field "title"';
+  if (bidId == null) {
+    return 'message interaction is missing required field "bidId"';
   }
-  if (summary == null) {
-    return 'instance_todo is missing required field "summary"';
-  }
-  if (state == null) {
-    return 'instance_todo is missing required field "state"';
-  }
-  if (state != 'pending') {
-    return 'instance_todo state "$state" is outside the frozen minimal state';
-  }
-  if (instanceRef is String) {
-    return instanceRef;
+  if (updatedAt == null) {
+    return 'message interaction is missing required field "updatedAt"';
   }
 
-  final routeTarget = _parseRouteTarget(actionKey, raw['routeTarget']);
+  final counterpart = _parseCounterpart(raw['counterpart']);
+  if (counterpart is String) {
+    return counterpart;
+  }
+  final seedSummary = _parseSeedSummary(raw['seedSummary']);
+  if (seedSummary is String) {
+    return seedSummary;
+  }
+  final lastMessageSummary = _parseLastMessageSummary(raw['lastMessageSummary']);
+  if (lastMessageSummary is String) {
+    return lastMessageSummary;
+  }
+  final routeTarget = _parseRouteTarget(raw['routeTarget']);
   if (routeTarget is String) {
     return routeTarget;
   }
 
-  final sanitizedInstanceRef = instanceRef as Map<String, String>;
-  if (messagesActionKeyToObjectType[actionKey] !=
-      sanitizedInstanceRef['objectType']) {
-    return 'instance_todo objectType must align with actionKey "$actionKey"';
-  }
-
-  return MessagesTodoItem(
-    todoId: todoId,
-    messageType: messageType,
-    instanceRef: sanitizedInstanceRef,
-    actionKey: actionKey,
-    title: title,
-    summary: summary,
-    routeTarget: routeTarget as MessagesRouteTarget,
-    state: state,
+  return MessageInteractionItemView(
+    interactionId: interactionId,
+    interactionType: interactionType,
+    threadId: threadId,
+    projectId: projectId,
+    bidId: bidId,
+    counterpart: counterpart as MessageInteractionCounterpartView,
+    seedSummary: seedSummary as MessageInteractionSeedSummaryView,
+    lastMessageSummary:
+        lastMessageSummary as MessageInteractionLastMessageSummaryView?,
+    updatedAt: updatedAt,
+    routeTarget: routeTarget as MessageInteractionRouteTarget,
   );
 }
 
-Object _parseInstanceRef(Object? raw) {
+Object _parseCounterpart(Object? raw) {
   if (raw is! Map) {
-    return 'instance_todo instanceRef must be an object';
+    return 'message interaction counterpart must be an object';
   }
-
-  final map = raw.map((Object? key, Object? value) => MapEntry('$key', value));
-  final objectType = _readRequiredString(map, 'objectType');
-  final instanceId = _readRequiredString(map, 'instanceId');
-
-  if (objectType == null) {
-    return 'instance_todo is missing required field "objectType"';
+  final organizationId = _readRequiredString(raw, 'organizationId');
+  final displayName = _readRequiredString(raw, 'displayName');
+  final role = _readRequiredString(raw, 'role');
+  if (organizationId == null) {
+    return 'message interaction counterpart is missing required field "organizationId"';
   }
-  if (!messagesAllowedObjectTypes.contains(objectType)) {
-    return 'instance_todo objectType "$objectType" is outside the frozen first batch';
+  if (displayName == null) {
+    return 'message interaction counterpart is missing required field "displayName"';
   }
-  if (instanceId == null) {
-    return 'instance_todo is missing required field "instanceId"';
+  if (role == null) {
+    return 'message interaction counterpart is missing required field "role"';
   }
-
-  return <String, String>{'objectType': objectType, 'instanceId': instanceId};
+  final avatarUrl = _readNullableString(raw['avatarUrl']);
+  if (raw.containsKey('avatarUrl') && raw['avatarUrl'] != null && avatarUrl == null) {
+    return 'message interaction counterpart.avatarUrl must be a string when present';
+  }
+  return MessageInteractionCounterpartView(
+    organizationId: organizationId,
+    displayName: displayName,
+    avatarUrl: avatarUrl,
+    role: role,
+  );
 }
 
-Object _parseRouteTarget(String actionKey, Object? raw) {
+Object _parseSeedSummary(Object? raw) {
   if (raw is! Map) {
-    return 'instance_todo routeTarget must be an object';
+    return 'message interaction seedSummary must be an object';
+  }
+  final seedType = _readRequiredString(raw, 'seedType');
+  final title = _readRequiredString(raw, 'title');
+  final summary = _readRequiredString(raw, 'summary');
+  final ctaLabel = _readRequiredString(raw, 'ctaLabel');
+  if (seedType == null) {
+    return 'message interaction seedSummary is missing required field "seedType"';
+  }
+  if (seedType != 'bid_submitted') {
+    return 'message interaction seedSummary returned an unsupported seedType';
+  }
+  if (title == null) {
+    return 'message interaction seedSummary is missing required field "title"';
+  }
+  if (summary == null) {
+    return 'message interaction seedSummary is missing required field "summary"';
+  }
+  if (ctaLabel == null) {
+    return 'message interaction seedSummary is missing required field "ctaLabel"';
+  }
+  return MessageInteractionSeedSummaryView(
+    seedType: seedType,
+    title: title,
+    summary: summary,
+    ctaLabel: ctaLabel,
+  );
+}
+
+Object? _parseLastMessageSummary(Object? raw) {
+  if (raw == null) {
+    return null;
+  }
+  if (raw is String) {
+    final normalized = raw.trim();
+    if (normalized.isEmpty) {
+      return 'message interaction lastMessageSummary must be non-empty when present';
+    }
+    return MessageInteractionLastMessageSummaryView(
+      text: normalized,
+      messageKind: 'plain_text',
+      createdAt: null,
+    );
+  }
+  if (raw is! Map) {
+    return 'message interaction lastMessageSummary must be either an object or a string';
+  }
+  final text = _readRequiredString(raw, 'text');
+  final messageKind = _readRequiredString(raw, 'messageKind');
+  if (text == null) {
+    return 'message interaction lastMessageSummary is missing required field "text"';
+  }
+  if (messageKind == null) {
+    return 'message interaction lastMessageSummary is missing required field "messageKind"';
+  }
+  final createdAt = _readNullableString(raw['createdAt']);
+  if (raw.containsKey('createdAt') && raw['createdAt'] != null && createdAt == null) {
+    return 'message interaction lastMessageSummary.createdAt must be a string when present';
+  }
+  return MessageInteractionLastMessageSummaryView(
+    text: text,
+    messageKind: messageKind,
+    createdAt: createdAt,
+  );
+}
+
+Object _parseRouteTarget(Object? raw) {
+  if (raw is! Map) {
+    return 'message interaction routeTarget must be an object';
+  }
+
+  final objectType = _readRequiredString(raw, 'objectType');
+  final actionKey = _readRequiredString(raw, 'actionKey');
+  final canonicalPath = _readRequiredString(raw, 'canonicalPath');
+  final params = _parseRouteParams(raw['params']);
+  if (objectType == null) {
+    return 'message interaction routeTarget is missing required field "objectType"';
+  }
+  if (actionKey == null) {
+    return 'message interaction routeTarget is missing required field "actionKey"';
+  }
+  if (canonicalPath == null) {
+    return 'message interaction routeTarget is missing required field "canonicalPath"';
+  }
+  if (params is String) {
+    return params;
   }
 
   final definition = messagesRegisteredEntryByActionKey[actionKey];
   if (definition == null) {
-    return 'instance_todo actionKey "$actionKey" is outside the frozen first batch';
+    return 'message interaction routeTarget returned an unsupported actionKey';
+  }
+  if (definition.objectType != objectType) {
+    return 'message interaction routeTarget objectType does not match the frozen action mapping';
+  }
+  if (definition.canonicalPath != canonicalPath) {
+    return 'message interaction routeTarget canonicalPath does not match the frozen action mapping';
+  }
+  if (actionKey != 'bid_thread.open') {
+    return 'message interaction routeTarget actionKey is outside the bounded trading scope';
   }
 
-  final map = raw.map((Object? key, Object? value) => MapEntry('$key', value));
-  final canonicalPath = _readRequiredString(map, 'canonicalPath');
-  final localEntryKey = _readRequiredString(map, 'localEntryKey');
-  final state = _readRequiredString(map, 'state');
-  final requiredParams = _parseRequiredParams(map['requiredParams']);
-  final routeParams = _parseRouteParams(map['routeParams']);
-
-  if (canonicalPath == null) {
-    return 'instance_todo routeTarget is missing required field "canonicalPath"';
-  }
-  if (localEntryKey == null) {
-    return 'instance_todo routeTarget is missing required field "localEntryKey"';
-  }
-  if (state == null) {
-    return 'instance_todo routeTarget is missing required field "state"';
-  }
-  if (requiredParams is String) {
-    return requiredParams;
-  }
-  if (routeParams is String) {
-    return routeParams;
-  }
-
-  final validationError = definition.validateSkeleton(
-    canonicalPath: canonicalPath,
-    localEntryKey: localEntryKey,
-    requiredParams: requiredParams as List<String>,
-    state: state,
-  );
-  if (validationError != null) {
-    return validationError;
-  }
-
-  final routeLocation = definition.buildRouteLocation(
-    routeParams as Map<String, String>,
-  );
+  final routeLocation = definition.buildRouteLocation(params as Map<String, String>);
   if (routeLocation == null) {
-    return 'routeTarget actionKey "$actionKey" is unsupported';
+    return 'message interaction routeTarget failed to build local route location';
   }
-  if (routeLocation.startsWith('routeTarget')) {
+  if (routeLocation.startsWith('routeTarget.')) {
     return routeLocation;
   }
 
-  return MessagesRouteTarget(
+  return MessageInteractionRouteTarget(
+    objectType: objectType,
+    actionKey: actionKey,
     canonicalPath: canonicalPath,
-    localEntryKey: localEntryKey,
-    requiredParams: requiredParams,
-    state: state,
-    routeParams: routeParams,
+    params: params,
     routeLocation: routeLocation,
   );
 }
 
-Object _parseRequiredParams(Object? raw) {
-  if (raw is! List) {
-    return 'instance_todo routeTarget.requiredParams must be an array of non-empty strings';
-  }
-
-  final requiredParams = <String>[];
-  for (final value in raw) {
-    final sanitized = '$value'.trim();
-    if (sanitized.isEmpty) {
-      return 'instance_todo routeTarget.requiredParams must be an array of non-empty strings';
-    }
-    requiredParams.add(sanitized);
-  }
-  return requiredParams;
-}
-
 Object _parseRouteParams(Object? raw) {
   if (raw is! Map) {
-    return 'instance_todo routeTarget.routeParams must be an object';
+    return 'message interaction routeTarget.params must be an object';
   }
-
-  final routeParams = <String, String>{};
+  final params = <String, String>{};
   for (final entry in raw.entries) {
     final key = '${entry.key}'.trim();
-    final value = '${entry.value ?? ''}'.trim();
-    if (key.isEmpty || value.isEmpty) {
-      return 'instance_todo routeTarget.routeParams must contain non-empty string values';
+    final value = _readNullableString(entry.value);
+    if (key.isEmpty || value == null || value.trim().isEmpty) {
+      return 'message interaction routeTarget.params must contain only non-empty strings';
     }
-    routeParams[key] = value;
+    params[key] = value;
   }
-  return routeParams;
-}
-
-String? _readRequiredString(Map<String, Object?> raw, String field) {
-  final value = '${raw[field] ?? ''}'.trim();
-  return value.isEmpty ? null : value;
+  return params;
 }
 
 String? _extractMessage(Object? payload) {
-  if (payload is! Map) {
+  if (payload is Map) {
+    final message = payload['message'];
+    if (message is String && message.trim().isNotEmpty) {
+      return message.trim();
+    }
+    final errorMessage = payload['errorMessage'];
+    if (errorMessage is String && errorMessage.trim().isNotEmpty) {
+      return errorMessage.trim();
+    }
+  }
+  if (payload is String && payload.trim().isNotEmpty) {
+    return payload.trim();
+  }
+  return null;
+}
+
+String? _readRequiredString(Map raw, String fieldName) {
+  return _readNullableString(raw[fieldName]);
+}
+
+String? _readNullableString(Object? value) {
+  if (value == null) {
     return null;
   }
-
-  final value = '${payload['message'] ?? ''}'.trim();
-  return value.isEmpty ? null : value;
+  if (value is! String) {
+    return null;
+  }
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
 }

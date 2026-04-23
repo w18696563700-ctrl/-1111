@@ -15,7 +15,9 @@ import { EnterpriseHubModule } from './modules/enterprise_hub/enterprise-hub.mod
 import { ForumModule } from './modules/forum/forum.module';
 import { GovernanceModule } from './modules/governance/governance.module';
 import { MembershipModule } from './modules/membership/membership.module';
+import { MessageInteractionModule } from './modules/message_interaction/message-interaction.module';
 import { MyProjectModule } from './modules/my_project/my-project.module';
+import { MyBidModule } from './modules/my_bid/my-bid.module';
 import { PaymentBillingModule } from './modules/payment_billing/payment-billing.module';
 import { ProfileModule } from './modules/profile/profile.module';
 import { ProjectModule } from './modules/project/project.module';
@@ -58,7 +60,9 @@ import { UploadModule } from './modules/upload/upload.module';
     ForumModule,
     GovernanceModule,
     MembershipModule,
+    MessageInteractionModule,
     PaymentBillingModule,
+    MyBidModule,
     MyProjectModule,
     RatingModule,
     ShellModule,

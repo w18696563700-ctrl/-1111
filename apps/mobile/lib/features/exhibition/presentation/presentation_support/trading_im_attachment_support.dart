@@ -100,6 +100,7 @@ String _tradingImRoleLabel(String role) {
     'project_owner' => '项目方',
     'bidder' => '投标方',
     'viewer' => '查看方',
+    'system_seed' => '系统消息',
     _ => role,
   };
 }

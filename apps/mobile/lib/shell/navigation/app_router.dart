@@ -386,7 +386,9 @@ class AppRouter {
         surface: ProjectListSurface.showcase,
       ),
       ExhibitionRoutes.projectList => const ProjectListPage(),
-      ExhibitionRoutes.myProjectList => const MyProjectListPage(),
+      ExhibitionRoutes.myProjectList => MyProjectListPage(
+        initialWorkspace: routeUri.queryParameters['workspace'],
+      ),
       ExhibitionRoutes.projectCreate => const ProjectCreatePage(),
       ExhibitionRoutes.projectEdit => ProjectCreatePage(
         projectId: routeUri.queryParameters['projectId'],

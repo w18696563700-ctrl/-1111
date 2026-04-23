@@ -63,29 +63,44 @@ Widget _buildApp({
   return const MaterialApp(home: Scaffold(body: MessagesPage()));
 }
 
-Map<String, Object?> _messageTodoItem({
-  required String todoId,
-  required String actionKey,
-  required String title,
+Map<String, Object?> _messageInteractionItem({
+  required String interactionId,
+  required String projectId,
+  required String bidId,
+  required String counterpartName,
   required String summary,
-  required Map<String, String> instanceRef,
-  required Map<String, String> routeParams,
+  required String lastMessageText,
 }) {
-  final definition = messagesRegisteredEntryByActionKey[actionKey]!;
+  final definition = messagesRegisteredEntryByActionKey['bid_thread.open']!;
   return <String, Object?>{
-    'todoId': todoId,
-    'messageType': 'instance_todo',
-    'instanceRef': instanceRef,
-    'actionKey': actionKey,
-    'title': title,
-    'summary': summary,
-    'state': 'pending',
+    'interactionId': interactionId,
+    'interactionType': 'bid_thread',
+    'threadId': 'thread-$interactionId',
+    'projectId': projectId,
+    'bidId': bidId,
+    'counterpart': <String, Object?>{
+      'organizationId': 'org-$interactionId',
+      'displayName': counterpartName,
+      'avatarUrl': null,
+      'role': 'bidder',
+    },
+    'seedSummary': <String, Object?>{
+      'seedType': 'bid_submitted',
+      'title': '新的竞标已提交',
+      'summary': summary,
+      'ctaLabel': '点击查看',
+    },
+    'lastMessageSummary': <String, Object?>{
+      'text': lastMessageText,
+      'messageKind': 'plain_text',
+      'createdAt': '2026-03-27T10:00:00Z',
+    },
+    'updatedAt': '2026-03-27T10:00:00Z',
     'routeTarget': <String, Object?>{
+      'objectType': definition.objectType,
+      'actionKey': definition.actionKey,
       'canonicalPath': definition.canonicalPath,
-      'localEntryKey': definition.localEntryKey,
-      'requiredParams': definition.requiredParams,
-      'state': definition.state,
-      'routeParams': routeParams,
+      'params': <String, String>{'projectId': projectId, 'bidId': bidId},
     },
   };
 }
@@ -163,7 +178,7 @@ void main() {
   });
 
   testWidgets(
-    'messages building renders project communication reminders in a separate lane',
+    'messages building renders project communication interactions in a separate lane',
     (WidgetTester tester) async {
       final forumTransport = FakeAppApiTransport(
         handlers:
@@ -196,51 +211,33 @@ void main() {
       final messageTransport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/message/index': (AppApiRequest request) async {
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                expect(
+                  request.uri.queryParameters['lane'],
+                  'project_communication',
+                );
                 return AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
                   body: <String, Object?>{
+                    'lane': 'project_communication',
                     'items': <Object?>[
-                      _messageTodoItem(
-                        todoId: 'todo-clarification-1',
-                        actionKey: 'project_clarification.open',
-                        title: '重庆馆项目新增公开澄清',
-                        summary: '请回到项目澄清查看最新补充说明。',
-                        instanceRef: const <String, String>{
-                          'objectType': 'project_clarification',
-                          'instanceId': 'clarification-1',
-                        },
-                        routeParams: const <String, String>{
-                          'projectId': 'project-1',
-                        },
+                      _messageInteractionItem(
+                        interactionId: 'interaction-1',
+                        projectId: 'project-1',
+                        bidId: 'bid-1',
+                        counterpartName: '杭州搭建公司',
+                        summary: '杭州搭建公司已对当前项目提交竞标。',
+                        lastMessageText: '当前竞标已提交，可继续进入沟通。',
                       ),
-                      _messageTodoItem(
-                        todoId: 'todo-thread-1',
-                        actionKey: 'bid_thread.open',
-                        title: 'A 馆投标线程有新消息',
-                        summary: '项目方在沟通与投标里回复了新的交付问题。',
-                        instanceRef: const <String, String>{
-                          'objectType': 'bid_thread',
-                          'instanceId': 'thread-1',
-                        },
-                        routeParams: const <String, String>{
-                          'projectId': 'project-1',
-                          'bidId': 'bid-1',
-                        },
-                      ),
-                      _messageTodoItem(
-                        todoId: 'todo-inspection-1',
-                        actionKey: 'inspection.submit',
-                        title: '这条验收待办不应该进入项目沟通提醒',
-                        summary: '非项目沟通提醒。',
-                        instanceRef: const <String, String>{
-                          'objectType': 'inspection',
-                          'instanceId': 'inspection-1',
-                        },
-                        routeParams: const <String, String>{
-                          'milestoneId': 'milestone-1',
-                        },
+                      _messageInteractionItem(
+                        interactionId: 'interaction-2',
+                        projectId: 'project-2',
+                        bidId: 'bid-2',
+                        counterpartName: '苏州执行团队',
+                        summary: '苏州执行团队已对当前项目提交竞标。',
+                        lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
                       ),
                     ],
                   },
@@ -257,12 +254,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('项目沟通提醒'), findsOneWidget);
-      expect(find.text('项目澄清'), findsOneWidget);
-      expect(find.text('沟通与投标'), findsOneWidget);
-      expect(find.text('重庆馆项目新增公开澄清'), findsOneWidget);
-      expect(find.text('A 馆投标线程有新消息'), findsOneWidget);
-      expect(find.text('这条验收待办不应该进入项目沟通提醒'), findsNothing);
+      expect(find.text('项目沟通'), findsOneWidget);
+      expect(find.text('杭州搭建公司'), findsOneWidget);
+      expect(find.text('苏州执行团队'), findsOneWidget);
+      expect(find.text('杭州搭建公司已对当前项目提交竞标。'), findsOneWidget);
+      expect(find.text('项目方在沟通与投标里回复了新的交付问题。'), findsOneWidget);
+      expect(find.text('进入沟通'), findsNWidgets(2));
       await tester.scrollUntilVisible(find.text('回复了你在《材料交接节点》里的问题'), 240);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
       expect(find.text('回复我的'), findsWidgets);
@@ -270,7 +267,7 @@ void main() {
   );
 
   testWidgets(
-    'messages page refresh reloads forum inbox and project communication reminders together',
+    'messages page refresh reloads forum inbox and project communication interactions together',
     (WidgetTester tester) async {
       var forumRequestCount = 0;
       var messageRequestCount = 0;
@@ -308,28 +305,25 @@ void main() {
       final messageTransport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/message/index': (AppApiRequest request) async {
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
                 messageRequestCount += 1;
                 final title = messageRequestCount == 1
-                    ? '第一次项目澄清提醒'
-                    : '第二次项目澄清提醒';
+                    ? '第一次项目沟通会话'
+                    : '第二次项目沟通会话';
                 return AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
                   body: <String, Object?>{
+                    'lane': 'project_communication',
                     'items': <Object?>[
-                      _messageTodoItem(
-                        todoId: 'todo-clarification-$messageRequestCount',
-                        actionKey: 'project_clarification.open',
-                        title: title,
-                        summary: '回到项目澄清查看更新。',
-                        instanceRef: const <String, String>{
-                          'objectType': 'project_clarification',
-                          'instanceId': 'clarification-1',
-                        },
-                        routeParams: const <String, String>{
-                          'projectId': 'project-1',
-                        },
+                      _messageInteractionItem(
+                        interactionId: 'interaction-$messageRequestCount',
+                        projectId: 'project-1',
+                        bidId: 'bid-1',
+                        counterpartName: title,
+                        summary: '$title 已生成。',
+                        lastMessageText: '$title 最近有更新。',
                       ),
                     ],
                   },
@@ -348,7 +342,7 @@ void main() {
 
       await tester.scrollUntilVisible(find.text('第一次论坛回复'), 240);
       expect(find.text('第一次论坛回复'), findsOneWidget);
-      expect(find.text('第一次项目澄清提醒'), findsOneWidget);
+      expect(find.text('第一次项目沟通会话'), findsOneWidget);
 
       final refreshIndicator = tester.state<RefreshIndicatorState>(
         find.byType(RefreshIndicator),
@@ -363,7 +357,7 @@ void main() {
       expect(messageRequestCount, greaterThanOrEqualTo(2));
       await tester.scrollUntilVisible(find.text('第二次论坛回复'), 240);
       expect(find.text('第二次论坛回复'), findsOneWidget);
-      expect(find.text('第二次项目澄清提醒'), findsOneWidget);
+      expect(find.text('第二次项目沟通会话'), findsOneWidget);
     },
   );
 

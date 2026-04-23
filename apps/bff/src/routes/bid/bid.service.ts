@@ -16,8 +16,10 @@ import {
 } from './bid-seat-completeness.read-model';
 import {
   readBidAwardAcceptedResponse,
+  readBidSubmitAcceptedResponse,
   readBidResultReadModel,
 } from './bid.read-model';
+import { readBidSubmissionSnapshotReadModel } from '../my_bid/my-bid.read-model';
 
 @Injectable()
 export class BidService {
@@ -152,6 +154,28 @@ export class BidService {
       return this.toAcceptedResponse(result);
     } catch (error) {
       throw this.normalizeSubmitError(error);
+    }
+  }
+
+  async getBidSubmissionSnapshot(
+    projectId: string | undefined,
+    bidId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.get<Record<string, unknown>>(
+        '/server/bid/submission/snapshot',
+        {
+          headers: this.buildScopedForwardHeaders(headers),
+          params: {
+            projectId: this.readBidSubmissionSnapshotProjectId(projectId),
+            bidId: this.readBidSubmissionSnapshotBidId(bidId),
+          },
+        },
+      );
+      return readBidSubmissionSnapshotReadModel(result);
+    } catch (error) {
+      throw this.normalizeSnapshotError(error);
     }
   }
 
@@ -319,11 +343,38 @@ export class BidService {
   }
 
   private toAcceptedResponse(result: Record<string, unknown>) {
-    const bidId = this.asString(result.bidId);
-    if (!bidId) {
-      throw new Error('Bid submit response is missing bidId.');
+    return readBidSubmitAcceptedResponse(result);
+  }
+
+  private normalizeSnapshotError(error: unknown) {
+    const normalized = this.errors.toHttpException(
+      error,
+      'BID_SUBMISSION_SNAPSHOT_UNAVAILABLE',
+      '当前竞标摘要暂不可用，请稍后再试。',
+      {
+        401: 'AUTH_SESSION_INVALID',
+        403: 'BID_SUBMISSION_SNAPSHOT_FORBIDDEN',
+        404: 'BID_SUBMISSION_SNAPSHOT_UNAVAILABLE',
+      },
+    );
+
+    const payload = this.asOptionalRecord(normalized.getResponse()) ?? {};
+    const statusCode = normalized.getStatus();
+    const message = this.asString(payload.message);
+    if (statusCode === 404 && message?.includes('/server/bid/submission/snapshot')) {
+      return new HttpException(
+        {
+          ...payload,
+          statusCode,
+          code: 'BID_SUBMISSION_SNAPSHOT_UNAVAILABLE',
+          source: payload.source === 'server' ? 'server' : 'bff',
+          message: '当前竞标摘要暂不可用，请稍后再试。',
+        },
+        statusCode,
+      );
     }
-    return { bidId };
+
+    return normalized;
   }
 
   private asOptionalRecord(value: unknown) {
@@ -376,6 +427,34 @@ export class BidService {
       statusCode: 400,
       code: 'BID_RESULT_INVALID',
       message: '当前项目标识缺失，无法查看投标结果。',
+      source: 'bff',
+    });
+  }
+
+  private readBidSubmissionSnapshotProjectId(projectId: string | undefined) {
+    const normalized = projectId?.trim() ?? '';
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'BID_SUBMISSION_SNAPSHOT_INVALID',
+      message: '当前竞标摘要查询参数无效，请检查后重试。',
+      source: 'bff',
+    });
+  }
+
+  private readBidSubmissionSnapshotBidId(bidId: string | undefined) {
+    const normalized = bidId?.trim() ?? '';
+    if (normalized.length > 0) {
+      return normalized;
+    }
+
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'BID_SUBMISSION_SNAPSHOT_INVALID',
+      message: '当前竞标摘要查询参数无效，请检查后重试。',
       source: 'bff',
     });
   }

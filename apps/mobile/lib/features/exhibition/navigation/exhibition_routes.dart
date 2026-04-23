@@ -68,6 +68,10 @@ final class ExhibitionRoutes {
   static const String disputeOpen = '/exhibition/disputes/open';
   static const String disputeWithdraw = '/exhibition/disputes/withdraw';
 
+  static String myProjectListWithWorkspace(String workspace) {
+    return _withQuery(myProjectList, <String, String>{'workspace': workspace});
+  }
+
   static String projectDetailWithProjectId(
     String projectId, {
     String? surface,

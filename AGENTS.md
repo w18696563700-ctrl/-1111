@@ -75,8 +75,25 @@
 
 ## Phase 0 Guardrail
 - No business pages by default.
-- The current bounded exception is the forum board after the formal unlock in
-  `docs/00_ssot/forum_implementation_unlock_addendum.md`.
-- No trading flow implementation.
-- Outside that explicit forum exception, only groundwork, truth docs,
+- The current bounded exceptions are:
+  - the forum board after the formal unlock in
+    `docs/00_ssot/forum_implementation_unlock_addendum.md`
+  - `messages interaction center and bidder carry` after the formal unlock in
+    `docs/00_ssot/messages_interaction_center_and_bidder_carry_implementation_unlock_addendum.md`
+- No trading flow implementation by default.
+- The current bounded trading exception applies only to:
+  - `message interactions`
+  - `my bids`
+  - `bid submission snapshot`
+  - bounded `system_seed` supplement on `bid thread detail`
+  - `participant-card minimum`
+  - matching `Server`, `BFF`, and Flutter implementation needed to support the
+    approved surfaces above
+- Retained non-goals for the bounded trading exception:
+  - generic DM / group chat
+  - compare / award / post-award bridge
+  - payment / billing / settlement
+  - `formal-info` full-page takeover
+- Outside the explicit forum exception and the explicit bounded trading
+  exception, only groundwork, truth docs,
   skeletons, env baselines, and platform pre-embed scaffolding are allowed.

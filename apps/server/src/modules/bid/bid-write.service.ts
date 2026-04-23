@@ -7,6 +7,7 @@ import { CurrentSessionVerificationService } from '../auth/current-session-verif
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { BidSubmittedSeedService } from '../trading_im/bid-submitted-seed.service';
 import { BidEntity } from './entities/bid.entity';
 import { BidPresenter } from './bid.presenter';
 import {
@@ -31,6 +32,7 @@ export class BidWriteService {
     private readonly dataSource: DataSource,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly bidSubmittedSeedService: BidSubmittedSeedService,
     private readonly presenter: BidPresenter
   ) {}
 
@@ -65,6 +67,8 @@ export class BidWriteService {
       submittedAt
     });
 
+    let threadId = '';
+    let seedMessageId = '';
     try {
       await this.dataSource.transaction(async (manager) => {
         const bidRepository = manager.getRepository(BidEntity);
@@ -77,6 +81,14 @@ export class BidWriteService {
         }
 
         await bidRepository.save(bid);
+        const seed = await this.bidSubmittedSeedService.createForSubmittedBid({
+          manager,
+          project,
+          bid,
+          bidderDisplayName: scope.organization.name ?? ''
+        });
+        threadId = seed.threadId;
+        seedMessageId = seed.seedMessageId;
         await manager.getRepository(IdentityAuditLogEntity).save({
           id: randomUUID(),
           objectType: 'bid',
@@ -100,7 +112,12 @@ export class BidWriteService {
       throw error;
     }
 
-    return this.presenter.toAcceptedResponse(bid.id);
+    return this.presenter.toAcceptedResponse({
+      bidId: bid.id,
+      projectId: project.id,
+      threadId,
+      seedMessageId
+    });
   }
 
   private toSubmitBidCommand(payload: Record<string, unknown>) {

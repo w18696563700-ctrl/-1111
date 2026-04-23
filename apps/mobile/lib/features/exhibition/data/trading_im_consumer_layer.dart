@@ -4,6 +4,8 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/protected_app_request.dart';
 import 'package:mobile/features/exhibition/data/trading_im_models.dart';
+import 'package:mobile/features/exhibition/data/trading_im_participant_card_models.dart';
+import 'package:mobile/features/exhibition/data/trading_im_snapshot_models.dart';
 
 class TradingImResult<T> {
   const TradingImResult({
@@ -119,6 +121,66 @@ class TradingImConsumerLayer {
         'bidId': normalizedBidId,
       },
       parser: parseBidThreadDetail,
+    );
+  }
+
+  Future<TradingImResult<BidSubmissionSnapshotView>> loadBidSubmissionSnapshot({
+    required String? projectId,
+    required String? bidId,
+  }) {
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedBidId = _normalize(bidId);
+    if (normalizedProjectId == null || normalizedBidId == null) {
+      return Future<TradingImResult<BidSubmissionSnapshotView>>.value(
+        const TradingImResult<BidSubmissionSnapshotView>(
+          state: AppPageState.notFound,
+          method: 'GET',
+          path: TradingImCanonicalPaths.bidSubmissionSnapshot,
+          message:
+              'projectId and bidId are required before loading bid submission snapshot',
+        ),
+      );
+    }
+    return _get(
+      TradingImCanonicalPaths.bidSubmissionSnapshot,
+      queryParameters: <String, String>{
+        'projectId': normalizedProjectId,
+        'bidId': normalizedBidId,
+      },
+      parser: parseBidSubmissionSnapshot,
+    );
+  }
+
+  Future<TradingImResult<TradingImParticipantCardView>> loadParticipantCard({
+    required String? projectId,
+    required String? bidId,
+    required String? participantOrganizationId,
+  }) {
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedBidId = _normalize(bidId);
+    final normalizedParticipantOrganizationId =
+        _normalize(participantOrganizationId);
+    if (normalizedProjectId == null ||
+        normalizedBidId == null ||
+        normalizedParticipantOrganizationId == null) {
+      return Future<TradingImResult<TradingImParticipantCardView>>.value(
+        const TradingImResult<TradingImParticipantCardView>(
+          state: AppPageState.notFound,
+          method: 'GET',
+          path: TradingImCanonicalPaths.participantCard,
+          message:
+              'projectId, bidId, and participantOrganizationId are required before loading participant-card',
+        ),
+      );
+    }
+    return _get(
+      TradingImCanonicalPaths.participantCard,
+      queryParameters: <String, String>{
+        'projectId': normalizedProjectId,
+        'bidId': normalizedBidId,
+        'participantOrganizationId': normalizedParticipantOrganizationId,
+      },
+      parser: parseTradingImParticipantCard,
     );
   }
 

@@ -9,6 +9,10 @@ final class TradingImCanonicalPaths {
   static const String bidThreadMessageSend = '/api/app/bid/thread/message/send';
   static const String bidThreadConfirmationCreate =
       '/api/app/bid/thread/confirmation/create';
+  static const String bidSubmissionSnapshot =
+      '/api/app/bid/submission/snapshot';
+  static const String participantCard =
+      '/api/app/exhibition/trading/participant-card';
 }
 
 class TradingImAvailabilityView {
@@ -98,9 +102,12 @@ class BidThreadMessageView {
     required this.projectId,
     required this.bidId,
     required this.senderRole,
+    required this.messageKind,
     required this.body,
     required this.attachmentFileAssetIds,
     required this.createdAt,
+    this.systemSeedType,
+    this.systemSeedAction,
   });
 
   final String messageId;
@@ -108,9 +115,26 @@ class BidThreadMessageView {
   final String projectId;
   final String bidId;
   final String senderRole;
+  final String messageKind;
   final String body;
   final List<String> attachmentFileAssetIds;
   final String createdAt;
+  final String? systemSeedType;
+  final BidThreadSystemSeedActionView? systemSeedAction;
+}
+
+class BidThreadSystemSeedActionView {
+  const BidThreadSystemSeedActionView({
+    required this.objectType,
+    required this.actionKey,
+    required this.canonicalPath,
+    required this.params,
+  });
+
+  final String objectType;
+  final String actionKey;
+  final String? canonicalPath;
+  final Map<String, String> params;
 }
 
 class ConfirmationCardView {
@@ -196,15 +220,29 @@ BidThreadDetailView parseBidThreadDetail(Object? payload) {
 
 BidThreadMessageView parseBidThreadMessage(Object? payload) {
   final body = _readMap(payload, 'bid thread message');
+  final senderRole = _messageSenderRole(_requiredString(body, 'senderRole'));
+  final messageKind = _messageKind(
+    _optionalString(body['messageKind']) ??
+        (senderRole == 'system_seed' ? 'system_seed' : 'actor_message'),
+  );
   return BidThreadMessageView(
     messageId: _requiredString(body, 'messageId'),
     threadId: _requiredString(body, 'threadId'),
     projectId: _requiredString(body, 'projectId'),
     bidId: _requiredString(body, 'bidId'),
-    senderRole: _participantRole(_requiredString(body, 'senderRole')),
+    senderRole: senderRole,
+    messageKind: messageKind,
     body: _requiredString(body, 'body'),
     attachmentFileAssetIds: _stringList(body['attachmentFileAssetIds']),
     createdAt: _requiredString(body, 'createdAt'),
+    systemSeedType: messageKind == 'system_seed'
+        ? _enumValue(_requiredString(body, 'systemSeedType'), const <String>{
+            'bid_submitted',
+          }, 'system seed type')
+        : null,
+    systemSeedAction: messageKind == 'system_seed'
+        ? _parseSystemSeedAction(body['systemSeedAction'])
+        : null,
   );
 }
 
@@ -247,6 +285,17 @@ String _participantRole(String value) => _enumValue(value, const <String>{
   'project_owner',
   'bidder',
 }, 'trading IM participant role');
+
+String _messageSenderRole(String value) => _enumValue(value, const <String>{
+  'project_owner',
+  'bidder',
+  'system_seed',
+}, 'trading IM message sender role');
+
+String _messageKind(String value) => _enumValue(value, const <String>{
+  'actor_message',
+  'system_seed',
+}, 'trading IM message kind');
 
 String? _optionalParticipantRole(String? value) {
   if (value == null) {
@@ -322,7 +371,46 @@ bool _requiredBool(Map<String, Object?> body, String field) {
   return value;
 }
 
+num _requiredNumber(Map<String, Object?> body, String field) {
+  final value = body[field];
+  if (value is! num) {
+    throw FormatException('field "$field" must be numeric');
+  }
+  return value;
+}
+
 bool? _optionalBool(Object? value) => value is bool ? value : null;
+
+BidThreadSystemSeedActionView? _parseSystemSeedAction(Object? payload) {
+  final body = _optionalMap(payload);
+  if (body == null) {
+    return null;
+  }
+  final actionKey = _enumValue(
+    _requiredString(body, 'actionKey'),
+    const <String>{'bid_submission_snapshot.open'},
+    'system seed action key',
+  );
+  return BidThreadSystemSeedActionView(
+    objectType: _enumValue(_requiredString(body, 'objectType'), const <String>{
+      'bid_submission_snapshot',
+    }, 'system seed action object type'),
+    actionKey: actionKey,
+    canonicalPath: _optionalString(body['canonicalPath']),
+    params: _stringMap(body['params']),
+  );
+}
+
+Map<String, String> _stringMap(Object? payload) {
+  final body = _readMap(payload, 'string map');
+  return body.map((String key, Object? value) {
+    final text = '${value ?? ''}'.trim();
+    if (text.isEmpty) {
+      throw FormatException('field "$key" must be a non-empty string');
+    }
+    return MapEntry<String, String>(key, text);
+  });
+}
 
 String _enumValue(String value, Set<String> allowed, String context) {
   if (!allowed.contains(value)) {

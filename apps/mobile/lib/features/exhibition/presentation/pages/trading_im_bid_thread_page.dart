@@ -16,6 +16,8 @@ class _BidThreadPageState extends State<BidThreadPage> {
       TextEditingController();
   final List<String> _attachmentFileAssetIds = <String>[];
   TradingImResult<BidThreadDetailView>? _result;
+  final Map<String, TradingImResult<TradingImParticipantCardView>>
+  _participantCardResults = <String, TradingImResult<TradingImParticipantCardView>>{};
   TradingImResult<BidThreadMessageView>? _lastMessageResult;
   TradingImResult<ConfirmationCardView>? _lastConfirmationResult;
   String _confirmationType = 'quote';
@@ -54,6 +56,46 @@ class _BidThreadPageState extends State<BidThreadPage> {
     setState(() {
       _result = result;
       _loading = false;
+    });
+    if (result.isSuccess && result.data != null) {
+      await _primeParticipantCards(result.data!.participants);
+    }
+  }
+
+  Future<void> _primeParticipantCards(
+    List<BidThreadParticipantView> participants,
+  ) async {
+    final projectId = _projectId;
+    final bidId = _bidId;
+    if (projectId == null || bidId == null) {
+      return;
+    }
+    final missing = participants
+        .map((BidThreadParticipantView item) => item.organizationId.trim())
+        .where((String item) => item.isNotEmpty)
+        .where((String item) => !_participantCardResults.containsKey(item))
+        .toSet()
+        .toList(growable: false);
+    if (missing.isEmpty) {
+      return;
+    }
+    final entries = await Future.wait(
+      missing.map((String participantOrganizationId) async {
+        final result = await TradingImConsumerLayer.instance.loadParticipantCard(
+          projectId: projectId,
+          bidId: bidId,
+          participantOrganizationId: participantOrganizationId,
+        );
+        return MapEntry(participantOrganizationId, result);
+      }),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      for (final entry in entries) {
+        _participantCardResults[entry.key] = entry.value;
+      }
     });
   }
 
@@ -149,58 +191,82 @@ class _BidThreadPageState extends State<BidThreadPage> {
     }
   }
 
+  Future<void> _openBidSubmissionSnapshot(BidThreadMessageView message) async {
+    final action = message.systemSeedAction;
+    if (action?.actionKey != 'bid_submission_snapshot.open') {
+      return;
+    }
+    await _showBidSubmissionSnapshotSheet(
+      context,
+      projectId: action?.params['projectId'] ?? message.projectId,
+      bidId: action?.params['bidId'] ?? message.bidId,
+    );
+  }
+
+  Future<void> _openParticipantCard(BidThreadParticipantView participant) async {
+    await _showTradingImParticipantCardSheet(
+      context,
+      projectId: _projectId,
+      bidId: _bidId,
+      participantOrganizationId: participant.organizationId,
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = _result;
     final data = result?.data;
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-        children: <Widget>[
-          const SizedBox(height: 8),
-          _ActionCard(
-            title: '沟通与投标',
-            summary: '当前页只承接一个项目与一个投标之间的私密沟通。',
-            tone: _ActionCardTone.emphasis,
-            children: <Widget>[
-              _DetailLine(label: '项目 ID', value: _projectId ?? '未承接'),
-              _DetailLine(label: '投标 ID', value: _bidId ?? '未承接'),
-              if (data != null)
-                _DetailLine(label: '线程状态', value: data.state, highlight: true),
-            ],
-          ),
-          const SizedBox(height: 16),
-          if (_loading)
-            const _StateMessage(title: '正在加载', body: '请稍候片刻。')
-          else if (result == null || result.state != AppPageState.content)
+    return Material(
+      color: Theme.of(context).colorScheme.surface,
+      child: RefreshIndicator(
+        onRefresh: _load,
+        child: ListView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+          children: <Widget>[
+            const SizedBox(height: 8),
             _ActionCard(
-              title: result?.message ?? '当前沟通线程暂不可用',
+              title: '沟通与投标',
+              summary: '当前页只承接一个项目与一个投标之间的私密沟通。',
+              tone: _ActionCardTone.emphasis,
               children: <Widget>[
-                _StateMessage(
-                  title: '受控状态',
-                  body:
-                      result?.errorCode ??
-                      result?.state.contractName ??
-                      'unknown',
-                ),
-                const SizedBox(height: 12),
-                FilledButton.tonal(onPressed: _load, child: const Text('重试')),
+                _DetailLine(label: '项目 ID', value: _projectId ?? '未承接'),
+                _DetailLine(label: '投标 ID', value: _bidId ?? '未承接'),
+                if (data != null)
+                  _DetailLine(label: '线程状态', value: data.state, highlight: true),
               ],
-            )
-          else ...<Widget>[
-            _buildParticipants(data!),
+            ),
             const SizedBox(height: 16),
-            _buildMessageComposer(data),
-            const SizedBox(height: 16),
-            _buildConfirmationComposer(data),
-            const SizedBox(height: 16),
-            _buildMessages(data),
-            const SizedBox(height: 16),
-            _buildConfirmationCards(data),
+            if (_loading)
+              const _StateMessage(title: '正在加载', body: '请稍候片刻。')
+            else if (result == null || result.state != AppPageState.content)
+              _ActionCard(
+                title: result?.message ?? '当前沟通线程暂不可用',
+                children: <Widget>[
+                  _StateMessage(
+                    title: '受控状态',
+                    body:
+                        result?.errorCode ??
+                        result?.state.contractName ??
+                        'unknown',
+                  ),
+                  const SizedBox(height: 12),
+                  FilledButton.tonal(onPressed: _load, child: const Text('重试')),
+                ],
+              )
+            else ...<Widget>[
+              _buildParticipants(data!),
+              const SizedBox(height: 16),
+              _buildMessageComposer(data),
+              const SizedBox(height: 16),
+              _buildConfirmationComposer(data),
+              const SizedBox(height: 16),
+              _buildMessages(data),
+              const SizedBox(height: 16),
+              _buildConfirmationCards(data),
+            ],
           ],
-        ],
+        ),
       ),
     );
   }
@@ -210,9 +276,9 @@ class _BidThreadPageState extends State<BidThreadPage> {
       title: '参与方',
       children: <Widget>[
         for (final participant in data.participants)
-          _DetailLine(
-            label: _tradingImRoleLabel(participant.participantRole),
-            value: participant.organizationId,
+          Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: _buildParticipantTile(participant),
           ),
         if (data.viewerParticipantRole != null)
           _DetailLine(
@@ -221,6 +287,70 @@ class _BidThreadPageState extends State<BidThreadPage> {
             highlight: true,
           ),
       ],
+    );
+  }
+
+  Widget _buildParticipantTile(BidThreadParticipantView participant) {
+    final result = _participantCardResults[participant.organizationId];
+    final data = result?.data;
+    final title = data?.enterpriseSummary.displayName ?? participant.organizationId;
+    final subtitle = data == null
+        ? _tradingImRoleLabel(participant.participantRole)
+        : '${_tradingImRoleLabel(participant.participantRole)} · ${data.enterpriseSummary.provinceName} / ${data.enterpriseSummary.cityName}';
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => _openParticipantCard(participant),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.03),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: Row(
+            children: <Widget>[
+              CircleAvatar(
+                radius: 22,
+                backgroundImage: data?.enterpriseSummary.logoUrl == null
+                    ? null
+                    : NetworkImage(data!.enterpriseSummary.logoUrl!),
+                child: data?.enterpriseSummary.logoUrl == null
+                    ? Text(
+                        title.trim().isEmpty
+                            ? '?'
+                            : title.characters.first.toUpperCase(),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.black.withValues(alpha: 0.6),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right_rounded),
+            ],
+          ),
+        ),
+      ),
     );
   }
 
@@ -346,6 +476,27 @@ class _BidThreadPageState extends State<BidThreadPage> {
     return Column(
       children: data.messages
           .map((BidThreadMessageView message) {
+            if (message.messageKind == 'system_seed') {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _ActionCard(
+                  title: '系统消息',
+                  summary: '投标方已提交当前竞标，可以先查看摘要，再决定是否继续沟通。',
+                  tone: _ActionCardTone.emphasis,
+                  children: <Widget>[
+                    _DetailLine(label: '内容', value: message.body),
+                    _DetailLine(label: '时间', value: message.createdAt),
+                    const SizedBox(height: 10),
+                    FilledButton.tonal(
+                      onPressed: message.systemSeedAction == null
+                          ? null
+                          : () => _openBidSubmissionSnapshot(message),
+                      child: const Text('点击查看'),
+                    ),
+                  ],
+                ),
+              );
+            }
             final selected = message.messageId == _sourceMessageId;
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),

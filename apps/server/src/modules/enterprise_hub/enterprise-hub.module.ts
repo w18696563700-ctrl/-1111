@@ -103,6 +103,6 @@ import { EnterpriseServiceAreaEntity } from './entities/enterprise-service-area.
     EnterpriseHubWriteService,
     EnterpriseHubAdminService
   ],
-  exports: [EnterpriseHubCertificationSyncService]
+  exports: [EnterpriseHubCertificationSyncService, EnterpriseHubMediaProjectionService]
 })
 export class EnterpriseHubModule {}

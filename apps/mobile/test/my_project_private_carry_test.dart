@@ -249,6 +249,13 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _tapChoiceChipLabel(WidgetTester tester, String label) async {
+  final chipFinder = find.widgetWithText(ChoiceChip, label);
+  await _scrollTo(tester, chipFinder.first);
+  await tester.tap(chipFinder.first);
+  await tester.pumpAndSettle();
+}
+
 Map<String, Object?> _projectMeta(String projectId) {
   if (projectId.contains('draft')) {
     return <String, Object?>{
@@ -429,10 +436,17 @@ Future<void> _tapEntityCardAction(
   required String actionLabel,
 }) async {
   final cardFinder = _entityCardByTitle(title).first;
-  final buttonFinder = find.descendant(
+  final primaryButtonFinder = find.descendant(
     of: cardFinder,
     matching: find.widgetWithText(FilledButton, actionLabel),
   );
+  final secondaryButtonFinder = find.descendant(
+    of: cardFinder,
+    matching: find.widgetWithText(OutlinedButton, actionLabel),
+  );
+  final buttonFinder = primaryButtonFinder.evaluate().isNotEmpty
+      ? primaryButtonFinder
+      : secondaryButtonFinder;
   await _scrollTo(tester, buttonFinder.first);
   await tester.tap(buttonFinder.first);
   await tester.pumpAndSettle();
@@ -662,20 +676,18 @@ void main() {
     expect(find.text('预发布列表 · 1'), findsOneWidget);
     expect(find.text('竞标中 · 1'), findsOneWidget);
     expect(find.text('进行中 · 1'), findsOneWidget);
+    await _tapChoiceChipLabel(tester, '草稿 · 1');
     expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
 
-    await tester.tap(find.text('预发布列表 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     expect(find.text('预发布项目'), findsOneWidget);
     expect(find.text('草稿项目'), findsNothing);
 
-    await tester.tap(find.text('竞标中 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '竞标中 · 1');
     expect(find.text('竞标中'), findsWidgets);
     expect(find.text('预发布项目'), findsNothing);
 
-    await tester.tap(find.text('进行中 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '进行中 · 1');
     expect(find.text('进行中项目'), findsOneWidget);
     expect(find.text('当前阶段：竞标中'), findsNothing);
 
@@ -726,6 +738,38 @@ void main() {
     expect(find.text('草稿 · 1'), findsOneWidget);
   });
 
+  testWidgets('我的项目路由可以直接钉到我的竞标 workspace', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-published-1': 'published'},
+      myBidItems: <Map<String, Object?>>[
+        _myBidItem(
+          bidId: 'bid-1',
+          projectId: 'project-published-1',
+          projectNo: 'BID-PROJECT-1',
+          projectTitle: '供应商竞标记录',
+          quoteAmount: 8800,
+          proposalSummaryPreview: '报价方案已提交，等待后续沟通。',
+          submittedAt: '2026-04-20T10:00:00Z',
+          outcomeState: 'published',
+          canOpenBidThread: true,
+          canOpenBidResult: false,
+        ),
+      ],
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectListWithWorkspace('bids'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('供应商竞标记录'), findsOneWidget);
+    expect(find.text('沟通与投标'), findsOneWidget);
+    expect(find.text('草稿 · 1'), findsNothing);
+  });
+
   testWidgets('我的项目列表卡片显示阶段、下一步和归档只读说明', (WidgetTester tester) async {
     final handlers = _mutableMyProjectHandlers(
       projectStates: <String, String>{
@@ -740,26 +784,26 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
+    await _tapChoiceChipLabel(tester, '草稿 · 1');
     expect(find.text('当前阶段：草稿'), findsOneWidget);
     expect(find.text('当前下一步：继续编辑 / 删除此项目'), findsOneWidget);
 
-    await tester.tap(find.text('预发布列表 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     expect(find.text('当前阶段：预发布列表'), findsOneWidget);
     expect(
-      find.text('当前下一步：查看详情 / 检查无误，确定发布 / 返回草稿继续编辑 / 作废归档'),
+      find.text(
+        '当前下一步：查看详情 / 补充资料 / 检查无误，确定发布 / 返回草稿继续编辑 / 作废归档',
+      ),
       findsOneWidget,
     );
     expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '查看详情'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '查看详情'), findsOneWidget);
 
-    await tester.tap(find.text('竞标中 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '竞标中 · 1');
     expect(find.text('当前阶段：竞标中'), findsOneWidget);
     expect(find.text('当前下一步：查看详情 / 补充资料'), findsOneWidget);
 
-    await tester.tap(find.text('进行中 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '进行中 · 1');
     expect(find.text('当前阶段：进行中'), findsOneWidget);
     expect(find.text('当前下一步：查看详情 / 进入业务继续处理'), findsOneWidget);
 
@@ -877,8 +921,7 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('预发布列表 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     await _tapEntityCardAction(
       tester,
       title: '项目 project-withdraw-flow',
@@ -908,8 +951,7 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('预发布列表 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     await _tapEntityCardAction(
       tester,
       title: '项目 project-archive-flow',
@@ -938,8 +980,7 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('预发布列表 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     await _tapEntityCardAction(
       tester,
       title: '项目 project-publish-flow',
@@ -966,8 +1007,7 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('竞标中 · 1'));
-    await tester.pumpAndSettle();
+    await _tapChoiceChipLabel(tester, '竞标中 · 1');
     await _tapEntityCardAction(
       tester,
       title: '项目 project-close-flow',
@@ -1034,6 +1074,7 @@ void main() {
 
     expect(deleteCalls, 1);
     expect(find.text('我的项目'), findsWidgets);
+    await _tapChoiceChipLabel(tester, '草稿 · 0');
     expect(find.text('当前没有草稿项目'), findsOneWidget);
   });
 }
