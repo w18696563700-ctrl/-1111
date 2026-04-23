@@ -128,15 +128,7 @@ export class EnterpriseHubQueryService {
     if (!listing) {
       throw enterpriseNotFound();
     }
-    await this.publicReadRepairService.repairListingFromCertificationIfNeeded(listing);
-    await this.repairPublishedListingCasesFromApprovedHistory([listing]);
-    const latestApplication = await this.applicationRepository.findOne({
-      where: { enterpriseId },
-      order: { createdAt: 'DESC', updatedAt: 'DESC' },
-    });
-    if (latestApplication) {
-      await this.maybeFinalizeApplication(latestApplication, listing);
-    }
+    await this.settlePublicListingReadState(listing);
 
     const [company, factory, supplier, serviceAreas, cases, certifications, reviewSummary, contacts] =
       await Promise.all([
@@ -196,20 +188,36 @@ export class EnterpriseHubQueryService {
   }
 
   async getPublicCaseDetail(caseId: string) {
-    const entity = await this.caseRepository.findOneBy({
-      id: caseId,
-      caseStatus: 'approved',
-    });
-    if (!entity) {
+    const candidate = await this.caseRepository.findOneBy({ id: caseId });
+    if (!candidate) {
       throw caseNotFound();
     }
     const listing = await this.listingRepository.findOneBy({
-      id: entity.enterpriseId,
-      primaryBoardType: entity.boardType,
-      enterpriseStatus: 'published',
-      displayStatus: 'visible',
+      id: candidate.enterpriseId,
+      primaryBoardType: candidate.boardType,
     });
     if (!listing) {
+      throw caseNotFound();
+    }
+    await this.settlePublicListingReadState(listing);
+    const [entity, settledListing] = await Promise.all([
+      this.caseRepository.findOneBy({
+        id: caseId,
+        enterpriseId: candidate.enterpriseId,
+        boardType: candidate.boardType,
+        caseStatus: 'approved',
+      }),
+      this.listingRepository.findOneBy({
+        id: candidate.enterpriseId,
+        primaryBoardType: candidate.boardType,
+      }),
+    ]);
+    if (
+      !entity ||
+      !settledListing ||
+      settledListing.enterpriseStatus !== 'published' ||
+      settledListing.displayStatus !== 'visible'
+    ) {
       throw caseNotFound();
     }
     const imageFileAssetIds = [
@@ -240,6 +248,18 @@ export class EnterpriseHubQueryService {
       isFeatured: entity.isFeatured,
       caseStatus: entity.caseStatus,
     };
+  }
+
+  private async settlePublicListingReadState(listing: EnterpriseListingEntity) {
+    await this.publicReadRepairService.repairListingFromCertificationIfNeeded(listing);
+    await this.repairPublishedListingCasesFromApprovedHistory([listing]);
+    const latestApplication = await this.applicationRepository.findOne({
+      where: { enterpriseId: listing.id },
+      order: { createdAt: 'DESC', updatedAt: 'DESC' },
+    });
+    if (latestApplication) {
+      await this.maybeFinalizeApplication(latestApplication, listing);
+    }
   }
 
   async getRecommendations(query: Record<string, unknown>) {

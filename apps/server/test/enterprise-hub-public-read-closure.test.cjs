@@ -191,6 +191,7 @@ function createQueryHarness(overrides = {}) {
 
   const factoryRepository = createRepository(overrides.factories ?? [], 'enterpriseId');
   const listingRepository = createListingRepository(overrides.listings ?? [], factoryRepository);
+  const caseRepository = createRepository(overrides.cases ?? []);
   const fileAssetRepository = createRepository(overrides.fileAssets ?? []);
   const mediaTruthService = {
     isEnterpriseDisplayImageFileAsset(fileAsset) {
@@ -241,7 +242,7 @@ function createQueryHarness(overrides = {}) {
     createRepository(overrides.companies ?? [], 'enterpriseId'),
     factoryRepository,
     createRepository(overrides.suppliers ?? [], 'enterpriseId'),
-    createRepository(overrides.cases ?? []),
+    caseRepository,
     createRepository(overrides.certificationSnapshots ?? []),
     createRepository(overrides.contacts ?? []),
     createRepository(overrides.applications ?? []),
@@ -256,6 +257,7 @@ function createQueryHarness(overrides = {}) {
     service,
     repositories: {
       listingRepository,
+      caseRepository,
       factoryRepository,
       fileAssetRepository,
     },
@@ -602,6 +604,90 @@ test('public case detail only exposes approved visible cases and hydrates image 
     'https://cdn.example.test/enterprise/cases/case-media-approved.png',
   );
   await assert.rejects(() => harness.service.getPublicCaseDetail('case-hidden'));
+});
+
+test('public case detail repairs stale case status from approved history before enforcing visibility', async () => {
+  const harness = createQueryHarness({
+    listings: [
+      {
+        id: 'enterprise-2',
+        organizationId: 'org-2',
+        primaryBoardType: 'company',
+        secondaryCapabilities: [],
+        name: '重庆坤特展览',
+        shortIntro: '展陈执行',
+        provinceName: '重庆市',
+        cityName: '重庆市',
+        provinceCode: '500000',
+        cityCode: '500100',
+        verificationStatusSnapshot: 'verified',
+        enterpriseStatus: 'published',
+        displayStatus: 'visible',
+        publishedAt: new Date('2026-04-10T10:00:00.000Z'),
+        updatedAt: new Date('2026-04-12T10:00:00.000Z'),
+      },
+    ],
+    cases: [
+      {
+        id: 'case-stale-approved-history',
+        enterpriseId: 'enterprise-2',
+        boardType: 'company',
+        title: '发布历史案例',
+        exhibitionType: '展陈施工',
+        city: '重庆',
+        eventTime: '2026-04-01',
+        summary: '详情页已能看到，但详情读链之前会误判不可用。',
+        caseCoverFileAssetId: 'case-stale-cover',
+        caseMediaFileAssetIds: ['case-stale-cover'],
+        isFeatured: false,
+        caseStatus: 'draft',
+      },
+    ],
+    applications: [
+      {
+        id: 'app-approved-history',
+        enterpriseId: 'enterprise-2',
+        applyBoardType: 'company',
+        applicationStatus: 'approved',
+        reviewedAt: new Date('2026-04-10T10:00:00.000Z'),
+        createdAt: new Date('2026-04-10T10:00:00.000Z'),
+        updatedAt: new Date('2026-04-10T10:00:00.000Z'),
+      },
+      {
+        id: 'app-submitted-latest',
+        enterpriseId: 'enterprise-2',
+        applyBoardType: 'company',
+        applicationStatus: 'submitted',
+        reviewedAt: null,
+        createdAt: new Date('2026-04-12T10:00:00.000Z'),
+        updatedAt: new Date('2026-04-12T10:00:00.000Z'),
+      },
+    ],
+    fileAssets: [
+      {
+        id: 'case-stale-cover',
+        objectKey: 'enterprise/cases/case-stale-cover.png',
+        mimeType: 'image/png',
+      },
+    ],
+  });
+
+  const detail = await harness.service.getPublicCaseDetail(
+    'case-stale-approved-history',
+  );
+
+  assert.equal(detail.caseId, 'case-stale-approved-history');
+  assert.equal(detail.caseStatus, 'approved');
+  assert.equal(
+    detail.caseImageUrlMap['case-stale-cover'],
+    'https://cdn.example.test/enterprise/cases/case-stale-cover.png',
+  );
+  assert.equal(
+    harness.repositories.caseRepository.items.find(
+      (item) => item.id === 'case-stale-approved-history',
+    )?.caseStatus,
+    'approved',
+  );
 });
 
 test('factory public detail keeps factory title separate from legal name, projects showcase display urls, and treats empty cases as empty only', async () => {
