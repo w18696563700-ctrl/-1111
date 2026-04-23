@@ -20,6 +20,7 @@ function createUploadWriteHarness(overrides = {}) {
     savedSessions: [],
     savedFileAssets: [],
     auditEvents: [],
+    verificationCalls: [],
   };
 
   const uploadSessionRepository = {
@@ -118,11 +119,25 @@ function createUploadWriteHarness(overrides = {}) {
     },
   };
 
-  const currentSessionVerificationService = {
-    verifyCurrentSessionContext: async () => {
-      throw new Error('not used for project upload');
-    },
-  };
+  const currentSession =
+    overrides.currentSession ?? {
+      sessionId: 'verified-session-1',
+      actorId: 'actor-1',
+      userId: 'user-1',
+      organizationId: 'org-1',
+      requestId: 'request-1',
+      traceId: 'trace-1',
+    };
+  const currentSessionVerificationService =
+    overrides.currentSessionVerificationService ?? {
+      verifyCurrentSessionContext: async (context) => {
+        state.verificationCalls.push({ ...context });
+        return {
+          outcome: 'verified',
+          currentSession,
+        };
+      },
+    };
 
   const { UploadWriteService } = require('../dist/modules/upload/upload-write.service.js');
 
@@ -173,7 +188,7 @@ test('upload storage service keeps returned headers aligned with presigned PUT c
     {
       UPLOAD_BUCKET: 'exhibition-uploads',
       UPLOAD_S3_ENDPOINT: 'http://127.0.0.1:9000',
-      UPLOAD_S3_PUBLIC_ENDPOINT: 'http://47.108.180.198:9000',
+      UPLOAD_S3_PUBLIC_ENDPOINT: 'http://formal-cloud.test:9000',
       UPLOAD_S3_REGION: 'us-east-1',
       UPLOAD_S3_ACCESS_KEY_ID: 'minioadmin',
       UPLOAD_S3_SECRET_ACCESS_KEY: 'minioadmin',
@@ -200,7 +215,7 @@ test('upload storage service keeps returned headers aligned with presigned PUT c
         .map((header) => header.toLowerCase())
         .sort();
 
-      assert.equal(parsed.host, '47.108.180.198:9000');
+      assert.equal(parsed.host, 'formal-cloud.test:9000');
       assert.equal(directive.directUploadMethod, 'PUT');
       assert.match(directive.directUploadUrl, /X-Amz-Signature=/);
       assert.deepEqual(signedHeaders, [
@@ -258,6 +273,50 @@ test('upload storage service rejects loopback public endpoint', async () => {
           }),
         (error) => error?.message === 'Upload public endpoint must not use loopback host.'
       );
+    }
+  );
+});
+
+test('upload storage service keeps spreadsheet object keys on canonical xls/xlsx extensions', async () => {
+  await withEnv(
+    {
+      UPLOAD_BUCKET: 'exhibition-uploads',
+      UPLOAD_S3_ENDPOINT: 'http://127.0.0.1:9000',
+      UPLOAD_S3_PUBLIC_ENDPOINT: 'http://formal-cloud.test:9000',
+      UPLOAD_S3_REGION: 'us-east-1',
+      UPLOAD_S3_ACCESS_KEY_ID: 'minioadmin',
+      UPLOAD_S3_SECRET_ACCESS_KEY: 'minioadmin',
+      UPLOAD_S3_FORCE_PATH_STYLE: 'true',
+      UPLOAD_SIGNED_URL_EXPIRES_SECONDS: '900',
+    },
+    async () => {
+      const { RuntimeConfigService } = require('../dist/core/runtime-config.service.js');
+      const { UploadStorageService } = require('../dist/modules/upload/upload-storage.service.js');
+
+      const config = new RuntimeConfigService();
+      const service = new UploadStorageService(config);
+      const cases = [
+        {
+          mimeType: 'application/vnd.ms-excel',
+          expectedSuffix: '.xls',
+        },
+        {
+          mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+          expectedSuffix: '.xlsx',
+        },
+      ];
+
+      for (const item of cases) {
+        const directive = await service.buildDirective({
+          sessionId: `session-${item.expectedSuffix}`,
+          businessType: 'project',
+          fileKind: 'bid_quote_sheet',
+          mimeType: item.mimeType,
+          checksum: 'abc123',
+        });
+
+        assert.match(directive.objectKey, new RegExp(`${item.expectedSuffix.replace('.', '\\.')}$`));
+      }
     }
   );
 });
@@ -329,6 +388,24 @@ test('confirm upload fails without transport truth and does not create FileAsset
       auditRecorded = true;
     },
   };
+  const enterpriseDisplayBinding = {
+    loadOwnedListingForInit: async () => null,
+    loadOwnedListingForConfirm: async () => null,
+    ensureFileAsset: () => {},
+  };
+  const currentSessionVerificationService = {
+    verifyCurrentSessionContext: async () => ({
+      outcome: 'verified',
+      currentSession: {
+        sessionId: 'verified-session-1',
+        actorId: 'actor-1',
+        userId: 'user-1',
+        organizationId: 'org-1',
+        requestId: 'request-1',
+        traceId: 'trace-1',
+      },
+    }),
+  };
 
   const service = new UploadWriteService(
     uploadSessionRepository,
@@ -337,7 +414,9 @@ test('confirm upload fails without transport truth and does not create FileAsset
     dataSource,
     presenter,
     storageService,
-    auditService
+    enterpriseDisplayBinding,
+    auditService,
+    currentSessionVerificationService
   );
 
   await assert.rejects(
@@ -381,6 +460,41 @@ test('upload init accepts project_attachment and keeps project binding truth', a
   assert.equal(response.fileKind, 'project_attachment');
   assert.equal(state.savedSessions.length, 1);
   assert.equal(state.savedSessions[0].fileKind, 'project_attachment');
+});
+
+test('upload init stores verified current session truth for project uploads', async () => {
+  const { service, state } = createUploadWriteHarness({
+    currentSession: {
+      sessionId: 'verified-session-project-init',
+      actorId: 'actor-project-init',
+      userId: 'user-project-init',
+      organizationId: 'org-project-init',
+      requestId: 'request-1',
+      traceId: 'trace-1',
+    },
+  });
+
+  await service.initUpload(
+    {
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'bid_quote_sheet',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      size: 256,
+      checksum: 'checksum-project-session-stamp',
+    },
+    {
+      ...createRequestContext(),
+      actorId: '',
+      userId: '',
+      organizationId: '',
+    },
+  );
+
+  assert.equal(state.verificationCalls.length, 1);
+  assert.equal(state.savedSessions[0].actorId, 'actor-project-init');
+  assert.equal(state.savedSessions[0].userId, 'user-project-init');
+  assert.equal(state.savedSessions[0].organizationId, 'org-project-init');
 });
 
 test('upload init accepts bid submit required attachment file kinds', async () => {
@@ -502,4 +616,95 @@ test('confirm upload keeps project_attachment in FileAsset truth for post-publis
   assert.equal(state.savedFileAssets[0].fileKind, 'project_attachment');
   assert.equal(state.savedFileAssets[0].businessType, 'project');
   assert.equal(state.savedFileAssets[0].businessId, 'project-1');
+});
+
+test('confirm upload backfills project file truth from verified current session', async () => {
+  const { service, state } = createUploadWriteHarness({
+    currentSession: {
+      sessionId: 'verified-session-project-confirm',
+      actorId: 'actor-project-confirm',
+      userId: 'user-project-confirm',
+      organizationId: 'org-project-confirm',
+      requestId: 'request-1',
+      traceId: 'trace-1',
+    },
+    session: {
+      id: 'session-project-confirm',
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'bid_schedule_plan',
+      objectKey: 'project/bid_schedule_plan/2026/04/file.pdf',
+      mimeType: 'application/pdf',
+      size: 64,
+      checksum: 'checksum-project-confirm',
+      actorId: null,
+      userId: null,
+      organizationId: '',
+      fileAssetId: null,
+      directUploadUrl: 'https://upload.example.com/object',
+      directUploadMethod: 'PUT',
+      directUploadHeaders: {},
+      sessionStatus: 'initiated',
+      confirmedAt: null,
+    },
+  });
+
+  await service.confirmUpload(
+    { uploadSessionId: 'session-project-confirm' },
+    {
+      ...createRequestContext(),
+      actorId: '',
+      userId: '',
+      organizationId: '',
+    },
+  );
+
+  assert.equal(state.verificationCalls.length, 1);
+  const savedSession = state.savedSessions[state.savedSessions.length - 1];
+  assert.equal(savedSession.actorId, 'actor-project-confirm');
+  assert.equal(savedSession.userId, 'user-project-confirm');
+  assert.equal(savedSession.organizationId, 'org-project-confirm');
+  assert.equal(state.savedFileAssets[0].actorId, 'actor-project-confirm');
+  assert.equal(state.savedFileAssets[0].userId, 'user-project-confirm');
+  assert.equal(state.savedFileAssets[0].organizationId, 'org-project-confirm');
+});
+
+test('confirm upload rejects project session ownership drift across users', async () => {
+  const { service } = createUploadWriteHarness({
+    currentSession: {
+      sessionId: 'verified-session-project-owner',
+      actorId: 'actor-project-owner',
+      userId: 'user-project-owner',
+      organizationId: 'org-project-owner',
+      requestId: 'request-1',
+      traceId: 'trace-1',
+    },
+    session: {
+      id: 'session-project-owner-mismatch',
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'project_attachment',
+      objectKey: 'project/project_attachment/2026/04/file.pdf',
+      mimeType: 'application/pdf',
+      size: 128,
+      checksum: 'checksum-project-owner-mismatch',
+      actorId: 'another-actor',
+      userId: 'another-user',
+      organizationId: 'org-project-owner',
+      fileAssetId: null,
+      directUploadUrl: 'https://upload.example.com/object',
+      directUploadMethod: 'PUT',
+      directUploadHeaders: {},
+      sessionStatus: 'initiated',
+      confirmedAt: null,
+    },
+  });
+
+  await assert.rejects(
+    () => service.confirmUpload({ uploadSessionId: 'session-project-owner-mismatch' }, createRequestContext()),
+    (error) =>
+      typeof error?.getStatus === 'function' &&
+      error.getStatus() === 409 &&
+      error.getResponse()?.code === 'FILE_UPLOAD_CONFIRM_REQUIRED'
+  );
 });

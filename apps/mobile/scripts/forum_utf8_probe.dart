@@ -1,10 +1,11 @@
 import 'dart:async';
 
 import 'package:mobile/core/api/app_api_client.dart';
+import 'package:mobile/core/api/app_api_entry_mode.dart';
 
 Future<void> main() async {
   final client = AppApiClient(
-    config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+    config: AppApiConfig(baseUrl: AppApiEntryTarget.sshTunnelBaseUrl),
   );
 
   Future<void> probe(String label, Future<AppApiResponse> Function() run) async {
@@ -46,4 +47,3 @@ Future<void> main() async {
     );
   });
 }
-

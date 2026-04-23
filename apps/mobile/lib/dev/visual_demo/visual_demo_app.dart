@@ -1,4 +1,5 @@
 import 'package:mobile/core/api/app_api_client.dart';
+import 'package:mobile/core/api/app_api_entry_mode.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
@@ -7,6 +8,7 @@ import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
 ExhibitionMobileApp buildVisualDemoApp({required String initialRoute}) {
+  const demoBaseUrl = AppApiEntryTarget.sshTunnelBaseUrl;
   return ExhibitionMobileApp(
     initialRoute: initialRoute,
     bootstrapManifest: AppConfigManifest.bootstrapDefaults(),
@@ -21,19 +23,19 @@ ExhibitionMobileApp buildVisualDemoApp({required String initialRoute}) {
     ),
     exhibitionConsumerLayer: ExhibitionConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(handlers: _exhibitionHandlers()),
       ),
     ),
     messagesConsumerLayer: MessagesConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(handlers: _messagesHandlers()),
       ),
     ),
     profileConsumerLayer: ProfileConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(handlers: _profileHandlers()),
       ),
     ),

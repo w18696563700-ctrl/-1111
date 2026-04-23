@@ -2,17 +2,19 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:mobile/core/auth/app_session_store.dart';
+import 'package:mobile/core/api/app_api_entry_mode.dart';
 
 enum AppApiMethod { get, post, put, delete }
 
 class AppApiConfig {
-  static const String cloudRuntimeBaseUrl = 'http://47.108.180.198/api/app';
-  static const String tunnelBaseUrl = 'http://127.0.0.1:8080/api/app';
-  static const String defaultBaseUrl = tunnelBaseUrl;
+  static String get cloudRuntimeBaseUrl => AppApiEntryTarget.cloudBaseUrl;
+  static String get tunnelBaseUrl => AppApiEntryTarget.sshTunnelBaseUrl;
+  static String get defaultBaseUrl => AppApiEntryTarget.defaultBaseUrl;
   static String? _runtimeBaseUrlOverride;
 
   AppApiConfig({
     required this.baseUrl,
+    this.entryMode,
     this.defaultHeaders = const <String, String>{},
     this.requestTimeout = const Duration(seconds: 5),
   });
@@ -21,9 +23,13 @@ class AppApiConfig {
     final runtimeBaseUrl = Platform.environment['APP_BFF_BASE_URL']?.trim();
     final runtimeActorId = Platform.environment['APP_BFF_ACTOR_ID']?.trim();
     final runtimeUserId = Platform.environment['APP_BFF_USER_ID']?.trim();
+    final runtimeEntryMode = Platform.environment['APP_RUNTIME_ENTRY_MODE'];
     const compileTimeBaseUrl = String.fromEnvironment('APP_BFF_BASE_URL');
     const compileTimeActorId = String.fromEnvironment('APP_BFF_ACTOR_ID');
     const compileTimeUserId = String.fromEnvironment('APP_BFF_USER_ID');
+    const compileTimeEntryMode = String.fromEnvironment(
+      'APP_RUNTIME_ENTRY_MODE',
+    );
     final defaultHeaders = <String, String>{};
     final actorId = compileTimeActorId.isNotEmpty
         ? compileTimeActorId
@@ -42,20 +48,29 @@ class AppApiConfig {
       defaultHeaders['x-user-id'] = userId;
     }
 
+    final requestedEntryMode =
+        AppApiEntryTarget.parse(compileTimeEntryMode) ??
+        AppApiEntryTarget.parse(runtimeEntryMode);
+    final resolvedEntryMode =
+        requestedEntryMode ?? AppApiEntryTarget.defaultEntryMode();
     final resolvedBaseUrl = compileTimeBaseUrl.isNotEmpty
         ? compileTimeBaseUrl
         : runtimeBaseUrl != null && runtimeBaseUrl.isNotEmpty
         ? runtimeBaseUrl
-        : defaultBaseUrl;
+        : AppApiEntryTarget.defaultBaseUrlForMode(resolvedEntryMode);
 
     return AppApiConfig(
       baseUrl: resolvedBaseUrl,
+      entryMode:
+          requestedEntryMode ??
+          AppApiEntryTarget.inferFromBaseUrl(resolvedBaseUrl),
       defaultHeaders: defaultHeaders,
       requestTimeout: const Duration(seconds: 5),
     );
   }
 
   final String baseUrl;
+  final AppApiEntryMode? entryMode;
   final Map<String, String> defaultHeaders;
   final Duration requestTimeout;
 
@@ -76,25 +91,19 @@ class AppApiConfig {
     return baseUrl;
   }
 
-  bool get isStagingLikeEnvironment {
-    final normalized = effectiveBaseUrl.toLowerCase();
-    final uri = Uri.tryParse(effectiveBaseUrl);
-    final host = uri?.host.toLowerCase() ?? '';
+  AppApiEntryMode get effectiveEntryMode =>
+      entryMode ?? AppApiEntryTarget.inferFromBaseUrl(effectiveBaseUrl);
 
-    return host == '127.0.0.1' ||
-        host == 'localhost' ||
-        host.contains('staging') ||
-        host.contains('dev') ||
-        host.contains('test') ||
-        normalized.contains('127.0.0.1') ||
-        normalized.contains('localhost') ||
-        normalized.contains('staging') ||
-        normalized.contains('dev') ||
-        normalized.contains('test');
-  }
+  bool get isStagingLikeEnvironment =>
+      AppApiEntryTarget.isStagingLikeEnvironment(
+        effectiveBaseUrl,
+        entryMode: effectiveEntryMode,
+      );
 
-  String get userFacingEnvironmentLabel =>
-      isStagingLikeEnvironment ? '联调环境' : '正式接口';
+  String get userFacingEnvironmentLabel => AppApiEntryTarget.userFacingLabel(
+    effectiveBaseUrl,
+    entryMode: effectiveEntryMode,
+  );
 
   Uri resolveCanonicalPath(
     String canonicalPath, {

@@ -2,7 +2,12 @@
 
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-http://127.0.0.1:8080}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
+
+. "${REPO_ROOT}/infra/scripts/load_formal_cloud_env.sh"
+
+TARGET_RUNTIME="${TARGET_RUNTIME:-cloud}"
 APP_TOKEN="${APP_TOKEN:-}"
 
 FACTORY_ENTERPRISE_ID="${FACTORY_ENTERPRISE_ID:-a9b46040-956e-44fd-8e35-e3c533687e27}"
@@ -10,6 +15,31 @@ COMPANY_ENTERPRISE_ID="${COMPANY_ENTERPRISE_ID:-e2a016f4-0b6a-497d-902c-40941385
 FACTORY_CASE_ID="${FACTORY_CASE_ID:-e3940909-b9ec-4f21-a150-7d34dafce31c}"
 
 FACTORY_TITLE_EXPECTED="${FACTORY_TITLE_EXPECTED:-重庆海川展览工厂}"
+
+resolve_base_url() {
+  case "$1" in
+    cloud)
+      printf '%s' "${FORMAL_CLOUD_ORIGIN}"
+      ;;
+    ssh_tunnel)
+      printf '%s' "http://127.0.0.1:8080"
+      ;;
+    custom)
+      printf '%s' ""
+      ;;
+    *)
+      echo "Unsupported TARGET_RUNTIME=$1. Supported: cloud, ssh_tunnel, custom." >&2
+      exit 1
+      ;;
+  esac
+}
+
+BASE_URL="${BASE_URL:-$(resolve_base_url "${TARGET_RUNTIME}")}"
+
+if [[ "${TARGET_RUNTIME}" == "custom" && -z "${BASE_URL}" ]]; then
+  echo "TARGET_RUNTIME=custom requires BASE_URL to be set explicitly." >&2
+  exit 1
+fi
 
 say() {
   printf '\n[%s] %s\n' "$1" "$2"
@@ -64,7 +94,7 @@ assert_nonempty_case_image_map() {
   assert_not_contains "$compact" "\"caseImageUrlMap\":{}" "private case detail returned an empty caseImageUrlMap"
 }
 
-say INFO "Running enterprise_hub post-release smoke against ${BASE_URL}"
+say INFO "Running enterprise_hub post-release smoke against ${BASE_URL} (target=${TARGET_RUNTIME})"
 
 say STEP "Check factory public detail title"
 factory_detail="$(get_public "/api/app/exhibition/enterprise-hub/enterprises/${FACTORY_ENTERPRISE_ID}?boardType=factory")"

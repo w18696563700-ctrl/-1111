@@ -10,6 +10,10 @@ export class RuntimeConfigService {
     return process.env.NODE_ENV ?? 'development';
   }
 
+  get runtimeEntryLabel() {
+    return process.env.RUNTIME_ENTRY_LABEL?.trim() || 'default';
+  }
+
   get isProduction() {
     return this.nodeEnv === 'production';
   }
@@ -24,6 +28,41 @@ export class RuntimeConfigService {
 
   get port() {
     return Number.parseInt(process.env.PORT ?? '3001', 10);
+  }
+
+  get redisEnabled() {
+    const raw = process.env.REDIS_ENABLED;
+    if (raw == null) {
+      return true;
+    }
+    return this.readBoolean(raw);
+  }
+
+  get redisHost() {
+    return process.env.REDIS_HOST ?? '127.0.0.1';
+  }
+
+  get redisPort() {
+    return Number.parseInt(process.env.REDIS_PORT ?? '6379', 10);
+  }
+
+  get redisDatabase() {
+    return Number.parseInt(process.env.REDIS_DB ?? '0', 10);
+  }
+
+  get redisPassword() {
+    return process.env.REDIS_PASSWORD ?? '';
+  }
+
+  get redisUrl() {
+    if (process.env.REDIS_URL?.trim()) {
+      return process.env.REDIS_URL.trim();
+    }
+
+    const credentials = this.redisPassword
+      ? `:${encodeURIComponent(this.redisPassword)}@`
+      : '';
+    return `redis://${credentials}${this.redisHost}:${this.redisPort}/${this.redisDatabase}`;
   }
 
   get postgresHost() {
@@ -97,6 +136,50 @@ export class RuntimeConfigService {
 
   get amapWebServiceTimeoutMs() {
     return Number.parseInt(process.env.AMAP_WEB_SERVICE_TIMEOUT_MS ?? '5000', 10);
+  }
+
+  get qweatherEnabled() {
+    return this.readBoolean(process.env.QWEATHER_ENABLED);
+  }
+
+  get qweatherApiHost() {
+    return process.env.QWEATHER_API_HOST ?? 'https://devapi.qweather.com';
+  }
+
+  get qweatherApiKey() {
+    return process.env.QWEATHER_API_KEY ?? '';
+  }
+
+  get qweatherTimeoutMs() {
+    return Number.parseInt(process.env.QWEATHER_TIMEOUT_MS ?? '5000', 10);
+  }
+
+  get qweatherLanguage() {
+    return process.env.QWEATHER_LANG ?? 'zh-hans';
+  }
+
+  get qweatherUnit() {
+    return process.env.QWEATHER_UNIT ?? 'm';
+  }
+
+  get weatherCacheGeoTtlSeconds() {
+    return Number.parseInt(process.env.WEATHER_CACHE_GEO_TTL_SECONDS ?? '86400', 10);
+  }
+
+  get weatherCacheCurrentTtlSeconds() {
+    return Number.parseInt(process.env.WEATHER_CACHE_CURRENT_TTL_SECONDS ?? '600', 10);
+  }
+
+  get weatherCacheHourlyTtlSeconds() {
+    return Number.parseInt(process.env.WEATHER_CACHE_HOURLY_TTL_SECONDS ?? '1800', 10);
+  }
+
+  get weatherCacheDailyTtlSeconds() {
+    return Number.parseInt(process.env.WEATHER_CACHE_DAILY_TTL_SECONDS ?? '3600', 10);
+  }
+
+  get weatherCacheAlertTtlSeconds() {
+    return Number.parseInt(process.env.WEATHER_CACHE_ALERT_TTL_SECONDS ?? '600', 10);
   }
 
   get aliyunOcrEnabled() {

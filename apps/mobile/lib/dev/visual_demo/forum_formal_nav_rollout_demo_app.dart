@@ -1,5 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:mobile/core/api/app_api_client.dart';
+import 'package:mobile/core/api/app_api_entry_mode.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
@@ -11,6 +12,7 @@ import 'package:mobile/shell/shell_app.dart';
 Widget buildForumFormalNavRolloutDemoApp({
   String initialRoute = '/exhibition/forum',
 }) {
+  const demoBaseUrl = AppApiEntryTarget.sshTunnelBaseUrl;
   final manifest = AppConfigManifest.bootstrapDefaults();
   return ExhibitionMobileApp(
     initialRoute: initialRoute,
@@ -20,7 +22,7 @@ Widget buildForumFormalNavRolloutDemoApp({
     ),
     exhibitionConsumerLayer: ExhibitionConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
         ),
@@ -28,13 +30,13 @@ Widget buildForumFormalNavRolloutDemoApp({
     ),
     forumConsumerLayer: ForumConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(handlers: _forumHandlers()),
       ),
     ),
     messagesConsumerLayer: MessagesConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
         ),
@@ -42,7 +44,7 @@ Widget buildForumFormalNavRolloutDemoApp({
     ),
     profileConsumerLayer: ProfileConsumerLayer(
       client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        config: AppApiConfig(baseUrl: demoBaseUrl),
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
             'GET /api/app/profile/index': (AppApiRequest request) async {
