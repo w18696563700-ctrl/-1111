@@ -11,6 +11,10 @@ final class ExhibitionRoutes {
   static const String myProjectDetail = '/exhibition/my/projects/detail';
   static const String projectClarification =
       '/exhibition/projects/clarification';
+  static const String projectNameAccessThread =
+      '/exhibition/projects/name-access-thread';
+  static const String counterpartConversation =
+      '/exhibition/messages/counterpart-conversation';
   static const String bidThread = '/exhibition/bids/thread';
   static const String forum = '/exhibition/forum';
   static const String forumSquare = '/exhibition/forum/square';
@@ -26,6 +30,7 @@ final class ExhibitionRoutes {
   static const String forumMePosts = '/exhibition/forum/me/posts';
   static const String forumMeComments = '/exhibition/forum/me/comments';
   static const String forumMeBookmarks = '/exhibition/forum/me/bookmarks';
+  static const String forumMeLikes = '/exhibition/forum/me/likes';
   static const String forumMeFollows = '/exhibition/forum/me/follows';
   static const String forumMeReports = '/exhibition/forum/me/reports';
   static const String companies = '/exhibition/companies';
@@ -92,6 +97,28 @@ final class ExhibitionRoutes {
 
   static String projectClarificationWithProjectId(String projectId) {
     return _withQuery(projectClarification, <String, String>{
+      'projectId': projectId,
+    });
+  }
+
+  static String projectNameAccessThreadWithIds({
+    required String threadId,
+    required String projectId,
+    required String requestId,
+  }) {
+    return _withQuery(projectNameAccessThread, <String, String>{
+      'threadId': threadId,
+      'projectId': projectId,
+      'requestId': requestId,
+    });
+  }
+
+  static String counterpartConversationWithIds({
+    required String conversationId,
+    required String projectId,
+  }) {
+    return _withQuery(counterpartConversation, <String, String>{
+      'conversationId': conversationId,
       'projectId': projectId,
     });
   }

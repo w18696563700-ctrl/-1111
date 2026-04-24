@@ -83,7 +83,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('查看全部评论'), 200);
+    await tester.scrollUntilVisible(find.text('评论区'), 200);
     await tester.pumpAndSettle();
     final reportFinder = find.byIcon(Icons.flag_outlined).last;
     await tester.ensureVisible(reportFinder);

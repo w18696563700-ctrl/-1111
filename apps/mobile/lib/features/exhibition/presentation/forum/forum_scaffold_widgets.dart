@@ -65,6 +65,7 @@ class ForumSectionCard extends StatelessWidget {
     required this.summary,
     required this.children,
     this.emphasis = false,
+    this.showEyebrow = true,
   });
 
   final String eyebrow;
@@ -72,6 +73,7 @@ class ForumSectionCard extends StatelessWidget {
   final String summary;
   final List<Widget> children;
   final bool emphasis;
+  final bool showEyebrow;
 
   @override
   Widget build(BuildContext context) {
@@ -93,8 +95,10 @@ class ForumSectionCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            ForumInfoPill(label: eyebrow, highlighted: emphasis),
-            const SizedBox(height: 12),
+            if (showEyebrow) ...<Widget>[
+              ForumInfoPill(label: eyebrow, highlighted: emphasis),
+              const SizedBox(height: 12),
+            ],
             Text(
               title,
               style: theme.textTheme.titleLarge?.copyWith(

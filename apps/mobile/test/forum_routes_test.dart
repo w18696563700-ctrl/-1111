@@ -214,112 +214,113 @@ void main() {
     expect(find.textContaining('Admin Review'), findsNothing);
   });
 
-  testWidgets('profile governance appeals consume bounded list and detail routes', (
-    WidgetTester tester,
-  ) async {
-    final requestedPaths = <String>[];
+  testWidgets(
+    'profile governance appeals consume bounded list and detail routes',
+    (WidgetTester tester) async {
+      final requestedPaths = <String>[];
 
-    await tester.pumpWidget(
-      buildForumTestAppWithOverrides(
-        initialRoute: ProfileRoutes.governanceAppeals,
-        profileGovernanceAppealHandlerOverrides:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/profile/governance/appeals':
-                  (AppApiRequest request) async {
-                    requestedPaths.add(request.canonicalPath);
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: const <String, Object?>{
-                        'items': <Object?>[
-                          <String, Object?>{
-                            'appealCaseId': 'appeal-case-1',
-                            'status': 'submitted',
-                            'statusLabel': '待审核',
-                            'submittedAt': '2026-04-08T10:00:00Z',
-                            'decidedAt': null,
-                            'penalty': <String, Object?>{
-                              'penaltyId': 'penalty-1',
-                              'penaltyType': 'restrict_publish',
-                              'penaltyTypeLabel': '限制发布',
-                              'penaltyStatus': 'active',
-                              'penaltyStatusLabel': '生效中',
-                              'reasonSummary': '存在重复刷屏与误导性内容。',
-                              'effectiveFrom': '2026-04-07T09:00:00Z',
-                              'effectiveUntil': '2026-04-15T09:00:00Z',
+      await tester.pumpWidget(
+        buildForumTestAppWithOverrides(
+          initialRoute: ProfileRoutes.governanceAppeals,
+          profileGovernanceAppealHandlerOverrides:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/profile/governance/appeals':
+                    (AppApiRequest request) async {
+                      requestedPaths.add(request.canonicalPath);
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'items': <Object?>[
+                            <String, Object?>{
+                              'appealCaseId': 'appeal-case-1',
+                              'status': 'submitted',
+                              'statusLabel': '待审核',
+                              'submittedAt': '2026-04-08T10:00:00Z',
+                              'decidedAt': null,
+                              'penalty': <String, Object?>{
+                                'penaltyId': 'penalty-1',
+                                'penaltyType': 'restrict_publish',
+                                'penaltyTypeLabel': '限制发布',
+                                'penaltyStatus': 'active',
+                                'penaltyStatusLabel': '生效中',
+                                'reasonSummary': '存在重复刷屏与误导性内容。',
+                                'effectiveFrom': '2026-04-07T09:00:00Z',
+                                'effectiveUntil': '2026-04-15T09:00:00Z',
+                              },
                             },
+                          ],
+                          'pagination': <String, Object?>{
+                            'page': 1,
+                            'pageSize': 20,
+                            'total': 1,
+                            'hasMore': false,
                           },
-                        ],
-                        'pagination': <String, Object?>{
-                          'page': 1,
-                          'pageSize': 20,
-                          'total': 1,
-                          'hasMore': false,
                         },
-                      },
-                    );
-                  },
-              'GET /api/app/profile/governance/appeals/appeal-case-1':
-                  (AppApiRequest request) async {
-                    requestedPaths.add(request.canonicalPath);
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: const <String, Object?>{
-                        'appealCaseId': 'appeal-case-1',
-                        'status': 'submitted',
-                        'statusLabel': '待审核',
-                        'appealReason': '该处罚对当前账号影响过重，申请复核。',
-                        'decision': null,
-                        'decisionLabel': null,
-                        'decisionNote': null,
-                        'submittedAt': '2026-04-08T10:00:00Z',
-                        'decidedAt': null,
-                        'evidenceFileAssetIds': <Object?>[
-                          'file-asset-1',
-                          'file-asset-2',
-                        ],
-                        'penalty': <String, Object?>{
-                          'penaltyId': 'penalty-1',
-                          'penaltyType': 'restrict_publish',
-                          'penaltyTypeLabel': '限制发布',
-                          'penaltyStatus': 'active',
-                          'penaltyStatusLabel': '生效中',
-                          'reasonSummary': '存在重复刷屏与误导性内容。',
-                          'effectiveFrom': '2026-04-07T09:00:00Z',
-                          'effectiveUntil': '2026-04-15T09:00:00Z',
+                      );
+                    },
+                'GET /api/app/profile/governance/appeals/appeal-case-1':
+                    (AppApiRequest request) async {
+                      requestedPaths.add(request.canonicalPath);
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'appealCaseId': 'appeal-case-1',
+                          'status': 'submitted',
+                          'statusLabel': '待审核',
+                          'appealReason': '该处罚对当前账号影响过重，申请复核。',
+                          'decision': null,
+                          'decisionLabel': null,
+                          'decisionNote': null,
+                          'submittedAt': '2026-04-08T10:00:00Z',
+                          'decidedAt': null,
+                          'evidenceFileAssetIds': <Object?>[
+                            'file-asset-1',
+                            'file-asset-2',
+                          ],
+                          'penalty': <String, Object?>{
+                            'penaltyId': 'penalty-1',
+                            'penaltyType': 'restrict_publish',
+                            'penaltyTypeLabel': '限制发布',
+                            'penaltyStatus': 'active',
+                            'penaltyStatusLabel': '生效中',
+                            'reasonSummary': '存在重复刷屏与误导性内容。',
+                            'effectiveFrom': '2026-04-07T09:00:00Z',
+                            'effectiveUntil': '2026-04-15T09:00:00Z',
+                          },
                         },
-                      },
-                    );
-                  },
-            },
-      ),
-    );
-    await tester.pumpAndSettle();
+                      );
+                    },
+              },
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('我的申诉记录'), findsWidgets);
-    expect(find.text('存在重复刷屏与误导性内容。'), findsOneWidget);
-    expect(find.textContaining('限制发布'), findsWidgets);
-    expect(find.textContaining('处罚历史中心'), findsNothing);
-    expect(find.textContaining('治理总控台'), findsNothing);
-    expect(find.textContaining('提交申诉'), findsNothing);
+      expect(find.text('我的申诉记录'), findsWidgets);
+      expect(find.text('存在重复刷屏与误导性内容。'), findsOneWidget);
+      expect(find.textContaining('限制发布'), findsWidgets);
+      expect(find.textContaining('处罚历史中心'), findsNothing);
+      expect(find.textContaining('治理总控台'), findsNothing);
+      expect(find.textContaining('提交申诉'), findsNothing);
 
-    await tester.tap(find.text('存在重复刷屏与误导性内容。').first);
-    await tester.pumpAndSettle();
+      await tester.tap(find.text('存在重复刷屏与误导性内容。').first);
+      await tester.pumpAndSettle();
 
-    expect(find.text('申诉详情'), findsWidgets);
-    expect(find.text('申诉原因'), findsOneWidget);
-    expect(find.text('该处罚对当前账号影响过重，申请复核。'), findsOneWidget);
-    expect(find.textContaining('处罚历史中心'), findsNothing);
-    expect(find.textContaining('治理总控台'), findsNothing);
-    expect(
-      requestedPaths,
-      containsAllInOrder(<String>[
-        '/api/app/profile/governance/appeals',
-        '/api/app/profile/governance/appeals/appeal-case-1',
-      ]),
-    );
-  });
+      expect(find.text('申诉详情'), findsWidgets);
+      expect(find.text('申诉原因'), findsOneWidget);
+      expect(find.text('该处罚对当前账号影响过重，申请复核。'), findsOneWidget);
+      expect(find.textContaining('处罚历史中心'), findsNothing);
+      expect(find.textContaining('治理总控台'), findsNothing);
+      expect(
+        requestedPaths,
+        containsAllInOrder(<String>[
+          '/api/app/profile/governance/appeals',
+          '/api/app/profile/governance/appeals/appeal-case-1',
+        ]),
+      );
+    },
+  );
 
   testWidgets('profile home exposes bounded my appeal entry', (
     WidgetTester tester,
@@ -578,6 +579,8 @@ void main() {
       );
       expect(find.text('作者公开帖子'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('拉黑作者'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('拉黑作者'));
       await tester.pumpAndSettle();
 
@@ -586,6 +589,8 @@ void main() {
       expect(find.text('解除拉黑'), findsOneWidget);
       expect(find.text('作者公开帖子'), findsOneWidget);
 
+      await tester.ensureVisible(find.text('解除拉黑'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('解除拉黑'));
       await tester.pumpAndSettle();
 

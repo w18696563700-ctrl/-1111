@@ -92,4 +92,32 @@ extension ForumConsumerLayerInteractionActions on ForumConsumerLayer {
       decodeMessage: '收藏暂时没有完成，请稍后再试',
     );
   }
+
+  Future<ForumActionResult<ForumToggleAcceptedView>> toggleAuthorFollow({
+    required String? authorId,
+    required bool currentlyFollowing,
+  }) async {
+    final resolvedAuthorId = _requiredRouteValue(authorId);
+    if (resolvedAuthorId == null) {
+      return const ForumActionResult(
+        isSuccess: false,
+        method: 'POST',
+        path: ForumCanonicalPaths.authorFollow,
+        controlledState: AppPageState.errorNonRetryable,
+        message: '当前作者暂不可用',
+      );
+    }
+
+    return _postAction<ForumToggleAcceptedView>(
+      path: ForumCanonicalPaths.authorFollow,
+      body: <String, Object?>{
+        'authorId': resolvedAuthorId,
+        'action': currentlyFollowing ? 'unfollow' : 'follow',
+      },
+      parser: _parseToggleAccepted,
+      networkMessage: '关注暂时没有完成，请稍后再试',
+      httpMessage: '关注暂时没有完成，请稍后再试',
+      decodeMessage: '关注暂时没有完成，请稍后再试',
+    );
+  }
 }

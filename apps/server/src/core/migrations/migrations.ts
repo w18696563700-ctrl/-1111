@@ -679,6 +679,116 @@ export const forumReportP0Migrations = [
   }
 ];
 
+export const forumInteractionTruthMigrations = [
+  {
+    key: '20260424_forum_interaction_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS forum_post_likes (
+        id varchar(64) PRIMARY KEY,
+        post_id varchar(64) NOT NULL,
+        user_id varchar(64) NOT NULL,
+        actor_id varchar(64),
+        organization_id varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `ALTER TABLE forum_post_likes
+       ADD COLUMN IF NOT EXISTS user_id varchar(64)`,
+      `ALTER TABLE forum_post_likes
+       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+      `UPDATE forum_post_likes
+       SET user_id = COALESCE(NULLIF(user_id, ''), actor_id, 'legacy-user')
+       WHERE user_id IS NULL OR user_id = ''`,
+      `ALTER TABLE forum_post_likes
+       ALTER COLUMN user_id SET NOT NULL`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_forum_post_likes_user_post
+       ON forum_post_likes (user_id, post_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_forum_post_likes_post_created
+       ON forum_post_likes (post_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_forum_post_likes_user_created
+       ON forum_post_likes (user_id, created_at DESC)`,
+      `CREATE TABLE IF NOT EXISTS forum_post_bookmarks (
+        id varchar(64) PRIMARY KEY,
+        post_id varchar(64) NOT NULL,
+        user_id varchar(64) NOT NULL,
+        actor_id varchar(64),
+        organization_id varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `ALTER TABLE forum_post_bookmarks
+       ADD COLUMN IF NOT EXISTS user_id varchar(64)`,
+      `ALTER TABLE forum_post_bookmarks
+       ADD COLUMN IF NOT EXISTS actor_id varchar(64)`,
+      `ALTER TABLE forum_post_bookmarks
+       ADD COLUMN IF NOT EXISTS organization_id varchar(64) NOT NULL DEFAULT ''`,
+      `ALTER TABLE forum_post_bookmarks
+       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+      `UPDATE forum_post_bookmarks
+       SET user_id = COALESCE(NULLIF(user_id, ''), actor_id, 'legacy-user')
+       WHERE user_id IS NULL OR user_id = ''`,
+      `ALTER TABLE forum_post_bookmarks
+       ALTER COLUMN user_id SET NOT NULL`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_forum_post_bookmarks_user_post
+       ON forum_post_bookmarks (user_id, post_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_forum_post_bookmarks_post_created
+       ON forum_post_bookmarks (post_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_forum_post_bookmarks_user_created
+       ON forum_post_bookmarks (user_id, created_at DESC)`,
+      `CREATE TABLE IF NOT EXISTS forum_author_follows (
+        id varchar(64) PRIMARY KEY,
+        follower_user_id varchar(64) NOT NULL,
+        follower_actor_id varchar(64),
+        follower_organization_id varchar(64) NOT NULL,
+        target_author_user_id varchar(64) NOT NULL,
+        target_organization_id varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `ALTER TABLE forum_author_follows
+       ADD COLUMN IF NOT EXISTS follower_user_id varchar(64)`,
+      `ALTER TABLE forum_author_follows
+       ADD COLUMN IF NOT EXISTS follower_actor_id varchar(64)`,
+      `ALTER TABLE forum_author_follows
+       ADD COLUMN IF NOT EXISTS follower_organization_id varchar(64) NOT NULL DEFAULT ''`,
+      `ALTER TABLE forum_author_follows
+       ADD COLUMN IF NOT EXISTS target_author_user_id varchar(64)`,
+      `ALTER TABLE forum_author_follows
+       ADD COLUMN IF NOT EXISTS target_organization_id varchar(64) NOT NULL DEFAULT ''`,
+      `ALTER TABLE forum_author_follows
+       ADD COLUMN IF NOT EXISTS updated_at timestamptz NOT NULL DEFAULT now()`,
+      `UPDATE forum_author_follows
+       SET follower_user_id = COALESCE(NULLIF(follower_user_id, ''), follower_actor_id, 'legacy-user')
+       WHERE follower_user_id IS NULL OR follower_user_id = ''`,
+      `UPDATE forum_author_follows
+       SET target_author_user_id = COALESCE(NULLIF(target_author_user_id, ''), target_organization_id, 'legacy-author')
+       WHERE target_author_user_id IS NULL OR target_author_user_id = ''`,
+      `ALTER TABLE forum_author_follows
+       ALTER COLUMN follower_user_id SET NOT NULL`,
+      `ALTER TABLE forum_author_follows
+       ALTER COLUMN target_author_user_id SET NOT NULL`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_forum_author_follows_user_author
+       ON forum_author_follows (follower_user_id, target_author_user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_forum_author_follows_follower_created
+       ON forum_author_follows (follower_user_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_forum_author_follows_target_created
+       ON forum_author_follows (target_author_user_id, created_at DESC)`
+    ]
+  },
+  {
+    key: '20260424_forum_post_likes_legacy_state_default',
+    statements: [
+      `ALTER TABLE forum_post_likes
+       ADD COLUMN IF NOT EXISTS state varchar(32) NOT NULL DEFAULT 'active'`,
+      `ALTER TABLE forum_post_likes
+       ALTER COLUMN state SET DEFAULT 'active'`,
+      `UPDATE forum_post_likes
+       SET state = 'active'
+       WHERE state IS NULL OR state = ''`
+    ]
+  }
+];
+
 
 export const blockP0AMigrations = [
   {
@@ -1003,6 +1113,20 @@ export const bidDuplicateSubmitRepairMigrations = [
              ON public.bids (project_id, bidder_organization_id);
          END IF;
        END $$`
+    ]
+  }
+];
+
+export const bidSubmissionSnapshotAttachmentTruthMigrations = [
+  {
+    key: '20260424_bid_submission_snapshot_attachment_truth',
+    statements: [
+      `ALTER TABLE bids
+       ADD COLUMN IF NOT EXISTS project_understanding_file_asset_id varchar(64)`,
+      `ALTER TABLE bids
+       ADD COLUMN IF NOT EXISTS quote_sheet_file_asset_id varchar(64)`,
+      `ALTER TABLE bids
+       ADD COLUMN IF NOT EXISTS schedule_plan_file_asset_id varchar(64)`
     ]
   }
 ];
@@ -1418,6 +1542,120 @@ export const tradingImRoundAMigrations = [
   }
 ];
 
+export const projectNameAccessRequestMigrations = [
+  {
+    key: '20260424_project_name_access_request_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_name_access_requests (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        requester_organization_id varchar(64) NOT NULL,
+        requested_by_user_id varchar(64) NOT NULL,
+        requested_by_actor_id varchar(64) NOT NULL DEFAULT '',
+        state varchar(32) NOT NULL DEFAULT 'pending',
+        reviewed_by_user_id varchar(64),
+        reviewed_by_actor_id varchar(64),
+        reviewed_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_name_access_requests_state
+          CHECK (state IN ('pending', 'approved', 'rejected'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_name_access_requests_project_requester_created
+       ON project_name_access_requests (project_id, requester_organization_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_name_access_requests_requester_updated
+       ON project_name_access_requests (requester_organization_id, updated_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_name_access_requests_one_active_pending
+       ON project_name_access_requests (project_id, requester_organization_id)
+       WHERE state = 'pending'`
+    ]
+  }
+];
+
+export const projectCommunicationAlbumMigrations = [
+  {
+    key: '20260428_project_communication_and_album_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_communication_threads (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        owner_organization_id varchar(64) NOT NULL,
+        counterpart_organization_id varchar(64) NOT NULL,
+        thread_state varchar(32) NOT NULL DEFAULT 'open',
+        last_message_id varchar(64),
+        last_message_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_communication_threads_state
+          CHECK (thread_state IN ('open', 'closed'))
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_communication_threads_unique_pair
+       ON project_communication_threads (project_id, owner_organization_id, counterpart_organization_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_communication_threads_counterpart_updated
+       ON project_communication_threads (counterpart_organization_id, updated_at DESC)`,
+      `CREATE TABLE IF NOT EXISTS project_communication_messages (
+        id varchar(64) PRIMARY KEY,
+        thread_id varchar(64) NOT NULL,
+        project_id varchar(64) NOT NULL,
+        sender_user_id varchar(64) NOT NULL,
+        sender_actor_id varchar(64),
+        sender_organization_id varchar(64) NOT NULL,
+        message_kind varchar(32) NOT NULL DEFAULT 'text',
+        body text NOT NULL,
+        client_message_id varchar(96),
+        message_state varchar(32) NOT NULL DEFAULT 'active',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_communication_messages_kind
+          CHECK (message_kind IN ('text')),
+        CONSTRAINT chk_project_communication_messages_state
+          CHECK (message_state IN ('active', 'removed'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_communication_messages_thread_created
+       ON project_communication_messages (thread_id, created_at ASC, id ASC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_communication_messages_client_dedupe
+       ON project_communication_messages (thread_id, sender_organization_id, client_message_id)
+       WHERE client_message_id IS NOT NULL`,
+      `CREATE TABLE IF NOT EXISTS project_communication_read_cursors (
+        thread_id varchar(64) NOT NULL,
+        organization_id varchar(64) NOT NULL,
+        project_id varchar(64) NOT NULL,
+        last_read_message_id varchar(64),
+        last_read_at timestamptz NOT NULL,
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        PRIMARY KEY (thread_id, organization_id)
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_communication_read_cursors_project
+       ON project_communication_read_cursors (project_id, organization_id)`,
+      `CREATE TABLE IF NOT EXISTS project_album_photos (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        file_asset_id varchar(64) NOT NULL,
+        category varchar(32) NOT NULL,
+        caption text,
+        mime_type varchar(128) NOT NULL,
+        sort_order integer NOT NULL DEFAULT 0,
+        photo_state varchar(32) NOT NULL DEFAULT 'active',
+        uploaded_by_user_id varchar(64) NOT NULL,
+        uploaded_by_actor_id varchar(64),
+        uploaded_by_organization_id varchar(64) NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        removed_at timestamptz,
+        CONSTRAINT chk_project_album_photos_category
+          CHECK (category IN ('contract', 'progress', 'final', 'defect')),
+        CONSTRAINT chk_project_album_photos_state
+          CHECK (photo_state IN ('active', 'removed'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_album_photos_project_category_order
+       ON project_album_photos (project_id, category, sort_order ASC, created_at ASC)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_album_photos_file_asset
+       ON project_album_photos (file_asset_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_album_photos_active_file_asset
+       ON project_album_photos (project_id, file_asset_id)
+       WHERE photo_state = 'active'`
+    ]
+  }
+];
+
 export const serverMigrations = [
   ...enterpriseHubMigrations,
   ...projectPublishCorridorMigrations,
@@ -1429,6 +1667,7 @@ export const serverMigrations = [
   ...personalMinimalEditMigrations,
   ...profileSafetyP0Migrations,
   ...forumReportP0Migrations,
+  ...forumInteractionTruthMigrations,
   ...blockP0AMigrations,
   ...governancePenaltyP1AMigrations,
   ...governanceAppealP1AMigrations,
@@ -1440,6 +1679,7 @@ export const serverMigrations = [
   ...bidSubmitQuoteAmountRepairMigrations,
   ...bidSeatTruthBackfillMigrations,
   ...bidDuplicateSubmitRepairMigrations,
+  ...bidSubmissionSnapshotAttachmentTruthMigrations,
   ...bidAwardBridgeCompletionMigrations,
   ...authWhitelistTestSessionMigrations,
   ...authLoginLegalConsentMigrations,
@@ -1449,5 +1689,7 @@ export const serverMigrations = [
   ...certificationLicenseFieldCollectionMigrations,
   ...enterpriseDisplayTruthRepairMigrations,
   ...personalCertificationDualGateMigrations,
-  ...tradingImRoundAMigrations
+  ...tradingImRoundAMigrations,
+  ...projectNameAccessRequestMigrations,
+  ...projectCommunicationAlbumMigrations
 ];

@@ -41,7 +41,6 @@ class _ForumDetailHero extends StatelessWidget {
                 author: author,
                 publishedAt: publishedAt,
                 onOpenAuthor: onOpenAuthor,
-                avatarUrl: null,
               ),
             ),
             if (viewerFollowsTopic)
@@ -154,18 +153,24 @@ class _ForumDetailActionBar extends StatelessWidget {
   const _ForumDetailActionBar({
     required this.viewerHasLiked,
     required this.viewerHasBookmarked,
+    required this.likeCount,
+    required this.replyCount,
     required this.onLike,
     required this.onBookmark,
     required this.onReply,
+    required this.onReport,
     this.likePending = false,
     this.bookmarkPending = false,
   });
 
   final bool viewerHasLiked;
   final bool viewerHasBookmarked;
+  final int likeCount;
+  final int replyCount;
   final VoidCallback onLike;
   final VoidCallback onBookmark;
   final VoidCallback onReply;
+  final VoidCallback onReport;
   final bool likePending;
   final bool bookmarkPending;
 
@@ -193,9 +198,18 @@ class _ForumDetailActionBar extends StatelessWidget {
                 label: likePending
                     ? '处理中'
                     : viewerHasLiked
-                    ? '已点赞'
-                    : '点赞',
+                    ? '已点赞 $likeCount'
+                    : '点赞 $likeCount',
                 onPressed: likePending ? null : onLike,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _ForumDetailActionButton(
+                icon: Icons.mode_comment_outlined,
+                label: replyCount > 0 ? '评论 $replyCount' : '暂无评论',
+                emphasized: true,
+                onPressed: onReply,
               ),
             ),
             const SizedBox(width: 10),
@@ -217,72 +231,9 @@ class _ForumDetailActionBar extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _ForumDetailActionButton(
-                icon: Icons.mode_comment_outlined,
-                label: '评论',
-                emphasized: true,
-                onPressed: onReply,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ForumDetailActionButton extends StatelessWidget {
-  const _ForumDetailActionButton({
-    required this.icon,
-    required this.label,
-    required this.onPressed,
-    this.emphasized = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final VoidCallback? onPressed;
-  final bool emphasized;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return InkWell(
-      borderRadius: BorderRadius.circular(999),
-      onTap: onPressed,
-      child: Ink(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 11),
-        decoration: BoxDecoration(
-          color: emphasized
-              ? colorScheme.primary
-              : onPressed == null
-              ? colorScheme.surfaceContainerHighest
-              : colorScheme.primaryContainer.withValues(alpha: 0.58),
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(
-              icon,
-              size: 18,
-              color: emphasized
-                  ? colorScheme.onPrimary
-                  : colorScheme.onPrimaryContainer,
-            ),
-            const SizedBox(width: 6),
-            Flexible(
-              child: Text(
-                label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelLarge?.copyWith(
-                  color: emphasized
-                      ? colorScheme.onPrimary
-                      : colorScheme.onPrimaryContainer,
-                  fontWeight: FontWeight.w800,
-                ),
+                icon: Icons.flag_outlined,
+                label: '举报',
+                onPressed: onReport,
               ),
             ),
           ],
@@ -408,42 +359,6 @@ class _ForumDetailAttachmentRow extends StatelessWidget {
               ],
             ),
           ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ForumDetailCommentEmpty extends StatelessWidget {
-  const _ForumDetailCommentEmpty();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '当前还没有评论',
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '欢迎先说说你的看法，或者直接进入评论区继续互动。',
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.55),
-            ),
-          ],
         ),
       ),
     );

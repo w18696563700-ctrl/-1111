@@ -20,6 +20,7 @@ class ForumToggleAcceptedView {
     required this.state,
     this.viewerHasLiked,
     this.viewerHasBookmarked,
+    this.viewerFollowsAuthor,
     this.likeCount,
   });
 
@@ -27,5 +28,6 @@ class ForumToggleAcceptedView {
   final String state;
   final bool? viewerHasLiked;
   final bool? viewerHasBookmarked;
+  final bool? viewerFollowsAuthor;
   final int? likeCount;
 }

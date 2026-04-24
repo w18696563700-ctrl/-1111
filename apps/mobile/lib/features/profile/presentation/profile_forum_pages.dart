@@ -18,7 +18,9 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
   _commentsResult;
   ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>?
   _bookmarksResult;
-  ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>? _followsResult;
+  ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>? _likesResult;
+  ForumReadResult<ForumPagedCollectionView<ForumFollowedAuthorItemView>>?
+  _followsResult;
   ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>? _draftsResult;
 
   @override
@@ -33,6 +35,7 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
       ForumConsumerLayer.instance.loadMyPosts(),
       ForumConsumerLayer.instance.loadMyComments(),
       ForumConsumerLayer.instance.loadMyBookmarks(),
+      ForumConsumerLayer.instance.loadMyLikes(),
       ForumConsumerLayer.instance.loadMyFollows(),
       ForumConsumerLayer.instance.loadDraftList(),
     ]);
@@ -52,11 +55,16 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
       _bookmarksResult =
           results[2]
               as ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>;
-      _followsResult =
+      _likesResult =
           results[3]
-              as ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>;
-      _draftsResult =
+              as ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>;
+      _followsResult =
           results[4]
+              as ForumReadResult<
+                ForumPagedCollectionView<ForumFollowedAuthorItemView>
+              >;
+      _draftsResult =
+          results[5]
               as ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>;
       _loading = false;
     });
@@ -70,6 +78,7 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
         _isReadyState(_postsResult?.state) &&
         _isReadyState(_commentsResult?.state) &&
         _isReadyState(_bookmarksResult?.state) &&
+        _isReadyState(_likesResult?.state) &&
         _isReadyState(_followsResult?.state) &&
         _isReadyState(_draftsResult?.state);
 
@@ -133,8 +142,19 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
                 ).pushNamed(ExhibitionRoutes.forumMeBookmarks),
               ),
               _ProfileForumEntryRow(
+                title: '我的点赞',
+                subtitle: '查看我点过赞的帖子',
+                countLabel: _countLabel(
+                  _likesResult?.data?.items.length,
+                  _likesResult?.state,
+                ),
+                onTap: () => Navigator.of(
+                  context,
+                ).pushNamed(ExhibitionRoutes.forumMeLikes),
+              ),
+              _ProfileForumEntryRow(
                 title: '我的关注',
-                subtitle: '查看我持续跟进的话题',
+                subtitle: '查看我持续关注的作者',
                 countLabel: _countLabel(
                   _followsResult?.data?.items.length,
                   _followsResult?.state,
@@ -173,6 +193,7 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
     return '帖子 ${_countLabel(_visiblePostsCount(_postsResult?.data?.items), _postsResult?.state)} · '
         '评论 ${_countLabel(_commentsResult?.data?.items.length, _commentsResult?.state)} · '
         '收藏 ${_countLabel(_bookmarksResult?.data?.items.length, _bookmarksResult?.state)} · '
+        '点赞 ${_countLabel(_likesResult?.data?.items.length, _likesResult?.state)} · '
         '关注 ${_countLabel(_followsResult?.data?.items.length, _followsResult?.state)} · '
         '草稿 ${_countLabel(_draftsResult?.data?.items.length, _draftsResult?.state)}';
   }
@@ -185,6 +206,7 @@ class _ProfileForumPageState extends State<ProfileForumPage> {
       (state: _postsResult?.state, message: _postsResult?.message),
       (state: _commentsResult?.state, message: _commentsResult?.message),
       (state: _bookmarksResult?.state, message: _bookmarksResult?.message),
+      (state: _likesResult?.state, message: _likesResult?.message),
       (state: _followsResult?.state, message: _followsResult?.message),
       (state: _draftsResult?.state, message: _draftsResult?.message),
     ];
@@ -261,7 +283,7 @@ class _ProfileForumHeader extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '帖子、评论、收藏、关注、草稿与举报记录',
+                    '帖子、评论、点赞、收藏、关注、草稿与举报记录',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),

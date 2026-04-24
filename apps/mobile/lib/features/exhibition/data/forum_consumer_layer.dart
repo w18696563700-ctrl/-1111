@@ -43,6 +43,7 @@ final class ForumCanonicalPaths {
   static const String postComment = '/api/app/forum/post/comment';
   static const String postLike = '/api/app/forum/post/like';
   static const String postBookmark = '/api/app/forum/post/bookmark';
+  static const String authorFollow = '/api/app/forum/author/follow';
   static const String postEdit = '/api/app/forum/post/edit';
   static const String postDelete = '/api/app/forum/post/delete';
   static const String reportSubmit = '/api/app/forum/report/submit';
@@ -62,6 +63,7 @@ final class ForumCanonicalPaths {
   static const String mePosts = '/api/app/forum/me/posts';
   static const String meComments = '/api/app/forum/me/comments';
   static const String meBookmarks = '/api/app/forum/me/bookmarks';
+  static const String meLikes = '/api/app/forum/me/likes';
   static const String meFollows = '/api/app/forum/me/follows';
   static const String interactionInbox = '/api/app/forum/interaction/inbox';
   static const String fileAccess = '/api/app/file/access';
@@ -117,6 +119,7 @@ class ForumConsumerLayer {
       },
       parser: _parseFeed,
       isEmpty: (ForumFeedView data) => data.items.isEmpty,
+      useProtectedSession: true,
     );
   }
 
@@ -126,6 +129,7 @@ class ForumConsumerLayer {
       path: ForumCanonicalPaths.topicMetadata,
       parser: _parseTopicMetadata,
       isEmpty: (List<ForumTopicMetadataItemView> data) => data.isEmpty,
+      useProtectedSession: true,
     );
   }
 
@@ -140,6 +144,7 @@ class ForumConsumerLayer {
       parser: _parseTopicCollection,
       isEmpty: (ForumPagedCollectionView<ForumTopicCardView> data) =>
           data.items.isEmpty,
+      useProtectedSession: true,
     );
   }
 
@@ -166,6 +171,7 @@ class ForumConsumerLayer {
       queryParameters: <String, String>{'topicId': resolved},
       parser: _parseTopicDetail,
       isEmpty: (_) => false,
+      useProtectedSession: true,
     );
   }
 
@@ -192,11 +198,12 @@ class ForumConsumerLayer {
       queryParameters: <String, String>{'postId': resolved},
       parser: _parsePostDetail,
       isEmpty: (_) => false,
+      useProtectedSession: true,
     );
   }
 
   Future<ForumReadResult<ForumPagedCollectionView<ForumCommentItemView>>>
-  loadPostComments({required String? postId}) {
+  loadPostComments({required String? postId, String? cursor, int? pageSize}) {
     final resolved = _requiredRouteValue(postId);
     if (resolved == null) {
       return Future<
@@ -216,10 +223,15 @@ class ForumConsumerLayer {
 
     return _loadRead(
       path: ForumCanonicalPaths.postComments,
-      queryParameters: <String, String>{'postId': resolved},
+      queryParameters: <String, String>{
+        'postId': resolved,
+        if (cursor != null && cursor.trim().isNotEmpty) 'cursor': cursor.trim(),
+        if (pageSize != null && pageSize > 0) 'pageSize': '$pageSize',
+      },
       parser: _parseCommentCollection,
       isEmpty: (ForumPagedCollectionView<ForumCommentItemView> data) =>
           data.items.isEmpty,
+      useProtectedSession: true,
     );
   }
 
@@ -281,6 +293,7 @@ class ForumConsumerLayer {
       queryParameters: <String, String>{'q': resolved},
       parser: _parseSearch,
       isEmpty: (ForumSearchView data) => data.items.isEmpty,
+      useProtectedSession: true,
     );
   }
 
@@ -317,12 +330,23 @@ class ForumConsumerLayer {
     );
   }
 
-  Future<ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>>
+  Future<ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>>
+  loadMyLikes() {
+    return _loadRead(
+      path: ForumCanonicalPaths.meLikes,
+      parser: _parseMyLikes,
+      isEmpty: (ForumPagedCollectionView<ForumPostCardView> data) =>
+          data.items.isEmpty,
+      useProtectedSession: true,
+    );
+  }
+
+  Future<ForumReadResult<ForumPagedCollectionView<ForumFollowedAuthorItemView>>>
   loadMyFollows() {
     return _loadRead(
       path: ForumCanonicalPaths.meFollows,
       parser: _parseMyFollows,
-      isEmpty: (ForumPagedCollectionView<ForumTopicCardView> data) =>
+      isEmpty: (ForumPagedCollectionView<ForumFollowedAuthorItemView> data) =>
           data.items.isEmpty,
       useProtectedSession: true,
     );
@@ -398,7 +422,7 @@ class ForumConsumerLayer {
     } on HttpException {
       return _readTransportFailure(path, '当前服务暂时不可用');
     } on StateError {
-      return _readTransportFailure(path, '当前内容暂时不可用');
+      return _readTransportFailure(path, '论坛接口状态异常，请重新加载后再试');
     } on FormatException {
       return ForumReadResult<T>(
         state: AppPageState.errorNonRetryable,

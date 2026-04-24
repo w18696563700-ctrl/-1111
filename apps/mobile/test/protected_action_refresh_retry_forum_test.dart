@@ -15,12 +15,16 @@ void main() {
     var saveRequests = 0;
     _installAuthConsumer(
       FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          'POST /api/app/auth/refresh': (AppApiRequest request) async {
-            refreshRequests += 1;
-            return _refreshSuccess(request, accessToken: 'forum-save-token');
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(
+                  request,
+                  accessToken: 'forum-save-token',
+                );
+              },
+            },
       ),
     );
 
@@ -28,27 +32,32 @@ void main() {
       client: AppApiClient(
         config: _config(),
         transport: FakeAppApiTransport(
-          handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'POST /api/app/forum/draft/save': (AppApiRequest request) async {
-              saveRequests += 1;
-              if (saveRequests == 1) {
-                return _unauthorized(
-                  request,
-                  path: ForumCanonicalPaths.draftSave,
-                );
-              }
-              expect(request.headers['authorization'], 'Bearer forum-save-token');
-              return AppApiResponse(
-                statusCode: 202,
-                uri: request.uri,
-                body: const <String, Object?>{
-                  'draftId': 'draft-1',
-                  'state': 'draft_saved',
-                  'updatedAt': '2026-04-03T09:30:00Z',
-                },
-              );
-            },
-          },
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/forum/draft/save':
+                    (AppApiRequest request) async {
+                      saveRequests += 1;
+                      if (saveRequests == 1) {
+                        return _unauthorized(
+                          request,
+                          path: ForumCanonicalPaths.draftSave,
+                        );
+                      }
+                      expect(
+                        request.headers['authorization'],
+                        'Bearer forum-save-token',
+                      );
+                      return AppApiResponse(
+                        statusCode: 202,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'draftId': 'draft-1',
+                          'state': 'draft_saved',
+                          'updatedAt': '2026-04-03T09:30:00Z',
+                        },
+                      );
+                    },
+              },
         ),
       ),
     );
@@ -71,12 +80,16 @@ void main() {
     var publishRequests = 0;
     _installAuthConsumer(
       FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          'POST /api/app/auth/refresh': (AppApiRequest request) async {
-            refreshRequests += 1;
-            return _refreshSuccess(request, accessToken: 'forum-publish-token');
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(
+                  request,
+                  accessToken: 'forum-publish-token',
+                );
+              },
+            },
       ),
     );
 
@@ -84,20 +97,21 @@ void main() {
       client: AppApiClient(
         config: _config(),
         transport: FakeAppApiTransport(
-          handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'POST /api/app/forum/publish': (AppApiRequest request) async {
-              publishRequests += 1;
-              expect(
-                request.headers['authorization'],
-                'Bearer forum-publish-token',
-              );
-              return AppApiResponse(
-                statusCode: 202,
-                uri: request.uri,
-                body: _publishClearBody(),
-              );
-            },
-          },
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/forum/publish': (AppApiRequest request) async {
+                  publishRequests += 1;
+                  expect(
+                    request.headers['authorization'],
+                    'Bearer forum-publish-token',
+                  );
+                  return AppApiResponse(
+                    statusCode: 202,
+                    uri: request.uri,
+                    body: _publishClearBody(),
+                  );
+                },
+              },
         ),
       ),
     );
@@ -115,15 +129,16 @@ void main() {
     var draftListRequests = 0;
     _installAuthConsumer(
       FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          'POST /api/app/auth/refresh': (AppApiRequest request) async {
-            refreshRequests += 1;
-            return _refreshSuccess(
-              request,
-              accessToken: 'forum-draft-list-token',
-            );
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(
+                  request,
+                  accessToken: 'forum-draft-list-token',
+                );
+              },
+            },
       ),
     );
 
@@ -131,22 +146,23 @@ void main() {
       client: AppApiClient(
         config: _config(),
         transport: FakeAppApiTransport(
-          handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/draft/list': (AppApiRequest request) async {
-              draftListRequests += 1;
-              if (draftListRequests == 1) {
-                return _unauthorized(
-                  request,
-                  path: ForumCanonicalPaths.draftList,
-                );
-              }
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _draftListBody(),
-              );
-            },
-          },
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/forum/draft/list': (AppApiRequest request) async {
+                  draftListRequests += 1;
+                  if (draftListRequests == 1) {
+                    return _unauthorized(
+                      request,
+                      path: ForumCanonicalPaths.draftList,
+                    );
+                  }
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _draftListBody(),
+                  );
+                },
+              },
         ),
       ),
     );
@@ -165,12 +181,13 @@ void main() {
     var meIndexRequests = 0;
     _installAuthConsumer(
       FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          'POST /api/app/auth/refresh': (AppApiRequest request) async {
-            refreshRequests += 1;
-            return _refreshSuccess(request, accessToken: 'forum-me-token');
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(request, accessToken: 'forum-me-token');
+              },
+            },
       ),
     );
 
@@ -178,17 +195,21 @@ void main() {
       client: AppApiClient(
         config: _config(),
         transport: FakeAppApiTransport(
-          handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/me/index': (AppApiRequest request) async {
-              meIndexRequests += 1;
-              expect(request.headers['authorization'], 'Bearer forum-me-token');
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _meIndexBody(),
-              );
-            },
-          },
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/forum/me/index': (AppApiRequest request) async {
+                  meIndexRequests += 1;
+                  expect(
+                    request.headers['authorization'],
+                    'Bearer forum-me-token',
+                  );
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _meIndexBody(),
+                  );
+                },
+              },
         ),
       ),
     );
@@ -201,18 +222,79 @@ void main() {
     expect(meIndexRequests, 1);
   });
 
-  test('forum interaction inbox recovers after one refresh retry', () async {
+  test(
+    'forum feed recovers with pre-refresh for cloud carrier reads',
+    () async {
+      _installSession(expired: true);
+      var refreshRequests = 0;
+      var feedRequests = 0;
+      _installAuthConsumer(
+        FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                  refreshRequests += 1;
+                  return _refreshSuccess(
+                    request,
+                    accessToken: 'forum-feed-token',
+                  );
+                },
+              },
+        ),
+      );
+
+      final consumer = ForumConsumerLayer(
+        client: AppApiClient(
+          config: _config(),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/forum/feed': (AppApiRequest request) async {
+                    feedRequests += 1;
+                    expect(
+                      request.headers['authorization'],
+                      'Bearer forum-feed-token',
+                    );
+                    expect(request.uri.queryParameters['scope'], 'square');
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _feedBody(),
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+
+      final result = await consumer.loadFeed(scope: 'square');
+
+      expect(result.state, AppPageState.content);
+      expect(result.data?.items.length, 1);
+      expect(refreshRequests, 1);
+      expect(feedRequests, 1);
+    },
+  );
+
+  test('forum post detail recovers after one refresh retry', () async {
     _installSession(expired: false);
     var refreshRequests = 0;
-    var inboxRequests = 0;
+    var detailRequests = 0;
     _installAuthConsumer(
       FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          'POST /api/app/auth/refresh': (AppApiRequest request) async {
-            refreshRequests += 1;
-            return _refreshSuccess(request, accessToken: 'forum-inbox-token');
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(
+                  request,
+                  accessToken: 'forum-detail-token',
+                );
+              },
+            },
       ),
     );
 
@@ -220,23 +302,83 @@ void main() {
       client: AppApiClient(
         config: _config(),
         transport: FakeAppApiTransport(
-          handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/interaction/inbox': (AppApiRequest request) async {
-              inboxRequests += 1;
-              if (inboxRequests == 1) {
-                return _unauthorized(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/forum/post/detail':
+                    (AppApiRequest request) async {
+                      detailRequests += 1;
+                      if (detailRequests == 1) {
+                        return _unauthorized(
+                          request,
+                          path: ForumCanonicalPaths.postDetail,
+                        );
+                      }
+                      expect(
+                        request.headers['authorization'],
+                        'Bearer forum-detail-token',
+                      );
+                      expect(request.uri.queryParameters['postId'], 'post-1');
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: _postDetailBody(),
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final result = await consumer.loadPostDetail(postId: 'post-1');
+
+    expect(result.state, AppPageState.content);
+    expect(result.data?.author.avatarUrl, 'https://example.test/avatar.png');
+    expect(refreshRequests, 1);
+    expect(detailRequests, 2);
+  });
+
+  test('forum interaction inbox recovers after one refresh retry', () async {
+    _installSession(expired: false);
+    var refreshRequests = 0;
+    var inboxRequests = 0;
+    _installAuthConsumer(
+      FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(
                   request,
-                  path: ForumCanonicalPaths.interactionInbox,
+                  accessToken: 'forum-inbox-token',
                 );
-              }
-              expect(request.uri.queryParameters['tab'], 'reply');
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _interactionInboxBody(),
-              );
+              },
             },
-          },
+      ),
+    );
+
+    final consumer = ForumConsumerLayer(
+      client: AppApiClient(
+        config: _config(),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/forum/interaction/inbox':
+                    (AppApiRequest request) async {
+                      inboxRequests += 1;
+                      if (inboxRequests == 1) {
+                        return _unauthorized(
+                          request,
+                          path: ForumCanonicalPaths.interactionInbox,
+                        );
+                      }
+                      expect(request.uri.queryParameters['tab'], 'reply');
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: _interactionInboxBody(),
+                      );
+                    },
+              },
         ),
       ),
     );
@@ -274,10 +416,7 @@ void _installSession({required bool expired}) {
 void _installAuthConsumer(FakeAppApiTransport transport) {
   AuthConsumerLayer.install(
     AuthConsumerLayer(
-      client: AppApiClient(
-        config: _config(),
-        transport: transport,
-      ),
+      client: AppApiClient(config: _config(), transport: transport),
     ),
   );
 }
@@ -297,27 +436,18 @@ AppApiResponse _refreshSuccess(
   );
 }
 
-AppApiResponse _unauthorized(
-  AppApiRequest request, {
-  required String path,
-}) {
+AppApiResponse _unauthorized(AppApiRequest request, {required String path}) {
   return AppApiResponse(
     statusCode: 401,
     uri: request.uri.replace(path: path),
-    body: const <String, Object?>{
-      'code': 'UNAUTHORIZED',
-      'message': '当前登录已失效',
-    },
+    body: const <String, Object?>{'code': 'UNAUTHORIZED', 'message': '当前登录已失效'},
   );
 }
 
 Map<String, Object?> _draftListBody() {
   return <String, Object?>{
     'items': <Object?>[_draftCard('draft-1')],
-    'page': const <String, Object?>{
-      'nextCursor': null,
-      'hasMore': false,
-    },
+    'page': const <String, Object?>{'nextCursor': null, 'hasMore': false},
   };
 }
 
@@ -352,10 +482,52 @@ Map<String, Object?> _interactionInboxBody() {
         'actor': _authorSummary(),
       },
     ],
-    'page': const <String, Object?>{
-      'nextCursor': null,
-      'hasMore': false,
+    'page': const <String, Object?>{'nextCursor': null, 'hasMore': false},
+  };
+}
+
+Map<String, Object?> _feedBody() {
+  return <String, Object?>{
+    'items': <Object?>[
+      <String, Object?>{
+        'postId': 'post-1',
+        'topicId': 'topic-1',
+        'topicLabel': '布展进场',
+        'title': '论坛读链帖子',
+        'excerpt': '论坛读链摘要',
+        'state': 'published',
+        'author': _authorSummary(),
+        'engagement': const <String, Object?>{
+          'replyCount': 0,
+          'likeCount': 0,
+          'viewCount': 0,
+        },
+        'publishedAt': '2026-04-03T09:30:00Z',
+        'viewerHasLiked': false,
+        'viewerHasBookmarked': false,
+        'viewerFollowsTopic': false,
+      },
+    ],
+    'page': const <String, Object?>{'nextCursor': null, 'hasMore': false},
+  };
+}
+
+Map<String, Object?> _postDetailBody() {
+  return <String, Object?>{
+    'postId': 'post-1',
+    'topicId': 'topic-1',
+    'topicTitle': '布展进场',
+    'state': 'published',
+    'author': <String, Object?>{
+      ..._authorSummary(),
+      'avatarUrl': 'https://example.test/avatar.png',
     },
+    'content': '论坛详情正文',
+    'attachmentRefs': const <Object?>[],
+    'publishedAt': '2026-04-03T09:30:00Z',
+    'viewerHasLiked': false,
+    'viewerHasBookmarked': false,
+    'viewerFollowsTopic': false,
   };
 }
 

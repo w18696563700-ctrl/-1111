@@ -158,6 +158,7 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
   bool _bookmarkPending = false;
   bool _inlineCommentVisible = false;
   bool _inlineCommentSubmitting = false;
+  bool _commentsLoadingMore = false;
   final Set<String> _openingAttachmentAssetIds = <String>{};
 
   @override
@@ -177,7 +178,10 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     setState(() => _loading = true);
     final results = await Future.wait<Object>(<Future<Object>>[
       ForumConsumerLayer.instance.loadPostDetail(postId: widget.postId),
-      ForumConsumerLayer.instance.loadPostComments(postId: widget.postId),
+      ForumConsumerLayer.instance.loadPostComments(
+        postId: widget.postId,
+        pageSize: 10,
+      ),
     ]);
     if (!mounted) {
       return;
@@ -337,6 +341,8 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
           _ForumDetailActionBar(
             viewerHasLiked: effectiveViewerHasLiked,
             viewerHasBookmarked: effectiveViewerHasBookmarked,
+            likeCount: detail.engagement.likeCount,
+            replyCount: detail.engagement.replyCount,
             likePending: _likePending,
             bookmarkPending: _bookmarkPending,
             onLike: _likePending
@@ -346,6 +352,14 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
                 ? () {}
                 : () => _toggleBookmark(effectiveViewerHasBookmarked),
             onReply: () => _openInlineComments(detail.postId),
+            onReport: () => _showForumReportSheet(
+              context,
+              target: _ForumReportTarget(
+                targetType: 'post',
+                targetId: detail.postId,
+                sheetTitle: '举报帖子',
+              ),
+            ),
           ),
           if (_inlineCommentVisible) ...<Widget>[
             const SizedBox(height: 14),
@@ -378,30 +392,16 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
               ],
             ),
           ],
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton.icon(
-              onPressed: () => _showForumReportSheet(
-                context,
-                target: _ForumReportTarget(
-                  targetType: 'post',
-                  targetId: detail.postId,
-                  sheetTitle: '举报帖子',
-                ),
-              ),
-              icon: const Icon(Icons.flag_outlined, size: 18),
-              label: const Text('举报帖子'),
-            ),
-          ),
           const SizedBox(height: 24),
           _buildForumCommentPreview(
             context: context,
             detail: detail,
             comments: comments,
             loading: _loading,
+            loadingMore: _commentsLoadingMore,
             commentResult: _commentResult,
             onRetry: _load,
+            onLoadMore: () => _loadMoreComments(detail.postId),
           ),
         ],
       ],
@@ -452,6 +452,61 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     }
     setState(() => _inlineCommentSubmitting = false);
     _showActionMessage(context, '评论已发送');
+  }
+
+  Future<void> _loadMoreComments(String postId) async {
+    if (_commentsLoadingMore) {
+      return;
+    }
+    final page = _commentResult?.data?.page;
+    final cursor = page?.nextCursor;
+    if (page?.hasMore != true || cursor == null || cursor.trim().isEmpty) {
+      return;
+    }
+
+    setState(() => _commentsLoadingMore = true);
+    final result = await ForumConsumerLayer.instance.loadPostComments(
+      postId: postId,
+      cursor: cursor,
+      pageSize: 10,
+    );
+    if (!mounted) {
+      return;
+    }
+    final current = _commentResult?.data;
+    final incoming = result.data;
+    if (result.state != AppPageState.content ||
+        current == null ||
+        incoming == null) {
+      setState(() {
+        _commentResult = result;
+        _commentsLoadingMore = false;
+      });
+      return;
+    }
+
+    final seen = current.items
+        .map((ForumCommentItemView item) => item.commentId)
+        .toSet();
+    final mergedItems = <ForumCommentItemView>[
+      ...current.items,
+      ...incoming.items.where(
+        (ForumCommentItemView item) => seen.add(item.commentId),
+      ),
+    ];
+    setState(() {
+      _commentResult =
+          ForumReadResult<ForumPagedCollectionView<ForumCommentItemView>>(
+            state: AppPageState.content,
+            method: result.method,
+            path: result.path,
+            data: ForumPagedCollectionView<ForumCommentItemView>(
+              items: List<ForumCommentItemView>.unmodifiable(mergedItems),
+              page: incoming.page,
+            ),
+          );
+      _commentsLoadingMore = false;
+    });
   }
 
   Future<void> _openAttachment(ForumAttachmentRefView item) async {

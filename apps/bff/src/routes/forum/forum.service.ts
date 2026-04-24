@@ -203,7 +203,7 @@ export class ForumService {
       void routeContract;
       return result;
     } catch (error) {
-      throw this.errors.toHttpException(error, 'FORUM_POST_COMMENTS_FAILED', 'Forum post comments aggregation failed.');
+      throw this.forumCommandErrors.normalizeInteractionReadError(error, 'post_comments');
     }
   }
 
@@ -248,6 +248,22 @@ export class ForumService {
     } catch (error) {
       throw this.errors.toHttpException(error, 'FORUM_DRAFT_LIST_FAILED', 'Forum draft list aggregation failed.');
     }
+  }
+
+  getMyComments(headers: IncomingHttpHeaders, cursor?: string, pageSize?: string) {
+    return this.getMyAssetList('/server/forum/me/comments', headers, cursor, pageSize);
+  }
+
+  getMyBookmarks(headers: IncomingHttpHeaders, cursor?: string, pageSize?: string) {
+    return this.getMyAssetList('/server/forum/me/bookmarks', headers, cursor, pageSize);
+  }
+
+  getMyLikes(headers: IncomingHttpHeaders, cursor?: string, pageSize?: string) {
+    return this.getMyAssetList('/server/forum/me/likes', headers, cursor, pageSize);
+  }
+
+  getMyFollows(headers: IncomingHttpHeaders, cursor?: string, pageSize?: string) {
+    return this.getMyAssetList('/server/forum/me/follows', headers, cursor, pageSize);
   }
 
   async submitReport(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
@@ -299,6 +315,23 @@ export class ForumService {
       cursor: this.asOptionalString(input.cursor),
       pageSize: this.asOptionalString(input.pageSize),
     };
+  }
+
+  private async getMyAssetList(
+    serverPath: string,
+    headers: IncomingHttpHeaders,
+    cursor?: string,
+    pageSize?: string,
+  ) {
+    try {
+      const forwardHeaders = await this.forumCommandContext.buildCommandHeaders(headers);
+      return await this.serverClient.get<Record<string, unknown>>(serverPath, {
+        headers: forwardHeaders,
+        params: this.toCursorParams({ cursor, pageSize }),
+      });
+    } catch (error) {
+      throw this.errors.toHttpException(error, 'FORUM_ME_ASSET_FAILED', 'Forum me asset aggregation failed.');
+    }
   }
 
   private asOptionalString(value: unknown): string | undefined {

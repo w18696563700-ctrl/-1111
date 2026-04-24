@@ -67,6 +67,24 @@ export class ForumCommandErrorService {
     );
   }
 
+  normalizeAuthorReadError(
+    error: unknown,
+    surface: 'profile' | 'posts',
+  ): HttpException {
+    const normalized = this.errors.toHttpException(
+      error,
+      surface === 'profile'
+        ? 'FORUM_AUTHOR_PROFILE_FAILED'
+        : 'FORUM_AUTHOR_POSTS_FAILED',
+      surface === 'profile'
+        ? '公共作者主页读链暂时不可用，请稍后再试。'
+        : '作者公开帖子读链暂时不可用，请稍后再试。',
+    );
+    return this.rewriteMessage(normalized, (code) =>
+      this.translateAuthorReadMessage(surface, code),
+    );
+  }
+
   normalizeInteractionWriteError(
     error: unknown,
     action: ForumInteractionWriteAction,
@@ -120,6 +138,23 @@ export class ForumCommandErrorService {
     return this.rewriteMessage(normalized, (code, message) =>
       this.ownPostMessages.translateOwnPostActionMessage(action, code, message),
     );
+  }
+
+  private translateAuthorReadMessage(
+    surface: 'profile' | 'posts',
+    code: string,
+  ): string {
+    if (code === 'AUTH_SESSION_INVALID') {
+      return '当前登录状态已失效，请重新登录后再试。';
+    }
+    if (code === 'FORUM_AUTHOR_UNAVAILABLE') {
+      return surface === 'profile'
+        ? '当前作者主页暂不可用。'
+        : '当前作者公开帖子暂不可用。';
+    }
+    return surface === 'profile'
+      ? '公共作者主页读链暂时不可用，请稍后再试。'
+      : '作者公开帖子读链暂时不可用，请稍后再试。';
   }
 
   private rewriteMessage(

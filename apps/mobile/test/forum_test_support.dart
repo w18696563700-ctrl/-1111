@@ -89,10 +89,14 @@ Map<String, Object?> _postCard(String postId, String topicTitle) {
     'postId': postId,
     'topicId': 'expo-materials',
     'topicTitle': topicTitle,
+    'title': topicTitle,
     'excerpt': '当前帖子摘要',
     'state': 'published',
     'author': <String, Object?>{'authorId': 'member-1', 'displayName': '赵工'},
     'publishedAt': '2026-03-27T09:30:00Z',
+    'updatedAt': '2026-03-27T09:30:00Z',
+    'canEdit': false,
+    'canDelete': false,
   };
 }
 
@@ -598,14 +602,13 @@ _forumHandlers() {
                 'postId': 'post-fallback-1',
                 'topicId': 'expo-materials',
                 'topicTitle': 'forum-publish-ready-20260327135138-topic',
+                'title': 'forum-publish-ready-20260327135138-topic',
                 'excerpt': 'fallback author 的公开帖子摘要。',
                 'state': 'published',
-                'author': <String, Object?>{
-                  'authorId': 'fallback-author',
-                  'displayName': 'u_forum_20260327130433',
-                  'organizationName': 'closure-dev-org-1774694443',
-                },
                 'publishedAt': '2026-03-27T09:30:00Z',
+                'updatedAt': '2026-03-27T09:30:00Z',
+                'canEdit': false,
+                'canDelete': false,
               },
             ],
             'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
@@ -918,7 +921,9 @@ ExhibitionMobileApp buildForumTestAppWithOverrides({
                         statusCode: 200,
                         uri: request.uri,
                         body: <String, Object?>{
-                          'items': <Object?>[_myAppealListItem('appeal-case-1')],
+                          'items': <Object?>[
+                            _myAppealListItem('appeal-case-1'),
+                          ],
                           'pagination': const <String, Object?>{
                             'page': 1,
                             'pageSize': 20,
@@ -943,7 +948,9 @@ ExhibitionMobileApp buildForumTestAppWithOverrides({
     profileGovernanceAppealConsumerLayer: ProfileGovernanceAppealConsumerLayer(
       client: AppApiClient(
         config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-        transport: FakeAppApiTransport(handlers: profileGovernanceAppealHandlers),
+        transport: FakeAppApiTransport(
+          handlers: profileGovernanceAppealHandlers,
+        ),
       ),
     ),
   );

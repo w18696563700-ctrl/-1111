@@ -83,6 +83,7 @@ Object _parsePostDetail(Map<String, Object?> body) {
   final publishedAt = _readRequiredString(body['publishedAt']);
   final author = _parseAuthor(body['author']);
   final attachments = _parseAttachmentList(body['attachmentRefs']);
+  final engagement = _parseEngagement(body['engagement']);
 
   if (postId == null ||
       topicId == null ||
@@ -92,8 +93,14 @@ Object _parsePostDetail(Map<String, Object?> body) {
       publishedAt == null) {
     return 'forum post detail is missing required fields';
   }
-  if (author is String || attachments is String) {
-    return author is String ? author : attachments as String;
+  if (author is String || attachments is String || engagement is String) {
+    if (author is String) {
+      return author;
+    }
+    if (attachments is String) {
+      return attachments;
+    }
+    return engagement as String;
   }
 
   return ForumPostDetailView(
@@ -105,6 +112,7 @@ Object _parsePostDetail(Map<String, Object?> body) {
     content: content,
     attachmentRefs: attachments as List<ForumAttachmentRefView>,
     publishedAt: publishedAt,
+    engagement: engagement as ForumEngagementSummaryView,
     viewerHasLiked: _readBool(body['viewerHasLiked']),
     viewerHasBookmarked: _readBool(body['viewerHasBookmarked']),
     viewerFollowsTopic: _readBool(body['viewerFollowsTopic']),
@@ -265,8 +273,23 @@ Object _parseMyBookmarks(Map<String, Object?> body) {
   );
 }
 
+Object _parseMyLikes(Map<String, Object?> body) {
+  final items = _parseBookmarkAssetPostList(body['items']);
+  final page = _parsePage(body['page']);
+  if (items is String) {
+    return items;
+  }
+  if (page is String) {
+    return page;
+  }
+  return ForumPagedCollectionView<ForumPostCardView>(
+    items: items as List<ForumPostCardView>,
+    page: page as ForumCursorPageInfoView,
+  );
+}
+
 Object _parseMyFollows(Map<String, Object?> body) {
-  return _parseTopicCollection(body);
+  return _parseFollowedAuthorCollection(body);
 }
 
 Object _parseInteractionInbox(Map<String, Object?> body) {
@@ -306,6 +329,7 @@ Object _parseAuthor(Object? raw) {
   return ForumAuthorSummaryView(
     authorId: authorId,
     displayName: displayName,
+    avatarUrl: _readOptionalString(body['avatarUrl']),
     organizationName: _readOptionalString(body['organizationName']),
   );
 }

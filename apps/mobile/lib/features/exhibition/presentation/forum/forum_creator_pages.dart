@@ -201,7 +201,9 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
 
     final publishResult = result.data;
     if (result.isSuccess && publishResult != null && publishResult.isClear) {
-      final continuation = await _resolveForumPublishContinuation(publishResult);
+      final continuation = await _resolveForumPublishContinuation(
+        publishResult,
+      );
       if (!mounted) {
         return;
       }
@@ -210,9 +212,7 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
         _publishing = false;
       });
       _showActionFeedback(continuation.message);
-      Navigator.of(context).pushReplacementNamed(
-        continuation.routeName,
-      );
+      Navigator.of(context).pushReplacementNamed(continuation.routeName);
       return;
     }
 
@@ -665,15 +665,24 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
     if (!mounted) {
       return;
     }
+    final colorScheme = Theme.of(context).colorScheme;
+    final foregroundColor = error
+        ? colorScheme.onErrorContainer
+        : colorScheme.onInverseSurface;
     final messenger = ScaffoldMessenger.of(context);
     messenger.hideCurrentSnackBar();
     messenger.showSnackBar(
       SnackBar(
-        content: Text(message),
+        content: Text(
+          message,
+          style: TextStyle(
+            color: foregroundColor,
+            fontWeight: FontWeight.w700,
+            height: 1.35,
+          ),
+        ),
         behavior: SnackBarBehavior.floating,
-        backgroundColor: error
-            ? Theme.of(context).colorScheme.errorContainer
-            : null,
+        backgroundColor: error ? colorScheme.errorContainer : null,
       ),
     );
   }

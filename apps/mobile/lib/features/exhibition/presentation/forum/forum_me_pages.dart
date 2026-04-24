@@ -15,7 +15,9 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
   _commentsResult;
   ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>?
   _bookmarksResult;
-  ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>? _followsResult;
+  ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>? _likesResult;
+  ForumReadResult<ForumPagedCollectionView<ForumFollowedAuthorItemView>>?
+  _followsResult;
   final Set<String> _editingPostIds = <String>{};
   final Set<String> _deletingPostIds = <String>{};
   bool _loading = true;
@@ -34,6 +36,7 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
         await ForumConsumerLayer.instance.loadMyComments(),
       ForumMeScope.bookmarks =>
         await ForumConsumerLayer.instance.loadMyBookmarks(),
+      ForumMeScope.likes => await ForumConsumerLayer.instance.loadMyLikes(),
       ForumMeScope.follows => await ForumConsumerLayer.instance.loadMyFollows(),
     };
     if (!mounted) {
@@ -59,11 +62,17 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
                   as ForumReadResult<
                     ForumPagedCollectionView<ForumPostCardView>
                   >;
+        case ForumMeScope.likes:
+          _likesResult =
+              result
+                  as ForumReadResult<
+                    ForumPagedCollectionView<ForumPostCardView>
+                  >;
         case ForumMeScope.follows:
           _followsResult =
               result
                   as ForumReadResult<
-                    ForumPagedCollectionView<ForumTopicCardView>
+                    ForumPagedCollectionView<ForumFollowedAuthorItemView>
                   >;
       }
       _loading = false;
@@ -113,6 +122,7 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
       ForumMeScope.posts => _postsResult?.state,
       ForumMeScope.comments => _commentsResult?.state,
       ForumMeScope.bookmarks => _bookmarksResult?.state,
+      ForumMeScope.likes => _likesResult?.state,
       ForumMeScope.follows => _followsResult?.state,
     };
   }
@@ -122,6 +132,7 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
       ForumMeScope.posts => _postsResult?.message,
       ForumMeScope.comments => _commentsResult?.message,
       ForumMeScope.bookmarks => _bookmarksResult?.message,
+      ForumMeScope.likes => _likesResult?.message,
       ForumMeScope.follows => _followsResult?.message,
     };
   }
@@ -131,6 +142,7 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
       ForumMeScope.posts => _postsResult?.errorCode,
       ForumMeScope.comments => _commentsResult?.errorCode,
       ForumMeScope.bookmarks => _bookmarksResult?.errorCode,
+      ForumMeScope.likes => _likesResult?.errorCode,
       ForumMeScope.follows => _followsResult?.errorCode,
     };
   }
@@ -148,6 +160,10 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
       ForumMeScope.bookmarks => _bookmarkCards(
         context,
         _bookmarksResult?.data?.items ?? const [],
+      ),
+      ForumMeScope.likes => _likeCards(
+        context,
+        _likesResult?.data?.items ?? const [],
       ),
       ForumMeScope.follows => _followCards(
         context,
@@ -317,6 +333,46 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
         .toList();
   }
 
+  List<Widget> _likeCards(BuildContext context, List<ForumPostCardView> likes) {
+    if (likes.isEmpty) {
+      return const <Widget>[
+        ForumPostPreviewCard(
+          title: '当前没有点赞内容',
+          summary: '这里暂时还没有点过赞的帖子。',
+          meta: '列表：0',
+        ),
+      ];
+    }
+
+    return likes
+        .map(
+          (ForumPostCardView item) => _ForumActionableCard(
+            title: forumDisplayTopicLabel(
+              rawLabel: item.topicTitle,
+              topicId: item.topicId,
+            ),
+            summary: item.excerpt,
+            meta:
+                '发布时间：${_compactPublishedAt(item.publishedAt)} | 状态：${forumDisplayContentState(item.state)}',
+            footer: '作者：${forumDisplayActorName(item.author.displayName)}',
+            actions: <Widget>[
+              FilledButton(
+                onPressed: () => Navigator.of(
+                  context,
+                ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
+                child: const Text('查看帖子'),
+              ),
+              FilledButton.tonal(
+                onPressed: () =>
+                    _openForumAuthorProfile(context, item.author.authorId),
+                child: const Text('看作者'),
+              ),
+            ],
+          ),
+        )
+        .toList();
+  }
+
   Future<void> _enterEditContinuation(ForumMyPostItemView item) async {
     setState(() => _editingPostIds.add(item.postId));
     final result = await ForumConsumerLayer.instance.enterPostEdit(
@@ -373,76 +429,50 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
 
   List<Widget> _followCards(
     BuildContext context,
-    List<ForumTopicCardView> topics,
+    List<ForumFollowedAuthorItemView> authors,
   ) {
-    if (topics.isEmpty) {
+    if (authors.isEmpty) {
       return <Widget>[
         const ForumPostPreviewCard(
           title: '当前没有关注内容',
-          summary: '这里暂时还没有可继续查看的话题。',
-          meta: '可以先回关注流看看',
+          summary: '这里暂时还没有持续关注的作者。',
+          meta: '可以先从帖子详情进入作者主页关注',
         ),
         FilledButton.tonal(
           onPressed: () =>
-              Navigator.of(context).pushNamed(ExhibitionRoutes.forumFollowing),
-          child: const Text('回关注流'),
+              Navigator.of(context).pushNamed(ExhibitionRoutes.forum),
+          child: const Text('回论坛'),
         ),
       ];
     }
 
     return <Widget>[
       const ForumPostPreviewCard(
-        title: '关注入口',
-        summary: '这里集中查看最近关注的话题。',
-        meta: '可以继续回到关注流',
+        title: '关注作者',
+        summary: '这里集中查看最近关注的作者。',
+        meta: '点击作者可进入公共作者主页',
       ),
-      ..._topicCards(context, topics, includeFollowingAction: true),
+      ...authors.map(
+        (ForumFollowedAuthorItemView item) => _ForumActionableCard(
+          title: forumDisplayActorName(item.displayName),
+          summary: item.organizationName ?? '当前作者未公开机构信息',
+          meta:
+              '公开帖子 ${item.publicPostCount} | 公开评论 ${item.publicCommentCount}',
+          footer: '关注时间：${_compactPublishedAt(item.followedAt)}',
+          actions: <Widget>[
+            FilledButton(
+              onPressed: () => _openForumAuthorProfile(context, item.authorId),
+              child: const Text('进入主页'),
+            ),
+            FilledButton.tonal(
+              onPressed: () => Navigator.of(
+                context,
+              ).pushNamed(AppBuilding.messages.routePath),
+              child: const Text('去消息楼'),
+            ),
+          ],
+        ),
+      ),
     ];
-  }
-
-  List<Widget> _topicCards(
-    BuildContext context,
-    List<ForumTopicCardView> topics, {
-    bool includeFollowingAction = false,
-  }) {
-    if (topics.isEmpty) {
-      return const <Widget>[];
-    }
-
-    return topics
-        .map(
-          (ForumTopicCardView item) => _ForumActionableCard(
-            title: forumDisplayTopicLabel(
-              rawLabel: item.title,
-              topicId: item.topicId,
-              categoryKey: item.categoryKey,
-            ),
-            summary: forumDisplayTopicDescription(
-              rawDescription: item.excerpt,
-              rawLabel: item.title,
-              topicId: item.topicId,
-              categoryKey: item.categoryKey,
-            ),
-            meta:
-                '分类：${_topicLabel(item.categoryKey)} | 回复：${item.engagement.replyCount} | 最近活跃：${_compactPublishedAt(item.lastActiveAt)}',
-            footer: '作者：${forumDisplayActorName(item.author.displayName)}',
-            actions: <Widget>[
-              FilledButton(
-                onPressed: () => Navigator.of(context).pushNamed(
-                  ExhibitionRoutes.forumTopicWithTopicId(item.topicId),
-                ),
-                child: const Text('查看话题'),
-              ),
-              if (includeFollowingAction)
-                FilledButton.tonal(
-                  onPressed: () => Navigator.of(
-                    context,
-                  ).pushNamed(ExhibitionRoutes.forumFollowing),
-                  child: const Text('回关注流'),
-                ),
-            ],
-          ),
-        )
-        .toList();
   }
 }

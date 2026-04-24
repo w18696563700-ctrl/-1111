@@ -433,6 +433,7 @@ Object _parseCommentAssetItem(Object? raw) {
       : const ForumAuthorSummaryView(
           authorId: 'self',
           displayName: '当前账号',
+          avatarUrl: null,
           organizationName: null,
         );
 

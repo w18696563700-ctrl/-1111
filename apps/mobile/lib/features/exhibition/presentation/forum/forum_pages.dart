@@ -21,6 +21,7 @@ part 'forum_feed_filter_support.dart';
 part 'forum_topics_page.dart';
 part 'forum_detail_pages.dart';
 part 'forum_detail_surface_widgets.dart';
+part 'forum_detail_action_widgets.dart';
 part 'forum_comment_pages.dart';
 part 'forum_creator_pages.dart';
 part 'forum_creator_page_sections.dart';
@@ -39,7 +40,7 @@ part 'forum_page_configs.dart';
 
 enum ForumFeedScope { square, local, following }
 
-enum ForumMeScope { posts, comments, bookmarks, follows }
+enum ForumMeScope { posts, comments, bookmarks, likes, follows }
 
 typedef ForumExternalUrlOpener = Future<bool> Function(Uri uri);
 

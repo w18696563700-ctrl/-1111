@@ -6,10 +6,17 @@ import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
+import { UploadModule } from '../upload/upload.module';
 import { ForumController } from './forum.controller';
+import { ForumAuthorProjectionService } from './forum-author-projection.service';
+import { ForumAuthorQueryService } from './forum-author.query.service';
+import { ForumCommentService } from './forum-comment.service';
+import { ForumAuthorFollowEntity } from './entities/forum-author-follow.entity';
 import { ForumCommentEntity } from './entities/forum-comment.entity';
 import { ForumDraftEntity } from './entities/forum-draft.entity';
+import { ForumPostBookmarkEntity } from './entities/forum-post-bookmark.entity';
 import { ForumPostEntity } from './entities/forum-post.entity';
+import { ForumPostLikeEntity } from './entities/forum-post-like.entity';
 import { ForumReportTicketEntity } from './entities/forum-report-ticket.entity';
 import { ForumPresenter } from './forum.presenter';
 import { ForumReportPresenter } from './forum-report.presenter';
@@ -23,7 +30,10 @@ import { ForumWriteService } from './forum.write.service';
     TypeOrmModule.forFeature([
       ForumCommentEntity,
       ForumDraftEntity,
+      ForumAuthorFollowEntity,
+      ForumPostBookmarkEntity,
       ForumPostEntity,
+      ForumPostLikeEntity,
       ForumReportTicketEntity,
       UserEntity,
       OrganizationEntity,
@@ -31,11 +41,15 @@ import { ForumWriteService } from './forum.write.service';
     ]),
     AuthModule,
     ContentSafetyModule,
-    OrganizationModule
+    OrganizationModule,
+    UploadModule
   ],
   controllers: [ForumController],
   providers: [
     ForumPresenter,
+    ForumAuthorProjectionService,
+    ForumAuthorQueryService,
+    ForumCommentService,
     ForumReportPresenter,
     ForumReportQueryService,
     ForumReportService,

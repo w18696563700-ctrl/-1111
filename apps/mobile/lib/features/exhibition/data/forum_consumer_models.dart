@@ -59,11 +59,13 @@ class ForumAuthorSummaryView {
   const ForumAuthorSummaryView({
     required this.authorId,
     required this.displayName,
+    required this.avatarUrl,
     required this.organizationName,
   });
 
   final String authorId;
   final String displayName;
+  final String? avatarUrl;
   final String? organizationName;
 }
 
@@ -322,6 +324,7 @@ class ForumPostDetailView {
     required this.content,
     required this.attachmentRefs,
     required this.publishedAt,
+    required this.engagement,
     required this.viewerHasLiked,
     required this.viewerHasBookmarked,
     required this.viewerFollowsTopic,
@@ -335,6 +338,7 @@ class ForumPostDetailView {
   final String content;
   final List<ForumAttachmentRefView> attachmentRefs;
   final String publishedAt;
+  final ForumEngagementSummaryView engagement;
   final bool? viewerHasLiked;
   final bool? viewerHasBookmarked;
   final bool? viewerFollowsTopic;

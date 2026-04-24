@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
-import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
+import { ForumCommandErrorService } from './forum-command-error.service';
 
 type ServerForumAuthorProfileResponse = {
   authorId?: unknown;
@@ -22,10 +22,13 @@ type ServerForumPostCard = {
   postId?: unknown;
   topicId?: unknown;
   topicTitle?: unknown;
+  title?: unknown;
   excerpt?: unknown;
   state?: unknown;
-  author?: unknown;
   publishedAt?: unknown;
+  updatedAt?: unknown;
+  canEdit?: unknown;
+  canDelete?: unknown;
 };
 
 const FORUM_AUTHOR_PROFILE_ROUTE_CONTRACT = {
@@ -41,7 +44,7 @@ export class ForumAuthorProfileService {
   constructor(
     private readonly serverClient: ServerClientService,
     private readonly authContext: AuthContextService,
-    private readonly errors: ErrorNormalizerService,
+    private readonly forumCommandErrors: ForumCommandErrorService,
   ) {}
 
   async getAuthorProfile(headers: IncomingHttpHeaders, authorId?: string) {
@@ -56,7 +59,7 @@ export class ForumAuthorProfileService {
       void routeContract;
       return this.shapeAuthorProfileResponse(result);
     } catch (error) {
-      throw this.errors.toHttpException(error, 'FORUM_AUTHOR_PROFILE_FAILED', 'Forum author profile aggregation failed.');
+      throw this.forumCommandErrors.normalizeAuthorReadError(error, 'profile');
     }
   }
 
@@ -74,7 +77,7 @@ export class ForumAuthorProfileService {
       void routeContract;
       return this.shapeAuthorPostsResponse(result);
     } catch (error) {
-      throw this.errors.toHttpException(error, 'FORUM_AUTHOR_POSTS_FAILED', 'Forum author posts aggregation failed.');
+      throw this.forumCommandErrors.normalizeAuthorReadError(error, 'posts');
     }
   }
 
@@ -123,12 +126,15 @@ export class ForumAuthorProfileService {
     const postId = this.asOptionalString(item.postId);
     const topicId = this.asOptionalString(item.topicId);
     const topicTitle = this.asOptionalString(item.topicTitle);
+    const title = this.asOptionalString(item.title);
     const excerpt = this.asOptionalString(item.excerpt);
     const state = this.asOptionalString(item.state);
     const publishedAt = this.asOptionalString(item.publishedAt);
-    const author = this.shapeAuthorSummary(item.author);
+    const updatedAt = this.asOptionalString(item.updatedAt);
+    const canEdit = typeof item.canEdit === 'boolean' ? item.canEdit : false;
+    const canDelete = typeof item.canDelete === 'boolean' ? item.canDelete : false;
 
-    if (!postId || !topicId || !topicTitle || !excerpt || !state || !publishedAt || !author) {
+    if (!postId || !topicId || !topicTitle || !title || !excerpt || !state || !publishedAt || !updatedAt) {
       return null;
     }
 
@@ -136,25 +142,13 @@ export class ForumAuthorProfileService {
       postId,
       topicId,
       topicTitle,
+      title,
       excerpt,
       state,
-      author,
       publishedAt,
-    };
-  }
-
-  private shapeAuthorSummary(raw: unknown) {
-    const body = this.asRecord(raw);
-    const authorId = this.asOptionalString(body.authorId);
-    const displayName = this.asOptionalString(body.displayName);
-    if (!authorId || !displayName) {
-      return null;
-    }
-
-    return {
-      authorId,
-      displayName,
-      organizationName: this.asNullableString(body.organizationName),
+      updatedAt,
+      canEdit,
+      canDelete,
     };
   }
 

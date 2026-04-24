@@ -24,18 +24,17 @@ extension ForumConsumerAuthorReads on ForumConsumerLayer {
       queryParameters: <String, String>{'authorId': resolved},
       parser: _parseAuthorProfile,
       isEmpty: (_) => false,
+      useProtectedSession: true,
     );
   }
 
-  Future<ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>>
-  loadAuthorPosts({
-    required String? authorId,
-    String? cursor,
-    int? pageSize,
-  }) {
+  Future<ForumReadResult<ForumPagedCollectionView<ForumAuthorPostCardView>>>
+  loadAuthorPosts({required String? authorId, String? cursor, int? pageSize}) {
     final resolved = _requiredRouteValue(authorId);
     if (resolved == null) {
-      return Future<ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>>.value(
+      return Future<
+        ForumReadResult<ForumPagedCollectionView<ForumAuthorPostCardView>>
+      >.value(
         ForumReadResult(
           state: AppPageState.notFound,
           method: 'GET',
@@ -56,8 +55,9 @@ extension ForumConsumerAuthorReads on ForumConsumerLayer {
         if (pageSize != null && pageSize > 0) 'pageSize': '$pageSize',
       },
       parser: _parseAuthorPosts,
-      isEmpty: (ForumPagedCollectionView<ForumPostCardView> data) =>
+      isEmpty: (ForumPagedCollectionView<ForumAuthorPostCardView> data) =>
           data.items.isEmpty,
+      useProtectedSession: true,
     );
   }
 }

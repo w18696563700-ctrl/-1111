@@ -31,21 +31,12 @@ class ForumReadStateCard extends StatelessWidget {
       AppPageState.content => '内容已准备好',
       AppPageState.empty => emptyMessage,
       AppPageState.errorRetryable => message ?? '当前内容暂时没有加载出来',
-      AppPageState.errorNonRetryable => message ?? '当前内容暂不可用',
+      AppPageState.errorNonRetryable => message ?? '论坛接口返回异常，请重新加载',
       AppPageState.unauthorized => message ?? '请先登录后查看',
       AppPageState.forbidden => message ?? '当前账号暂不能查看',
-      AppPageState.notFound => message ?? '当前内容暂不可用',
+      AppPageState.notFound => message ?? '没有找到这条论坛内容',
     };
-    final body = switch (resolved) {
-      AppPageState.loading => '请稍候片刻。',
-      AppPageState.content => '现在可以继续查看了。',
-      AppPageState.empty => '这里暂时还没有新的内容。',
-      AppPageState.errorRetryable => '你可以稍后重试。',
-      AppPageState.errorNonRetryable => '当前暂时还不能查看，请稍后再试。',
-      AppPageState.unauthorized => '登录后可以继续查看。',
-      AppPageState.forbidden => '当前账号暂时没有查看权限。',
-      AppPageState.notFound => '这个内容现在还不能查看。',
-    };
+    final body = _forumReadStateBody(state: resolved, message: message);
 
     return ForumSectionCard(
       eyebrow: '页面提示',
@@ -67,6 +58,33 @@ class ForumReadStateCard extends StatelessWidget {
       ],
     );
   }
+}
+
+String _forumReadStateBody({required AppPageState state, String? message}) {
+  if (_forumRouteMissingSummary(message) case final String summary) {
+    return summary;
+  }
+
+  return switch (state) {
+    AppPageState.loading => '请稍候片刻。',
+    AppPageState.content => '现在可以继续查看了。',
+    AppPageState.empty => '这里暂时还没有新的内容。',
+    AppPageState.errorRetryable => '你可以稍后重试。',
+    AppPageState.errorNonRetryable => '当前暂时还不能查看，请稍后再试。',
+    AppPageState.unauthorized => '登录后可以继续查看。',
+    AppPageState.forbidden => '当前账号暂时没有查看权限。',
+    AppPageState.notFound => '这个内容现在还不能查看。',
+  };
+}
+
+String? _forumRouteMissingSummary(String? message) {
+  if (message == null) {
+    return null;
+  }
+  if (!message.contains('尚未部署') || !message.contains('路由')) {
+    return null;
+  }
+  return '这表示当前云端运行时还没有挂出对应论坛读侧接口，请先同步云端后再试。';
 }
 
 class ForumSlimStatePanel extends StatelessWidget {
@@ -96,10 +114,10 @@ class ForumSlimStatePanel extends StatelessWidget {
       AppPageState.content => '内容已准备好',
       AppPageState.empty => emptyMessage,
       AppPageState.errorRetryable => message ?? '当前内容暂时没有加载出来',
-      AppPageState.errorNonRetryable => message ?? '当前暂时不可用',
+      AppPageState.errorNonRetryable => message ?? '论坛接口返回异常',
       AppPageState.unauthorized => message ?? '请先登录后查看',
       AppPageState.forbidden => message ?? '当前账号暂不能查看',
-      AppPageState.notFound => message ?? '当前内容暂不可用',
+      AppPageState.notFound => message ?? '没有找到这条论坛内容',
     };
     final showRetry = switch (resolved) {
       AppPageState.errorRetryable ||

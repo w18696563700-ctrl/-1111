@@ -240,32 +240,43 @@ class _ForumThreadCommentCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Row(
-              children: <Widget>[
-                InkWell(
-                  borderRadius: BorderRadius.circular(999),
-                  onTap: onOpenAuthor,
-                  child: Padding(
-                    padding: const EdgeInsets.all(2),
-                    child: _ForumAuthorAvatar(
-                      label: visibleName,
-                      avatarUrl: null,
-                      radius: 16,
-                    ),
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                borderRadius: BorderRadius.circular(18),
+                onTap: onOpenAuthor,
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 2,
+                    vertical: 2,
+                  ),
+                  child: Row(
+                    children: <Widget>[
+                      _ForumAuthorAvatar(
+                        label: visibleName,
+                        avatarUrl: author.avatarUrl,
+                        radius: 16,
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Text(
+                          '$visibleName · $target',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 18,
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    '$visibleName · $target',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
             const SizedBox(height: 8),
             Text(

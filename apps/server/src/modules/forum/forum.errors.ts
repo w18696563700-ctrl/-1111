@@ -1,4 +1,4 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 
 export function forumDraftInvalid(message: string) {
   return new BadRequestException({
@@ -46,6 +46,34 @@ export function forumReportUnavailable(message: string) {
 export function forumPostUnavailable(message: string) {
   return new NotFoundException({
     code: 'FORUM_POST_UNAVAILABLE',
+    message
+  });
+}
+
+export function forumAuthorUnavailable(message: string) {
+  return new NotFoundException({
+    code: 'FORUM_AUTHOR_UNAVAILABLE',
+    message
+  });
+}
+
+export function forumCommentInvalid(message: string) {
+  return new BadRequestException({
+    code: 'FORUM_COMMENT_INVALID',
+    message
+  });
+}
+
+export function forumCommentInvalidState(message: string) {
+  return new ConflictException({
+    code: 'FORUM_COMMENT_INVALID_STATE',
+    message
+  });
+}
+
+export function forumInteractionUnavailable(message: string) {
+  return new ServiceUnavailableException({
+    code: 'FORUM_INTERACTION_UNAVAILABLE',
     message
   });
 }

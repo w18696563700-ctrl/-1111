@@ -7,6 +7,102 @@ import 'forum_test_support.dart';
 
 void main() {
   testWidgets(
+    'forum detail keeps comments inline with page size 10 and load more',
+    (WidgetTester tester) async {
+      final requestedPageSizes = <String?>[];
+      final requestedCursors = <String?>[];
+      final submittedBodies = <String?>[];
+      final firstPage = List<Map<String, Object?>>.generate(
+        10,
+        (int index) =>
+            _commentFixture('comment-${index + 1}', '第 ${index + 1} 条评论'),
+      );
+      final secondPage = <Map<String, Object?>>[
+        _commentFixture('comment-11', '第 11 条评论'),
+      ];
+
+      await tester.pumpWidget(
+        buildForumTestAppWithOverrides(
+          initialRoute: ExhibitionRoutes.forumPostWithPostId(
+            'post-materials-1',
+          ),
+          forumHandlerOverrides:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/forum/post/detail':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: _detailBody(),
+                      );
+                    },
+                'GET /api/app/forum/post/comments':
+                    (AppApiRequest request) async {
+                      requestedPageSizes.add(
+                        request.uri.queryParameters['pageSize'],
+                      );
+                      requestedCursors.add(
+                        request.uri.queryParameters['cursor'],
+                      );
+                      final isSecondPage =
+                          request.uri.queryParameters['cursor'] == 'cursor-2';
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'items': isSecondPage ? secondPage : firstPage,
+                          'page': <String, Object?>{
+                            'nextCursor': isSecondPage ? null : 'cursor-2',
+                            'hasMore': !isSecondPage,
+                          },
+                        },
+                      );
+                    },
+                'POST /api/app/forum/post/comment':
+                    (AppApiRequest request) async {
+                      final body = request.body as Map<String, Object?>;
+                      submittedBodies.add(body['body'] as String?);
+                      return AppApiResponse(
+                        statusCode: 202,
+                        uri: request.uri,
+                        body: <String, Object?>{
+                          'commentId': 'comment-new-1',
+                          'postId': body['postId'],
+                          'parentCommentId': null,
+                          'state': 'published',
+                          'publishedAt': '2026-03-30T11:00:00Z',
+                        },
+                      );
+                    },
+              },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(requestedPageSizes.first, '10');
+      expect(find.text('查看全部评论'), findsNothing);
+      await tester.tap(find.text('评论').first);
+      await tester.pumpAndSettle();
+      expect(find.text('写评论'), findsOneWidget);
+      await tester.enterText(find.byType(TextField).first, '详情页内联评论');
+      await tester.ensureVisible(find.widgetWithText(FilledButton, '发送'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(FilledButton, '发送'));
+      await tester.pumpAndSettle();
+      expect(submittedBodies, contains('详情页内联评论'));
+
+      await tester.scrollUntilVisible(find.text('查看更多评论'), 500);
+      await tester.ensureVisible(find.text('查看更多评论'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('查看更多评论'));
+      await tester.pumpAndSettle();
+      expect(requestedCursors, contains('cursor-2'));
+      expect(requestedPageSizes, everyElement('10'));
+      expect(find.text('第 11 条评论'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'forum comment interaction submits text comment and reloads list',
     (WidgetTester tester) async {
       final comments = <Map<String, Object?>>[];
@@ -347,4 +443,36 @@ void main() {
     expect(find.textContaining('王监理'), findsOneWidget);
     expect(find.text('查看帖子'), findsOneWidget);
   });
+}
+
+Map<String, Object?> _detailBody() {
+  return const <String, Object?>{
+    'postId': 'post-materials-1',
+    'topicId': 'expo-materials',
+    'topicTitle': '布展进场',
+    'state': 'published',
+    'author': <String, Object?>{'authorId': 'member-1', 'displayName': '赵工'},
+    'content': '正式帖子正文',
+    'attachmentRefs': <Object?>[],
+    'publishedAt': '2026-03-27T09:30:00Z',
+    'viewerHasLiked': false,
+    'viewerHasBookmarked': false,
+    'viewerFollowsTopic': true,
+  };
+}
+
+Map<String, Object?> _commentFixture(String commentId, String body) {
+  return <String, Object?>{
+    'commentId': commentId,
+    'postId': 'post-materials-1',
+    'parentCommentId': null,
+    'author': const <String, Object?>{
+      'authorId': 'member-1',
+      'displayName': '赵工',
+    },
+    'body': body,
+    'state': 'published',
+    'publishedAt': '2026-03-30T11:00:00Z',
+    'replyCount': 0,
+  };
 }

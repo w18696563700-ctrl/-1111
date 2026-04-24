@@ -132,6 +132,9 @@ class AppRouter {
       ExhibitionRoutes.forumMeBookmarks => const ForumMeCollectionPage(
         scope: ForumMeScope.bookmarks,
       ),
+      ExhibitionRoutes.forumMeLikes => const ForumMeCollectionPage(
+        scope: ForumMeScope.likes,
+      ),
       ExhibitionRoutes.forumMeFollows => const ForumMeCollectionPage(
         scope: ForumMeScope.follows,
       ),
@@ -162,6 +165,7 @@ class AppRouter {
       ExhibitionRoutes.forumMePosts => '我的帖子',
       ExhibitionRoutes.forumMeComments => '我的评论',
       ExhibitionRoutes.forumMeBookmarks => '我的收藏',
+      ExhibitionRoutes.forumMeLikes => '我的点赞',
       ExhibitionRoutes.forumMeFollows => '我的关注',
       ExhibitionRoutes.forumMeReports => '我的举报记录',
       _ when reportTicketId != null => '举报详情',
@@ -402,6 +406,15 @@ class AppRouter {
       ExhibitionRoutes.projectClarification => ProjectClarificationPage(
         projectId: routeUri.queryParameters['projectId'],
       ),
+      ExhibitionRoutes.projectNameAccessThread => ProjectNameAccessThreadPage(
+        threadId: routeUri.queryParameters['threadId'],
+        projectId: routeUri.queryParameters['projectId'],
+        requestId: routeUri.queryParameters['requestId'],
+      ),
+      ExhibitionRoutes.counterpartConversation => CounterpartConversationPage(
+        conversationId: routeUri.queryParameters['conversationId'],
+        projectId: routeUri.queryParameters['projectId'],
+      ),
       ExhibitionRoutes.bidThread => BidThreadPage(
         projectId: routeUri.queryParameters['projectId'],
         bidId: routeUri.queryParameters['bidId'],
@@ -453,6 +466,8 @@ class AppRouter {
       ExhibitionRoutes.projectDetail => '项目详情',
       ExhibitionRoutes.myProjectDetail => '我的项目详情',
       ExhibitionRoutes.projectClarification => '项目澄清',
+      ExhibitionRoutes.projectNameAccessThread => '名称查看申请',
+      ExhibitionRoutes.counterpartConversation => '项目沟通',
       ExhibitionRoutes.bidThread => '沟通与投标',
       ExhibitionRoutes.bidSubmit =>
         routeUri.queryParameters['mode'] == 'result' ? '竞标结果' : '竞标提交',

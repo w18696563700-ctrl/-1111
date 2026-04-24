@@ -7,6 +7,12 @@ class _ForumAuthorSummaryCard extends StatelessWidget {
     required this.organizationName,
     required this.publicPostCount,
     required this.publicCommentCount,
+    required this.viewerFollowsAuthor,
+    required this.followPending,
+    required this.isCurrentActor,
+    required this.onToggleFollow,
+    required this.onOpenMessages,
+    required this.onOpenMine,
   });
 
   final String visibleName;
@@ -14,141 +20,117 @@ class _ForumAuthorSummaryCard extends StatelessWidget {
   final String? organizationName;
   final int publicPostCount;
   final int publicCommentCount;
+  final bool viewerFollowsAuthor;
+  final bool followPending;
+  final bool isCurrentActor;
+  final VoidCallback onToggleFollow;
+  final VoidCallback onOpenMessages;
+  final VoidCallback onOpenMine;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return ForumSectionCard(
-      eyebrow: '公开资料',
-      title: visibleName,
-      summary: organizationName == null
-          ? '当前只展示作者的公开资料投影和公开帖子。'
-          : '机构：$organizationName',
-      children: <Widget>[
-        Row(
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(28),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _ForumAuthorAvatar(
-              label: visibleName,
-              avatarUrl: avatarUrl,
-              radius: 32,
+            Row(
+              children: <Widget>[
+                _ForumAuthorAvatar(
+                  label: visibleName,
+                  avatarUrl: avatarUrl,
+                  radius: 32,
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        visibleName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        organizationName ?? '当前未公开机构信息',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    visibleName,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                if (isCurrentActor)
+                  FilledButton.tonal(
+                    onPressed: onOpenMine,
+                    child: const Text('进入我的楼'),
+                  )
+                else ...<Widget>[
+                  FilledButton.icon(
+                    onPressed: followPending ? null : onToggleFollow,
+                    icon: Icon(
+                      followPending
+                          ? Icons.hourglass_top_rounded
+                          : viewerFollowsAuthor
+                          ? Icons.how_to_reg_rounded
+                          : Icons.person_add_alt_1_rounded,
+                      size: 18,
+                    ),
+                    label: Text(
+                      followPending
+                          ? '处理中'
+                          : viewerFollowsAuthor
+                          ? '已关注'
+                          : '关注',
                     ),
                   ),
-                  const SizedBox(height: 6),
-                  Text(
-                    organizationName ?? '当前未公开机构信息',
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
+                  FilledButton.tonalIcon(
+                    onPressed: onOpenMessages,
+                    icon: const Icon(
+                      Icons.chat_bubble_outline_rounded,
+                      size: 18,
                     ),
+                    label: const Text('发消息'),
                   ),
                 ],
-              ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                ForumInfoPill(
+                  label: '公开帖子 $publicPostCount',
+                  highlighted: true,
+                ),
+                ForumInfoPill(label: '公开评论 $publicCommentCount'),
+              ],
             ),
           ],
         ),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            ForumInfoPill(label: '公开帖子 $publicPostCount', highlighted: true),
-            ForumInfoPill(label: '公开评论 $publicCommentCount'),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _ForumBlockRelationControlCard extends StatelessWidget {
-  const _ForumBlockRelationControlCard({
-    required this.result,
-    required this.actionPending,
-    required this.onRetry,
-    required this.onToggle,
-    this.actionMessage,
-  });
-
-  final ForumReadResult<ForumBlockRelationStatusView>? result;
-  final bool actionPending;
-  final String? actionMessage;
-  final VoidCallback onRetry;
-  final ValueChanged<ForumBlockRelationStatusView> onToggle;
-
-  @override
-  Widget build(BuildContext context) {
-    final status = result?.data;
-    if (result == null) {
-      return ForumSlimStatePanel(
-        loading: true,
-        state: AppPageState.loading,
-        emptyMessage: '正在读取拉黑关系状态',
-        onRetry: onRetry,
-      );
-    }
-    if (result?.state != AppPageState.content || status == null) {
-      return ForumSlimStatePanel(
-        loading: false,
-        state: result?.state,
-        emptyMessage: '拉黑关系状态暂时不可用',
-        onRetry: onRetry,
-        message: result?.message,
-      );
-    }
-
-    final theme = Theme.of(context);
-    final isBlocked = status.isBlocked;
-    final actionLabel = isBlocked ? '解除拉黑' : '拉黑作者';
-    final actionIcon = isBlocked
-        ? Icons.person_add_alt_1_outlined
-        : Icons.person_off_outlined;
-
-    return ForumSectionCard(
-      eyebrow: '关系状态',
-      title: isBlocked ? '已拉黑该作者' : '未拉黑该作者',
-      summary: '这里只读取你与该作者的 CS-018 拉黑关系状态，不改变当前公开内容展示。',
-      children: <Widget>[
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: <Widget>[
-            ForumInfoPill(
-              label: isBlocked ? '关系状态：已拉黑' : '关系状态：未拉黑',
-              highlighted: true,
-            ),
-            ForumInfoPill(label: '单目标状态读取'),
-          ],
-        ),
-        if (actionMessage != null && actionMessage!.trim().isNotEmpty)
-          Text(
-            actionMessage!,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.tonalIcon(
-            onPressed: actionPending ? null : () => onToggle(status),
-            icon: Icon(actionIcon, size: 18),
-            label: Text(actionPending ? '处理中' : actionLabel),
-          ),
-        ),
-      ],
+      ),
     );
   }
 }
@@ -169,30 +151,28 @@ class _ForumPublicPostCard extends StatelessWidget {
       viewCount = item.engagement.viewCount,
       showAuthor = true;
 
-  _ForumPublicPostCard.fromPostCard({required ForumPostCardView item})
-    : topicLabel = forumDisplayTopicLabel(
-        rawLabel: item.topicTitle,
-        topicId: item.topicId,
-      ),
-      title = forumDisplayTopicLabel(
-        rawLabel: item.topicTitle,
-        topicId: item.topicId,
-      ),
-      excerpt = item.excerpt,
-      postId = item.postId,
-      publishedAt = item.publishedAt,
-      author = item.author,
-      replyCount = null,
-      likeCount = null,
-      viewCount = null,
-      showAuthor = false;
+  _ForumPublicPostCard.fromAuthorPostCard({
+    required ForumAuthorPostCardView item,
+  }) : topicLabel = forumDisplayTopicLabel(
+         rawLabel: item.topicTitle,
+         topicId: item.topicId,
+       ),
+       title = item.title,
+       excerpt = item.excerpt,
+       postId = item.postId,
+       publishedAt = item.publishedAt,
+       author = null,
+       replyCount = null,
+       likeCount = null,
+       viewCount = null,
+       showAuthor = false;
 
   final String topicLabel;
   final String title;
   final String excerpt;
   final String postId;
   final String publishedAt;
-  final ForumAuthorSummaryView author;
+  final ForumAuthorSummaryView? author;
   final int? replyCount;
   final int? likeCount;
   final int? viewCount;
@@ -243,12 +223,12 @@ class _ForumPublicPostCard extends StatelessWidget {
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
                 ),
                 const SizedBox(height: 8),
-                if (showAuthor)
+                if (showAuthor && author != null)
                   _ForumAuthorAnchorRow(
-                    author: author,
+                    author: author!,
                     publishedAt: publishedAt,
                     onOpenAuthor: () =>
-                        _openForumAuthorProfile(context, author.authorId),
+                        _openForumAuthorProfile(context, author!.authorId),
                   )
                 else
                   Text(
@@ -281,13 +261,11 @@ class _ForumAuthorAnchorRow extends StatelessWidget {
     required this.author,
     required this.publishedAt,
     required this.onOpenAuthor,
-    this.avatarUrl,
   });
 
   final ForumAuthorSummaryView author;
   final String publishedAt;
   final VoidCallback onOpenAuthor;
-  final String? avatarUrl;
 
   @override
   Widget build(BuildContext context) {
@@ -300,49 +278,57 @@ class _ForumAuthorAnchorRow extends StatelessWidget {
         ? '论坛用户 · ${_compactPublishedAt(publishedAt)}'
         : '$organizationName · ${_compactPublishedAt(publishedAt)}';
 
-    return Row(
-      children: <Widget>[
-        InkWell(
-          borderRadius: BorderRadius.circular(999),
-          onTap: onOpenAuthor,
-          child: Padding(
-            padding: const EdgeInsets.all(2),
-            child: _ForumAuthorAvatar(
-              label: visibleName,
-              avatarUrl: avatarUrl,
-              radius: 16,
-            ),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 4),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  visibleName,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontWeight: FontWeight.w700,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onOpenAuthor,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 2),
+          child: Row(
+            children: <Widget>[
+              _ForumAuthorAvatar(
+                label: visibleName,
+                avatarUrl: author.avatarUrl,
+                radius: 16,
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        visibleName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        secondaryLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  secondaryLabel,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              Icon(
+                Icons.chevron_right_rounded,
+                size: 18,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
           ),
         ),
-      ],
+      ),
     );
   }
 }

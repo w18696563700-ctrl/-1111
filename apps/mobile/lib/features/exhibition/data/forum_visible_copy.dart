@@ -147,6 +147,9 @@ String forumVisibleReadMessage({
   if (visibleRaw != null) {
     return visibleRaw;
   }
+  if (_forumReadRouteMissingMessage(rawMessage) case final String message) {
+    return message;
+  }
 
   if (errorCode == 'AUTH_SESSION_INVALID') {
     return '请先登录后再查看';
@@ -156,6 +159,12 @@ String forumVisibleReadMessage({
   }
   if (errorCode == 'FORUM_AUTHOR_UNAVAILABLE') {
     return '当前作者主页暂不可用';
+  }
+  if (errorCode == 'FORUM_POST_UNAVAILABLE') {
+    if (path.contains('/forum/post/comments')) {
+      return '当前帖子暂不可查看评论，请刷新后再试';
+    }
+    return '当前帖子暂不可用，请刷新后再试';
   }
   if (errorCode == 'FORUM_AUTHOR_POSTS_INVALID') {
     return '公开帖子暂时不可用，请稍后再试';
@@ -172,7 +181,7 @@ String forumVisibleReadMessage({
     AppPageState.empty => _readEmptyFallback(path),
     AppPageState.unauthorized => '请先登录后再查看',
     AppPageState.forbidden => '当前账号暂不能查看',
-    AppPageState.notFound => '当前内容暂不可用',
+    AppPageState.notFound => _readNotFoundFallback(path),
     AppPageState.errorRetryable || AppPageState.errorNonRetryable =>
       _readFailureFallback(path, errorCode: errorCode),
     AppPageState.content => '内容已准备好',
@@ -228,18 +237,67 @@ String forumVisibleActionMessage({
   }
 
   if (path.contains('/forum/draft/save')) {
-    return '草稿暂时保存失败，请稍后再试';
+    if (errorCode == 'AUTH_SESSION_INVALID' ||
+        state == AppPageState.unauthorized) {
+      return '当前登录状态已失效，请重新登录后再保存草稿';
+    }
+    if (state == AppPageState.notFound) {
+      return '当前云端 BFF 尚未部署草稿保存路由，请先同步云端后再试';
+    }
+    if (state == AppPageState.forbidden) {
+      return '当前账号暂不能保存论坛草稿';
+    }
+    if (errorCode == 'FORUM_DRAFT_INVALID') {
+      return '当前草稿内容不完整，请检查分类、标题和正文后再试';
+    }
+    if (errorCode == 'FORUM_DRAFT_UNAVAILABLE') {
+      return '当前账号或话题暂不能保存论坛草稿，请检查组织身份和话题后再试';
+    }
+    if (state == AppPageState.errorRetryable) {
+      return '云端 BFF 暂时不可达，草稿没有保存，请稍后重试';
+    }
+    return '草稿未保存，请检查登录状态、组织身份和话题后再试';
   }
   if (path.contains('/forum/publish')) {
     return '当前暂时还不能发布，请稍后再试';
   }
   if (path.contains('/forum/post/comment')) {
+    if (errorCode == 'AUTH_SESSION_INVALID' ||
+        state == AppPageState.unauthorized) {
+      return '当前登录状态已失效，请重新登录后再试';
+    }
+    if (errorCode == 'FORUM_COMMENT_INVALID') {
+      return '请先填写评论内容后再提交';
+    }
+    if (errorCode == 'FORUM_COMMENT_INVALID_STATE') {
+      return '当前回复目标暂不可用，请刷新后再试';
+    }
+    if (errorCode == 'FORUM_POST_UNAVAILABLE') {
+      return '当前帖子暂不可评论，请刷新后再试';
+    }
+    if (errorCode == 'FORUM_INTERACTION_UNAVAILABLE') {
+      return '评论提交能力正在接入，请稍后再试';
+    }
     return '回复暂时发送失败，请稍后再试';
   }
   if (path.contains('/forum/post/like')) {
+    if (errorCode == 'AUTH_SESSION_INVALID' ||
+        state == AppPageState.unauthorized) {
+      return '当前登录状态已失效，请重新登录后再试';
+    }
+    if (errorCode == 'FORUM_INTERACTION_UNAVAILABLE') {
+      return '点赞能力尚未接真实写链，本期暂不保存状态';
+    }
     return '点赞暂时没有完成，请稍后再试';
   }
   if (path.contains('/forum/post/bookmark')) {
+    if (errorCode == 'AUTH_SESSION_INVALID' ||
+        state == AppPageState.unauthorized) {
+      return '当前登录状态已失效，请重新登录后再试';
+    }
+    if (errorCode == 'FORUM_INTERACTION_UNAVAILABLE') {
+      return '收藏能力尚未接真实写链，本期暂不保存状态';
+    }
     return '收藏暂时没有完成，请稍后再试';
   }
   if (path.contains('/forum/report/submit')) {
@@ -344,6 +402,19 @@ bool _looksTechnicalVisibleMessage(String value) {
       lower.contains('postid');
 }
 
+String? _forumReadRouteMissingMessage(String? rawMessage) {
+  final normalized = rawMessage?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return null;
+  }
+
+  if (normalized == 'Cannot GET /api/app/forum/me/posts') {
+    return '当前云端 BFF 尚未部署我的帖子读侧路由，请先同步云端后再试。';
+  }
+
+  return null;
+}
+
 String _readFailureFallback(String path, {String? errorCode}) {
   if (path.contains('/forum/feed')) {
     return '论坛内容暂时不可用，请稍后再试';
@@ -386,6 +457,28 @@ String _readFailureFallback(String path, {String? errorCode}) {
     return '请先登录后再查看';
   }
   return '内容暂时没有加载出来，请稍后再试';
+}
+
+String _readNotFoundFallback(String path) {
+  if (path.contains('/forum/post/detail')) {
+    return '没有找到这条帖子，可能已删除或暂不公开';
+  }
+  if (path.contains('/forum/post/comments')) {
+    return '没有找到这条帖子的评论入口';
+  }
+  if (path.contains('/forum/author/profile')) {
+    return '没有找到这个作者主页';
+  }
+  if (path.contains('/forum/author/posts')) {
+    return '没有找到这个作者的公开帖子';
+  }
+  if (path.contains('/forum/me/')) {
+    return '没有找到对应的论坛资产';
+  }
+  if (path.contains('/forum/topic/')) {
+    return '没有找到这个论坛分类';
+  }
+  return '没有找到对应的论坛内容';
 }
 
 String _readEmptyFallback(String path) {

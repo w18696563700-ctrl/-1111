@@ -269,6 +269,116 @@ void main() {
     expect(find.textContaining('Cannot POST'), findsNothing);
   });
 
+  testWidgets('forum my posts route-missing 404 stays specific and Chinese', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      buildForumTestAppWithOverrides(
+        initialRoute: ExhibitionRoutes.forumMePosts,
+        forumHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/me/posts': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 404,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'message': 'Cannot GET /api/app/forum/me/posts',
+                    'error': 'Not Found',
+                    'statusCode': 404,
+                  },
+                );
+              },
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前云端 BFF 尚未部署我的帖子读侧路由，请先同步云端后再试。'), findsOneWidget);
+    expect(find.text('这表示当前云端运行时还没有挂出对应论坛读侧接口，请先同步云端后再试。'), findsOneWidget);
+    expect(find.text('当前内容暂不可用'), findsNothing);
+    expect(find.text('这个内容现在还不能查看。'), findsNothing);
+    expect(find.textContaining('Cannot GET'), findsNothing);
+  });
+
+  testWidgets('forum draft save auth failure is specific and legible', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      buildForumTestAppWithOverrides(
+        initialRoute: ExhibitionRoutes.forumPublish,
+        forumHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/forum/draft/save': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 401,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'statusCode': 401,
+                    'code': 'AUTH_SESSION_INVALID',
+                    'message': 'Request failed with status code 401',
+                  },
+                );
+              },
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(0), '草稿保存失败验证');
+    await tester.enterText(find.byType(TextField).at(1), '这是一条用于验证草稿失败提示的正文。');
+    await tester.pump();
+
+    await tester.tap(find.text('保存草稿'));
+    await tester.pumpAndSettle();
+
+    const expectedMessage = '当前登录状态已失效，请重新登录后再保存草稿';
+    expect(find.text(expectedMessage), findsOneWidget);
+    expect(find.text('草稿暂时保存失败，请稍后再试'), findsNothing);
+    expect(find.textContaining('Request failed'), findsNothing);
+
+    final snackBar = tester.widget<SnackBar>(find.byType(SnackBar));
+    final context = tester.element(find.byType(SnackBar));
+    final colorScheme = Theme.of(context).colorScheme;
+    expect(snackBar.backgroundColor, colorScheme.errorContainer);
+    final messageText = tester.widget<Text>(find.text(expectedMessage));
+    expect(messageText.style?.color, colorScheme.onErrorContainer);
+  });
+
+  testWidgets('forum draft save 502 explains cloud bff reachability', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      buildForumTestAppWithOverrides(
+        initialRoute: ExhibitionRoutes.forumPublish,
+        forumHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/forum/draft/save': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 502,
+                  uri: request.uri,
+                  body: '<html><body>Bad Gateway</body></html>',
+                );
+              },
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(find.byType(TextField).at(0), '草稿保存 502 验证');
+    await tester.enterText(
+      find.byType(TextField).at(1),
+      '这是一条用于验证 BFF 不可达提示的正文。',
+    );
+    await tester.pump();
+
+    await tester.tap(find.text('保存草稿'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('云端 BFF 暂时不可达，草稿没有保存，请稍后重试'), findsOneWidget);
+    expect(find.text('草稿暂时保存失败，请稍后再试'), findsNothing);
+    expect(find.textContaining('Bad Gateway'), findsNothing);
+  });
+
   testWidgets('forum pending media resumes upload after manual draft save', (
     WidgetTester tester,
   ) async {

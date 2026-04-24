@@ -34,6 +34,7 @@ Object _parseToggleAccepted(Map<String, Object?> body) {
     state: state,
     viewerHasLiked: _readBool(body['viewerHasLiked']),
     viewerHasBookmarked: _readBool(body['viewerHasBookmarked']),
+    viewerFollowsAuthor: _readBool(body['viewerFollowsAuthor']),
     likeCount: _readInt(body['likeCount']),
   );
 }

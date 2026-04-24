@@ -67,10 +67,15 @@ export class ForumWriteService {
       ? await this.loadEditableDraft(command.draftId, currentSession.userId, scope.organization.id)
       : this.draftRepository.create({
           id: randomUUID(),
+          draftNo: this.createDraftNo(),
           organizationId: scope.organization.id,
           creatorUserId: currentSession.userId,
           creatorActorId: currentSession.actorId,
+          ownerActorId: currentSession.actorId,
+          ownerOrganizationId: scope.organization.id,
           draftType: 'topic',
+          targetPostId: null,
+          parentCommentId: null,
           publishedPostId: null
         });
 
@@ -116,9 +121,11 @@ export class ForumWriteService {
     const publishedAt = new Date();
     const post = this.postRepository.create({
       id: randomUUID(),
+      postNo: this.createPostNo(),
       organizationId: scope.organization.id,
       authorUserId: currentSession.userId,
       authorActorId: currentSession.actorId,
+      authorOrganizationId: scope.organization.id,
       sourceDraftId: draft.id,
       topicId: topic.topicId,
       title: draft.title,
@@ -126,6 +133,10 @@ export class ForumWriteService {
       excerpt: this.presenter.toExcerpt(draft.body),
       attachmentFileAssetIds: draft.attachmentFileAssetIds,
       state: 'published',
+      commentCount: 0,
+      lastModerationCaseId: null,
+      hiddenAt: null,
+      archivedAt: null,
       publishedAt
     });
 
@@ -154,6 +165,14 @@ export class ForumWriteService {
       throw forumDraftUnavailable('Forum draft is not editable in the current state.');
     }
     return draft;
+  }
+
+  private createDraftNo() {
+    return randomUUID().replace(/-/g, '').toUpperCase();
+  }
+
+  private createPostNo() {
+    return `FP${randomUUID().replace(/-/g, '').slice(0, 30).toUpperCase()}`;
   }
 
   private async assertAttachmentAssets(

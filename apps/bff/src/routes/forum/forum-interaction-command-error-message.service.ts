@@ -54,6 +54,27 @@ export class ForumInteractionCommandErrorMessageService {
       return this.translateCommentInvalidWriteMessage(action, message);
     }
 
+    if (code === 'FORUM_COMMENT_INVALID_STATE') {
+      return this.translateCommentInvalidStateWriteMessage(action, message);
+    }
+
+    if (code === 'FORUM_INTERACTION_UNAVAILABLE') {
+      if (action === 'post_like') {
+        return '点赞能力尚未接真实写链，本期暂不保存状态。';
+      }
+      if (action === 'post_bookmark') {
+        return '收藏能力尚未接真实写链，本期暂不保存状态。';
+      }
+      if (action === 'author_follow') {
+        return '关注能力暂时不可用，请稍后再试。';
+      }
+      return '评论提交能力正在接入，请稍后再试。';
+    }
+
+    if (code === 'FORUM_AUTHOR_UNAVAILABLE') {
+      return '当前作者主页暂不可用，请刷新后再试。';
+    }
+
     if (code === 'FORUM_POST_UNAVAILABLE') {
       return this.translatePostUnavailableWriteMessage(action, message);
     }
@@ -116,10 +137,42 @@ export class ForumInteractionCommandErrorMessageService {
       return '当前点赞请求无效，请检查后再试。';
     }
 
+    if (action === 'author_follow') {
+      if (message.includes('authorId is required')) {
+        return '当前关注作者参数不完整，请刷新后再试。';
+      }
+      return '当前关注请求无效，请检查后再试。';
+    }
+
     if (message.includes('postId is required')) {
       return '当前收藏参数不完整，请刷新后再试。';
     }
     return '当前收藏请求无效，请检查后再试。';
+  }
+
+  private translateCommentInvalidStateWriteMessage(
+    action: ForumInteractionWriteAction,
+    message: string,
+  ) {
+    if (message.includes('organizationId is unavailable')) {
+      return '当前账号还没有可用的组织上下文，暂时不能进行论坛互动。';
+    }
+    if (message.includes('parentCommentId is unavailable')) {
+      return '当前回复目标暂不可用，请刷新后再试。';
+    }
+    if (action === 'comment_submit') {
+      return '当前帖子暂不可评论，请刷新后再试。';
+    }
+    if (action === 'post_like') {
+      return '当前帖子暂不可点赞，请刷新后再试。';
+    }
+    if (action === 'author_follow') {
+      if (message.includes('Current actor cannot follow itself')) {
+        return '不能关注自己。';
+      }
+      return '当前作者暂不可关注，请刷新后再试。';
+    }
+    return '当前帖子暂不可收藏，请刷新后再试。';
   }
 
   private translatePostUnavailableWriteMessage(
@@ -147,6 +200,9 @@ export class ForumInteractionCommandErrorMessageService {
     }
     if (action === 'post_like') {
       return '当前点赞操作暂不可用，请稍后再试。';
+    }
+    if (action === 'author_follow') {
+      return '当前关注操作暂不可用，请稍后再试。';
     }
     return '当前收藏操作暂不可用，请稍后再试。';
   }

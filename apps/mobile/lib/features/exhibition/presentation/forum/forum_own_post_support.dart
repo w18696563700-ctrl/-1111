@@ -41,12 +41,15 @@ Widget _buildForumCommentPreview({
   required bool loading,
   required ForumReadResult<ForumPagedCollectionView<ForumCommentItemView>>?
   commentResult,
+  required bool loadingMore,
   required VoidCallback onRetry,
+  required VoidCallback onLoadMore,
 }) {
   final showCommentState =
       loading ||
       (commentResult?.state != null &&
           commentResult?.state != AppPageState.content);
+  final hasMore = commentResult?.data?.page.hasMore == true;
 
   return Column(
     crossAxisAlignment: CrossAxisAlignment.start,
@@ -64,44 +67,44 @@ Widget _buildForumCommentPreview({
           onRetry: onRetry,
           message: commentResult?.message,
         )
-      else if (comments.isEmpty)
-        const _ForumDetailCommentEmpty()
-      else
-        ...comments
-            .take(2)
-            .map(
-              (ForumCommentItemView item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ForumThreadCommentCard(
-                  author: item.author,
-                  target: item.parentCommentId == null ? '回复主帖' : '回复评论',
-                  content: item.body,
-                  meta:
-                      '${_compactPublishedAt(item.publishedAt)} · ${item.replyCount} 条后续回复',
-                  onOpenAuthor: () =>
-                      _openForumAuthorProfile(context, item.author.authorId),
-                  onReport: () => _showForumReportSheet(
-                    context,
-                    target: _ForumReportTarget(
-                      targetType: 'comment',
-                      targetId: item.commentId,
-                      sheetTitle: '举报评论',
-                    ),
-                  ),
+      else if (comments.isNotEmpty)
+        ...comments.map(
+          (ForumCommentItemView item) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: _ForumThreadCommentCard(
+              author: item.author,
+              target: item.parentCommentId == null ? '回复主帖' : '回复评论',
+              content: item.body,
+              meta:
+                  '${_compactPublishedAt(item.publishedAt)} · ${item.replyCount} 条后续回复',
+              onOpenAuthor: () =>
+                  _openForumAuthorProfile(context, item.author.authorId),
+              onReport: () => _showForumReportSheet(
+                context,
+                target: _ForumReportTarget(
+                  targetType: 'comment',
+                  targetId: item.commentId,
+                  sheetTitle: '举报评论',
                 ),
               ),
             ),
-      const SizedBox(height: 12),
-      Align(
-        alignment: Alignment.centerLeft,
-        child: OutlinedButton.icon(
-          onPressed: () => Navigator.of(
-            context,
-          ).pushNamed(ExhibitionRoutes.forumCommentsWithPostId(detail.postId)),
-          icon: const Icon(Icons.forum_outlined),
-          label: const Text('查看全部评论'),
+          ),
         ),
-      ),
+      if (hasMore) ...<Widget>[
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: loadingMore ? null : onLoadMore,
+            icon: Icon(
+              loadingMore
+                  ? Icons.hourglass_top_rounded
+                  : Icons.expand_more_rounded,
+            ),
+            label: Text(loadingMore ? '加载中' : '查看更多评论'),
+          ),
+        ),
+      ],
     ],
   );
 }
