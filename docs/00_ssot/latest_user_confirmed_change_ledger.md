@@ -930,3 +930,29 @@ updated_at_local: 2026-04-14
   - 头图标题区与底部信息胶囊不得拦截翻页手势
   - 桌面模拟器场景必须保留右侧显式翻页按钮，方便非触摸测试
   - 后续不得把该按钮或可翻页交互静默回退掉
+
+### 3.9 消息楼订单闭环进度追平规则
+
+- `2026-04-26` 用户确认：
+  - 当前实际实现进度已经超过原始工期表；
+  - 后续不应继续按旧日期逐项补历史进度，而应以最新真实云上状态作为推进基线；
+  - 当前消息楼剩余主线是把订单闭环做完：
+    - 承接方 `申请完工`
+    - 发布方 `确认完成`
+    - 双方提交 `ProjectCounterpartyRating`
+    - 信用 `shadow / ledger` 产生真实 `source_type=project_counterparty_rating` 证据
+  - 在上述闭环完成前，不得把当前状态写成 `100% 生产验收通过`。
+- 当前真实订单锚点：
+  - `projectId`: `c788eaff-6243-4e97-8be3-c4e174ee7944`
+  - `bidId`: `6e936969-3520-44bc-8804-1c804351423e`
+  - `orderId`: `a3c63f04-8c10-44d1-9e0c-710ae00c7211`
+  - `buyerOrganizationId`: `e6bf4567-016e-45f9-9420-9c950237690e`
+  - `supplierOrganizationId`: `bdfb4523-aeb7-4b56-89a1-992170fb5d98`
+- 当前判定：
+  - 聊天、相册、互评基础链路可作为阶段性 checkpoint；
+  - 订单卡已接入统一 `counterpart_conversation` 入口；
+  - 订单当前仍为 `active / none`；
+  - `ratings=0` 且信用 ledger 证据仍为 `0`；
+  - 最终验收仍为 conditional，不是 production pass。
+- 当前新增正式文书：
+  - `docs/00_ssot/project_communication_album_rating_progress_catchup_checkpoint_20260426_addendum.md`

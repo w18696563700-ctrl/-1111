@@ -336,6 +336,9 @@ codes:
   - code: FORUM_POST_UNAVAILABLE
     owner: Server
     meaning: Forum post truth is absent, hidden by visibility or moderation, or otherwise unavailable to the current actor.
+  - code: FORUM_AUTHOR_UNAVAILABLE
+    owner: Server
+    meaning: Forum public author truth is absent, hidden by visibility, or otherwise unavailable to the current actor.
   - code: FORUM_DRAFT_UNAVAILABLE
     owner: Server
     meaning: Forum draft truth is absent or not accessible to the current actor.
@@ -345,6 +348,15 @@ codes:
   - code: FORUM_PUBLISH_INVALID_STATE
     owner: Server
     meaning: Forum draft or topic truth is not in a state that allows the requested publish handoff.
+  - code: FORUM_COMMENT_INVALID
+    owner: Server
+    meaning: Forum comment request is missing required minimum fields, has invalid text content, or references a parent comment outside the current bounded comment contract.
+  - code: FORUM_COMMENT_INVALID_STATE
+    owner: Server
+    meaning: Forum comment truth exists, but the current post, parent comment, actor, or organization state does not allow the requested comment creation.
+  - code: FORUM_INTERACTION_UNAVAILABLE
+    owner: Server
+    meaning: Forum interaction capability is intentionally not connected to a real Server-owned write chain in the current bounded stage.
   - code: FORUM_REPORT_INVALID
     owner: Server
     meaning: Forum report-submit request is missing required minimum fields, uses an unsupported target type, or uses a reason code outside the current bounded report contract.

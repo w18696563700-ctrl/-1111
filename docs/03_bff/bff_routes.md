@@ -120,6 +120,12 @@ layer: L3 BFF
   - `GET /api/app/forum/topic/list`
   - `GET /api/app/forum/topic/detail`
   - `GET /api/app/forum/post/detail`
+  - `GET /api/app/forum/author/profile`
+  - `GET /api/app/forum/author/posts`
+  - `GET /api/app/forum/post/comments`
+  - `POST /api/app/forum/post/comment`
+  - `POST /api/app/forum/post/like`
+  - `POST /api/app/forum/post/bookmark`
   - `POST /api/app/forum/publish`
   - `GET /api/app/forum/draft/list`
   - `GET /api/app/forum/search`

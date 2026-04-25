@@ -34,8 +34,9 @@ inputs_canonical:
 - `Flutter App` may support:
   - explicit tunnel mode
   - explicit cloud mode
-  - explicit local mode
-- `Flutter App` must not hide tunnel mode as an invisible default that looks like formal cloud mode.
+- `Flutter App` local-only backend mode is disabled.
+- `Flutter App` local execution must default to the approved SSH tunnel instead
+  of silently preferring cloud-direct mode.
 - `Admin` must not silently assume local `127.0.0.1:3001/server/admin` when no explicit target has been provided.
 
 ## 3. Required Cleanup Outcome
@@ -43,17 +44,22 @@ inputs_canonical:
 - Runtime entry scripts must self-identify the chosen mode.
 - If a mode depends on an SSH tunnel, the script output must say so.
 - If a mode is cloud-direct, the script output must say so.
-- If a mode is local-only, the script or entry name must say `local`.
+- Any disabled local-only Flutter entry must fail loudly before it can start.
 - Missing admin target configuration must fail loudly instead of quietly drifting to localhost.
 - `infra/env/formal_cloud_target.env` is the canonical formal cloud target
   register for frontend runtime entry resolution.
 - `Flutter App`, `Admin`, and frontend smoke scripts must derive formal cloud
   base URLs from that register or an explicit env override instead of carrying a
   repeated raw host or IP in each entrypoint.
+- `apps/mobile/scripts/run_macos_formal.sh` must default to `ssh_tunnel`.
+- `apps/mobile/scripts/run_macos_local_dev.sh`,
+  `apps/mobile/scripts/run_local_membership_app.sh`, and the local membership
+  stack wrappers must not start a local BFF or local Server.
 
 ## 4. Anti-Revert Rule
 
 - Later threads must not reintroduce:
   - silent localhost fallback into Admin
   - ambiguous Flutter startup messages that hide whether the app is on cloud or tunnel
-  - runtime defaults that make tunnel and formal cloud behavior indistinguishable
+  - a `local_dev` Flutter runtime path that points the app at `127.0.0.1:3000` or `127.0.0.1:3001`
+  - runtime defaults that bypass the approved SSH tunnel during local execution
