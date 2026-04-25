@@ -35,6 +35,9 @@ logs/
 *.swp
 *.swo
 
+# Local-only source photos must not be committed as UI default covers.
+apps/mobile/assets/images/exhibition/default_project_cover.jpg
+
 # Local-only runtime and assistant state
 .codex/
 runtime/

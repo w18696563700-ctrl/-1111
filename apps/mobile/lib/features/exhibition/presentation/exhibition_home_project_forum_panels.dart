@@ -114,15 +114,21 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
               label: '进入项目列表',
               onPressed: widget.onOpenProjectList,
               primary: true,
+              icon: Icons.snippet_folder_outlined,
             ),
             _HomeChannelAction(
               label: '去发布项目',
               onPressed: widget.onOpenProjectCreate,
+              icon: Icons.workspace_premium_outlined,
             ),
-            _HomeChannelAction(label: '刷新', onPressed: _refreshActiveFilter),
+            _HomeChannelAction(
+              label: '刷新',
+              onPressed: _refreshActiveFilter,
+              icon: Icons.refresh_rounded,
+            ),
           ],
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _HomeChannelFilterRail<_HomeProjectFilter>(
           options: _HomeProjectFilter.values
               .map(
@@ -135,7 +141,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
           selectedValue: _selectedFilter,
           onSelected: _handleFilterSelected,
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         ...body,
       ],
     );
@@ -178,35 +184,34 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
     }
 
     if (activeState == AppPageState.content && activeItems.isNotEmpty) {
-      return activeItems
-          .take(3)
-          .map(
-            (Map<String, Object?> item) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _HomeProjectCard(
-                title: _homeTrimmedString(item['title']) ?? '未命名项目',
-                projectNo: _homeTrimmedString(item['projectNo']) ?? '未提供',
-                budgetLabel: _homeCurrencyText(item['budgetAmount']),
-                stateLabel: _homeFrontStateLabel(
-                  _homeTrimmedString(item['state']),
-                ),
-                summary: _homeProjectGuidance(
-                  _homeTrimmedString(item['state']),
-                ),
-                actionLabel:
-                    _homeCanContinueBid(_homeTrimmedString(item['state']))
-                    ? '进入项目详情'
-                    : '查看项目详情',
-                onPressed: switch (_homeTrimmedString(item['projectId'])) {
-                  final String projectId => () => widget.onOpenProjectDetail(
-                    projectId,
-                  ),
-                  _ => null,
-                },
+      final visibleItems = activeItems.take(3).toList(growable: false);
+      return List<Widget>.generate(visibleItems.length, (int index) {
+        final item = visibleItems[index];
+        final isLast = index == visibleItems.length - 1;
+        return Padding(
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+          child: _HomeProjectCard(
+            title:
+                _homeTrimmedString(item['displayTitle']) ??
+                _homeTrimmedString(item['title']) ??
+                '未命名项目',
+            budgetLabel: _homeCurrencyText(item['budgetAmount']),
+            stateLabel: _homeFrontStateLabel(_homeTrimmedString(item['state'])),
+            cityLabel: _homeProjectCityLabel(item),
+            areaLabel: _homeProjectAreaLabel(item['areaSqm']),
+            entryTimeLabel: _homeProjectEntryTimeLabel(item),
+            actionLabel: _homeCanContinueBid(_homeTrimmedString(item['state']))
+                ? '进入项目详情'
+                : '查看项目详情',
+            onPressed: switch (_homeTrimmedString(item['projectId'])) {
+              final String projectId => () => widget.onOpenProjectDetail(
+                projectId,
               ),
-            ),
-          )
-          .toList(growable: false);
+              _ => null,
+            },
+          ),
+        );
+      });
     }
 
     if (activeState == AppPageState.empty) {

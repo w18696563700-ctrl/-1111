@@ -58,18 +58,24 @@ class AppShellScaffold extends StatelessWidget {
           ),
         ),
     ];
+    final hideRootExhibitionAppBar =
+        currentBuilding == AppBuilding.exhibition &&
+        titleOverride == null &&
+        !canPop;
 
     return Scaffold(
-      appBar: AppBar(
-        automaticallyImplyLeading: canPop,
-        leading: canPop
-            ? CupertinoNavigationBarBackButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-              )
-            : null,
-        title: Text(titleOverride ?? currentBuilding.label),
-        actions: appBarActions.isEmpty ? null : appBarActions,
-      ),
+      appBar: hideRootExhibitionAppBar
+          ? null
+          : AppBar(
+              automaticallyImplyLeading: canPop,
+              leading: canPop
+                  ? CupertinoNavigationBarBackButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                    )
+                  : null,
+              title: Text(titleOverride ?? currentBuilding.label),
+              actions: appBarActions.isEmpty ? null : appBarActions,
+            ),
       body: SafeArea(
         child: Column(
           children: <Widget>[
@@ -80,41 +86,68 @@ class AppShellScaffold extends StatelessWidget {
         ),
       ),
       floatingActionButton: floatingActionButton,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
-        destinations: visibleBottomBuildings
-            .map(
-              (AppBuilding building) => NavigationDestination(
-                icon: _ShellNavigationIcon(
-                  icon: building.icon,
-                  badgeLabel: building == AppBuilding.messages
-                      ? unreadBadgeLabel
-                      : null,
+      bottomNavigationBar: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 14),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: theme.colorScheme.surface,
+              borderRadius: BorderRadius.circular(30),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: theme.colorScheme.shadow.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
                 ),
-                selectedIcon: _ShellNavigationIcon(
-                  icon: building.selectedIcon,
-                  badgeLabel: building == AppBuilding.messages
-                      ? unreadBadgeLabel
-                      : null,
-                ),
-                label: building.label,
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(30),
+              child: NavigationBar(
+                height: 78,
+                backgroundColor: theme.colorScheme.surface,
+                surfaceTintColor: Colors.transparent,
+                selectedIndex: selectedIndex < 0 ? 0 : selectedIndex,
+                destinations: visibleBottomBuildings
+                    .map(
+                      (AppBuilding building) => NavigationDestination(
+                        icon: _ShellNavigationIcon(
+                          icon: building.icon,
+                          badgeLabel: building == AppBuilding.messages
+                              ? unreadBadgeLabel
+                              : null,
+                        ),
+                        selectedIcon: _ShellNavigationIcon(
+                          icon: building.selectedIcon,
+                          badgeLabel: building == AppBuilding.messages
+                              ? unreadBadgeLabel
+                              : null,
+                        ),
+                        label: building.label,
+                      ),
+                    )
+                    .toList(),
+                onDestinationSelected: (int index) {
+                  final targetBuilding = visibleBottomBuildings[index];
+                  if (targetBuilding == currentBuilding) {
+                    return;
+                  }
+
+                  final onBuildingSelected = this.onBuildingSelected;
+                  if (onBuildingSelected != null) {
+                    onBuildingSelected(targetBuilding);
+                    return;
+                  }
+
+                  Navigator.of(
+                    context,
+                  ).pushReplacementNamed(targetBuilding.routePath);
+                },
               ),
-            )
-            .toList(),
-        onDestinationSelected: (int index) {
-          final targetBuilding = visibleBottomBuildings[index];
-          if (targetBuilding == currentBuilding) {
-            return;
-          }
-
-          final onBuildingSelected = this.onBuildingSelected;
-          if (onBuildingSelected != null) {
-            onBuildingSelected(targetBuilding);
-            return;
-          }
-
-          Navigator.of(context).pushReplacementNamed(targetBuilding.routePath);
-        },
+            ),
+          ),
+        ),
       ),
     );
   }

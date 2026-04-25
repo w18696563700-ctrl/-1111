@@ -1,5 +1,43 @@
 part of 'exhibition_home_page.dart';
 
+class _HomeHeroHeader extends StatelessWidget {
+  const _HomeHeroHeader();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: <Widget>[
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '展览',
+                style: theme.textTheme.displaySmall?.copyWith(
+                  color: ExhibitionHomeVisualTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                  height: 1.05,
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                '发现优质项目，把握商机',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: ExhibitionHomeVisualTokens.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _HomeSectionHeader extends StatelessWidget {
   const _HomeSectionHeader({required this.eyebrow, required this.title});
 
@@ -11,23 +49,37 @@ class _HomeSectionHeader extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 2,
-      crossAxisAlignment: WrapCrossAlignment.center,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
-        Text(
-          eyebrow,
-          style: theme.textTheme.labelMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 0.2,
-          ),
-        ),
-        Text(
-          title,
-          style: theme.textTheme.titleSmall?.copyWith(
-            fontWeight: FontWeight.w800,
+        Expanded(
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 4,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: <Widget>[
+              Text(
+                eyebrow,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  color: ExhibitionHomeVisualTokens.textPrimary,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Icon(
+                Icons.auto_awesome_rounded,
+                size: 18,
+                color: ExhibitionHomeVisualTokens.brandGold.withValues(
+                  alpha: 0.72,
+                ),
+              ),
+            ],
           ),
         ),
       ],

@@ -11,6 +11,15 @@ extension _HomeModuleTabPresentation on _HomeModuleTab {
     _HomeModuleTab.supplier => '供应商',
     _HomeModuleTab.team => '团队',
   };
+
+  IconData get icon => switch (this) {
+    _HomeModuleTab.project => Icons.snippet_folder_outlined,
+    _HomeModuleTab.forum => Icons.forum_outlined,
+    _HomeModuleTab.company => Icons.apartment_rounded,
+    _HomeModuleTab.factory => Icons.factory_outlined,
+    _HomeModuleTab.supplier => Icons.business_center_outlined,
+    _HomeModuleTab.team => Icons.groups_2_outlined,
+  };
 }
 
 class _HomeModuleDeck extends StatelessWidget {
@@ -56,23 +65,16 @@ class _HomeModuleDeck extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(28),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.05),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
-          ),
-        ],
+        color: ExhibitionHomeVisualTokens.cardBackground,
+        borderRadius: BorderRadius.circular(
+          ExhibitionHomeVisualTokens.radiusLarge,
+        ),
+        boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.055),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+        padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -81,14 +83,6 @@ class _HomeModuleDeck extends StatelessWidget {
               onTabSelected: onTabSelected,
             ),
             const SizedBox(height: 12),
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant.withValues(alpha: 0.32),
-                borderRadius: BorderRadius.circular(999),
-              ),
-              child: const SizedBox(height: 1, width: double.infinity),
-            ),
-            const SizedBox(height: 16),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
               child: KeyedSubtree(
@@ -172,7 +166,7 @@ class _HomeModuleTabStrip extends StatelessWidget {
                   builder: (BuildContext chipContext) {
                     return _HomeModuleTabChip(
                       key: ValueKey<String>('home-tab-${tab.name}'),
-                      title: tab.title,
+                      tab: tab,
                       selected: selectedTab == tab,
                       onPressed: () {
                         onTabSelected(tab);
@@ -202,49 +196,65 @@ class _HomeModuleTabStrip extends StatelessWidget {
 class _HomeModuleTabChip extends StatelessWidget {
   const _HomeModuleTabChip({
     super.key,
-    required this.title,
+    required this.tab,
     required this.selected,
     required this.onPressed,
   });
 
-  final String title;
+  final _HomeModuleTab tab;
   final bool selected;
   final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
+    final foreground = selected
+        ? ExhibitionHomeVisualTokens.brandGoldDeep
+        : ExhibitionHomeVisualTokens.textSecondary;
 
     return Material(
       color: Colors.transparent,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.circular(18),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         onTap: onPressed,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(6, 6, 6, 2),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? ExhibitionHomeVisualTokens.brandGoldLight
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(18),
+          ),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Text(
-                title,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w700,
-                  color: selected
-                      ? colorScheme.primary
-                      : colorScheme.onSurfaceVariant,
-                  height: 1.1,
-                ),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(tab.icon, size: 18, color: foreground),
+                  const SizedBox(width: 6),
+                  Text(
+                    tab.title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                      color: foreground,
+                      height: 1.1,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
                 curve: Curves.easeOutCubic,
-                width: 18,
-                height: 3,
+                width: selected ? 24 : 0,
+                height: 2.5,
                 decoration: BoxDecoration(
-                  color: selected ? colorScheme.primary : Colors.transparent,
+                  color: selected
+                      ? ExhibitionHomeVisualTokens.brandGold
+                      : Colors.transparent,
                   borderRadius: BorderRadius.circular(999),
                 ),
               ),

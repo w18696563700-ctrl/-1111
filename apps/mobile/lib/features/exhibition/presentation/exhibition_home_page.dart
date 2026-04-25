@@ -31,6 +31,7 @@ part 'exhibition_home_weather_panels.dart';
 part 'exhibition_home_weather_warning_sections.dart';
 part 'exhibition_home_weather_semantics.dart';
 part 'exhibition_home_widgets.dart';
+part 'exhibition_home_visual_tokens.dart';
 
 class ExhibitionHomePage extends StatefulWidget {
   const ExhibitionHomePage({super.key});
@@ -141,15 +142,23 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
   Widget build(BuildContext context) {
     final projectItems = _homeProjectItemsFromPayload(_projectResult?.payload);
     final weatherProjection = _homeWeatherProjectionFromResult(_homeResult);
+    final bottomClearance = 78 + 14 + MediaQuery.paddingOf(context).bottom + 24;
 
     return ColoredBox(
-      color: Colors.white,
+      color: ExhibitionHomeVisualTokens.pageBackground,
       child: Stack(
         children: <Widget>[
           ListView(
             controller: _scrollController,
-            padding: const EdgeInsets.fromLTRB(20, 18, 20, 120),
+            padding: EdgeInsets.fromLTRB(
+              ExhibitionHomeVisualTokens.spacingPage,
+              14,
+              ExhibitionHomeVisualTokens.spacingPage,
+              bottomClearance,
+            ),
             children: <Widget>[
+              const _HomeHeroHeader(),
+              const SizedBox(height: 14),
               _HomeWeatherCard(
                 expanded: _weatherExpanded,
                 refreshing: _refreshing,
@@ -169,9 +178,9 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
                 ),
                 onManualSelectionPressed: _openManualLocationSelect,
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
               const _HomeSectionHeader(eyebrow: '公开入口', title: '推荐频道'),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _HomeModuleDeck(
                 selectedTab: _selectedModuleTab,
                 onTabSelected: (_HomeModuleTab tab) {
@@ -203,7 +212,7 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
           ),
           Positioned(
             right: 20,
-            bottom: 28,
+            bottom: 24 + MediaQuery.paddingOf(context).bottom,
             child: IgnorePointer(
               ignoring: !_showScrollToTop,
               child: AnimatedOpacity(
