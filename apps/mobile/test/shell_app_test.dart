@@ -18,6 +18,7 @@ import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/trading_im_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
+import 'package:mobile/features/messages/data/counterpart_conversation_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
@@ -204,37 +205,98 @@ Map<String, Object?> _messageInteractionItem({
   required String summary,
   required String lastMessageText,
 }) {
-  final definition = messagesRegisteredEntryByActionKey['bid_thread.open']!;
+  final definition =
+      messagesRegisteredEntryByActionKey['counterpart_conversation.open']!;
   return <String, Object?>{
     'interactionId': interactionId,
-    'interactionType': 'bid_thread',
-    'threadId': 'thread-$interactionId',
+    'interactionType': 'counterpart_conversation',
+    'conversationId': 'org-$interactionId',
     'projectId': projectId,
-    'bidId': bidId,
     'counterpart': <String, Object?>{
       'organizationId': 'org-$interactionId',
       'displayName': counterpartName,
       'avatarUrl': null,
-      'role': 'bidder',
+      'role': 'counterpart',
     },
-    'seedSummary': <String, Object?>{
-      'seedType': 'bid_submitted',
+    'summary': <String, Object?>{
+      'focusProjectId': projectId,
       'title': '新的竞标已提交',
-      'summary': summary,
-      'ctaLabel': '点击查看',
-    },
-    'lastMessageSummary': <String, Object?>{
-      'text': lastMessageText,
-      'messageKind': 'plain_text',
-      'createdAt': '2026-04-20T10:00:00Z',
+      'text': lastMessageText.isEmpty ? summary : lastMessageText,
+      'projectCount': 1,
+      'latestCardType': 'bid_thread',
     },
     'updatedAt': '2026-04-20T10:00:00Z',
     'routeTarget': <String, Object?>{
       'objectType': definition.objectType,
       'actionKey': definition.actionKey,
       'canonicalPath': definition.canonicalPath,
-      'params': <String, String>{'projectId': projectId, 'bidId': bidId},
+      'params': <String, String>{
+        'conversationId': 'org-$interactionId',
+        'projectId': projectId,
+      },
     },
+  };
+}
+
+Map<String, Object?> _counterpartConversationBidDetailPayload({
+  required String interactionId,
+  required String projectId,
+  required String bidId,
+  required String counterpartName,
+}) {
+  final bidThreadDefinition =
+      messagesRegisteredEntryByActionKey['bid_thread.open']!;
+  return <String, Object?>{
+    'conversationId': 'org-$interactionId',
+    'counterpart': <String, Object?>{
+      'organizationId': 'org-$interactionId',
+      'displayName': counterpartName,
+      'avatarUrl': null,
+      'role': 'counterpart',
+    },
+    'summary': <String, Object?>{
+      'focusProjectId': projectId,
+      'title': counterpartName,
+      'text': '当前竞标已提交，可继续进入沟通。',
+      'projectCount': 1,
+      'latestCardType': 'bid_thread',
+    },
+    'focusProjectId': projectId,
+    'latestActivityAt': '2026-04-20T10:00:00Z',
+    'projectGroups': <Object?>[
+      <String, Object?>{
+        'projectId': projectId,
+        'projectDisplayTitle': '展览项目 1',
+        'titleVisibility': 'visible',
+        'projectState': 'published',
+        'latestActivityAt': '2026-04-20T10:00:00Z',
+        'cards': <Object?>[
+          <String, Object?>{
+            'cardId': 'card-$interactionId-bid',
+            'cardType': 'bid_thread',
+            'title': '新的竞标已提交',
+            'summary': '$counterpartName 已对当前项目提交竞标。',
+            'status': 'submitted',
+            'updatedAt': '2026-04-20T10:00:00Z',
+            'truthAnchor': <String, Object?>{
+              'truthType': 'bid_thread',
+              'projectId': projectId,
+              'bidId': bidId,
+              'threadId': 'thread-$interactionId',
+            },
+            'detailRouteTarget': <String, Object?>{
+              'objectType': bidThreadDefinition.objectType,
+              'actionKey': bidThreadDefinition.actionKey,
+              'canonicalPath': bidThreadDefinition.canonicalPath,
+              'params': <String, Object?>{
+                'projectId': projectId,
+                'bidId': bidId,
+              },
+            },
+          },
+        ],
+      },
+    ],
   };
 }
 
@@ -497,6 +559,7 @@ void main() {
     FakeAppApiTransport? messagesTransport,
     FakeAppApiTransport? profileTransport,
     TradingImConsumerLayer? tradingImConsumerLayer,
+    CounterpartConversationConsumerLayer? counterpartConversationConsumerLayer,
     AuthConsumerLayer? authConsumerLayer,
     ProfileIdentityConsumerLayer? profileIdentityConsumerLayer,
     ExhibitionHomeAggregationClient? exhibitionHomeAggregationClient,
@@ -639,6 +702,14 @@ void main() {
           transport: resolvedMessagesTransport,
         ),
       ),
+      counterpartConversationConsumerLayer:
+          counterpartConversationConsumerLayer ??
+          CounterpartConversationConsumerLayer(
+            client: AppApiClient(
+              config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+              transport: resolvedMessagesTransport,
+            ),
+          ),
       profileConsumerLayer: ProfileConsumerLayer(
         client: AppApiClient(
           config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
@@ -1409,7 +1480,7 @@ void main() {
     await tester.pumpWidget(buildApp());
     await tester.pumpAndSettle();
 
-    expect(find.text('天气与定位'), findsOneWidget);
+    expect(find.text('发现优质项目，把握商机'), findsOneWidget);
     expect(find.text('秩序化首页'), findsNothing);
     expect(find.text('展览首页'), findsNothing);
     expect(find.text('当前定位：重庆'), findsNothing);
@@ -1419,7 +1490,7 @@ void main() {
     expect(find.text('推荐频道'), findsOneWidget);
     expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
     expect(find.byTooltip('回到顶部'), findsOneWidget);
-    expect(find.byTooltip('整页刷新'), findsOneWidget);
+    expect(find.byTooltip('展开天气卡'), findsOneWidget);
     expect(find.text('手动选择地区'), findsOneWidget);
     expect(find.text('项目'), findsOneWidget);
     expect(find.text('论坛'), findsOneWidget);
@@ -1451,15 +1522,15 @@ void main() {
                 >{
                   'GET /api/app/message/interactions':
                       (AppApiRequest request) async {
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: const <String, Object?>{
-                        'lane': 'project_communication',
-                        'items': <Object?>[],
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'lane': 'project_communication',
+                            'items': <Object?>[],
+                          },
+                        );
                       },
-                    );
-                  },
                 },
           ),
         ),
@@ -1524,29 +1595,29 @@ void main() {
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
               'GET /api/app/message/interactions':
                   (AppApiRequest request) async {
-                messageInteractionRequestCount += 1;
-                final title = messageInteractionRequestCount == 1
-                    ? '第一次项目沟通会话'
-                    : '第二次项目沟通会话';
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: <String, Object?>{
-                    'lane': 'project_communication',
-                    'items': <Object?>[
-                      _messageInteractionItem(
-                        interactionId:
-                            'interaction-$messageInteractionRequestCount',
-                        projectId: 'project-1',
-                        bidId: 'bid-1',
-                        counterpartName: title,
-                        summary: '$title 已生成。',
-                        lastMessageText: '$title 最近有更新。',
-                      ),
-                    ],
+                    messageInteractionRequestCount += 1;
+                    final title = messageInteractionRequestCount == 1
+                        ? '第一次项目沟通会话'
+                        : '第二次项目沟通会话';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          _messageInteractionItem(
+                            interactionId:
+                                'interaction-$messageInteractionRequestCount',
+                            projectId: 'project-1',
+                            bidId: 'bid-1',
+                            counterpartName: title,
+                            summary: '$title 已生成。',
+                            lastMessageText: '$title 最近有更新。',
+                          ),
+                        ],
+                      },
+                    );
                   },
-                );
-              },
             },
       );
 
@@ -1595,80 +1666,158 @@ void main() {
   );
 
   testWidgets(
-    'messages interactions jump stably to bid thread routes',
+    'messages building auto-refreshes project communication while staying on messages',
     (WidgetTester tester) async {
+      var messageInteractionRequestCount = 0;
       final messagesTransport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
               'GET /api/app/message/interactions':
                   (AppApiRequest request) async {
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: <String, Object?>{
-                    'lane': 'project_communication',
-                    'items': <Object?>[
-                      _messageInteractionItem(
-                        interactionId: 'interaction-1',
-                        projectId: 'project-1',
-                        bidId: 'bid-1',
-                        counterpartName: '杭州搭建公司',
-                        summary: '杭州搭建公司已对当前项目提交竞标。',
-                        lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
-                      ),
-                    ],
-                  },
-                );
-              },
-            },
-      );
-      final tradingImConsumerLayer = TradingImConsumerLayer(
-        client: AppApiClient(
-          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-          transport: FakeAppApiTransport(
-            handlers:
-                <
-                  String,
-                  Future<AppApiResponse> Function(AppApiRequest request)
-                >{
-                  'GET /api/app/project/clarification/list':
-                      (AppApiRequest request) async => throw UnimplementedError(),
-                  'GET /api/app/bid/thread/detail':
-                      (AppApiRequest request) async {
-                        return AppApiResponse(
-                          statusCode: 200,
-                          uri: request.uri,
-                          body: _bidThreadDetailPayload(
-                            threadId: 'thread-1',
+                    messageInteractionRequestCount += 1;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          _messageInteractionItem(
+                            interactionId:
+                                'interaction-$messageInteractionRequestCount',
                             projectId: 'project-1',
                             bidId: 'bid-1',
+                            counterpartName:
+                                '项目沟通会话 $messageInteractionRequestCount',
+                            summary: '会话已刷新。',
+                            lastMessageText:
+                                '最近更新时间 $messageInteractionRequestCount',
                           ),
-                        );
+                        ],
                       },
-                },
-          ),
-        ),
+                    );
+                  },
+            },
       );
 
       await tester.pumpWidget(
         buildApp(
           initialRoute: AppBuilding.messages.routePath,
           messagesTransport: messagesTransport,
-          tradingImConsumerLayer: tradingImConsumerLayer,
         ),
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('项目沟通'), findsOneWidget);
+      expect(messageInteractionRequestCount, 1);
+      expect(find.text('项目沟通会话 1'), findsOneWidget);
 
-      await _scrollAndTap(
-        tester,
-        find.widgetWithText(FilledButton, '进入沟通').first,
-      );
-      expect(find.text('沟通与投标'), findsWidgets);
-      expect(find.text('发送消息'), findsWidgets);
+      await tester.pump(const Duration(seconds: 3));
+      await tester.pumpAndSettle();
+
+      expect(messageInteractionRequestCount, greaterThanOrEqualTo(2));
+      expect(find.text('项目沟通会话 2'), findsOneWidget);
     },
   );
+
+  testWidgets('messages interactions jump stably to bid thread routes', (
+    WidgetTester tester,
+  ) async {
+    final messagesTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/message/interactions': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'lane': 'project_communication',
+                  'items': <Object?>[
+                    _messageInteractionItem(
+                      interactionId: 'interaction-1',
+                      projectId: 'project-1',
+                      bidId: 'bid-1',
+                      counterpartName: '杭州搭建公司',
+                      summary: '杭州搭建公司已对当前项目提交竞标。',
+                      lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
+                    ),
+                  ],
+                },
+              );
+            },
+            'GET /api/app/message/counterpart-conversation/detail':
+                (AppApiRequest request) async {
+                  expect(
+                    request.uri.queryParameters['conversationId'],
+                    'org-interaction-1',
+                  );
+                  expect(request.uri.queryParameters['projectId'], 'project-1');
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _counterpartConversationBidDetailPayload(
+                      interactionId: 'interaction-1',
+                      projectId: 'project-1',
+                      bidId: 'bid-1',
+                      counterpartName: '杭州搭建公司',
+                    ),
+                  );
+                },
+          },
+    );
+    final tradingImConsumerLayer = TradingImConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/project/clarification/list':
+                    (AppApiRequest request) async => throw UnimplementedError(),
+                'GET /api/app/bid/thread/detail':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: _bidThreadDetailPayload(
+                          threadId: 'thread-1',
+                          projectId: 'project-1',
+                          bidId: 'bid-1',
+                        ),
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: AppBuilding.messages.routePath,
+        messagesTransport: messagesTransport,
+        tradingImConsumerLayer: tradingImConsumerLayer,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('项目沟通'), findsOneWidget);
+
+    await _scrollAndTap(
+      tester,
+      find.widgetWithText(FilledButton, '进入项目沟通').first,
+    );
+    expect(find.text('展览项目 1'), findsOneWidget);
+
+    await _scrollAndTap(
+      tester,
+      find.widgetWithText(FilledButton, '进入竞标沟通').first,
+    );
+    expect(find.text('沟通与投标'), findsWidgets);
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, '发送消息'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(FilledButton, '发送消息'), findsOneWidget);
+  });
 
   testWidgets('messages building can be hidden by manifest and stays guarded', (
     WidgetTester tester,
@@ -3310,6 +3459,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await _expandBidSubmitFlowIfNeeded(tester);
       await _expectVisibleText(tester, '提交竞标');
       expect(find.text('当前组织类型未开放竞标资格'), findsNothing);
     },
@@ -4139,304 +4289,361 @@ void main() {
     );
   });
 
-  testWidgets('core v1 local chain runs from bid submit to my bids, interactions, thread and snapshot', (
-    WidgetTester tester,
-  ) async {
-    final uploadedKinds = <String>[];
-    final previewPngBytes = base64Decode(
-      'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
-      'AAAADUlEQVR42mP8z8BQDwAFgwJ/lOSv0wAAAABJRU5ErkJggg==',
-    );
-    BidSubmitAttachmentDebugOverrides.installPicker(() async {
-      final nextFile = switch (uploadedKinds.length) {
-        0 => 'project-understanding.png',
-        1 => 'quote-sheet.xlsx',
-        _ => 'schedule-plan.docx',
-      };
-      return BidSubmitAttachmentDraft(
-        fileName: nextFile,
-        bytes: nextFile.endsWith('.png')
-            ? previewPngBytes
-            : utf8.encode('mock-$nextFile'),
+  testWidgets(
+    'core v1 local chain runs from bid submit to my bids, interactions, thread and snapshot',
+    (WidgetTester tester) async {
+      final uploadedKinds = <String>[];
+      final previewPngBytes = base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJ'
+        'AAAADUlEQVR42mP8z8BQDwAFgwJ/lOSv0wAAAABJRU5ErkJggg==',
       );
-    });
+      BidSubmitAttachmentDebugOverrides.installPicker(() async {
+        final nextFile = switch (uploadedKinds.length) {
+          0 => 'project-understanding.png',
+          1 => 'quote-sheet.xlsx',
+          _ => 'schedule-plan.docx',
+        };
+        return BidSubmitAttachmentDraft(
+          fileName: nextFile,
+          bytes: nextFile.endsWith('.png')
+              ? previewPngBytes
+              : utf8.encode('mock-$nextFile'),
+        );
+      });
 
-    final exhibitionTransport = FakeAppApiTransport(
-      uploadHandler: (AppApiUploadRequest request) async {
-        return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
-      },
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            ...defaultHandlers(),
-            'GET /api/app/project/detail': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _projectPayload(
-                  projectId: 'proj-1',
-                  projectNo: 'PROJ-1',
-                  title: '展览项目 1',
-                  buildingType: 'exhibition',
-                  budgetAmount: 1888,
-                  state: 'published',
-                  viewerProjectRelation: 'public_viewer',
-                  summaryHeading: 'project',
-                ),
-              );
-            },
-            'GET /api/app/project/public-resources':
-                (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: <String, Object?>{'resources': <Object?>[]},
-                  );
-                },
-            'POST /api/app/file/upload/init': (AppApiRequest request) async {
-              final body = request.body as Map<String, Object?>;
-              final fileKind = '${body['fileKind']}';
-              uploadedKinds.add(fileKind);
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'uploadSessionId': 'session-$fileKind',
-                  'directUpload': <String, Object?>{
-                    'url': 'https://upload.test/$fileKind',
-                    'method': 'PUT',
-                    'headers': <String, Object?>{},
-                  },
-                  'confirm': <String, Object?>{
-                    'endpoint': '/api/app/file/upload/confirm',
-                  },
-                },
-              );
-            },
-            'POST /api/app/file/upload/confirm': (AppApiRequest request) async {
-              final body = request.body as Map<String, Object?>;
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'fileAssetId': 'fa-${body['uploadSessionId']}',
-                },
-              );
-            },
-            'POST /api/app/bid/submit': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 202,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'bidId': 'bid-123',
-                  'systemSeed': <String, Object?>{
-                    'seedType': 'bid_submitted',
-                    'threadId': 'thread-1',
-                  },
-                  'interactionSeed': <String, Object?>{
-                    'threadId': 'thread-1',
-                    'projectId': 'proj-1',
-                    'bidId': 'bid-123',
-                  },
-                },
-              );
-            },
-            'GET /api/app/my/bids': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'items': <Object?>[
-                    _myBidItem(
-                      bidId: 'bid-123',
-                      projectId: 'proj-1',
-                      projectNo: 'BID-PROJ-1',
-                      projectTitle: '展览项目 1',
-                      quoteAmount: 1200,
-                      proposalSummaryPreview: 'phase 2.1 bid',
-                      submittedAt: '2026-04-20T10:00:00Z',
-                      outcomeState: 'published',
-                      canOpenBidThread: true,
-                      canOpenBidResult: false,
-                    ),
-                  ],
-                },
-              );
-            },
-          },
-    );
-    final messagesTransport = FakeAppApiTransport(
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/message/interactions':
-                (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: <String, Object?>{
-                      'lane': 'project_communication',
-                      'items': <Object?>[
-                        _messageInteractionItem(
-                          interactionId: 'interaction-1',
-                          projectId: 'proj-1',
-                          bidId: 'bid-123',
-                          counterpartName: '杭州搭建公司',
-                          summary: '杭州搭建公司已对当前项目提交竞标。',
-                          lastMessageText: '当前竞标已提交，可继续进入沟通。',
-                        ),
-                      ],
-                    },
-                  );
-                },
-          },
-    );
-    final tradingImConsumerLayer = TradingImConsumerLayer(
-      client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-        transport: FakeAppApiTransport(
-          handlers:
-              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/bid/thread/detail':
-                    (AppApiRequest request) async {
-                      return AppApiResponse(
-                        statusCode: 200,
-                        uri: request.uri,
-                        body: <String, Object?>{
-                          'threadId': 'thread-1',
-                          'projectId': 'proj-1',
-                          'bidId': 'bid-123',
-                          'participants': <Object?>[
-                            <String, Object?>{
-                              'participantRole': 'project_owner',
-                              'organizationId': 'org-owner-1',
-                            },
-                            <String, Object?>{
-                              'participantRole': 'bidder',
-                              'organizationId': 'org-bidder-1',
-                            },
-                          ],
-                          'viewerParticipantRole': 'project_owner',
-                          'state': 'open',
-                          'availability': <String, Object?>{
-                            'canSendMessage': true,
-                            'canCreateConfirmation': true,
-                            'reason': 'participant_allowed',
-                          },
-                          'messages': <Object?>[
-                            <String, Object?>{
-                              'messageId': 'message-seed-1',
-                              'threadId': 'thread-1',
-                              'projectId': 'proj-1',
-                              'bidId': 'bid-123',
-                              'senderRole': 'system_seed',
-                              'messageKind': 'system_seed',
-                              'systemSeedType': 'bid_submitted',
-                              'systemSeedAction': <String, Object?>{
-                                'objectType': 'bid_submission_snapshot',
-                                'actionKey': 'bid_submission_snapshot.open',
-                                'canonicalPath':
-                                    '/api/app/bid/submission/snapshot',
-                                'params': <String, Object?>{
-                                  'projectId': 'proj-1',
-                                  'bidId': 'bid-123',
-                                },
-                              },
-                              'body': '杭州搭建公司已对当前项目提交竞标。',
-                              'attachmentFileAssetIds': <Object?>[],
-                              'createdAt': '2026-04-16T00:00:00Z',
-                            },
-                          ],
-                          'confirmationCards': <Object?>[],
-                        },
-                      );
-                    },
-                'GET /api/app/bid/submission/snapshot':
-                    (AppApiRequest request) async {
-                      return AppApiResponse(
-                        statusCode: 200,
-                        uri: request.uri,
-                        body: const <String, Object?>{
-                          'projectId': 'proj-1',
-                          'bidId': 'bid-123',
-                          'bidder': <String, Object?>{
-                            'organizationId': 'org-bidder-1',
-                            'displayName': '杭州搭建公司',
-                            'avatarUrl': null,
-                          },
-                          'submittedAt': '2026-04-16T00:00:00Z',
-                          'quoteAmount': 1200,
-                          'proposalSummary': 'phase 2.1 bid',
-                          'attachmentSummary': <String, Object?>{'count': 3},
-                          'availability': <String, Object?>{
-                            'canOpenBidThread': true,
-                          },
-                        },
-                      );
-                    },
+      final exhibitionTransport = FakeAppApiTransport(
+        uploadHandler: (AppApiUploadRequest request) async {
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/project/detail': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectPayload(
+                    projectId: 'proj-1',
+                    projectNo: 'PROJ-1',
+                    title: '展览项目 1',
+                    buildingType: 'exhibition',
+                    budgetAmount: 1888,
+                    state: 'published',
+                    viewerProjectRelation: 'public_viewer',
+                    summaryHeading: 'project',
+                  ),
+                );
               },
+              'GET /api/app/project/public-resources':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{'resources': <Object?>[]},
+                    );
+                  },
+              'POST /api/app/file/upload/init': (AppApiRequest request) async {
+                final body = request.body as Map<String, Object?>;
+                final fileKind = '${body['fileKind']}';
+                uploadedKinds.add(fileKind);
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'uploadSessionId': 'session-$fileKind',
+                    'directUpload': <String, Object?>{
+                      'url': 'https://upload.test/$fileKind',
+                      'method': 'PUT',
+                      'headers': <String, Object?>{},
+                    },
+                    'confirm': <String, Object?>{
+                      'endpoint': '/api/app/file/upload/confirm',
+                    },
+                  },
+                );
+              },
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async {
+                    final body = request.body as Map<String, Object?>;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'fileAssetId': 'fa-${body['uploadSessionId']}',
+                      },
+                    );
+                  },
+              'POST /api/app/bid/submit': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'bidId': 'bid-123',
+                    'systemSeed': <String, Object?>{
+                      'seedType': 'bid_submitted',
+                      'threadId': 'thread-1',
+                    },
+                    'interactionSeed': <String, Object?>{
+                      'threadId': 'thread-1',
+                      'projectId': 'proj-1',
+                      'bidId': 'bid-123',
+                    },
+                  },
+                );
+              },
+              'GET /api/app/my/bids': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'items': <Object?>[
+                      _myBidItem(
+                        bidId: 'bid-123',
+                        projectId: 'proj-1',
+                        projectNo: 'BID-PROJ-1',
+                        projectTitle: '展览项目 1',
+                        quoteAmount: 1200,
+                        proposalSummaryPreview: 'phase 2.1 bid',
+                        submittedAt: '2026-04-20T10:00:00Z',
+                        outcomeState: 'published',
+                        canOpenBidThread: true,
+                        canOpenBidResult: false,
+                      ),
+                    ],
+                  },
+                );
+              },
+            },
+      );
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          _messageInteractionItem(
+                            interactionId: 'interaction-1',
+                            projectId: 'proj-1',
+                            bidId: 'bid-123',
+                            counterpartName: '杭州搭建公司',
+                            summary: '杭州搭建公司已对当前项目提交竞标。',
+                            lastMessageText: '当前竞标已提交，可继续进入沟通。',
+                          ),
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['conversationId'],
+                      'org-interaction-1',
+                    );
+                    expect(request.uri.queryParameters['projectId'], 'proj-1');
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _counterpartConversationBidDetailPayload(
+                        interactionId: 'interaction-1',
+                        projectId: 'proj-1',
+                        bidId: 'bid-123',
+                        counterpartName: '杭州搭建公司',
+                      ),
+                    );
+                  },
+            },
+      );
+      final tradingImConsumerLayer = TradingImConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/bid/thread/detail':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: <String, Object?>{
+                            'threadId': 'thread-1',
+                            'projectId': 'proj-1',
+                            'bidId': 'bid-123',
+                            'participants': <Object?>[
+                              <String, Object?>{
+                                'participantRole': 'project_owner',
+                                'organizationId': 'org-owner-1',
+                              },
+                              <String, Object?>{
+                                'participantRole': 'bidder',
+                                'organizationId': 'org-bidder-1',
+                              },
+                            ],
+                            'viewerParticipantRole': 'project_owner',
+                            'state': 'open',
+                            'availability': <String, Object?>{
+                              'canSendMessage': true,
+                              'canCreateConfirmation': true,
+                              'reason': 'participant_allowed',
+                            },
+                            'messages': <Object?>[
+                              <String, Object?>{
+                                'messageId': 'message-seed-1',
+                                'threadId': 'thread-1',
+                                'projectId': 'proj-1',
+                                'bidId': 'bid-123',
+                                'senderRole': 'system_seed',
+                                'messageKind': 'system_seed',
+                                'systemSeedType': 'bid_submitted',
+                                'systemSeedAction': <String, Object?>{
+                                  'objectType': 'bid_submission_snapshot',
+                                  'actionKey': 'bid_submission_snapshot.open',
+                                  'canonicalPath':
+                                      '/api/app/bid/submission/snapshot',
+                                  'params': <String, Object?>{
+                                    'projectId': 'proj-1',
+                                    'bidId': 'bid-123',
+                                  },
+                                },
+                                'body': '杭州搭建公司已对当前项目提交竞标。',
+                                'attachmentFileAssetIds': <Object?>[],
+                                'createdAt': '2026-04-16T00:00:00Z',
+                              },
+                            ],
+                            'confirmationCards': <Object?>[],
+                          },
+                        );
+                      },
+                  'GET /api/app/bid/submission/snapshot':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'projectId': 'proj-1',
+                            'bidId': 'bid-123',
+                            'bidder': <String, Object?>{
+                              'organizationId': 'org-bidder-1',
+                              'displayName': '杭州搭建公司',
+                              'avatarUrl': null,
+                            },
+                            'submittedAt': '2026-04-16T00:00:00Z',
+                            'quoteAmount': 1200,
+                            'proposalSummary': 'phase 2.1 bid',
+                            'attachmentSummary': <String, Object?>{'count': 3},
+                            'attachments': <Object?>[
+                              <String, Object?>{
+                                'slotKey': 'project_understanding',
+                                'slotLabel': '项目理解',
+                                'fileAssetId':
+                                    'fa-session-bid_project_understanding',
+                                'fileKind': 'bid_project_understanding',
+                                'mimeType': 'application/pdf',
+                              },
+                              <String, Object?>{
+                                'slotKey': 'quote_sheet',
+                                'slotLabel': '报价表',
+                                'fileAssetId': 'fa-session-bid_quote_sheet',
+                                'fileKind': 'bid_quote_sheet',
+                                'mimeType': 'application/vnd.ms-excel',
+                              },
+                              <String, Object?>{
+                                'slotKey': 'schedule_plan',
+                                'slotLabel': '进度安排',
+                                'fileAssetId': 'fa-session-bid_schedule_plan',
+                                'fileKind': 'bid_schedule_plan',
+                                'mimeType': 'application/pdf',
+                              },
+                            ],
+                            'availability': <String, Object?>{
+                              'canOpenBidThread': true,
+                              'participantCardReadable': true,
+                            },
+                          },
+                        );
+                      },
+                },
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
-        transport: exhibitionTransport,
-        messagesTransport: messagesTransport,
-        tradingImConsumerLayer: tradingImConsumerLayer,
-        shellContextConsumer: buildShellContextConsumer(
-          organizationId: 'org-1',
-          roleKeys: const <String>['supplier_admin'],
-          certificationStatus: 'verified',
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+          transport: exhibitionTransport,
+          messagesTransport: messagesTransport,
+          tradingImConsumerLayer: tradingImConsumerLayer,
+          shellContextConsumer: buildShellContextConsumer(
+            organizationId: 'org-1',
+            roleKeys: const <String>['supplier_admin'],
+            certificationStatus: 'verified',
+          ),
+          sessionStore: buildAuthenticatedSessionStore(
+            deviceId: 'device-core-v1',
+          ),
         ),
-        sessionStore: buildAuthenticatedSessionStore(deviceId: 'device-core-v1'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      );
+      await tester.pumpAndSettle();
 
-    await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _enterVisibleTextField(tester, label: '方案说明', value: 'phase 2.1 bid');
-    await _uploadBidAttachment(tester, '项目理解');
-    await _uploadBidAttachment(tester, '报价表');
-    await _uploadBidAttachment(tester, '进度安排');
-    await _scrollAndTap(tester, find.widgetWithText(FilledButton, '提交竞标'));
+      await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
+      await _enterVisibleTextField(
+        tester,
+        label: '方案说明',
+        value: 'phase 2.1 bid',
+      );
+      await _uploadBidAttachment(tester, '项目理解');
+      await _uploadBidAttachment(tester, '报价表');
+      await _uploadBidAttachment(tester, '进度安排');
+      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '提交竞标'));
 
-    expect(find.text('竞标已提交'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '查看我的竞标'), findsOneWidget);
+      expect(find.text('竞标已提交'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '查看我的竞标'), findsOneWidget);
 
-    await _scrollAndTap(tester, find.widgetWithText(FilledButton, '查看我的竞标'));
-    expect(find.byType(MyProjectListPage), findsOneWidget);
-    final myBidsChip = find.widgetWithText(ChoiceChip, '我的竞标');
-    if (myBidsChip.evaluate().isNotEmpty) {
-      await _scrollAndTap(tester, myBidsChip.first);
-    }
-    expect(find.text('phase 2.1 bid'), findsOneWidget);
-    expect(find.text('沟通与投标'), findsOneWidget);
+      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '查看我的竞标'));
+      expect(find.byType(MyProjectListPage), findsOneWidget);
+      final myBidsChip = find.widgetWithText(ChoiceChip, '我的竞标');
+      if (myBidsChip.evaluate().isNotEmpty) {
+        await _scrollAndTap(tester, myBidsChip.first);
+      }
+      expect(find.text('phase 2.1 bid'), findsOneWidget);
+      expect(find.text('沟通与投标'), findsOneWidget);
 
-    await tester.tap(
-      find.descendant(
-        of: find.byType(NavigationBar),
-        matching: find.text('消息'),
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.tap(
+        find.descendant(
+          of: find.byType(NavigationBar),
+          matching: find.text('消息'),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('项目沟通'), findsOneWidget);
-    expect(find.text('杭州搭建公司'), findsOneWidget);
+      expect(find.text('项目沟通'), findsOneWidget);
+      expect(find.text('杭州搭建公司'), findsOneWidget);
 
-    await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入沟通'));
-    expect(find.text('沟通与投标'), findsWidgets);
-    await tester.scrollUntilVisible(
-      find.text('点击查看'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('点击查看'), findsOneWidget);
+      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入项目沟通'));
+      expect(find.text('展览项目 1'), findsOneWidget);
 
-    await _scrollAndTap(tester, find.widgetWithText(FilledButton, '点击查看'));
-    expect(find.text('竞标摘要'), findsOneWidget);
-    expect(find.textContaining('报价金额：¥1200'), findsOneWidget);
-  });
+      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入竞标沟通'));
+      expect(find.text('沟通与投标'), findsWidgets);
+      await tester.scrollUntilVisible(
+        find.text('点击查看'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('点击查看'), findsOneWidget);
+
+      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '点击查看'));
+      expect(find.text('竞标摘要'), findsOneWidget);
+      expect(find.textContaining('报价金额：¥1200'), findsOneWidget);
+    },
+  );
 
   testWidgets(
     'order detail enters read-only content from route orderId and exposes contract detail plus rating entry continuation actions',
@@ -4733,11 +4940,13 @@ void main() {
 
       expect(find.text('竞标提交'), findsWidgets);
       expect(find.text('第一步 核对项目'), findsOneWidget);
+      await _expandBidSubmitFlowIfNeeded(tester);
       await _expectVisibleText(tester, '核心信息');
       await _expectVisibleText(tester, '地点与安排');
       await _expectVisibleText(tester, '第二步 填写报价与方案说明');
       await _expectVisibleText(tester, '第三步 上传必选文档');
       await _expectVisibleText(tester, '模板下载区');
+      await _expectVisibleText(tester, '必传资料');
       await _expectVisibleText(tester, '合同模板');
       await _expectVisibleText(tester, '流程图与说明');
       await _expectVisibleText(tester, '公共资料');
@@ -4864,6 +5073,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _expandBidSubmitFlowIfNeeded(tester);
     await _expectVisibleText(tester, '模板下载区');
     await _expectVisibleText(tester, '合同模板');
     await _expectVisibleText(tester, '流程图与说明');
@@ -4997,6 +5207,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      await _expandBidSubmitFlowIfNeeded(tester);
       final projectUnderstandingCard = find.byKey(
         const ValueKey<String>(
           'bid-submit-attachment-card-project-understanding',

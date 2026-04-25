@@ -1,31 +1,45 @@
+import 'dart:async';
+import 'dart:io';
+
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_api_entry_mode.dart';
+import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
+import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
 ExhibitionMobileApp buildVisualDemoApp({required String initialRoute}) {
   const demoBaseUrl = AppApiEntryTarget.sshTunnelBaseUrl;
+  final exhibitionClient = AppApiClient(
+    config: AppApiConfig(baseUrl: demoBaseUrl),
+    transport: FakeAppApiTransport(handlers: _exhibitionHandlers()),
+  );
   return ExhibitionMobileApp(
     initialRoute: initialRoute,
     bootstrapManifest: AppConfigManifest.bootstrapDefaults(),
     bootstrapShellContext: AppShellContextData(
       userId: 'demo-user',
       organizationId: 'org-demo',
-      roleKeys: const <String>['buyer_admin'],
+      organizationType: 'both',
+      roleKeys: const <String>['buyer_admin', 'supplier_admin'],
       certificationStatus: 'verified',
+      personalCertificationStatus: 'verified',
+      personalCertificationQualified: true,
       membershipStatus: 'active',
       visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
       unreadSummary: const <String, Object?>{'todo': 3, 'notice': 2},
     ),
-    exhibitionConsumerLayer: ExhibitionConsumerLayer(
-      client: AppApiClient(
-        config: AppApiConfig(baseUrl: demoBaseUrl),
-        transport: FakeAppApiTransport(handlers: _exhibitionHandlers()),
-      ),
+    exhibitionConsumerLayer: ExhibitionConsumerLayer(client: exhibitionClient),
+    exhibitionHomeAggregationClient: CanonicalExhibitionHomeAggregationClient(
+      client: exhibitionClient,
+    ),
+    deviceLocationService: _VisualDemoDeviceLocationService(
+      state: _visualHomeWeatherState(),
     ),
     messagesConsumerLayer: MessagesConsumerLayer(
       client: AppApiClient(
@@ -39,12 +53,24 @@ ExhibitionMobileApp buildVisualDemoApp({required String initialRoute}) {
         transport: FakeAppApiTransport(handlers: _profileHandlers()),
       ),
     ),
+    sessionStore: AppSessionStore()
+      ..establishSession(
+        accessToken: 'visual-demo-access-token',
+        refreshToken: 'visual-demo-refresh-token',
+        expiresInSeconds: 3600,
+        deviceId: 'visual-demo-device',
+        localLoginSource: AppSessionLoginSource.passwordLogin,
+      ),
   );
 }
 
 Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
 _exhibitionHandlers() {
   return <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+    'GET /api/app/exhibition/home': _handleExhibitionHome,
+    'POST /api/app/exhibition/home/refresh': _handleExhibitionHome,
+    'POST /api/app/exhibition/home/location/select': _handleExhibitionHome,
+    'GET /api/app/project/list': _handleProjectList,
     'GET /api/app/project/detail': _handleProjectDetail,
     'POST /api/app/file/upload/init': _handleUploadInit,
     'POST /api/app/file/upload/confirm': _handleUploadConfirm,
@@ -52,6 +78,157 @@ _exhibitionHandlers() {
     'POST /api/app/contract/confirm': _handleContractConfirm,
     'POST /api/app/dispute/open': _handleDisputeOpen,
     'GET /api/app/rating/entry': _handleRatingEntry,
+  };
+}
+
+String _visualHomeWeatherState() {
+  const compileTimeState = String.fromEnvironment('VISUAL_HOME_WEATHER_STATE');
+  final runtimeState = Platform.environment['VISUAL_HOME_WEATHER_STATE']
+      ?.trim();
+  final state = compileTimeState.isNotEmpty
+      ? compileTimeState
+      : runtimeState != null && runtimeState.isNotEmpty
+      ? runtimeState
+      : 'formal';
+  return state == 'degraded' || state == 'no_location' ? state : 'formal';
+}
+
+final class _VisualDemoDeviceLocationService implements DeviceLocationService {
+  const _VisualDemoDeviceLocationService({required this.state});
+
+  final String state;
+
+  @override
+  bool get supportsDeviceLocation => true;
+
+  @override
+  bool get supportsReverseGeocoding => true;
+
+  @override
+  Future<DeviceLocationSnapshot> resolveCurrentPosition() async {
+    if (state == 'no_location') {
+      return const DeviceLocationSnapshot(
+        permissionState: DeviceLocationPermissionState.denied,
+        errorMessage: '定位权限未开启。',
+      );
+    }
+    return const DeviceLocationSnapshot(
+      permissionState: DeviceLocationPermissionState.granted,
+      latitude: 29.5630,
+      longitude: 106.5516,
+      provinceCode: '500000',
+      provinceName: '重庆市',
+    );
+  }
+}
+
+Future<AppApiResponse> _handleExhibitionHome(AppApiRequest request) async {
+  final state = _visualHomeWeatherState();
+  return AppApiResponse(
+    statusCode: state == 'no_location' ? 503 : 200,
+    uri: request.uri,
+    body: state == 'no_location'
+        ? const <String, Object?>{
+            'errorCode': 'HOME_AGGREGATION_UNAVAILABLE',
+            'message': '天气信息同步中，请稍候。',
+          }
+        : _homePayload(degraded: state == 'degraded'),
+  );
+}
+
+Future<AppApiResponse> _handleProjectList(AppApiRequest request) async {
+  return AppApiResponse(
+    statusCode: 200,
+    uri: request.uri,
+    body: <String, Object?>{
+      'items': <Object?>[
+        <String, Object?>{
+          'projectId': 'project-home-capture',
+          'projectNo': 'EXH-2026-DD93A8',
+          'displayTitle': '西洽会',
+          'title': '西洽会',
+          'buildingType': 'exhibition',
+          'budgetAmount': 120000,
+          'state': 'published',
+          'areaSqm': 200,
+          'provinceName': '重庆市',
+          'cityName': '重庆市',
+          'plannedStartAt': '2026-05-16',
+          'publishedAt': '2026-04-20',
+          'summary': <String, Object?>{'heading': '西洽会'},
+        },
+      ],
+    },
+  );
+}
+
+Map<String, Object?> _homePayload({required bool degraded}) {
+  return <String, Object?>{
+    'currentLocation': const <String, Object?>{
+      'displayName': '重庆南岸',
+      'provinceCode': '500000',
+      'provinceName': '重庆市',
+      'cityName': '重庆市',
+      'districtName': '南岸区',
+      'latitude': 29.5630,
+      'longitude': 106.5516,
+      'source': 'device_location',
+      'persisted': false,
+    },
+    'selectionScope': 'request_only',
+    'selectionNotice': '当前定位仅用于本次首页聚合',
+    'isUsingDeviceLocation': true,
+    'currentWeather': degraded ? '天气暂不可用' : '小雨',
+    'currentTemperature': degraded ? 0 : 21,
+    'highTemperature': degraded ? 0 : 24,
+    'lowTemperature': degraded ? 0 : 18,
+    'precipitationProbability': degraded ? 0 : 20,
+    'constructionRiskLevel': degraded ? 'medium' : 'low',
+    'constructionRiskSummary': degraded
+        ? '天气接口异常不影响项目列表和推荐频道。'
+        : '天气平稳，适合推进布展准备。',
+    'riskTags': degraded ? const <Object?>[] : const <Object?>['rain'],
+    'riskTimeLabel': degraded ? null : '今日白天',
+    'nightRainExpected': degraded ? null : false,
+    'nightRainTimeLabel': degraded ? null : '今夜无明显降雨',
+    'officialAlerts': const <Object?>[],
+    'constructionSuggestions': degraded
+        ? const <Object?>['稍后刷新天气，项目列表与公开入口仍可正常使用。']
+        : const <Object?>['按计划推进布展准备。', '关注临电和材料覆盖。', '预留雨具和转运缓冲。'],
+    'hourlyForecast': degraded
+        ? const <Object?>[]
+        : const <Object?>[
+            <String, Object?>{
+              'timeLabel': '18:00',
+              'weather': '小雨',
+              'temperature': 21,
+              'precipitationProbability': 20,
+            },
+            <String, Object?>{
+              'timeLabel': '20:00',
+              'weather': '多云',
+              'temperature': 20,
+              'precipitationProbability': 10,
+            },
+          ],
+    'dailyForecast': degraded
+        ? const <Object?>[]
+        : const <Object?>[
+            <String, Object?>{
+              'dateLabel': '今天',
+              'weekdayLabel': '周六',
+              'weather': '小雨',
+              'highTemperature': 24,
+              'lowTemperature': 18,
+              'precipitationProbability': 20,
+            },
+          ],
+    'updatedAt': '2026-04-25T18:00:00+08:00',
+    'sourceLabel': '首页聚合返回',
+    'canExpand': true,
+    'refreshable': true,
+    'modules': const <Object?>[],
+    'recommendationSections': const <Object?>[],
   };
 }
 
@@ -118,7 +295,8 @@ _profileHandlers() {
         body: <String, Object?>{
           'organization': <String, Object?>{
             'organizationId': 'org-demo',
-            'roleKeys': const <String>['buyer_admin'],
+            'organizationType': 'both',
+            'roleKeys': const <String>['buyer_admin', 'supplier_admin'],
             'visibleBuildings': const <String>[
               'exhibition',
               'messages',
@@ -126,6 +304,10 @@ _profileHandlers() {
             ],
           },
           'certification': <String, Object?>{'status': 'verified'},
+          'personalCertification': <String, Object?>{
+            'status': 'verified',
+            'qualifiedForCurrentActor': true,
+          },
           'membership': <String, Object?>{'status': 'active'},
           'settingsEntry': <String, Object?>{'state': 'visible'},
         },
