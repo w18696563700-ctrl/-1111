@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_workbench_consumer_layer.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_supplier_category_support.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_shared.dart';
 
 const List<MapEntry<String, String>> enterpriseWorkbenchTeamSizeOptions =
@@ -63,20 +64,8 @@ const List<MapEntry<String, String>> enterpriseWorkbenchFactoryProcessOptions =
     ];
 
 const List<MapEntry<String, String>>
-enterpriseWorkbenchSupplierCategoryOptions = <MapEntry<String, String>>[
-  MapEntry<String, String>('家具租赁', '家具租赁'),
-  MapEntry<String, String>('灯光音视频', '灯光音视频'),
-  MapEntry<String, String>('LED显示', 'LED 显示'),
-  MapEntry<String, String>('美陈道具', '美陈道具'),
-];
-
-const List<MapEntry<String, String>> enterpriseWorkbenchSupplierModeOptions =
-    <MapEntry<String, String>>[
-      MapEntry<String, String>('现货供应', '现货供应'),
-      MapEntry<String, String>('定制加工', '定制加工'),
-      MapEntry<String, String>('租赁服务', '租赁服务'),
-      MapEntry<String, String>('安装配套', '安装配套'),
-    ];
+enterpriseWorkbenchSupplierCategoryOptions =
+    enterpriseHubSupplierCategoryOptions;
 
 class EnterpriseWorkbenchProgressCard extends StatelessWidget {
   const EnterpriseWorkbenchProgressCard({
@@ -216,7 +205,8 @@ class EnterpriseWorkbenchCaseListCard extends StatelessWidget {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
-                          if (onContinueEdit != null || onDelete != null) ...<Widget>[
+                          if (onContinueEdit != null ||
+                              onDelete != null) ...<Widget>[
                             const SizedBox(height: 8),
                             Align(
                               alignment: Alignment.centerRight,
@@ -228,7 +218,8 @@ class EnterpriseWorkbenchCaseListCard extends StatelessWidget {
                                       key: ValueKey<String>(
                                         'enterprise-workbench-case-continue-edit-${item.caseId}',
                                       ),
-                                      onPressed: () => onContinueEdit!(item.caseId),
+                                      onPressed: () =>
+                                          onContinueEdit!(item.caseId),
                                       child: const Text('继续编辑'),
                                     ),
                                   if (onDelete != null)
@@ -307,7 +298,7 @@ class EnterpriseWorkbenchBoardProfileHeader extends StatelessWidget {
     return Text(switch (boardType) {
       EnterpriseBoardType.company => '当前主板块为公司，重点维护业务方向、服务项目和案例履历。',
       EnterpriseBoardType.factory => '当前主板块为工厂，重点维护工艺、产能与交付能力。',
-      EnterpriseBoardType.supplier => '当前主板块为供应商，重点维护品类、供应模式与响应能力。',
+      EnterpriseBoardType.supplier => '当前主板块为供应商，重点维护主营品类与响应能力。',
     }, style: Theme.of(context).textTheme.bodySmall);
   }
 }
@@ -321,6 +312,7 @@ class EnterpriseWorkbenchMultiSelectField extends StatelessWidget {
     required this.selectedValues,
     required this.onChanged,
     this.required = false,
+    this.singleSelect = false,
   });
 
   final String label;
@@ -329,6 +321,7 @@ class EnterpriseWorkbenchMultiSelectField extends StatelessWidget {
   final Set<String> selectedValues;
   final ValueChanged<Set<String>> onChanged;
   final bool required;
+  final bool singleSelect;
 
   @override
   Widget build(BuildContext context) {
@@ -347,7 +340,9 @@ class EnterpriseWorkbenchMultiSelectField extends StatelessWidget {
                 label: Text(option.value),
                 selected: selectedValues.contains(option.key),
                 onSelected: (selected) {
-                  final next = Set<String>.of(selectedValues);
+                  final next = singleSelect
+                      ? <String>{}
+                      : Set<String>.of(selectedValues);
                   if (selected) {
                     next.add(option.key);
                   } else {

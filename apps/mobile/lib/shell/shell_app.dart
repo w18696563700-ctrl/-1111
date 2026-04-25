@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
@@ -9,8 +11,10 @@ import 'package:mobile/core/config/config_manifest.dart';
 import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
+import 'package:mobile/features/exhibition/data/project_name_access_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/trading_im_consumer_layer.dart';
+import 'package:mobile/features/messages/data/counterpart_conversation_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_governance_appeal_consumer_layer.dart';
@@ -29,10 +33,12 @@ class ExhibitionMobileApp extends StatefulWidget {
     this.shellContextConsumer,
     this.exhibitionConsumerLayer,
     this.exhibitionHomeAggregationClient,
+    this.projectNameAccessConsumerLayer,
     this.forumConsumerLayer,
     this.tradingImConsumerLayer,
     this.authConsumerLayer,
     this.messagesConsumerLayer,
+    this.counterpartConversationConsumerLayer,
     this.profileConsumerLayer,
     this.profileGovernanceAppealConsumerLayer,
     this.profileGovernanceStatusConsumerLayer,
@@ -47,10 +53,13 @@ class ExhibitionMobileApp extends StatefulWidget {
   final AppShellContextConsumer? shellContextConsumer;
   final ExhibitionConsumerLayer? exhibitionConsumerLayer;
   final ExhibitionHomeAggregationClient? exhibitionHomeAggregationClient;
+  final ProjectNameAccessConsumerLayer? projectNameAccessConsumerLayer;
   final ForumConsumerLayer? forumConsumerLayer;
   final TradingImConsumerLayer? tradingImConsumerLayer;
   final AuthConsumerLayer? authConsumerLayer;
   final MessagesConsumerLayer? messagesConsumerLayer;
+  final CounterpartConversationConsumerLayer?
+  counterpartConversationConsumerLayer;
   final ProfileConsumerLayer? profileConsumerLayer;
   final ProfileGovernanceAppealConsumerLayer?
   profileGovernanceAppealConsumerLayer;
@@ -65,18 +74,34 @@ class ExhibitionMobileApp extends StatefulWidget {
 }
 
 class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
+  static const bool _enablePersistedSession = bool.fromEnvironment(
+    'APP_ENABLE_PERSISTED_SESSION',
+  );
+  static const String _sessionStorageNamespace = String.fromEnvironment(
+    'APP_SESSION_STORAGE_NAMESPACE',
+    defaultValue: 'default',
+  );
+
   late final AppBootstrapController _controller = AppBootstrapController(
     bootstrapManifest: widget.bootstrapManifest,
     bootstrapShellContext: widget.bootstrapShellContext,
     shellContextConsumer: widget.shellContextConsumer,
-  )..initialize();
+  );
 
   final AppRouter _router = const AppRouter();
 
   @override
   void initState() {
     super.initState();
-    AppSessionStore.install(widget.sessionStore ?? AppSessionStore());
+    AppSessionStore.install(
+      widget.sessionStore ??
+          AppSessionStore(
+            persistSession: _enablePersistedSession,
+            storageNamespace: _sessionStorageNamespace,
+          ),
+    );
+    final hasBootstrapSession = AppSessionStore.instance
+        .establishBootstrapSessionFromEnvironment();
     AuthConsumerLayer.install(widget.authConsumerLayer ?? AuthConsumerLayer());
     ExhibitionConsumerLayer.install(
       widget.exhibitionConsumerLayer ?? ExhibitionConsumerLayer(),
@@ -84,6 +109,9 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     ExhibitionHomeAggregationClient.install(
       widget.exhibitionHomeAggregationClient ??
           CanonicalExhibitionHomeAggregationClient(),
+    );
+    ProjectNameAccessConsumerLayer.install(
+      widget.projectNameAccessConsumerLayer ?? ProjectNameAccessConsumerLayer(),
     );
     DeviceLocationService.install(
       widget.deviceLocationService ?? GeolocatorDeviceLocationService(),
@@ -96,6 +124,10 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     );
     MessagesConsumerLayer.install(
       widget.messagesConsumerLayer ?? MessagesConsumerLayer(),
+    );
+    CounterpartConversationConsumerLayer.install(
+      widget.counterpartConversationConsumerLayer ??
+          CounterpartConversationConsumerLayer(),
     );
     ProfileConsumerLayer.install(
       widget.profileConsumerLayer ?? ProfileConsumerLayer(),
@@ -111,6 +143,19 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     ProfileIdentityConsumerLayer.install(
       widget.profileIdentityConsumerLayer ?? ProfileIdentityConsumerLayer(),
     );
+    if (AppSessionStore.instance.persistsSession && !hasBootstrapSession) {
+      unawaited(_restorePersistedSessionAndInitializeShell());
+    } else {
+      _controller.initialize();
+    }
+  }
+
+  Future<void> _restorePersistedSessionAndInitializeShell() async {
+    await AppSessionStore.instance.restorePersistedSession();
+    if (!mounted) {
+      return;
+    }
+    _controller.initialize();
   }
 
   @override
@@ -119,10 +164,12 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     AuthConsumerLayer.reset();
     ExhibitionConsumerLayer.reset();
     ExhibitionHomeAggregationClient.reset();
+    ProjectNameAccessConsumerLayer.reset();
     DeviceLocationService.reset();
     ForumConsumerLayer.reset();
     TradingImConsumerLayer.reset();
     MessagesConsumerLayer.reset();
+    CounterpartConversationConsumerLayer.reset();
     ProfileConsumerLayer.reset();
     ProfileGovernanceAppealConsumerLayer.reset();
     ProfileGovernanceStatusConsumerLayer.reset();

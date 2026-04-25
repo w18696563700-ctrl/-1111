@@ -66,6 +66,24 @@ export class TradingShellHandoffService {
     }
   }
 
+  async passInspection(
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.post<Record<string, unknown>>(
+        '/server/inspection/pass',
+        this.normalizeInspectionPassPayload(payload),
+        { headers: this.authContext.buildForwardHeaders(headers) },
+      );
+      return this.toInspectionPassAccepted(
+        this.requireRecord(result, 'Inspection pass accepted response must be an object.'),
+      );
+    } catch (error) {
+      throw this.errors.normalizeInspectionPassError(error);
+    }
+  }
+
   async confirmContract(
     payload: Record<string, unknown>,
     headers: IncomingHttpHeaders,
@@ -174,6 +192,26 @@ export class TradingShellHandoffService {
       inspectionId,
       milestoneId,
       state,
+      summary,
+    };
+  }
+
+  private toInspectionPassAccepted(result: Record<string, unknown>) {
+    const inspectionId = this.asString(result.inspectionId);
+    const milestoneId = this.asString(result.milestoneId);
+    const orderId = this.asString(result.orderId);
+    const state = this.asString(result.state);
+    const orderState = this.asString(result.orderState);
+    const summary = this.asRecordOrNull(result.summary);
+    if (!inspectionId || !milestoneId || !orderId || !state || !orderState || !summary) {
+      throw new Error('Inspection pass accepted response is missing required fields.');
+    }
+    return {
+      inspectionId,
+      milestoneId,
+      orderId,
+      state,
+      orderState,
       summary,
     };
   }
@@ -298,6 +336,29 @@ export class TradingShellHandoffService {
         statusCode: 400,
         code: 'INSPECTION_RECHECK_INVALID',
         message: '当前验收复检参数无效，请检查后再试。',
+        source: 'bff',
+      });
+    }
+
+    return { inspectionId };
+  }
+
+  private normalizeInspectionPassPayload(payload: Record<string, unknown>) {
+    if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'INSPECTION_PASS_INVALID',
+        message: '当前验收通过参数无效，请检查后再试。',
+        source: 'bff',
+      });
+    }
+
+    const inspectionId = this.asString(payload.inspectionId);
+    if (!inspectionId) {
+      throw new BadRequestException({
+        statusCode: 400,
+        code: 'INSPECTION_PASS_INVALID',
+        message: '当前验收通过参数无效，请检查后再试。',
         source: 'bff',
       });
     }

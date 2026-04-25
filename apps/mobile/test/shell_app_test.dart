@@ -1485,7 +1485,7 @@ void main() {
     expect(find.text('展览首页'), findsNothing);
     expect(find.text('当前定位：重庆'), findsNothing);
     expect(find.text('当前环境：联调环境'), findsNothing);
-    expect(find.text('地区识别中'), findsWidgets);
+    expect(find.text('定位状态待确认'), findsWidgets);
     expect(find.text('公开入口'), findsOneWidget);
     expect(find.text('推荐频道'), findsOneWidget);
     expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
@@ -2741,37 +2741,53 @@ void main() {
   );
 
   testWidgets(
-    'rating entry route is reachable and issues the app-facing read request',
+    'counterparty rating entry route reaches the new app-facing read request',
     (WidgetTester tester) async {
       var ratingEntryRequestCount = 0;
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
               ...defaultHandlers(),
-              'GET /api/app/rating/entry': (AppApiRequest request) async {
-                ratingEntryRequestCount += 1;
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: <String, Object?>{
-                    'ratingId': 'rating-1',
-                    'orderId': 'order-1',
-                    'state': 'eligible',
-                    'summary': <String, Object?>{'heading': 'rating'},
+              'GET /api/app/project-counterparty-rating/entry':
+                  (AppApiRequest request) async {
+                    ratingEntryRequestCount += 1;
+                    expect(request.uri.queryParameters['orderId'], 'order-1');
+                    expect(
+                      request.uri.queryParameters['projectId'],
+                      'project-1',
+                    );
+                    expect(
+                      request.uri.queryParameters['rateeOrganizationId'],
+                      'org-counterpart',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'orderId': 'order-1',
+                        'projectId': 'project-1',
+                        'raterOrganizationId': 'org-owner',
+                        'rateeOrganizationId': 'org-counterpart',
+                        'canRate': true,
+                        'reason': null,
+                        'ratingState': 'eligible',
+                      },
+                    );
                   },
-                );
-              },
             },
       );
 
       await tester.pumpWidget(buildApp(transport: transport));
       await tester.pumpAndSettle();
 
-      await pushNamedRoute(tester, '/exhibition/ratings/entry?orderId=order-1');
+      await pushNamedRoute(
+        tester,
+        '/exhibition/ratings/entry?orderId=order-1&projectId=project-1&rateeOrganizationId=org-counterpart',
+      );
       await tester.pumpAndSettle();
 
       expect(ratingEntryRequestCount, 1);
-      expect(find.text('评价入口'), findsWidgets);
+      expect(find.text('双方互评入口'), findsWidgets);
       expect(find.textContaining('当前订单 ID：order-1'), findsAtLeastNWidgets(1));
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey<String>('rating_submit_button')),
@@ -4706,7 +4722,8 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('查看合同详情'), findsOneWidget);
-      expect(find.text('查看评价入口'), findsOneWidget);
+      expect(find.text('双方互评暂不可从订单页进入'), findsOneWidget);
+      expect(find.text('查看双方互评入口'), findsNothing);
       expect(find.text('查看里程碑列表'), findsNothing);
       expect(find.text('去提交 initial delivery'), findsNothing);
       expect(find.text('开启争议入口'), findsNothing);

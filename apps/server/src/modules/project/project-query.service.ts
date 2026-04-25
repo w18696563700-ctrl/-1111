@@ -4,12 +4,38 @@ import { IsNull, Not, Repository } from 'typeorm';
 import { CurrentSessionVerificationResult } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
-import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
+import {
+  CurrentActorEligibilityService,
+  CurrentOrganizationScope,
+} from '../organization/current-actor-eligibility.service';
+import { readBidAwardTruth } from '../bid_award/bid-award.truth';
+import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { ProjectEntity } from './entities/project.entity';
 import { projectUnavailable } from './project.errors';
 import { ProjectPresenter } from './project.presenter';
 
 type ProjectViewerRelation = 'owner' | 'non_owner';
+type ProjectBidCandidateRow = {
+  bidId: string;
+  bidNo: string | null;
+  bidderOrganizationId: string | null;
+  bidderOrganizationName: string | null;
+  quoteAmount: string | number | null;
+  proposalSummary: string | null;
+  state: string | null;
+  submittedAt: string | Date | null;
+};
+
+type ProjectBidCandidateReadModel = {
+  bidId: string;
+  bidNo: string | null;
+  bidderOrganizationId: string | null;
+  bidderOrganizationName: string | null;
+  quoteAmount: number | null;
+  proposalSummary: string | null;
+  state: string | null;
+  submittedAt: string | null;
+};
 type ProjectListQuery = {
   provinceCode?: string;
   cityCode?: string;
@@ -49,6 +75,7 @@ export class ProjectQueryService {
     private readonly projectRepository: Repository<ProjectEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly projectNameAccessProjectionService: ProjectNameAccessProjectionService,
     private readonly presenter: ProjectPresenter
   ) {}
 
@@ -75,7 +102,24 @@ export class ProjectQueryService {
     );
     const total = visibleProjects.length;
     const pagedProjects = visibleProjects.slice((page - 1) * pageSize, page * pageSize);
-    return this.presenter.toListResponse(pagedProjects, page, pageSize, total);
+    const viewer = await this.resolveOptionalViewerContext(context);
+    const accessProjectionByProjectId =
+      await this.projectNameAccessProjectionService.buildPublicProjectionMap({
+        projects: pagedProjects,
+        viewerOrganizationId: viewer.scope?.organization.id ?? null,
+        ownerProjectIds: new Set(
+          pagedProjects
+            .filter((project) => this.isOwnerOrganizationViewer(project, viewer.scope))
+            .map((project) => project.id),
+        ),
+      });
+    return this.presenter.toListResponse(
+      pagedProjects,
+      page,
+      pageSize,
+      total,
+      accessProjectionByProjectId,
+    );
   }
 
   async getProjectById(projectId: string, context: RequestContext) {
@@ -91,7 +135,8 @@ export class ProjectQueryService {
     if (this.isArchivedProject(project)) {
       throw projectUnavailable('Current project is unavailable.');
     }
-    const viewerProjectRelation = await this.resolveViewerProjectRelation(project, context);
+    const viewer = await this.resolveOptionalViewerContext(context);
+    const viewerProjectRelation = this.resolveViewerProjectRelation(project, viewer);
     if (project.publishedAt == null) {
       throw projectUnavailable('Current project is unavailable.');
     }
@@ -99,9 +144,24 @@ export class ProjectQueryService {
       throw projectUnavailable('Current project is unavailable.');
     }
 
-    return {
-      ...this.presenter.toReadModel(project),
+    const readModel = {
+      ...this.presenter.toReadModel(
+        project,
+        await this.projectNameAccessProjectionService.buildSingleProjectProjection({
+          project,
+          viewerOrganizationId: viewer.scope?.organization.id ?? null,
+          isOwnerViewer: this.isOwnerOrganizationViewer(project, viewer.scope),
+        }),
+      ),
       viewerProjectRelation
+    };
+    if (viewerProjectRelation !== 'owner') {
+      return readModel;
+    }
+    return {
+      ...readModel,
+      bidCandidates: await this.fetchProjectBidCandidates(project.id),
+      bidSelection: this.readProjectBidSelection(project),
     };
   }
 
@@ -129,28 +189,51 @@ export class ProjectQueryService {
     };
   }
 
-  private async resolveViewerProjectRelation(project: ProjectEntity, context: RequestContext) {
+  private async resolveOptionalViewerContext(context: RequestContext) {
     const verification = await this.verifyOptionalCurrentSession(context);
     if (verification.outcome !== 'verified') {
-      return 'non_owner' satisfies ProjectViewerRelation;
-    }
-
-    const currentSession = verification.currentSession;
-    if (!this.sameUser(project.creatorUserId, currentSession.userId)) {
-      return 'non_owner' satisfies ProjectViewerRelation;
+      return {
+        currentSession: null,
+        scope: null,
+      };
     }
 
     try {
-      const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
-      if (!scope) {
-        return 'non_owner' satisfies ProjectViewerRelation;
-      }
-      return scope.organization.id === project.organizationId
-        ? ('owner' satisfies ProjectViewerRelation)
-        : ('non_owner' satisfies ProjectViewerRelation);
+      return {
+        currentSession: verification.currentSession,
+        scope: await this.eligibilityService.getCurrentOrganizationScope(verification.currentSession),
+      };
     } catch {
+      return {
+        currentSession: verification.currentSession,
+        scope: null,
+      };
+    }
+  }
+
+  private resolveViewerProjectRelation(
+    project: ProjectEntity,
+    viewer: {
+      currentSession: { userId: string } | null;
+      scope: CurrentOrganizationScope | null;
+    },
+  ) {
+    if (!viewer.currentSession) {
       return 'non_owner' satisfies ProjectViewerRelation;
     }
+    if (!this.sameUser(project.creatorUserId, viewer.currentSession.userId)) {
+      return 'non_owner' satisfies ProjectViewerRelation;
+    }
+    if (!viewer.scope) {
+      return 'non_owner' satisfies ProjectViewerRelation;
+    }
+    return viewer.scope.organization.id === project.organizationId
+      ? ('owner' satisfies ProjectViewerRelation)
+      : ('non_owner' satisfies ProjectViewerRelation);
+  }
+
+  private isOwnerOrganizationViewer(project: ProjectEntity, scope: CurrentOrganizationScope | null) {
+    return Boolean(scope && scope.organization.id === project.organizationId);
   }
 
   private async verifyOptionalCurrentSession(context: RequestContext) {
@@ -170,6 +253,80 @@ export class ProjectQueryService {
     const creatorUserId = projectCreatorUserId?.trim() ?? '';
     const viewerUserId = currentUserId.trim();
     return Boolean(creatorUserId) && creatorUserId === viewerUserId;
+  }
+
+  private async fetchProjectBidCandidates(projectId: string) {
+    const rows = (await this.projectRepository.query(
+      `
+        select
+          bid.id as "bidId",
+          bid.bid_no as "bidNo",
+          coalesce(nullif(bid.bidder_organization_id, ''), bid.organization_id) as "bidderOrganizationId",
+          organization.name as "bidderOrganizationName",
+          bid.quote_amount as "quoteAmount",
+          bid.proposal_summary as "proposalSummary",
+          bid.state as "state",
+          bid.submitted_at as "submittedAt"
+        from public.bids bid
+        left join public.organizations organization
+          on organization.id::text = coalesce(nullif(bid.bidder_organization_id, ''), bid.organization_id)
+        where bid.project_id = $1
+        order by bid.submitted_at asc nulls last, bid.created_at asc nulls last, bid.id asc
+      `,
+      [projectId]
+    )) as ProjectBidCandidateRow[];
+
+    return rows
+      .map((row) => this.toProjectBidCandidate(row))
+      .filter((row): row is ProjectBidCandidateReadModel => row !== null);
+  }
+
+  private toProjectBidCandidate(row: ProjectBidCandidateRow) {
+    const bidId = this.normalizeText(row.bidId);
+    if (!bidId) {
+      return null;
+    }
+    return {
+      bidId,
+      bidNo: this.normalizeNullableText(row.bidNo),
+      bidderOrganizationId: this.normalizeNullableText(row.bidderOrganizationId),
+      bidderOrganizationName: this.normalizeNullableText(row.bidderOrganizationName),
+      quoteAmount: this.toNullableNumber(row.quoteAmount),
+      proposalSummary: this.normalizeNullableText(row.proposalSummary),
+      state: this.normalizeNullableText(row.state),
+      submittedAt: this.toDateTimeString(row.submittedAt),
+    } satisfies ProjectBidCandidateReadModel;
+  }
+
+  private readProjectBidSelection(project: ProjectEntity) {
+    const award = readBidAwardTruth(project.summary);
+    if (!award) {
+      return null;
+    }
+    return {
+      winningBidId: award.winningBidId,
+      orderId: award.orderId,
+      contractId: award.contractId,
+    };
+  }
+
+  private normalizeNullableText(value: string | null | undefined) {
+    if (typeof value !== 'string') {
+      return null;
+    }
+    const normalized = value.trim();
+    return normalized ? normalized : null;
+  }
+
+  private toDateTimeString(value: string | Date | null | undefined) {
+    if (typeof value === 'string') {
+      const normalized = value.trim();
+      return normalized ? normalized : null;
+    }
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString();
+    }
+    return null;
   }
 
   private normalizeText(value: string | undefined) {

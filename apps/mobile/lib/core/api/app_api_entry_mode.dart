@@ -6,6 +6,8 @@ final class AppApiEntryTarget {
   static const String _formalCloudEnvKey = 'APP_FORMAL_CLOUD_BFF_BASE_URL';
   static const String sshTunnelBaseUrl = 'http://127.0.0.1:8080/api/app';
   static const String localDevelopmentBaseUrl = 'http://127.0.0.1:3000/api/app';
+  static const String disabledLocalDevelopmentMessage =
+      'Flutter App local_dev mode is disabled. Run the app against the Aliyun BFF through the approved SSH tunnel on 127.0.0.1:8080, or use an explicit cloud entry.';
 
   static String get cloudBaseUrl {
     const compileTimeBaseUrl = String.fromEnvironment(_formalCloudEnvKey);
@@ -20,11 +22,7 @@ final class AppApiEntryTarget {
   }
 
   static AppApiEntryMode defaultEntryMode({String? configuredCloudBaseUrl}) {
-    final resolvedCloudBaseUrl =
-        configuredCloudBaseUrl?.trim() ?? cloudBaseUrl.trim();
-    return resolvedCloudBaseUrl.isNotEmpty
-        ? AppApiEntryMode.cloud
-        : AppApiEntryMode.sshTunnel;
+    return AppApiEntryMode.sshTunnel;
   }
 
   static String get defaultBaseUrl => defaultBaseUrlForMode(defaultEntryMode());
@@ -55,7 +53,7 @@ final class AppApiEntryTarget {
       case AppApiEntryMode.sshTunnel:
         return sshTunnelBaseUrl;
       case AppApiEntryMode.localDev:
-        return localDevelopmentBaseUrl;
+        throw StateError(disabledLocalDevelopmentMessage);
       case AppApiEntryMode.custom:
         return defaultBaseUrl;
     }
@@ -70,6 +68,19 @@ final class AppApiEntryTarget {
     throw StateError(
       'APP_FORMAL_CLOUD_BFF_BASE_URL is not configured. Launch through the repository runtime scripts or pass --dart-define=APP_FORMAL_CLOUD_BFF_BASE_URL=<formal-cloud-bff-base-url>.',
     );
+  }
+
+  static String requireApprovedBaseUrl(
+    String baseUrl, {
+    AppApiEntryMode? entryMode,
+  }) {
+    final normalizedBaseUrl = baseUrl.trim();
+    final inferredEntryMode = inferFromBaseUrl(normalizedBaseUrl);
+    if (entryMode == AppApiEntryMode.localDev ||
+        inferredEntryMode == AppApiEntryMode.localDev) {
+      throw StateError(disabledLocalDevelopmentMessage);
+    }
+    return normalizedBaseUrl;
   }
 
   static AppApiEntryMode inferFromBaseUrl(String baseUrl) {
@@ -116,7 +127,7 @@ final class AppApiEntryTarget {
       case AppApiEntryMode.sshTunnel:
         return 'SSH隧道';
       case AppApiEntryMode.localDev:
-        return '本地开发';
+        return '本地开发（已禁用）';
       case AppApiEntryMode.custom:
         return isStagingLikeEnvironment(baseUrl) ? '自定义联调' : '自定义入口';
     }

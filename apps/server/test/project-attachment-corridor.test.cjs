@@ -15,6 +15,28 @@ function createContext(requestId) {
   };
 }
 
+function createProjectNameAccessProjectionService() {
+  const toProjection = (project) => ({
+    displayTitle: project.exhibitionName ?? project.title,
+    title: project.title,
+    exhibitionName: project.exhibitionName ?? null,
+    brandName: project.brandName ?? null,
+    nameAccess: {
+      status: 'visible',
+      canRequest: false,
+      requestId: null,
+    },
+  });
+  return {
+    async buildSingleProjectProjection({ project }) {
+      return toProjection(project);
+    },
+    async buildPublicProjectionMap({ projects }) {
+      return new Map(projects.map((project) => [project.id, toProjection(project)]));
+    },
+  };
+}
+
 function createProject(overrides = {}) {
   return {
     id: 'project-1',
@@ -649,6 +671,7 @@ test('public project detail is not expanded by attachment corridor', async () =>
       },
     },
     createEligibilityService(),
+    createProjectNameAccessProjectionService(),
     new ProjectPresenter(),
   );
 
@@ -713,6 +736,7 @@ test('bid-material projection filters to effect_image and construction_doc only'
       },
     },
     createEligibilityService(),
+    createProjectNameAccessProjectionService(),
     new ProjectPresenter(),
   );
   const service = new ProjectBidMaterialService(

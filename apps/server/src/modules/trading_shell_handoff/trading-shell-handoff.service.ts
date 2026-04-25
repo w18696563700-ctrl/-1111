@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
@@ -15,6 +15,7 @@ import {
   disputeInvalidState,
   disputeOpenInvalid,
   disputeWithdrawInvalid,
+  inspectionPassInvalid,
   inspectionEntryUnavailable,
   inspectionInvalidState,
   inspectionRecheckInvalid,
@@ -22,6 +23,7 @@ import {
   milestoneInvalidState,
   milestoneSubmitInvalid,
 } from './trading-shell-handoff.errors';
+import { TradingShellFulfillmentProgressService } from './trading-shell-fulfillment-progress.service';
 import { TradingShellHandoffPresenter } from './trading-shell-handoff.presenter';
 
 const ACTIVE_ORDER_STATE = 'active';
@@ -107,9 +109,14 @@ export class TradingShellHandoffService {
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly presenter: TradingShellHandoffPresenter,
+    @Optional()
+    private readonly fulfillmentProgressService?: TradingShellFulfillmentProgressService,
   ) {}
 
   async submitMilestone(payload: Record<string, unknown>, context: RequestContext) {
+    if (this.fulfillmentProgressService) {
+      return this.fulfillmentProgressService.submitMilestone(payload, context);
+    }
     const command = this.toMilestoneSubmitCommand(payload);
     const organizationId = await this.requireScopedOrganizationId(context);
     const milestone = await this.fetchScopedMilestone(command.milestoneId, organizationId);
@@ -123,6 +130,9 @@ export class TradingShellHandoffService {
   }
 
   async submitInspection(payload: Record<string, unknown>, context: RequestContext) {
+    if (this.fulfillmentProgressService) {
+      return this.fulfillmentProgressService.submitInspection(payload, context);
+    }
     const command = this.toInspectionSubmitCommand(payload);
     const organizationId = await this.requireScopedOrganizationId(context);
     const inspection = await this.fetchScopedInspection(command.inspectionId, organizationId);
@@ -175,6 +185,13 @@ export class TradingShellHandoffService {
       milestoneId: inspection.milestoneId,
       state: RECHECKED_INSPECTION_STATE,
     });
+  }
+
+  async passInspection(payload: Record<string, unknown>, context: RequestContext) {
+    if (!this.fulfillmentProgressService) {
+      throw inspectionPassInvalid('Inspection pass entry is unavailable.');
+    }
+    return this.fulfillmentProgressService.passInspection(payload, context);
   }
 
   async confirmContract(payload: Record<string, unknown>, context: RequestContext) {

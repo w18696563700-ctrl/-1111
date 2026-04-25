@@ -163,9 +163,10 @@ class _LegacyEnterpriseApplicationPageState
         'coreProducts': _csvList(_profileTwoController.text),
       },
       EnterpriseBoardType.supplier => <String, Object?>{
-        'supplyCategories': _selectedProfileOneOptions.toList(growable: false),
-        'supplyMode': _selectedProfileTwoOptions.toList(growable: false),
-        'coreProductsOrServices': _csvList(_shortIntroController.text),
+        'supplyCategories': _selectedProfileOneOptions
+            .take(1)
+            .toList(growable: false),
+        'coreProductsOrServices': _csvList(_profileTwoController.text),
       },
     };
 
@@ -443,6 +444,7 @@ class _LegacyEnterpriseApplicationPageState
                 helperText: _profileOneHelper,
                 options: _profileOneOptions,
                 selectedValues: _selectedProfileOneOptions,
+                singleSelect: _boardType == EnterpriseBoardType.supplier,
                 onChanged: (Set<String> next) {
                   setState(() {
                     _selectedProfileOneOptions = next;
@@ -588,7 +590,7 @@ class _LegacyEnterpriseApplicationPageState
   String get _profileTwoLabel => switch (_boardType) {
     EnterpriseBoardType.company => '服务项目',
     EnterpriseBoardType.factory => '核心产品',
-    EnterpriseBoardType.supplier => '供应模式',
+    EnterpriseBoardType.supplier => '核心产品/服务（逗号分隔）',
   };
 
   String get _profileOneHelper => switch (_boardType) {
@@ -600,10 +602,10 @@ class _LegacyEnterpriseApplicationPageState
   String get _profileTwoHelper => switch (_boardType) {
     EnterpriseBoardType.company => '请按前台展示筛选口径选择服务项目。',
     EnterpriseBoardType.factory => '核心产品保留自由表达，便于描述你的实际产物。',
-    EnterpriseBoardType.supplier => '请按前台展示筛选口径选择供应模式。',
+    EnterpriseBoardType.supplier => '请用逗号分隔填写核心产品或服务。',
   };
 
-  bool get _usesProfileTwoOptions => _boardType != EnterpriseBoardType.factory;
+  bool get _usesProfileTwoOptions => _boardType == EnterpriseBoardType.company;
 
   List<MapEntry<String, String>> get _profileOneOptions => switch (_boardType) {
     EnterpriseBoardType.company => enterpriseWorkbenchCompanyExhibitionOptions,
@@ -614,7 +616,7 @@ class _LegacyEnterpriseApplicationPageState
   List<MapEntry<String, String>> get _profileTwoOptions => switch (_boardType) {
     EnterpriseBoardType.company => enterpriseWorkbenchCompanyServiceItemOptions,
     EnterpriseBoardType.factory => enterpriseWorkbenchFactoryProcessOptions,
-    EnterpriseBoardType.supplier => enterpriseWorkbenchSupplierModeOptions,
+    EnterpriseBoardType.supplier => const <MapEntry<String, String>>[],
   };
 }
 

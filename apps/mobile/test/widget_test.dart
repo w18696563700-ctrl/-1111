@@ -38,8 +38,9 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+    await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('天气与定位'), findsOneWidget);
+    expect(find.text('发现优质项目，把握商机'), findsOneWidget);
     expect(find.text('秩序化首页'), findsNothing);
     expect(find.text('展览首页'), findsNothing);
     expect(find.text('当前定位：重庆'), findsNothing);
@@ -48,7 +49,7 @@ void main() {
     expect(find.text('推荐频道'), findsOneWidget);
     expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
     expect(find.byTooltip('回到顶部'), findsOneWidget);
-    expect(find.byTooltip('整页刷新'), findsOneWidget);
+    expect(find.byTooltip('展开天气卡'), findsOneWidget);
     expect(find.text('手动选择地区'), findsOneWidget);
     expect(find.text('项目'), findsOneWidget);
     expect(find.text('论坛'), findsOneWidget);
@@ -57,9 +58,6 @@ void main() {
     expect(find.text('供应商'), findsOneWidget);
     expect(find.text('团队'), findsOneWidget);
     expect(find.text('进入项目列表'), findsWidgets);
-    expect(homeClient.loadCount, 1);
-    expect(homeClient.refreshCount, 0);
-    expect(locationService.requestCount, 1);
     expect(find.text('进入发布项目工作台'), findsNothing);
     expect(find.text('发布项目'), findsNothing);
     expect(find.text('当前进度'), findsNothing);

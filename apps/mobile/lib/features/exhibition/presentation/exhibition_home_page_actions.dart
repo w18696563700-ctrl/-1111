@@ -32,19 +32,33 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
       return;
     }
 
+    _storeRecoveredHomeLocationContext(results[0]);
     _applyRefreshResults(results);
   }
 
   Future<ExhibitionHomeLocationContextRequest?> _resolveRefreshLocationContext({
     required bool forceDeviceRelocation,
   }) async {
-    final manualSelection = forceDeviceRelocation ? null : _manualLocationSelection;
+    await ExhibitionHomeLocationContextStore.instance.restore();
+    if (!mounted) {
+      return null;
+    }
+
+    final manualSelection = forceDeviceRelocation
+        ? null
+        : _manualLocationSelection ??
+              ExhibitionHomeLocationContextStore.instance.lastManualSelection;
     if (manualSelection != null) {
+      final permissionState =
+          _locationSnapshot?.permissionState ??
+          ExhibitionHomeLocationContextStore.instance.lastPermissionState;
+      ExhibitionHomeLocationContextStore.instance.storeManualSelection(
+        manualSelection,
+        permissionState: permissionState,
+      );
       return _homeLocationContextFromSelection(
         manualSelection,
-        permissionState:
-            _locationSnapshot?.permissionState ??
-            DeviceLocationPermissionState.unknown,
+        permissionState: permissionState,
       );
     }
 
@@ -55,7 +69,14 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
     }
 
     _applyResolvedLocation(locationSnapshot);
-    return _homeLocationContextFromSnapshot(locationSnapshot);
+    final locationContext = _homeLocationContextFromSnapshot(locationSnapshot);
+    if (locationContext != null && locationContext.hasUsableLocationHints) {
+      ExhibitionHomeLocationContextStore.instance.storeDeviceSnapshot(
+        locationSnapshot,
+      );
+      return locationContext;
+    }
+    return ExhibitionHomeLocationContextStore.instance.lastKnownLocationContext;
   }
 
   Future<ExhibitionLoadResult> _loadHomeResult({
@@ -76,6 +97,21 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
 
     return ExhibitionHomeAggregationClient.instance.load(
       locationContext: locationContext,
+    );
+  }
+
+  void _storeRecoveredHomeLocationContext(ExhibitionLoadResult homeResult) {
+    final locationContext = _homeLocationContextFromResult(homeResult);
+    if (locationContext == null) {
+      return;
+    }
+
+    final permissionState =
+        _locationSnapshot?.permissionState ??
+        ExhibitionHomeLocationContextStore.instance.lastPermissionState;
+    ExhibitionHomeLocationContextStore.instance.storeResolvedLocationContext(
+      locationContext,
+      permissionState: permissionState,
     );
   }
 
@@ -179,9 +215,8 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
 
     _markManualLocationRefreshStarted();
     final selectionResult = await _loadSelectedLocationHomeResult(selected);
-    final projectResult = await ExhibitionConsumerLayer.instance.loadProjectList(
-      forceRefresh: true,
-    );
+    final projectResult = await ExhibitionConsumerLayer.instance
+        .loadProjectList(forceRefresh: true);
     if (!mounted) {
       return;
     }
@@ -196,8 +231,12 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
       return;
     }
 
+    _storeRecoveredHomeLocationContext(selectionResult);
     _applyManualLocationSelection(selected);
-    _applyRefreshResults(<ExhibitionLoadResult>[selectionResult, projectResult]);
+    _applyRefreshResults(<ExhibitionLoadResult>[
+      selectionResult,
+      projectResult,
+    ]);
   }
 
   Future<ExhibitionLoadResult> _loadSelectedLocationHomeResult(

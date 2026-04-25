@@ -53,7 +53,7 @@ test('order/detail fails closed on missing orderId and does not forward upstream
   });
 
   await assert.rejects(
-    () => service.getOrderDetail(undefined, {}),
+    () => service.getOrderDetail(undefined, undefined, {}),
     (error) => {
       assert.equal(error.getStatus(), 400);
       assert.equal(error.getResponse().code, 'ORDER_DETAIL_INVALID');
@@ -103,7 +103,7 @@ test('order/detail translates upstream technical query failure into stable app-f
   });
 
   await assert.rejects(
-    () => service.getOrderDetail('order-1', {}),
+    () => service.getOrderDetail('order-1', undefined, {}),
     (error) => {
       assert.equal(error.getStatus(), 400);
       assert.equal(error.getResponse().code, 'ORDER_DETAIL_INVALID');
@@ -115,6 +115,41 @@ test('order/detail translates upstream technical query failure into stable app-f
       return true;
     },
   );
+});
+
+test('order/detail forwards optional projectId when present', async () => {
+  let captured = null;
+  const service = createService({
+    async onGet(path, options) {
+      captured = { path, options };
+      return {
+        orderId: 'order-1',
+        orderNo: 'ORD-1',
+        projectId: 'project-1',
+        bidId: 'bid-1',
+        buyerOrganizationId: 'buyer-org',
+        supplierOrganizationId: 'supplier-org',
+        sellerOrganizationId: 'supplier-org',
+        state: 'active',
+        completionRequestState: 'none',
+        summary: { heading: '订单详情' },
+        milestones: [],
+      };
+    },
+  });
+
+  const result = await service.getOrderDetail(' order-1 ', ' project-1 ', {});
+
+  assert.equal(result.orderId, 'order-1');
+  assert.equal(result.buyerOrganizationId, 'buyer-org');
+  assert.equal(result.supplierOrganizationId, 'supplier-org');
+  assert.equal(result.sellerOrganizationId, 'supplier-org');
+  assert.equal(result.completionRequestState, 'none');
+  assert.equal(captured.path, '/server/order/detail');
+  assert.deepEqual(captured.options.params, {
+    orderId: 'order-1',
+    projectId: 'project-1',
+  });
 });
 
 test('contract/detail translates upstream unavailable into stable app-facing unavailable message', async () => {

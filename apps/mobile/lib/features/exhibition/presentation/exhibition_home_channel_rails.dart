@@ -5,11 +5,13 @@ class _HomeChannelAction {
     required this.label,
     required this.onPressed,
     this.primary = false,
+    this.icon,
   });
 
   final String label;
   final VoidCallback? onPressed;
   final bool primary;
+  final IconData? icon;
 }
 
 class _HomeChannelActionRail extends StatelessWidget {
@@ -20,58 +22,64 @@ class _HomeChannelActionRail extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final pillShape = RoundedRectangleBorder(
       borderRadius: BorderRadius.circular(999),
     );
 
-    return Wrap(
-      spacing: 8,
-      runSpacing: 6,
-      children: actions
-          .map((action) {
-            if (action.primary) {
-              return OutlinedButton(
-                onPressed: action.onPressed,
-                style: OutlinedButton.styleFrom(
-                  backgroundColor: colorScheme.primaryContainer.withValues(
-                    alpha: 0.64,
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      physics: const BouncingScrollPhysics(),
+      child: Row(
+        children: actions
+            .map((action) {
+              final Widget button;
+              if (action.primary) {
+                button = FilledButton.icon(
+                  onPressed: action.onPressed,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: ExhibitionHomeVisualTokens.brandGoldLight,
+                    foregroundColor: ExhibitionHomeVisualTokens.brandGoldDeep,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 11,
+                    ),
+                    shape: pillShape,
+                    textStyle: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
                   ),
-                  foregroundColor: colorScheme.onPrimaryContainer,
-                  side: BorderSide(
-                    color: colorScheme.primary.withValues(alpha: 0.14),
+                  icon: Icon(
+                    action.icon ?? Icons.arrow_forward_rounded,
+                    size: 18,
                   ),
-                  visualDensity: VisualDensity.compact,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 14,
-                    vertical: 10,
+                  label: Text(action.label),
+                );
+              } else {
+                button = TextButton.icon(
+                  onPressed: action.onPressed,
+                  style: TextButton.styleFrom(
+                    foregroundColor: ExhibitionHomeVisualTokens.textSecondary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 10,
+                    ),
+                    shape: pillShape,
+                    textStyle: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                  shape: pillShape,
-                  textStyle: theme.textTheme.labelLarge?.copyWith(
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                child: Text(action.label),
+                  icon: Icon(action.icon ?? Icons.more_horiz_rounded, size: 18),
+                  label: Text(action.label),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.only(right: 8),
+                child: button,
               );
-            }
-            return TextButton(
-              onPressed: action.onPressed,
-              style: TextButton.styleFrom(
-                foregroundColor: colorScheme.onSurfaceVariant,
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 10,
-                ),
-                shape: pillShape,
-                textStyle: theme.textTheme.labelLarge?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              child: Text(action.label),
-            );
-          })
-          .toList(growable: false),
+            })
+            .toList(growable: false),
+      ),
     );
   }
 }
@@ -97,8 +105,6 @@ class _HomeChannelFilterRail<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return SingleChildScrollView(
       scrollDirection: Axis.horizontal,
       physics: const BouncingScrollPhysics(),
@@ -116,32 +122,23 @@ class _HomeChannelFilterRail<T> extends StatelessWidget {
                     onTap: () => onSelected(option.value),
                     child: Ink(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 7,
+                        horizontal: 14,
+                        vertical: 9,
                       ),
                       decoration: BoxDecoration(
                         color: selected
-                            ? colorScheme.primaryContainer.withValues(
-                                alpha: 0.72,
-                              )
-                            : colorScheme.surfaceContainerLowest,
+                            ? ExhibitionHomeVisualTokens.brandGoldLight
+                            : const Color(0xFFF7F8FA),
                         borderRadius: BorderRadius.circular(999),
-                        border: Border.all(
-                          color: selected
-                              ? colorScheme.primary.withValues(alpha: 0.14)
-                              : colorScheme.outlineVariant.withValues(
-                                  alpha: 0.42,
-                                ),
-                        ),
                       ),
                       child: Text(
                         option.label,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: selected
-                              ? colorScheme.onPrimaryContainer
-                              : colorScheme.onSurfaceVariant,
+                              ? ExhibitionHomeVisualTokens.brandGoldDeep
+                              : ExhibitionHomeVisualTokens.textSecondary,
                           fontWeight: selected
-                              ? FontWeight.w700
+                              ? FontWeight.w900
                               : FontWeight.w600,
                         ),
                       ),

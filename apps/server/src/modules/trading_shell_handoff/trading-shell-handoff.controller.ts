@@ -56,6 +56,22 @@ export class TradingShellHandoffController {
     );
   }
 
+  @Post('inspection/pass')
+  @HttpCode(202)
+  passInspection(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request,
+  ) {
+    return this.service.passInspection(
+      body,
+      resolveRequestContext(headers, {
+        userAgent: request.get('user-agent') ?? '',
+        remoteIp: request.ip,
+      }),
+    );
+  }
+
   @Post('contract/confirm')
   @HttpCode(202)
   confirmContract(

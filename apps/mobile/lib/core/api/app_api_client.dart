@@ -13,11 +13,14 @@ class AppApiConfig {
   static String? _runtimeBaseUrlOverride;
 
   AppApiConfig({
-    required this.baseUrl,
+    required String baseUrl,
     this.entryMode,
     this.defaultHeaders = const <String, String>{},
     this.requestTimeout = const Duration(seconds: 5),
-  });
+  }) : baseUrl = AppApiEntryTarget.requireApprovedBaseUrl(
+         baseUrl,
+         entryMode: entryMode,
+       );
 
   factory AppApiConfig.fromEnvironment() {
     final runtimeBaseUrl = Platform.environment['APP_BFF_BASE_URL']?.trim();
@@ -76,7 +79,9 @@ class AppApiConfig {
 
   static void installRuntimeBaseUrlOverride(String? baseUrl) {
     final value = baseUrl?.trim();
-    _runtimeBaseUrlOverride = value == null || value.isEmpty ? null : value;
+    _runtimeBaseUrlOverride = value == null || value.isEmpty
+        ? null
+        : AppApiEntryTarget.requireApprovedBaseUrl(value);
   }
 
   static void resetRuntimeBaseUrlOverride() {

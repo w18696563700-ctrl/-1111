@@ -56,6 +56,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
   String? _selectedAreaBucket;
   String? _selectedBudgetBucket;
   bool _loading = true;
+  String? _requestingProjectId;
 
   @override
   void initState() {
@@ -232,6 +233,37 @@ class _ProjectListPageState extends State<ProjectListPage> {
     );
   }
 
+  Future<void> _requestNameAccess(String? projectId) async {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null || _requestingProjectId != null) {
+      return;
+    }
+
+    setState(() => _requestingProjectId = normalizedProjectId);
+    final result = await ProjectNameAccessConsumerLayer.instance.requestAccess(
+      projectId: normalizedProjectId,
+    );
+    if (!mounted) {
+      return;
+    }
+
+    setState(() => _requestingProjectId = null);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.isSuccess
+              ? '已提交项目名称查看申请，等待发布方审批。'
+              : (result.message ?? '当前申请未完成，请稍后再试。'),
+        ),
+      ),
+    );
+    if (result.isSuccess) {
+      await _load(forceRefresh: true);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final snapshot = _snapshot;
@@ -281,6 +313,17 @@ class _ProjectListPageState extends State<ProjectListPage> {
                       ExhibitionRoutes.projectDetailWithProjectId(projectId),
                     );
                   },
+                  onRequestNameAccess:
+                      _projectShouldShowNameAccessControls(item) &&
+                          _projectCanRequestNameAccess(item) &&
+                          _normalizeId(item['projectId'] as String?) != null
+                      ? () => _requestNameAccess(
+                          _normalizeId(item['projectId'] as String?),
+                        )
+                      : null,
+                  requestInProgress:
+                      _requestingProjectId ==
+                      _normalizeId(item['projectId'] as String?),
                 ),
               ),
             ),

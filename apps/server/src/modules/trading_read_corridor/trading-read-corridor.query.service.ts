@@ -19,10 +19,10 @@ import {
 } from './trading-read-corridor.errors';
 import { TradingReadCorridorPresenter } from './trading-read-corridor.presenter';
 
-const ACTIVE_ORDER_STATE = 'active';
+const VISIBLE_ORDER_STATES = new Set(['active', 'completed']);
 const VISIBLE_CONTRACT_STATES = new Set(['pending_confirm', 'active', 'amended']);
-const VISIBLE_MILESTONE_STATES = new Set(['pending_submission', 'submitted']);
-const VISIBLE_INSPECTION_STATES = new Set(['draft', 'submitted', 'rechecked']);
+const VISIBLE_MILESTONE_STATES = new Set(['pending_submission', 'submitted', 'completed']);
+const VISIBLE_INSPECTION_STATES = new Set(['draft', 'submitted', 'rechecked', 'passed']);
 
 type ScopedOrderTruthRow = {
   orderId: string;
@@ -34,6 +34,7 @@ type ScopedOrderTruthRow = {
   title: string | null;
   totalAmount: number | string | null;
   state: string | null;
+  completionRequestState: string | null;
   activatedAt: string | null;
   createdAt: string | null;
   updatedAt: string | null;
@@ -88,13 +89,22 @@ export class TradingReadCorridorQueryService {
     private readonly presenter: TradingReadCorridorPresenter,
   ) {}
 
-  async getOrderDetail(orderId: string | undefined, context: RequestContext) {
+  async getOrderDetail(
+    orderId: string | undefined,
+    projectId: string | undefined,
+    context: RequestContext
+  ) {
     const normalizedOrderId = this.readRequiredId(
       orderId,
       orderDetailInvalid('Field `orderId` is required for order detail.')
     );
+    const normalizedProjectId = this.readOptionalId(projectId);
     const scopeOrganizationId = await this.requireScopedOrganizationId(context);
-    const order = await this.safeFetchScopedOrder(normalizedOrderId, scopeOrganizationId);
+    const order = await this.safeFetchScopedOrder(
+      normalizedOrderId,
+      scopeOrganizationId,
+      normalizedProjectId
+    );
     if (!order || !this.isVisibleOrderState(order.state)) {
       throw orderDetailUnavailable('Current order detail is unavailable.');
     }
@@ -175,7 +185,11 @@ export class TradingReadCorridorQueryService {
     return scope.organization.id;
   }
 
-  private async fetchScopedOrder(orderId: string, organizationId: string) {
+  private async fetchScopedOrder(
+    orderId: string,
+    organizationId: string,
+    projectId?: string
+  ) {
     const rows = (await this.projectRepository.query(
       `
         select
@@ -188,6 +202,7 @@ export class TradingReadCorridorQueryService {
           "order".title as "title",
           "order".total_amount as "totalAmount",
           "order".state as "state",
+          coalesce("order".completion_request_state, 'none') as "completionRequestState",
           "order".activated_at as "activatedAt",
           "order".created_at as "createdAt",
           "order".updated_at as "updatedAt"
@@ -197,10 +212,11 @@ export class TradingReadCorridorQueryService {
             "order".buyer_organization_id = $2
             or "order".supplier_organization_id = $2
           )
+          and ($3::varchar is null or "order".project_id = $3)
         order by "order".updated_at desc nulls last, "order".created_at desc nulls last, "order".id desc
         limit 1
       `,
-      [orderId, organizationId]
+      [orderId, organizationId, projectId ?? null]
     )) as ScopedOrderTruthRow[];
     return rows[0] ?? null;
   }
@@ -298,9 +314,13 @@ export class TradingReadCorridorQueryService {
     return rows[0] ?? null;
   }
 
-  private async safeFetchScopedOrder(orderId: string, organizationId: string) {
+  private async safeFetchScopedOrder(
+    orderId: string,
+    organizationId: string,
+    projectId?: string
+  ) {
     try {
-      return await this.fetchScopedOrder(orderId, organizationId);
+      return await this.fetchScopedOrder(orderId, organizationId, projectId);
     } catch {
       throw orderDetailUnavailable('Current order detail is unavailable.');
     }
@@ -323,7 +343,8 @@ export class TradingReadCorridorQueryService {
   }
 
   private isVisibleOrderState(value: string | null) {
-    return this.normalizeState(value) === ACTIVE_ORDER_STATE;
+    const normalized = this.normalizeState(value);
+    return normalized ? VISIBLE_ORDER_STATES.has(normalized) : false;
   }
 
   private isVisibleContractState(value: string | null) {
@@ -352,5 +373,10 @@ export class TradingReadCorridorQueryService {
       throw error;
     }
     return normalized;
+  }
+
+  private readOptionalId(value: string | undefined) {
+    const normalized = value?.trim() ?? '';
+    return normalized ? normalized : undefined;
   }
 }

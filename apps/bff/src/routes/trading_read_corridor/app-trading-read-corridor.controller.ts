@@ -11,9 +11,14 @@ export class AppTradingReadCorridorController {
   @Get('order/detail')
   getOrderDetail(
     @Query('orderId') orderId: string | undefined,
+    @Query('projectId') projectId: string | undefined,
     @Headers() headers: IncomingHttpHeaders,
   ) {
-    return this.tradingReadCorridorService.getOrderDetail(orderId, headers);
+    return this.tradingReadCorridorService.getOrderDetail(
+      orderId,
+      projectId,
+      headers,
+    );
   }
 
   @Get('contract/detail')

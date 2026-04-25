@@ -157,8 +157,11 @@ ExhibitionLoadResult unavailableHomeResult({
 ExhibitionLoadResult contentHomeResult({
   String displayName = '成都市成华区',
   String provinceName = '四川',
-  double latitude = 30.5728,
-  double longitude = 104.0668,
+  String? provinceCode,
+  String? cityName,
+  String? districtName,
+  double? latitude = 30.5728,
+  double? longitude = 104.0668,
   String selectionScope = 'request_only',
   String selectionNotice = '当前定位仅用于本次首页聚合',
   String sourceLabel = '首页聚合返回',
@@ -189,7 +192,10 @@ ExhibitionLoadResult contentHomeResult({
     payload: <String, Object?>{
       'currentLocation': <String, Object?>{
         'displayName': displayName,
+        'provinceCode': provinceCode,
         'provinceName': provinceName,
+        'cityName': cityName,
+        'districtName': districtName,
         'latitude': latitude,
         'longitude': longitude,
         'source': 'device_location',
@@ -243,8 +249,11 @@ ExhibitionLoadResult contentHomeResult({
 ExhibitionLoadResult degradedWeatherHomeResult({
   String displayName = '成都市成华区',
   String provinceName = '四川',
-  double latitude = 30.5728,
-  double longitude = 104.0668,
+  String? provinceCode,
+  String? cityName,
+  String? districtName,
+  double? latitude = 30.5728,
+  double? longitude = 104.0668,
   String selectionScope = 'request_only',
   String selectionNotice = '当前定位仅用于本次首页聚合',
   String sourceLabel = '当前首页按定位地区返回天气受控降级',
@@ -264,7 +273,10 @@ ExhibitionLoadResult degradedWeatherHomeResult({
     payload: <String, Object?>{
       'currentLocation': <String, Object?>{
         'displayName': displayName,
+        'provinceCode': provinceCode,
         'provinceName': provinceName,
+        'cityName': cityName,
+        'districtName': districtName,
         'latitude': latitude,
         'longitude': longitude,
         'source': 'device_location',

@@ -1200,6 +1200,117 @@ export const bidAwardBridgeCompletionMigrations = [
   }
 ];
 
+export const bidToCompletedOrderFulfillmentMigrations = [
+  {
+    key: '20260425_bid_to_completed_order_fulfillment_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS milestones (
+        id varchar(64) PRIMARY KEY,
+        order_id varchar(64) NOT NULL,
+        sequence_no integer,
+        title text,
+        amount numeric(12,2),
+        state varchar(32) NOT NULL DEFAULT 'pending_submission',
+        submitted_at timestamptz,
+        submitted_by varchar(64),
+        submission_note text,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE TABLE IF NOT EXISTS inspections (
+        id varchar(64) PRIMARY KEY,
+        milestone_id varchar(64) NOT NULL,
+        order_id varchar(64) NOT NULL,
+        state varchar(32) NOT NULL DEFAULT 'draft',
+        summary_text text,
+        submitted_at timestamptz,
+        submitted_by varchar(64),
+        passed_at timestamptz,
+        passed_by varchar(64),
+        rectification_count integer NOT NULL DEFAULT 0,
+        recheck_count integer NOT NULL DEFAULT 0,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completed_at timestamptz`,
+      `CREATE INDEX IF NOT EXISTS idx_milestones_order_sequence
+       ON milestones (order_id, sequence_no, updated_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_inspections_milestone_unique
+       ON inspections (milestone_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_inspections_order_state
+       ON inspections (order_id, state, updated_at DESC)`
+    ]
+  }
+];
+
+export const projectOrderTruthMigrations = [
+  {
+    key: '20260520_project_order_truth_state_machine',
+    statements: [
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completed_at timestamptz`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_request_state varchar(32) NOT NULL DEFAULT 'none'`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_requested_at timestamptz`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_requested_by varchar(64)`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_requested_by_organization_id varchar(64)`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_request_note text`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_confirmed_at timestamptz`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_confirmed_by varchar(64)`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_confirmed_by_organization_id varchar(64)`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_rejected_at timestamptz`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_rejected_by varchar(64)`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_rejected_by_organization_id varchar(64)`,
+      `ALTER TABLE orders
+       ADD COLUMN IF NOT EXISTS completion_rejection_reason text`,
+      `DO $$
+       BEGIN
+         ALTER TABLE public.orders
+           ADD CONSTRAINT chk_orders_state
+           CHECK (state IN ('active', 'completed', 'cancelled')) NOT VALID;
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$`,
+      `DO $$
+       BEGIN
+         ALTER TABLE public.orders
+           ADD CONSTRAINT chk_orders_required_business_anchor
+           CHECK (
+             length(btrim(project_id)) > 0
+             AND length(btrim(buyer_organization_id)) > 0
+             AND supplier_organization_id IS NOT NULL
+             AND length(btrim(supplier_organization_id)) > 0
+           ) NOT VALID;
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$`,
+      `DO $$
+       BEGIN
+         ALTER TABLE public.orders
+           ADD CONSTRAINT chk_orders_completion_request_state
+           CHECK (completion_request_state IN ('none', 'requested', 'rejected', 'dispute_reserved', 'confirmed')) NOT VALID;
+       EXCEPTION
+         WHEN duplicate_object THEN NULL;
+       END $$`,
+      `CREATE INDEX IF NOT EXISTS idx_orders_seller_state_updated
+       ON public.orders (supplier_organization_id, state, updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_orders_completion_request_state_updated
+       ON public.orders (completion_request_state, updated_at DESC)`
+    ]
+  }
+];
+
 export const authWhitelistTestSessionMigrations = [
   {
     key: '20260410_auth_whitelist_test_session_truth',
@@ -1656,6 +1767,378 @@ export const projectCommunicationAlbumMigrations = [
   }
 ];
 
+export const projectCounterpartyRatingMigrations = [
+  {
+    key: '20260428_project_counterparty_rating_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_counterparty_ratings (
+        id varchar(64) PRIMARY KEY,
+        order_id varchar(64) NOT NULL,
+        project_id varchar(64) NOT NULL,
+        rater_organization_id varchar(64) NOT NULL,
+        ratee_organization_id varchar(64) NOT NULL,
+        rater_user_id varchar(64) NOT NULL,
+        rater_actor_id varchar(64),
+        score_value integer NOT NULL,
+        score_label varchar(32) NOT NULL,
+        comment_text text,
+        rating_state varchar(32) NOT NULL DEFAULT 'submitted',
+        submitted_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_counterparty_ratings_score
+          CHECK (score_value BETWEEN 1 AND 5),
+        CONSTRAINT chk_project_counterparty_ratings_score_label
+          CHECK (score_label IN ('very_satisfied', 'satisfied', 'passable', 'negative')),
+        CONSTRAINT chk_project_counterparty_ratings_state
+          CHECK (rating_state IN ('submitted'))
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_counterparty_ratings_unique_direction
+       ON project_counterparty_ratings (order_id, rater_organization_id, ratee_organization_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_counterparty_ratings_project
+       ON project_counterparty_ratings (project_id, submitted_at DESC)`
+    ]
+  },
+  {
+    key: '20260602_credit_shadow_source_type_truth',
+    statements: [
+      `DO $$
+       BEGIN
+         IF to_regclass('public.organization_shadow_credit_recompute_triggers') IS NOT NULL THEN
+           ALTER TABLE organization_shadow_credit_recompute_triggers
+             ADD COLUMN IF NOT EXISTS source_type varchar(64) NOT NULL DEFAULT 'order_rating';
+         END IF;
+       END $$`,
+      `DO $$
+       BEGIN
+         IF to_regclass('public.organization_shadow_credit_ledgers') IS NOT NULL THEN
+           ALTER TABLE organization_shadow_credit_ledgers
+             ADD COLUMN IF NOT EXISTS source_type varchar(64) NOT NULL DEFAULT 'order_rating';
+         END IF;
+       END $$`,
+      `DO $$
+       BEGIN
+         IF to_regclass('public.organization_shadow_credit_recompute_triggers') IS NOT NULL THEN
+           CREATE INDEX IF NOT EXISTS idx_org_shadow_credit_triggers_source
+             ON organization_shadow_credit_recompute_triggers (source_type, source_rating_id);
+         END IF;
+       END $$`,
+      `DO $$
+       BEGIN
+         IF to_regclass('public.organization_shadow_credit_ledgers') IS NOT NULL THEN
+           CREATE INDEX IF NOT EXISTS idx_org_shadow_credit_ledgers_source
+             ON organization_shadow_credit_ledgers (source_type, source_rating_id);
+         END IF;
+       END $$`
+    ]
+  }
+];
+
+export const p0PayMigrations = [
+  {
+    key: '20260504_p0_pay_payment_execution_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS platform_service_fee_authorizations (
+        id varchar(64) PRIMARY KEY,
+        task_id varchar(64) NOT NULL,
+        bid_id varchar(64) NOT NULL,
+        factory_organization_id varchar(64) NOT NULL,
+        publisher_organization_id varchar(64) NOT NULL,
+        quoted_amount numeric(12,2) NOT NULL,
+        fee_rate numeric(8,6) NOT NULL,
+        estimated_fee_amount numeric(12,2) NOT NULL,
+        final_confirmed_amount numeric(12,2),
+        final_fee_amount numeric(12,2),
+        payment_channel varchar(32),
+        payment_order_id varchar(64),
+        authorization_order_id varchar(96),
+        status varchar(32) NOT NULL,
+        rule_version varchar(64) NOT NULL,
+        rule_snapshot_hash varchar(128) NOT NULL,
+        agreement_text_snapshot text NOT NULL DEFAULT '',
+        agreed_at timestamptz NOT NULL,
+        authorized_at timestamptz,
+        released_at timestamptz,
+        refunded_at timestamptz,
+        breach_hold_reason text NOT NULL DEFAULT '',
+        breach_held_at timestamptz,
+        charged_at timestamptz,
+        created_by_user_id varchar(64) NOT NULL DEFAULT '',
+        created_by_actor_id varchar(64) NOT NULL DEFAULT '',
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_platform_service_fee_auth_status
+          CHECK (status IN (
+            'pending_authorization',
+            'authorized',
+            'authorization_released',
+            'pending_contract_confirm',
+            'charged',
+            'refund_pending',
+            'refunded',
+            'breach_hold',
+            'cancelled',
+            'failed',
+            'expired'
+          )),
+        CONSTRAINT chk_platform_service_fee_auth_channel
+          CHECK (payment_channel IS NULL OR payment_channel IN ('alipay', 'wechat', 'other'))
+      )`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS refunded_at timestamptz`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS breach_hold_reason text NOT NULL DEFAULT ''`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS breach_held_at timestamptz`,
+      `CREATE INDEX IF NOT EXISTS idx_platform_service_fee_auth_task_bid
+       ON platform_service_fee_authorizations (task_id, bid_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_platform_service_fee_auth_payment_order
+       ON platform_service_fee_authorizations (payment_order_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_service_fee_auth_one_active_bid
+       ON platform_service_fee_authorizations (bid_id)
+       WHERE status IN ('pending_authorization', 'authorized', 'pending_contract_confirm')`,
+      `CREATE TABLE IF NOT EXISTS inquiry_quote_deposits (
+        id varchar(64) PRIMARY KEY,
+        task_id varchar(64) NOT NULL,
+        publisher_organization_id varchar(64) NOT NULL,
+        amount numeric(12,2) NOT NULL DEFAULT 200,
+        currency varchar(8) NOT NULL DEFAULT 'CNY',
+        payment_channel varchar(32),
+        payment_order_id varchar(64),
+        status varchar(32) NOT NULL,
+        rule_version varchar(64) NOT NULL DEFAULT '',
+        rule_snapshot_hash varchar(128) NOT NULL DEFAULT '',
+        paid_at timestamptz,
+        refund_requested_at timestamptz,
+        refunded_at timestamptz,
+        deducted_at timestamptz,
+        deduction_reason text NOT NULL DEFAULT '',
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_inquiry_quote_deposits_status
+          CHECK (status IN (
+            'pending_payment',
+            'paid',
+            'refund_pending',
+            'refunded',
+            'deducted',
+            'dispute_hold',
+            'cancelled',
+            'failed',
+            'expired'
+          )),
+        CONSTRAINT chk_inquiry_quote_deposits_channel
+          CHECK (payment_channel IS NULL OR payment_channel IN ('alipay', 'wechat', 'other'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_inquiry_quote_deposits_task
+       ON inquiry_quote_deposits (task_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_inquiry_quote_deposits_payment_order
+       ON inquiry_quote_deposits (payment_order_id)`,
+      `CREATE TABLE IF NOT EXISTS payment_orders (
+        id varchar(64) PRIMARY KEY,
+        business_type varchar(64) NOT NULL,
+        business_id varchar(64) NOT NULL,
+        task_id varchar(64) NOT NULL DEFAULT '',
+        bid_id varchar(64) NOT NULL DEFAULT '',
+        payer_organization_id varchar(64) NOT NULL,
+        payee_organization_id varchar(64) NOT NULL DEFAULT '',
+        amount numeric(12,2) NOT NULL,
+        currency varchar(8) NOT NULL DEFAULT 'CNY',
+        payment_channel varchar(32) NOT NULL,
+        order_role varchar(32) NOT NULL,
+        status varchar(32) NOT NULL,
+        merchant_order_no varchar(96) NOT NULL,
+        channel_order_id varchar(128),
+        idempotency_key_hash varchar(128) NOT NULL,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        expires_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_payment_orders_business_type
+          CHECK (business_type IN (
+            'platform_service_fee_authorization',
+            'platform_service_fee_charge',
+            'inquiry_deposit'
+          )),
+        CONSTRAINT chk_payment_orders_channel
+          CHECK (payment_channel IN ('alipay', 'wechat', 'other')),
+        CONSTRAINT chk_payment_orders_role
+          CHECK (order_role IN ('payment', 'authorization', 'refund', 'release')),
+        CONSTRAINT chk_payment_orders_status
+          CHECK (status IN (
+            'created',
+            'pending_user_confirm',
+            'succeeded',
+            'failed',
+            'cancelled',
+            'closed',
+            'release_pending',
+            'released',
+            'refund_pending',
+            'refunded',
+            'expired'
+          ))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_payment_orders_business
+       ON payment_orders (business_type, business_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_orders_idempotency_scope
+       ON payment_orders (business_type, business_id, idempotency_key_hash)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_orders_merchant_order_no
+       ON payment_orders (merchant_order_no)`,
+      `CREATE INDEX IF NOT EXISTS idx_payment_orders_channel_order
+       ON payment_orders (payment_channel, channel_order_id)`,
+      `CREATE TABLE IF NOT EXISTS payment_transactions (
+        id varchar(64) PRIMARY KEY,
+        payment_order_id varchar(64) NOT NULL,
+        transaction_type varchar(32) NOT NULL,
+        payment_channel varchar(32) NOT NULL,
+        channel_transaction_id varchar(128),
+        amount numeric(12,2) NOT NULL,
+        requested_amount numeric(12,2),
+        confirmed_amount numeric(12,2),
+        status varchar(32) NOT NULL,
+        channel_action_type varchar(32) NOT NULL DEFAULT 'unavailable',
+        channel_reference varchar(128) NOT NULL DEFAULT '',
+        raw_status varchar(128) NOT NULL DEFAULT '',
+        initiated_at timestamptz,
+        confirmed_at timestamptz,
+        failed_at timestamptz,
+        failure_reason_code varchar(96) NOT NULL DEFAULT '',
+        occurred_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_payment_transactions_type
+          CHECK (transaction_type IN ('authorization', 'payment', 'refund', 'release', 'callback')),
+        CONSTRAINT chk_payment_transactions_channel
+          CHECK (payment_channel IN ('alipay', 'wechat', 'other')),
+        CONSTRAINT chk_payment_transactions_status
+          CHECK (status IN ('pending', 'succeeded', 'failed', 'cancelled')),
+        CONSTRAINT chk_payment_transactions_action_type
+          CHECK (channel_action_type IN ('sdk_payload', 'web_redirect', 'qr_code', 'unavailable', 'server_capture'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_payment_transactions_order_created
+       ON payment_transactions (payment_order_id, created_at)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_transactions_channel_transaction
+       ON payment_transactions (payment_channel, channel_transaction_id)
+       WHERE channel_transaction_id IS NOT NULL`,
+      `CREATE TABLE IF NOT EXISTS payment_callback_events (
+        id varchar(64) PRIMARY KEY,
+        payment_channel varchar(32) NOT NULL,
+        merchant_order_no varchar(96) NOT NULL,
+        channel_event_id varchar(128) NOT NULL,
+        provider_event_id varchar(128) NOT NULL DEFAULT '',
+        event_type varchar(64) NOT NULL,
+        event_status varchar(64) NOT NULL DEFAULT '',
+        payload_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+        callback_payload_hash varchar(128) NOT NULL DEFAULT '',
+        verification_status varchar(32) NOT NULL DEFAULT 'received',
+        apply_status varchar(32) NOT NULL DEFAULT 'not_applied',
+        rejected_reason_code varchar(96) NOT NULL DEFAULT '',
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        received_at timestamptz NOT NULL,
+        verified_at timestamptz,
+        applied_at timestamptz,
+        processed_at timestamptz,
+        CONSTRAINT chk_payment_callback_events_channel
+          CHECK (payment_channel IN ('alipay', 'wechat', 'other')),
+        CONSTRAINT chk_payment_callback_events_verification
+          CHECK (verification_status IN ('received', 'verified', 'rejected', 'duplicate')),
+        CONSTRAINT chk_payment_callback_events_apply
+          CHECK (apply_status IN ('not_applied', 'applied', 'duplicate', 'ignored_out_of_order', 'apply_failed'))
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_callback_events_channel_event
+       ON payment_callback_events (payment_channel, channel_event_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_payment_callback_events_order_received
+       ON payment_callback_events (merchant_order_no, received_at)`,
+      `CREATE TABLE IF NOT EXISTS contract_confirmations (
+        id varchar(64) PRIMARY KEY,
+        task_id varchar(64) NOT NULL,
+        selected_bid_id varchar(64),
+        selected_quotation_id varchar(64),
+        publisher_organization_id varchar(64) NOT NULL,
+        factory_organization_id varchar(64) NOT NULL,
+        final_confirmed_amount numeric(12,2) NOT NULL,
+        currency varchar(8) NOT NULL DEFAULT 'CNY',
+        publisher_confirmed_at timestamptz,
+        factory_confirmed_at timestamptz,
+        contract_status varchar(32) NOT NULL,
+        contract_file_asset_ids jsonb NOT NULL DEFAULT '[]'::jsonb,
+        platform_service_fee_charge_id varchar(64),
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_contract_confirmations_status
+          CHECK (contract_status IN ('pending_counterparty', 'confirmed', 'cancelled'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_contract_confirmations_task_bid
+       ON contract_confirmations (task_id, selected_bid_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_contract_confirmations_status
+       ON contract_confirmations (contract_status)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_contract_confirmations_one_active_bid
+       ON contract_confirmations (task_id, selected_bid_id)
+       WHERE selected_bid_id IS NOT NULL AND contract_status IN ('pending_counterparty', 'confirmed')`,
+      `CREATE TABLE IF NOT EXISTS platform_service_fee_charges (
+        id varchar(64) PRIMARY KEY,
+        task_id varchar(64) NOT NULL,
+        contract_confirmation_id varchar(64) NOT NULL,
+        authorization_id varchar(64) NOT NULL,
+        factory_organization_id varchar(64) NOT NULL,
+        final_confirmed_amount numeric(12,2) NOT NULL,
+        fee_rate numeric(8,6) NOT NULL,
+        final_fee_amount numeric(12,2) NOT NULL,
+        payment_order_id varchar(64),
+        charge_status varchar(32) NOT NULL,
+        charged_at timestamptz,
+        refunded_at timestamptz,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_platform_service_fee_charges_status
+          CHECK (charge_status IN (
+            'pending_charge',
+            'charged',
+            'charge_failed',
+            'refund_pending',
+            'refunded',
+            'cancelled'
+          ))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_platform_service_fee_charges_contract
+       ON platform_service_fee_charges (contract_confirmation_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_platform_service_fee_charges_payment_order
+       ON platform_service_fee_charges (payment_order_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_service_fee_charges_one_active_contract
+       ON platform_service_fee_charges (contract_confirmation_id)
+       WHERE charge_status IN ('pending_charge', 'charged', 'refund_pending')`,
+      `CREATE TABLE IF NOT EXISTS payment_idempotency_records (
+        id varchar(64) PRIMARY KEY,
+        operation_key varchar(96) NOT NULL,
+        scope_key varchar(256) NOT NULL,
+        idempotency_key_hash varchar(128) NOT NULL,
+        request_hash varchar(128) NOT NULL,
+        resource_type varchar(64) NOT NULL,
+        resource_id varchar(64) NOT NULL,
+        status varchar(32) NOT NULL,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_payment_idempotency_records_status
+          CHECK (status IN ('succeeded', 'failed'))
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_idempotency_records_scope_key
+       ON payment_idempotency_records (operation_key, scope_key, idempotency_key_hash)`
+    ]
+  }
+];
+
 export const serverMigrations = [
   ...enterpriseHubMigrations,
   ...projectPublishCorridorMigrations,
@@ -1681,6 +2164,8 @@ export const serverMigrations = [
   ...bidDuplicateSubmitRepairMigrations,
   ...bidSubmissionSnapshotAttachmentTruthMigrations,
   ...bidAwardBridgeCompletionMigrations,
+  ...bidToCompletedOrderFulfillmentMigrations,
+  ...projectOrderTruthMigrations,
   ...authWhitelistTestSessionMigrations,
   ...authLoginLegalConsentMigrations,
   ...authPasswordCredentialMigrations,
@@ -1691,5 +2176,7 @@ export const serverMigrations = [
   ...personalCertificationDualGateMigrations,
   ...tradingImRoundAMigrations,
   ...projectNameAccessRequestMigrations,
-  ...projectCommunicationAlbumMigrations
+  ...projectCommunicationAlbumMigrations,
+  ...projectCounterpartyRatingMigrations,
+  ...p0PayMigrations
 ];

@@ -31,6 +31,13 @@ export function inspectionRecheckInvalid(message: string) {
   });
 }
 
+export function inspectionPassInvalid(message: string) {
+  return new BadRequestException({
+    code: 'INSPECTION_PASS_INVALID',
+    message,
+  });
+}
+
 export function inspectionEntryUnavailable(message: string) {
   return new ConflictException({
     code: 'INSPECTION_ENTRY_UNAVAILABLE',

@@ -1,23 +1,37 @@
 import { Injectable } from '@nestjs/common';
-import { ExhibitionHomeLocationInput, ExhibitionHomePresenter } from './exhibition-home.presenter';
+import { ExhibitionHomeAggregationService } from './exhibition-home-aggregation.service';
 import { exhibitionHomeLocationRequired } from './exhibition-home.errors';
+import { ExhibitionHomePresenter } from './exhibition-home.presenter';
+import type { ExhibitionHomeLocationInput } from './exhibition-home.types';
 
 type HomeLocationPermissionState = 'granted' | 'denied' | 'unavailable' | 'unknown';
 
 @Injectable()
 export class ExhibitionHomeQueryService {
-  constructor(private readonly presenter: ExhibitionHomePresenter) {}
+  constructor(
+    private readonly aggregation: ExhibitionHomeAggregationService,
+    private readonly presenter: ExhibitionHomePresenter,
+  ) {}
 
-  getHome(query: Record<string, unknown>) {
-    return this.presenter.toReadModel(this.resolveLocationFromQuery(query));
+  async getHome(query: Record<string, unknown>) {
+    const aggregation = await this.aggregation.build(
+      this.resolveLocationFromQuery(query),
+    );
+    return this.presenter.toReadModel(aggregation);
   }
 
-  refreshHome(body: unknown) {
-    return this.presenter.toReadModel(this.resolveLocationFromRefreshBody(body));
+  async refreshHome(body: unknown) {
+    const aggregation = await this.aggregation.build(
+      this.resolveLocationFromRefreshBody(body),
+    );
+    return this.presenter.toReadModel(aggregation);
   }
 
-  selectLocation(body: unknown) {
-    return this.presenter.toReadModel(this.resolveLocationFromSelectBody(body));
+  async selectLocation(body: unknown) {
+    const aggregation = await this.aggregation.build(
+      this.resolveLocationFromSelectBody(body),
+    );
+    return this.presenter.toReadModel(aggregation);
   }
 
   private resolveLocationFromQuery(query: Record<string, unknown>) {
@@ -42,9 +56,9 @@ export class ExhibitionHomeQueryService {
     return this.toLocationInput(
       {
         ...source,
-        provinceName
+        provinceName,
       },
-      { manualSelection: true }
+      { manualSelection: true },
     );
   }
 
@@ -70,15 +84,9 @@ export class ExhibitionHomeQueryService {
         : 'system_default';
 
     return {
-      displayName:
-        this.readOptionalString(source.displayName) ??
-        this.composeDisplayName({
-          provinceName,
-          cityName,
-          districtName
-        }),
+      displayName: this.readOptionalString(source.displayName),
       provinceCode,
-      provinceName: provinceName ?? '当前地区',
+      provinceName,
       cityName,
       districtName,
       latitude,
@@ -86,7 +94,7 @@ export class ExhibitionHomeQueryService {
       source: locationSource,
       selectionScope: 'request_only',
       selectionNotice: this.toSelectionNotice(locationSource),
-      isUsingDeviceLocation: locationSource === 'device_location'
+      isUsingDeviceLocation: locationSource === 'device_location',
     };
   }
 
@@ -99,20 +107,6 @@ export class ExhibitionHomeQueryService {
       case 'system_default':
         return '当前使用系统默认地区说明；可重新定位或手动选择地区。';
     }
-  }
-
-  private composeDisplayName(input: {
-    provinceName: string | null;
-    cityName: string | null;
-    districtName: string | null;
-  }) {
-    const parts = [input.provinceName, input.cityName, input.districtName].filter(
-      (value): value is string => Boolean(value)
-    );
-    if (!parts.length) {
-      return '当前地区';
-    }
-    return parts.join('');
   }
 
   private readLocationPermissionState(value: unknown): HomeLocationPermissionState | null {

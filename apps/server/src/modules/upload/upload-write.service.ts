@@ -2,35 +2,30 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
-import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { ProjectPublishAuditService } from '../audit/project-publish-audit.service';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { RequestContext } from '../../shared/request-context';
 import { FileAssetEntity } from './entities/file-asset.entity';
 import { UploadSessionEntity } from './entities/upload-session.entity';
-import {
-  uploadConfirmRequired,
-  uploadInitInvalid,
-  uploadSessionMissingFileAssetTruth,
-  uploadSessionUnavailable
-} from './upload.errors';
+import { uploadInitInvalid, uploadSessionMissingFileAssetTruth, uploadSessionUnavailable } from './upload.errors';
 import { UploadPresenter } from './upload.presenter';
 import { UploadEnterpriseDisplayBindingService } from './upload-enterprise-display-binding.service';
 import { UploadStorageService } from './upload-storage.service';
-
-type UploadInitCommand = {
-  businessType: string;
-  businessId: string | null;
-  fileKind: string;
-  mimeType: string;
-  size: number;
-  checksum: string;
-};
-
-const BID_PROJECT_UNDERSTANDING_FILE_KIND = 'bid_project_understanding';
-const BID_QUOTE_SHEET_FILE_KIND = 'bid_quote_sheet';
-const BID_SCHEDULE_PLAN_FILE_KIND = 'bid_schedule_plan';
+import {
+  nullable,
+  readUploadSessionId,
+  resolveUploadBusinessId,
+  toUploadInitCommand
+} from './upload-write-command.support';
+import {
+  ensureProfileFileAsset,
+  ensureProjectFileAsset,
+  loadProfileSessionForConfirm,
+  loadProfileSessionForInit,
+  loadProjectSessionForConfirm,
+  loadProjectSessionForInit
+} from './upload-write-session.support';
 
 @Injectable()
 export class UploadWriteService {
@@ -50,11 +45,21 @@ export class UploadWriteService {
   ) {}
 
   async initUpload(payload: Record<string, unknown>, context: RequestContext) {
-    const command = this.toInitCommand(payload);
-    const profileSession = await this.loadProfileSessionForInit(command, context);
+    const command = toUploadInitCommand(payload);
+    const profileSession = await loadProfileSessionForInit(
+      command,
+      context,
+      this.currentSessionVerificationService
+    );
+    const projectSession = await loadProjectSessionForInit(
+      command,
+      context,
+      this.currentSessionVerificationService
+    );
     const enterpriseDisplayListing = await this.loadEnterpriseDisplayListingForInit(command, context);
     const businessId =
-      enterpriseDisplayListing?.id ?? this.resolveBusinessId(command, profileSession);
+      enterpriseDisplayListing?.id ?? resolveUploadBusinessId(command, profileSession);
+    const verifiedSession = profileSession ?? projectSession;
     await this.ensureUploadBindingForInit(command.businessType, businessId);
     const sessionId = randomUUID();
 
@@ -79,9 +84,9 @@ export class UploadWriteService {
       directUploadHeaders: directive.directUploadHeaders,
       sessionStatus: 'initiated',
       fileAssetId: null,
-      actorId: profileSession?.actorId ?? this.nullable(context.actorId),
-      userId: profileSession?.userId ?? this.nullable(context.userId),
-      organizationId: profileSession?.organizationId ?? context.organizationId ?? '',
+      actorId: verifiedSession?.actorId ?? nullable(context.actorId),
+      userId: verifiedSession?.userId ?? nullable(context.userId),
+      organizationId: verifiedSession?.organizationId ?? context.organizationId ?? '',
       confirmedAt: null
     });
 
@@ -109,7 +114,7 @@ export class UploadWriteService {
   }
 
   async confirmUpload(payload: Record<string, unknown>, context: RequestContext) {
-    const uploadSessionId = this.readUploadSessionId(payload.uploadSessionId);
+    const uploadSessionId = readUploadSessionId(payload.uploadSessionId);
 
     return this.dataSource.transaction(async (manager) => {
       const sessionRepository = manager.getRepository(UploadSessionEntity);
@@ -118,19 +123,30 @@ export class UploadWriteService {
       if (!session) {
         throw uploadSessionUnavailable('Upload session does not exist for upload confirm.');
       }
-      const profileSession = await this.loadProfileSessionForConfirm(session, context);
+      const profileSession = await loadProfileSessionForConfirm(
+        session,
+        context,
+        this.currentSessionVerificationService
+      );
+      const projectSession = await loadProjectSessionForConfirm(
+        session,
+        context,
+        this.currentSessionVerificationService
+      );
       const enterpriseDisplayListing = await this.loadEnterpriseDisplayListingForConfirm(
         session,
         context,
         manager
       );
+      const verifiedSession = profileSession ?? projectSession;
 
       if (session.fileAssetId) {
         const existing = await fileAssetRepository.findOneBy({ id: session.fileAssetId });
         if (!existing) {
           throw uploadSessionMissingFileAssetTruth('Upload session is confirmed but missing FileAsset truth.');
         }
-        this.ensureProfileFileAsset(existing, session, profileSession);
+        ensureProfileFileAsset(existing, session, profileSession);
+        ensureProjectFileAsset(existing, session, projectSession);
         this.enterpriseDisplayBinding.ensureFileAsset(existing, session, enterpriseDisplayListing);
         return this.presenter.toConfirmResponse(existing);
       }
@@ -148,17 +164,23 @@ export class UploadWriteService {
         mimeType: session.mimeType,
         size: session.size,
         checksum: session.checksum,
-        actorId: profileSession?.actorId ?? this.nullable(context.actorId) ?? session.actorId,
-        userId: profileSession?.userId ?? this.nullable(context.userId) ?? session.userId,
+        actorId: verifiedSession?.actorId ?? nullable(context.actorId) ?? session.actorId,
+        userId: verifiedSession?.userId ?? nullable(context.userId) ?? session.userId,
         organizationId:
-          profileSession?.organizationId ?? context.organizationId ?? session.organizationId
+          verifiedSession?.organizationId ?? context.organizationId ?? session.organizationId
       });
 
       session.fileAssetId = fileAsset.id;
       session.sessionStatus = 'confirmed';
       session.confirmedAt = new Date();
+      if (projectSession) {
+        session.actorId = projectSession.actorId;
+        session.userId = projectSession.userId;
+        session.organizationId = projectSession.organizationId ?? '';
+      }
 
-      this.ensureProfileFileAsset(fileAsset, session, profileSession);
+      ensureProfileFileAsset(fileAsset, session, profileSession);
+      ensureProjectFileAsset(fileAsset, session, projectSession);
       this.enterpriseDisplayBinding.ensureFileAsset(fileAsset, session, enterpriseDisplayListing);
       await fileAssetRepository.save(fileAsset);
       await sessionRepository.save(session);
@@ -196,79 +218,6 @@ export class UploadWriteService {
     });
   }
 
-  private toInitCommand(payload: Record<string, unknown>): UploadInitCommand {
-    const source = this.asRecord(payload);
-    if (!('businessId' in source)) {
-      throw uploadInitInvalid(
-        'Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.'
-      );
-    }
-
-    const businessType = this.readRequiredString(source.businessType, 'businessType');
-    const fileKind = this.readRequiredString(source.fileKind, 'fileKind');
-    const mimeType = this.readRequiredString(source.mimeType, 'mimeType');
-    const checksum = this.readRequiredString(source.checksum, 'checksum');
-    const size = this.readPositiveSize(source.size);
-    const businessId = this.readBusinessId(source.businessId);
-    this.ensureSupportedUploadBinding(businessType, fileKind, mimeType);
-
-    return {
-      businessType,
-      businessId,
-      fileKind,
-      mimeType,
-      size,
-      checksum
-    };
-  }
-
-  private readUploadSessionId(value: unknown) {
-    if (typeof value !== 'string') {
-      throw uploadConfirmRequired('uploadSessionId is required for upload confirm.');
-    }
-    const normalized = value.trim();
-    if (!normalized) {
-      throw uploadConfirmRequired('uploadSessionId is required for upload confirm.');
-    }
-    return normalized;
-  }
-
-  private readRequiredString(value: unknown, field: string) {
-    if (typeof value !== 'string') {
-      throw uploadInitInvalid(
-        `Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum. Missing \`${field}\`.`
-      );
-    }
-    const normalized = value.trim();
-    if (!normalized) {
-      throw uploadInitInvalid(
-        `Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum. Missing \`${field}\`.`
-      );
-    }
-    return normalized;
-  }
-
-  private readBusinessId(value: unknown) {
-    if (value === null) {
-      return null;
-    }
-    if (typeof value !== 'string') {
-      throw uploadInitInvalid(
-        'Upload init requires businessType, businessId, fileKind, mimeType, size, and checksum.'
-      );
-    }
-    const normalized = value.trim();
-    return normalized ? normalized : null;
-  }
-
-  private readPositiveSize(value: unknown) {
-    const size = typeof value === 'number' ? value : Number(value);
-    if (!Number.isInteger(size) || size <= 0) {
-      throw uploadInitInvalid('Field `size` must be a positive integer for upload init.');
-    }
-    return size;
-  }
-
   private async ensureProjectBindingForInit(projectId: string | null, manager?: EntityManager) {
     if (!projectId) {
       return;
@@ -291,11 +240,6 @@ export class UploadWriteService {
     }
   }
 
-  private nullable(value: string) {
-    const normalized = value.trim();
-    return normalized ? normalized : null;
-  }
-
   private async ensureUploadBindingForInit(
     businessType: string,
     businessId: string | null,
@@ -316,173 +260,14 @@ export class UploadWriteService {
     }
   }
 
-  private ensureSupportedUploadBinding(
-    businessType: string,
-    fileKind: string,
-    mimeType: string
-  ) {
-    const normalizedMimeType = mimeType.toLowerCase();
-    if (
-      businessType === 'project' &&
-      (fileKind === 'evidence' || fileKind === 'project_attachment')
-    ) {
-      return;
-    }
-    if (businessType === 'project' && this.isBidSubmitFileKind(fileKind)) {
-      this.ensureBidSubmitMimeType(fileKind, normalizedMimeType);
-      return;
-    }
-    if (businessType === 'profile' && fileKind === 'avatar') {
-      if (!normalizedMimeType.startsWith('image/')) {
-        throw uploadInitInvalid('Current profile avatar upload only supports image mime types.');
-      }
-      return;
-    }
-    if (businessType === 'profile' && fileKind === 'business_license') {
-      if (!normalizedMimeType.startsWith('image/')) {
-        throw uploadInitInvalid('Current business license upload only supports image mime types.');
-      }
-      return;
-    }
-    if (businessType === 'profile' && fileKind === 'id_card_front') {
-      if (!normalizedMimeType.startsWith('image/')) {
-        throw uploadInitInvalid('Current id-card front upload only supports image mime types.');
-      }
-      return;
-    }
-    if (
-      businessType === 'enterprise_display' &&
-      (fileKind === 'enterprise_logo' ||
-        fileKind === 'enterprise_album' ||
-        fileKind === 'enterprise_factory_showcase' ||
-        fileKind === 'enterprise_case_media')
-    ) {
-      if (!normalizedMimeType.startsWith('image/')) {
-        throw uploadInitInvalid('Current enterprise display upload only supports image mime types.');
-      }
-      return;
-    }
-    throw uploadInitInvalid(
-      'Current upload init only supports project/evidence, project/project_attachment, project bid attachments, profile/avatar, profile/business_license, profile/id_card_front, or enterprise_display image bindings.'
-    );
-  }
-
-  private isBidSubmitFileKind(fileKind: string) {
-    return (
-      fileKind === BID_PROJECT_UNDERSTANDING_FILE_KIND ||
-      fileKind === BID_QUOTE_SHEET_FILE_KIND ||
-      fileKind === BID_SCHEDULE_PLAN_FILE_KIND
-    );
-  }
-
-  private ensureBidSubmitMimeType(fileKind: string, mimeType: string) {
-    const isImage = mimeType === 'image/png' || mimeType === 'image/jpeg' || mimeType === 'image/webp';
-    const isDocument =
-      mimeType === 'application/pdf' ||
-      mimeType === 'application/msword' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-    const isSpreadsheet =
-      mimeType === 'application/vnd.ms-excel' ||
-      mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-
-    if (fileKind === BID_PROJECT_UNDERSTANDING_FILE_KIND && (isImage || isDocument)) {
-      return;
-    }
-    if (
-      (fileKind === BID_QUOTE_SHEET_FILE_KIND || fileKind === BID_SCHEDULE_PLAN_FILE_KIND) &&
-      (isDocument || isSpreadsheet)
-    ) {
-      return;
-    }
-
-    throw uploadInitInvalid('Current bid submit upload only supports the configured attachment mime types.');
-  }
-
-  private async loadProfileSessionForInit(
-    command: UploadInitCommand,
-    context: RequestContext
-  ) {
-    if (command.businessType !== 'profile') {
-      return null;
-    }
-
-    const currentSession = await requireVerifiedCurrentSessionContext(
-      context,
-      this.currentSessionVerificationService
-    );
-    if (command.fileKind === 'avatar') {
-      if (command.businessId && command.businessId !== currentSession.userId) {
-        throw uploadInitInvalid('Current profile avatar upload must bind to the current user.');
-      }
-      return currentSession;
-    }
-    if (command.fileKind === 'business_license' || command.fileKind === 'id_card_front') {
-      const currentOrganizationId = currentSession.organizationId?.trim() ?? '';
-      if (!currentOrganizationId) {
-        throw uploadInitInvalid('Current organization-scoped profile upload requires an active organization scope.');
-      }
-      if (command.businessId && command.businessId !== currentOrganizationId) {
-        throw uploadInitInvalid('Current organization-scoped profile upload must bind to the current organization.');
-      }
-      return currentSession;
-    }
-    return null;
-  }
-
   private async loadEnterpriseDisplayListingForInit(
-    command: UploadInitCommand,
+    command: { businessType: string; businessId: string | null },
     context: RequestContext
   ) {
     if (command.businessType !== 'enterprise_display') {
       return null;
     }
     return this.enterpriseDisplayBinding.loadOwnedListingForInit(command.businessId, context);
-  }
-
-  private async loadProfileSessionForConfirm(
-    session: UploadSessionEntity,
-    context: RequestContext
-  ) {
-    if (session.businessType !== 'profile') {
-      return null;
-    }
-
-    const currentSession = await requireVerifiedCurrentSessionContext(
-      context,
-      this.currentSessionVerificationService
-    );
-    if (session.fileKind === 'avatar') {
-      if (session.businessId !== currentSession.userId || session.userId !== currentSession.userId) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current profile avatar upload session does not belong to the current user.'
-        );
-      }
-      if (!session.mimeType.toLowerCase().startsWith('image/')) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current profile avatar upload session is missing image mime truth.'
-        );
-      }
-      return currentSession;
-    }
-    if (session.fileKind === 'business_license' || session.fileKind === 'id_card_front') {
-      const currentOrganizationId = currentSession.organizationId?.trim() ?? '';
-      if (
-        !currentOrganizationId ||
-        session.businessId !== currentOrganizationId ||
-        session.organizationId !== currentOrganizationId
-      ) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current organization-scoped profile upload session does not belong to the current organization.'
-        );
-      }
-      if (!session.mimeType.toLowerCase().startsWith('image/')) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current organization-scoped profile upload session is missing image mime truth.'
-        );
-      }
-      return currentSession;
-    }
-    return null;
   }
 
   private async loadEnterpriseDisplayListingForConfirm(
@@ -496,93 +281,4 @@ export class UploadWriteService {
     return this.enterpriseDisplayBinding.loadOwnedListingForConfirm(session, context, manager);
   }
 
-  private ensureProfileFileAsset(
-    fileAsset: FileAssetEntity,
-    session: UploadSessionEntity,
-    currentSession:
-      | {
-          userId: string;
-          organizationId: string | null;
-        }
-      | null
-  ) {
-    if (session.businessType !== 'profile') {
-      return;
-    }
-
-    if (session.fileKind === 'avatar') {
-      if (
-        fileAsset.businessType !== 'profile' ||
-        fileAsset.fileKind !== 'avatar' ||
-        !fileAsset.mimeType.toLowerCase().startsWith('image/')
-      ) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current profile avatar FileAsset truth is not aligned with the upload session.'
-        );
-      }
-      if (
-        !currentSession?.userId ||
-        fileAsset.businessId !== currentSession.userId ||
-        fileAsset.userId !== currentSession.userId
-      ) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current profile avatar FileAsset truth does not belong to the current user.'
-        );
-      }
-      return;
-    }
-
-    if (session.fileKind === 'business_license' || session.fileKind === 'id_card_front') {
-      const currentOrganizationId = currentSession?.organizationId?.trim() ?? '';
-      if (
-        fileAsset.businessType !== 'profile' ||
-        fileAsset.fileKind !== session.fileKind ||
-        !fileAsset.mimeType.toLowerCase().startsWith('image/')
-      ) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current organization-scoped profile FileAsset truth is not aligned with the upload session.'
-        );
-      }
-      if (
-        !currentOrganizationId ||
-        fileAsset.businessId !== currentOrganizationId ||
-        fileAsset.organizationId !== currentOrganizationId
-      ) {
-        throw uploadSessionMissingFileAssetTruth(
-          'Current organization-scoped profile FileAsset truth does not belong to the current organization.'
-        );
-      }
-    }
-  }
-
-  private resolveBusinessId(
-    command: UploadInitCommand,
-    profileSession:
-      | {
-          userId: string;
-          organizationId: string | null;
-        }
-      | null
-  ) {
-    if (!profileSession) {
-      return command.businessId;
-    }
-    if (command.fileKind === 'avatar') {
-      return profileSession.userId;
-    }
-    if (command.fileKind === 'business_license') {
-      return profileSession.organizationId?.trim() ?? command.businessId;
-    }
-    if (command.fileKind === 'id_card_front') {
-      return profileSession.organizationId?.trim() ?? command.businessId;
-    }
-    return command.businessId;
-  }
-
-  private asRecord(value: unknown) {
-    if (!value || Array.isArray(value) || typeof value !== 'object') {
-      throw uploadInitInvalid('Upload init body must be an object.');
-    }
-    return value as Record<string, unknown>;
-  }
 }

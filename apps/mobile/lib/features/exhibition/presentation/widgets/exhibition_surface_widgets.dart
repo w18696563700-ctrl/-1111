@@ -97,6 +97,8 @@ class _ActionCard extends StatelessWidget {
     this.summary,
     this.tone = _ActionCardTone.standard,
     this.eyebrow,
+    this.titleColor,
+    this.summaryStyle,
   });
 
   final String title;
@@ -104,6 +106,8 @@ class _ActionCard extends StatelessWidget {
   final String? summary;
   final _ActionCardTone tone;
   final String? eyebrow;
+  final Color? titleColor;
+  final TextStyle? summaryStyle;
 
   @override
   Widget build(BuildContext context) {
@@ -139,16 +143,19 @@ class _ActionCard extends StatelessWidget {
               title,
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w800,
+                color: titleColor,
               ),
             ),
             if (summary != null) ...<Widget>[
               const SizedBox(height: 10),
               Text(
                 summary!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.45,
-                ),
+                style:
+                    summaryStyle ??
+                    theme.textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
               ),
             ],
             const SizedBox(height: 16),

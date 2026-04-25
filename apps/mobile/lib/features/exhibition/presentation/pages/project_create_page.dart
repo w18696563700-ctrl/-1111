@@ -180,6 +180,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   final TextEditingController _scheduleDetailController =
       TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
+  final TextEditingController _p0PayMaterialFileAssetIdsController =
+      TextEditingController();
+  final TextEditingController _p0PayQuoteDeadlineAtController =
+      TextEditingController();
+  final TextEditingController _p0PayContactIdController = TextEditingController(
+    text: 'primary-contact',
+  );
   final Map<_ProjectCreateFieldId, GlobalKey> _fieldKeys =
       <_ProjectCreateFieldId, GlobalKey>{
         for (final fieldId in _ProjectCreateFieldId.values)
@@ -197,7 +204,19 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   ExhibitionLoadResult? _editDetailResult;
   int _guardRetryCount = 0;
   bool _submitting = false;
+  bool _p0PaySubmitting = false;
+  String _p0PayTaskType = 'fixed_price_bid';
+  bool _p0PayDemandExistsConfirmed = false;
+  bool _p0PayAuthorizationConfirmed = false;
+  bool _p0PayNoQuoteHarvestingConfirmed = false;
+  bool _p0PayResultProcessingConfirmed = false;
+  bool _p0PayCreditImpactAcknowledged = false;
   ExhibitionActionResult? _lastResult;
+  ExhibitionActionResult? _p0PayTaskResult;
+  ExhibitionActionResult? _p0PayDepositOrderResult;
+  ExhibitionActionResult? _p0PayDepositInitResult;
+  ExhibitionLoadResult? _p0PayDepositStatusResult;
+  P0PayPaymentPollResult? _p0PayDepositPollResult;
   Map<_ProjectCreateFieldId, String> _fieldErrors =
       <_ProjectCreateFieldId, String>{};
   String? _formErrorMessage;
@@ -266,7 +285,143 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     _plannedEndAtController.dispose();
     _scheduleDetailController.dispose();
     _descriptionController.dispose();
+    _p0PayMaterialFileAssetIdsController.dispose();
+    _p0PayQuoteDeadlineAtController.dispose();
+    _p0PayContactIdController.dispose();
     super.dispose();
+  }
+
+  Future<void> _createP0PayTradeTask() async {
+    FocusScope.of(context).unfocus();
+    final validationMessage = _p0PayTradeTaskBlockerMessage();
+    if (validationMessage != null) {
+      setState(() {
+        _p0PayTaskResult = ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.p0PayTradeTaskCreate,
+          isSuccess: false,
+          controlledState: AppPageState.errorNonRetryable,
+          message: validationMessage,
+        );
+      });
+      return;
+    }
+
+    final standardizedLocation = _selectedStandardizedLocation!;
+    final area = _parseAreaSqmInput(_areaSqmController.text.trim())!;
+    final budgetAmount = double.parse(_budgetAmountController.text.trim());
+    final buildStartAt =
+        _normalizeDateInput(_plannedStartAtController.text.trim()) ?? '';
+    final dismantleAt =
+        _normalizeDateInput(_plannedEndAtController.text.trim()) ?? '';
+    final projectName = _composeProjectTitle(
+      _titleController.text.trim(),
+      _brandNameController.text.trim(),
+    );
+
+    setState(() {
+      _p0PaySubmitting = true;
+      _p0PayTaskResult = null;
+      _p0PayDepositOrderResult = null;
+      _p0PayDepositInitResult = null;
+      _p0PayDepositStatusResult = null;
+      _p0PayDepositPollResult = null;
+    });
+
+    final taskResult = await ExhibitionConsumerLayer.instance
+        .createP0PayTradeTask(
+          P0PayTradeTaskCreateCommand(
+            taskType: _p0PayTaskType,
+            projectName: projectName,
+            cityCode: standardizedLocation.cityCode,
+            projectType: _normalizeBuildingTypeSelection(
+              _buildingTypeController.text.trim(),
+            ),
+            exhibitionName: _titleController.text.trim(),
+            area: area,
+            buildStartAt: buildStartAt,
+            dismantleAt: dismantleAt,
+            requirementDescription: _p0PayRequirementDescription(),
+            budgetAmount: budgetAmount,
+            budgetRange: 'CNY ${budgetAmount.toStringAsFixed(2)}',
+            quoteDeadlineAt: _p0PayQuoteDeadlineAtController.text.trim(),
+            contactId: _p0PayContactIdController.text.trim(),
+            authenticityMaterialFileAssetIds: _p0PayMaterialFileAssetIds(),
+            authenticityDeclarations: _p0PayAuthenticityDeclarations(),
+          ),
+        );
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _p0PayTaskResult = taskResult;
+      _p0PaySubmitting =
+          _p0PayTaskType == 'inquiry_quote' && taskResult.isSuccess;
+    });
+
+    final taskId = _taskIdFromPayload(taskResult.payload);
+    if (!taskResult.isSuccess ||
+        _p0PayTaskType != 'inquiry_quote' ||
+        taskId == null) {
+      if (mounted) {
+        setState(() {
+          _p0PaySubmitting = false;
+        });
+      }
+      return;
+    }
+
+    final depositResult = await ExhibitionConsumerLayer.instance
+        .createP0PayInquiryDepositOrder(
+          taskId: taskId,
+          command: P0PayInquiryDepositOrderCommand(
+            ruleVersion: 'p0-pay-v1.3',
+            ruleSnapshotHash: 'p0-pay-v1.3-freeze',
+          ),
+        );
+
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _p0PayDepositOrderResult = depositResult;
+    });
+
+    final depositOrderId = _depositOrderIdFromPayload(depositResult.payload);
+    if (!depositResult.isSuccess || depositOrderId == null) {
+      setState(() {
+        _p0PaySubmitting = false;
+      });
+      return;
+    }
+
+    final initResult = await ExhibitionConsumerLayer.instance
+        .initP0PayInquiryDepositPayment(
+          taskId: taskId,
+          depositOrderId: depositOrderId,
+          command: P0PayPayInitCommand(payChannel: 'alipay_candidate'),
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _p0PayDepositInitResult = initResult;
+    });
+    if (!initResult.isSuccess) {
+      setState(() {
+        _p0PaySubmitting = false;
+      });
+      return;
+    }
+    await _openP0PayChannelPayload(initResult.payload);
+    await _pollP0PayInquiryDepositStatus();
+    if (mounted) {
+      setState(() {
+        _p0PaySubmitting = false;
+      });
+    }
   }
 
   Future<void> _submitCreate() async {
@@ -744,64 +899,410 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       hideResultPanelOnSuccess: true,
       resultSectionsBuilder: (ExhibitionActionResult result) =>
           _buildResultSections(result),
-      body: isEditMode
-          ? _buildProjectEditBody(
-              editContentReady: editContentReady,
-              editResult: editResult,
-              currentState: editState,
-            )
-          : _buildProjectCreateRoundABody(
-              context: context,
-              guardLoading: _guardLoading,
-              accessGuard: _accessGuard,
-              formErrorMessage: _formErrorMessage,
-              selectedProjectTypeLabel: _selectedProjectTypeLabel,
-              selectedStandardizedLocationLabel:
-                  _selectedStandardizedLocationLabel,
-              hasStandardizedLocationSelection:
-                  _selectedStandardizedLocation != null,
-              districtSelectionEnabled:
-                  _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
-              exhibitionNameController: _titleController,
-              brandNameController: _brandNameController,
-              buildingTypeController: _buildingTypeController,
-              buildingTypeRemarkController: _buildingTypeRemarkController,
-              budgetAmountController: _budgetAmountController,
-              areaSqmController: _areaSqmController,
-              provinceNameController: _provinceNameController,
-              cityNameController: _cityNameController,
-              districtNameController: _districtNameController,
-              detailAddressController: _detailAddressController,
-              scopeSummaryController: _scopeSummaryController,
-              plannedStartAtController: _plannedStartAtController,
-              plannedEndAtController: _plannedEndAtController,
-              scheduleDetailController: _scheduleDetailController,
-              descriptionController: _descriptionController,
-              fieldKeys: _fieldKeys,
-              fieldErrors: _fieldErrors,
-              onFieldInteracted: _handleFieldInteracted,
-              onProjectTypePressed: _pickProjectType,
-              onStandardizedLocationPressed: _pickStandardizedLocation,
-              onDistrictPressed: _pickDistrict,
-              onScopeSummaryPressed: _editScopeSummary,
-              onPlannedStartDatePressed: () => _pickDate(
-                controller: _plannedStartAtController,
-                fieldId: _ProjectCreateFieldId.plannedStartAt,
-              ),
-              onPlannedEndDatePressed: () => _pickDate(
-                controller: _plannedEndAtController,
-                fieldId: _ProjectCreateFieldId.plannedEndAt,
-              ),
-              onPlannedStartDateCleared: () => _clearDate(
-                controller: _plannedStartAtController,
-                fieldId: _ProjectCreateFieldId.plannedStartAt,
-              ),
-              onPlannedEndDateCleared: () => _clearDate(
-                controller: _plannedEndAtController,
-                fieldId: _ProjectCreateFieldId.plannedEndAt,
-              ),
-            ),
+      body:
+          isEditMode
+                ? _buildProjectEditBody(
+                    editContentReady: editContentReady,
+                    editResult: editResult,
+                    currentState: editState,
+                  )
+                : _buildProjectCreateRoundABody(
+                    context: context,
+                    guardLoading: _guardLoading,
+                    accessGuard: _accessGuard,
+                    formErrorMessage: _formErrorMessage,
+                    selectedProjectTypeLabel: _selectedProjectTypeLabel,
+                    selectedStandardizedLocationLabel:
+                        _selectedStandardizedLocationLabel,
+                    hasStandardizedLocationSelection:
+                        _selectedStandardizedLocation != null,
+                    districtSelectionEnabled:
+                        _selectedStandardizedLocation?.districts.isNotEmpty ??
+                        false,
+                    exhibitionNameController: _titleController,
+                    brandNameController: _brandNameController,
+                    buildingTypeController: _buildingTypeController,
+                    buildingTypeRemarkController: _buildingTypeRemarkController,
+                    budgetAmountController: _budgetAmountController,
+                    areaSqmController: _areaSqmController,
+                    provinceNameController: _provinceNameController,
+                    cityNameController: _cityNameController,
+                    districtNameController: _districtNameController,
+                    detailAddressController: _detailAddressController,
+                    scopeSummaryController: _scopeSummaryController,
+                    plannedStartAtController: _plannedStartAtController,
+                    plannedEndAtController: _plannedEndAtController,
+                    scheduleDetailController: _scheduleDetailController,
+                    descriptionController: _descriptionController,
+                    fieldKeys: _fieldKeys,
+                    fieldErrors: _fieldErrors,
+                    onFieldInteracted: _handleFieldInteracted,
+                    onProjectTypePressed: _pickProjectType,
+                    onStandardizedLocationPressed: _pickStandardizedLocation,
+                    onDistrictPressed: _pickDistrict,
+                    onScopeSummaryPressed: _editScopeSummary,
+                    onPlannedStartDatePressed: () => _pickDate(
+                      controller: _plannedStartAtController,
+                      fieldId: _ProjectCreateFieldId.plannedStartAt,
+                    ),
+                    onPlannedEndDatePressed: () => _pickDate(
+                      controller: _plannedEndAtController,
+                      fieldId: _ProjectCreateFieldId.plannedEndAt,
+                    ),
+                    onPlannedStartDateCleared: () => _clearDate(
+                      controller: _plannedStartAtController,
+                      fieldId: _ProjectCreateFieldId.plannedStartAt,
+                    ),
+                    onPlannedEndDateCleared: () => _clearDate(
+                      controller: _plannedEndAtController,
+                      fieldId: _ProjectCreateFieldId.plannedEndAt,
+                    ),
+                  )
+            ..addAll(<Widget>[
+              if (_shouldShowP0PayTradeTaskSection) ...<Widget>[
+                const SizedBox(height: 16),
+                _buildP0PayTradeTaskSection(),
+              ],
+            ]),
     );
+  }
+
+  bool get _shouldShowP0PayTradeTaskSection {
+    return _titleController.text.trim().isNotEmpty ||
+        _brandNameController.text.trim().isNotEmpty ||
+        _budgetAmountController.text.trim().isNotEmpty ||
+        _areaSqmController.text.trim().isNotEmpty ||
+        _selectedStandardizedLocation != null ||
+        _p0PayTaskResult != null ||
+        _p0PayDepositOrderResult != null ||
+        _p0PayDepositInitResult != null ||
+        _p0PayDepositStatusResult != null ||
+        _p0PayDepositPollResult != null;
+  }
+
+  Widget _buildP0PayTradeTaskSection() {
+    final declarationsCompleted = _p0PayDeclarationsCompleted;
+    final materials = _p0PayMaterialFileAssetIds();
+    final canSubmit =
+        !_p0PaySubmitting &&
+        declarationsCompleted &&
+        materials.isNotEmpty &&
+        _p0PayTradeTaskBlockerMessage() == null;
+    final isInquiry = _p0PayTaskType == 'inquiry_quote';
+
+    return _ActionCard(
+      title: 'P0-Pay 交易任务',
+      summary: '当前只创建展览交易任务和订单级支付/预授权 handoff，不做钱包、余额、保证金或资金池。',
+      tone: _ActionCardTone.emphasis,
+      children: <Widget>[
+        const _StateMessage(
+          title: '发布类型与真实性入口',
+          body: '展开后选择明价竞标单或询价报价单，补充真实性材料 FileAsset ID，并按询价报价单规则拉起 200 元发单诚意金。',
+        ),
+        ExpansionTile(
+          initiallyExpanded:
+              _p0PayTaskResult != null ||
+              _p0PayDepositOrderResult != null ||
+              _p0PayDepositInitResult != null ||
+              _p0PayDepositStatusResult != null,
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: EdgeInsets.zero,
+          title: const Text('展开 P0-Pay 发布承接'),
+          children: <Widget>[
+            SegmentedButton<String>(
+              segments: const <ButtonSegment<String>>[
+                ButtonSegment<String>(
+                  value: 'fixed_price_bid',
+                  label: Text('明价竞标单'),
+                  icon: Icon(Icons.gavel_outlined),
+                ),
+                ButtonSegment<String>(
+                  value: 'inquiry_quote',
+                  label: Text('询价报价单'),
+                  icon: Icon(Icons.request_quote_outlined),
+                ),
+              ],
+              selected: <String>{_p0PayTaskType},
+              onSelectionChanged: (Set<String> value) {
+                setState(() {
+                  _p0PayTaskType = value.first;
+                  _p0PayTaskResult = null;
+                  _p0PayDepositOrderResult = null;
+                  _p0PayDepositInitResult = null;
+                  _p0PayDepositStatusResult = null;
+                  _p0PayDepositPollResult = null;
+                });
+              },
+            ),
+            const SizedBox(height: 12),
+            _InputField(
+              controller: _p0PayMaterialFileAssetIdsController,
+              inputKey: const ValueKey<String>(
+                'p0-pay-authenticity-material-ids',
+              ),
+              label: '真实性材料 FileAsset ID',
+              hintText: '例如：file-1,file-2',
+              helperText: '只填写已 confirmed 的 FileAsset ID；objectKey 不作为真实性材料真相。',
+              maxLines: 2,
+              onChanged: (_) => setState(() {}),
+            ),
+            _InputField(
+              controller: _p0PayQuoteDeadlineAtController,
+              inputKey: const ValueKey<String>('p0-pay-quote-deadline-at'),
+              label: '报价截止时间',
+              hintText: '例如：2026-05-20T18:00:00+08:00',
+              helperText: '报价截止后发布方必须处理选择、关闭或取消说明。',
+              onChanged: (_) => setState(() {}),
+            ),
+            _InputField(
+              controller: _p0PayContactIdController,
+              inputKey: const ValueKey<String>('p0-pay-contact-id'),
+              label: '联系人 ID',
+              helperText: '当前只作为 BFF/Server 业务锚点透传，Flutter 不持有联系人真相。',
+              onChanged: (_) => setState(() {}),
+            ),
+            const SizedBox(height: 8),
+            _buildP0PayDeclarationCheckbox(
+              value: _p0PayDemandExistsConfirmed,
+              title: '我确认本项目需求真实存在',
+              onChanged: (bool value) =>
+                  setState(() => _p0PayDemandExistsConfirmed = value),
+            ),
+            _buildP0PayDeclarationCheckbox(
+              value: _p0PayAuthorizationConfirmed,
+              title: '我确认已获得发布该项目需求的授权',
+              onChanged: (bool value) =>
+                  setState(() => _p0PayAuthorizationConfirmed = value),
+            ),
+            _buildP0PayDeclarationCheckbox(
+              value: _p0PayNoQuoteHarvestingConfirmed,
+              title: '我不会以套取报价、恶意比价、绕开平台交易为目的发布项目',
+              onChanged: (bool value) =>
+                  setState(() => _p0PayNoQuoteHarvestingConfirmed = value),
+            ),
+            _buildP0PayDeclarationCheckbox(
+              value: _p0PayResultProcessingConfirmed,
+              title: '我会在规定时间内处理报价或竞标结果',
+              onChanged: (bool value) =>
+                  setState(() => _p0PayResultProcessingConfirmed = value),
+            ),
+            _buildP0PayDeclarationCheckbox(
+              value: _p0PayCreditImpactAcknowledged,
+              title: '我知晓违规发布将影响企业信用，并可能限制后续发布权限',
+              onChanged: (bool value) =>
+                  setState(() => _p0PayCreditImpactAcknowledged = value),
+            ),
+            if (isInquiry) ...<Widget>[
+              const SizedBox(height: 12),
+              const _StateMessage(
+                title: '发单诚意金',
+                body:
+                    '询价报价单需支付 200 元发单诚意金，用于约束发布方完成结果处理；合规选择、关闭说明或合理取消后退回。逾期不处理、恶意询价、虚假发布或绕单成立时，可按规则扣除并记录信用影响。',
+              ),
+            ],
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const ValueKey<String>('p0-pay-create-trade-task'),
+              onPressed: canSubmit ? _createP0PayTradeTask : null,
+              icon: _p0PaySubmitting
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.send_outlined),
+              label: Text(isInquiry ? '创建询价报价单并拉起发单诚意金' : '创建明价竞标单'),
+            ),
+            if (!canSubmit && !_p0PaySubmitting) ...<Widget>[
+              const SizedBox(height: 8),
+              _StateMessage(
+                title: 'P0-Pay 提交条件未完成',
+                body:
+                    _p0PayTradeTaskBlockerMessage() ?? '请先补齐真实性材料，并勾选全部真实性声明。',
+              ),
+            ],
+            ..._buildP0PayResultLines(),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildP0PayDeclarationCheckbox({
+    required bool value,
+    required String title,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return CheckboxListTile(
+      dense: true,
+      contentPadding: EdgeInsets.zero,
+      value: value,
+      title: Text(title),
+      controlAffinity: ListTileControlAffinity.leading,
+      onChanged: (bool? next) => onChanged(next ?? false),
+    );
+  }
+
+  List<Widget> _buildP0PayResultLines() {
+    final taskResult = _p0PayTaskResult;
+    final depositResult = _p0PayDepositOrderResult;
+    final initResult = _p0PayDepositInitResult;
+    final statusResult = _p0PayDepositStatusResult;
+    final pollResult = _p0PayDepositPollResult;
+    if (taskResult == null &&
+        depositResult == null &&
+        initResult == null &&
+        statusResult == null &&
+        pollResult == null) {
+      return const <Widget>[];
+    }
+    return <Widget>[
+      const SizedBox(height: 12),
+      if (taskResult != null)
+        _DetailLine(
+          label: '交易任务',
+          value: taskResult.isSuccess
+              ? '已创建：${_taskIdFromPayload(taskResult.payload) ?? '待回读'}'
+              : taskResult.message ?? '创建失败',
+          highlight: taskResult.isSuccess,
+        ),
+      if (depositResult != null)
+        _DetailLine(
+          label: '发单诚意金订单',
+          value: depositResult.isSuccess
+              ? '已创建：${_depositOrderIdFromPayload(depositResult.payload) ?? '待回读'}'
+              : depositResult.message ?? '创建失败',
+          highlight: depositResult.isSuccess,
+        ),
+      if (initResult != null)
+        _DetailLine(
+          label: '支付通道',
+          value: initResult.isSuccess
+              ? '已拉起：${_paymentReferenceIdFromPayload(initResult.payload) ?? '等待通道确认'}'
+              : _p0PayActionFailureText(initResult),
+          highlight: initResult.isSuccess,
+        ),
+      if (statusResult != null)
+        _DetailLine(
+          label: '诚意金状态',
+          value: _depositStatusText(statusResult),
+          highlight:
+              pollResult?.isSuccess ??
+              statusResult.state == AppPageState.content,
+        ),
+      if (pollResult != null)
+        _StateMessage(
+          title: '支付结果',
+          body: _p0PayPaymentPollResultText(pollResult),
+        ),
+      if (_depositOrderIdFromPayload(depositResult?.payload) != null)
+        TextButton.icon(
+          onPressed: _p0PaySubmitting ? null : _pollP0PayInquiryDepositStatus,
+          icon: const Icon(Icons.refresh_rounded),
+          label: const Text('重新轮询诚意金状态'),
+        ),
+    ];
+  }
+
+  Future<void> _pollP0PayInquiryDepositStatus() async {
+    final taskId = _taskIdFromPayload(_p0PayTaskResult?.payload);
+    final depositOrderId = _depositOrderIdFromPayload(
+      _p0PayDepositOrderResult?.payload,
+    );
+    if (taskId == null || depositOrderId == null) {
+      return;
+    }
+    final result = await ExhibitionConsumerLayer.instance
+        .pollP0PayInquiryDepositStatus(
+          taskId: taskId,
+          depositOrderId: depositOrderId,
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _p0PayDepositPollResult = result;
+      _p0PayDepositStatusResult = result.result;
+    });
+  }
+
+  Future<void> _openP0PayChannelPayload(Object? payload) async {
+    final url = _channelPayloadUrl(payload);
+    if (url == null) {
+      return;
+    }
+    await launchUrlString(url);
+  }
+
+  String? _p0PayTradeTaskBlockerMessage() {
+    if (_guardLoading) {
+      return '当前正在核对发布守卫，请稍候再试。';
+    }
+    if (_accessGuard.blocked) {
+      return _accessGuard.message ?? '当前发布入口暂不可继续。';
+    }
+    if (_selectedStandardizedLocation == null) {
+      return '请先选择项目所在省 / 市。';
+    }
+    if (_parseAreaSqmInput(_areaSqmController.text.trim()) == null) {
+      return 'P0-Pay 交易任务需要填写项目面积。';
+    }
+    if (double.tryParse(_budgetAmountController.text.trim()) == null) {
+      return '请先填写有效预算金额。';
+    }
+    if ((_normalizeDateInput(_plannedStartAtController.text.trim()) ?? '')
+            .isEmpty ||
+        (_normalizeDateInput(_plannedEndAtController.text.trim()) ?? '')
+            .isEmpty) {
+      return '请先填写搭建时间和撤展时间。';
+    }
+    if (_p0PayQuoteDeadlineAtController.text.trim().isEmpty) {
+      return '请先填写报价截止时间。';
+    }
+    if (_p0PayContactIdController.text.trim().isEmpty) {
+      return '请先填写联系人 ID。';
+    }
+    if (_p0PayMaterialFileAssetIds().isEmpty) {
+      return '请先填写至少一个已 confirmed 的真实性材料 FileAsset ID。';
+    }
+    if (!_p0PayDeclarationsCompleted) {
+      return '请先勾选全部真实性声明。';
+    }
+    return null;
+  }
+
+  bool get _p0PayDeclarationsCompleted =>
+      _p0PayDemandExistsConfirmed &&
+      _p0PayAuthorizationConfirmed &&
+      _p0PayNoQuoteHarvestingConfirmed &&
+      _p0PayResultProcessingConfirmed &&
+      _p0PayCreditImpactAcknowledged;
+
+  List<String> _p0PayMaterialFileAssetIds() {
+    return _p0PayMaterialFileAssetIdsController.text
+        .split(RegExp(r'[,，\s]+'))
+        .map((String value) => value.trim())
+        .where((String value) => value.isNotEmpty)
+        .toSet()
+        .toList(growable: false);
+  }
+
+  Map<String, bool> _p0PayAuthenticityDeclarations() {
+    return <String, bool>{
+      'demandExistsConfirmed': _p0PayDemandExistsConfirmed,
+      'authorizationConfirmed': _p0PayAuthorizationConfirmed,
+      'noQuoteHarvestingConfirmed': _p0PayNoQuoteHarvestingConfirmed,
+      'resultProcessingConfirmed': _p0PayResultProcessingConfirmed,
+      'creditImpactAcknowledged': _p0PayCreditImpactAcknowledged,
+    };
+  }
+
+  String _p0PayRequirementDescription() {
+    final parts = <String>[
+      _scopeSummaryController.text.trim(),
+      _descriptionController.text.trim(),
+    ].where((String value) => value.isNotEmpty).toList(growable: false);
+    return parts.isEmpty ? '项目需求待补充' : parts.join('\n');
   }
 
   List<Widget> _buildResultSections(ExhibitionActionResult result) {

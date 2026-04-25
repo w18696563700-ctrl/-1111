@@ -5,6 +5,7 @@ import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { BidAwardFulfillmentSeedService } from './bid-award-fulfillment-seed.service';
 import { BidAwardController } from './bid-award.controller';
 import { BidAwardPresenter } from './bid-award.presenter';
 import { BidAwardQueryService } from './bid-award.query.service';
@@ -17,6 +18,11 @@ import { BidAwardWriteService } from './bid-award.write.service';
     OrganizationModule
   ],
   controllers: [BidAwardController],
-  providers: [BidAwardPresenter, BidAwardQueryService, BidAwardWriteService]
+  providers: [
+    BidAwardFulfillmentSeedService,
+    BidAwardPresenter,
+    BidAwardQueryService,
+    BidAwardWriteService
+  ]
 })
 export class BidAwardModule {}

@@ -6,6 +6,11 @@ type InspectionAcceptedInput = {
   state: string;
 };
 
+type InspectionPassAcceptedInput = InspectionAcceptedInput & {
+  orderId: string;
+  orderState: string;
+};
+
 type ContractAcceptedInput = {
   contractId: string;
   orderId: string;
@@ -42,6 +47,19 @@ export class TradingShellHandoffPresenter {
       state: input.state,
       summary: {
         heading: '当前验收复检已受理，后续仍以验收详情真值为准。',
+      },
+    };
+  }
+
+  toInspectionPassAccepted(input: InspectionPassAcceptedInput) {
+    return {
+      inspectionId: input.inspectionId,
+      milestoneId: input.milestoneId,
+      orderId: input.orderId,
+      state: input.state,
+      orderState: input.orderState,
+      summary: {
+        heading: '当前验收已通过；若所有里程碑均完成，订单将同步进入完成态。',
       },
     };
   }

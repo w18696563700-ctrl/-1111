@@ -9,6 +9,8 @@ type ExhibitionHomeQuery = {
   longitude?: string;
   provinceCode?: string;
   provinceName?: string;
+  cityName?: string;
+  districtName?: string;
   locationPermissionState?: string;
 };
 
@@ -163,6 +165,8 @@ export class ExhibitionHomeService {
       longitude: this.asOptionalString(query.longitude),
       provinceCode: this.asOptionalString(query.provinceCode),
       provinceName: this.asOptionalString(query.provinceName),
+      cityName: this.asOptionalString(query.cityName),
+      districtName: this.asOptionalString(query.districtName),
       locationPermissionState: this.asOptionalString(query.locationPermissionState),
     };
   }

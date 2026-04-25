@@ -8,6 +8,7 @@ import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { BidSubmittedSeedService } from '../trading_im/bid-submitted-seed.service';
+import { BidSubmissionAttachmentTruthService } from './bid-submission-attachment-truth.service';
 import { BidEntity } from './entities/bid.entity';
 import { BidPresenter } from './bid.presenter';
 import {
@@ -20,6 +21,9 @@ type SubmitBidCommand = {
   projectId: string;
   quoteAmount: number;
   proposalSummary: string;
+  projectUnderstandingFileAssetId: string;
+  quoteSheetFileAssetId: string;
+  schedulePlanFileAssetId: string;
 };
 
 @Injectable()
@@ -32,6 +36,7 @@ export class BidWriteService {
     private readonly dataSource: DataSource,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly bidSubmissionAttachmentTruthService: BidSubmissionAttachmentTruthService,
     private readonly bidSubmittedSeedService: BidSubmittedSeedService,
     private readonly presenter: BidPresenter
   ) {}
@@ -52,6 +57,15 @@ export class BidWriteService {
     const bidId = randomUUID();
     const submittedAt = new Date();
     const submittedBy = this.resolveSubmittedBy(currentSession.actorId, currentSession.userId);
+    const attachments = await this.bidSubmissionAttachmentTruthService.validateAndNormalize(
+      {
+        projectUnderstandingFileAssetId: command.projectUnderstandingFileAssetId,
+        quoteSheetFileAssetId: command.quoteSheetFileAssetId,
+        schedulePlanFileAssetId: command.schedulePlanFileAssetId,
+      },
+      project.id,
+      scope.organization.id,
+    );
     const bid = this.bidRepository.create({
       id: bidId,
       bidNo: this.buildBidNo(project.projectNo, bidId),
@@ -62,6 +76,9 @@ export class BidWriteService {
       userId: currentSession.userId,
       quoteAmount: command.quoteAmount.toFixed(2),
       proposalSummary: command.proposalSummary,
+      projectUnderstandingFileAssetId: attachments.projectUnderstandingFileAssetId,
+      quoteSheetFileAssetId: attachments.quoteSheetFileAssetId,
+      schedulePlanFileAssetId: attachments.schedulePlanFileAssetId,
       state: 'submitted',
       submittedBy,
       submittedAt
@@ -125,7 +142,19 @@ export class BidWriteService {
     return {
       projectId: this.readRequiredString(source.projectId, 'projectId'),
       quoteAmount: this.readQuoteAmount(source.quoteAmount),
-      proposalSummary: this.readRequiredString(source.proposalSummary, 'proposalSummary')
+      proposalSummary: this.readRequiredString(source.proposalSummary, 'proposalSummary'),
+      projectUnderstandingFileAssetId: this.readRequiredString(
+        source.projectUnderstandingFileAssetId,
+        'projectUnderstandingFileAssetId',
+      ),
+      quoteSheetFileAssetId: this.readRequiredString(
+        source.quoteSheetFileAssetId,
+        'quoteSheetFileAssetId',
+      ),
+      schedulePlanFileAssetId: this.readRequiredString(
+        source.schedulePlanFileAssetId,
+        'schedulePlanFileAssetId',
+      ),
     } satisfies SubmitBidCommand;
   }
 

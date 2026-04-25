@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "run_local_membership_stack.sh is disabled. Local BFF/Server startup is no longer allowed for Flutter App runtime. Use the approved SSH tunnel to 127.0.0.1:8080 instead." >&2
+exit 1
+
 ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 ENV_FILE="${ROOT_DIR}/infra/env/.env.example"
 

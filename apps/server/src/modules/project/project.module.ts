@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { ProjectNameAccessModule } from '../project_name_access/project-name-access.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { ProjectAttachmentController } from './project-attachment.controller';
 import { ProjectAttachmentPresenter } from './project-attachment.presenter';
@@ -32,7 +33,8 @@ import { ProjectWriteService } from './project-write.service';
     ]),
     ProjectPublishAuditModule,
     AuthModule,
-    OrganizationModule
+    OrganizationModule,
+    ProjectNameAccessModule
   ],
   controllers: [
     ProjectPublicResourceController,

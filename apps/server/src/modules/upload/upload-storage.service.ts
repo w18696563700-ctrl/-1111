@@ -179,6 +179,10 @@ export class UploadStorageService {
     if (mimeType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
       return 'docx';
     }
+    if (mimeType === 'application/vnd.ms-excel') return 'xls';
+    if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
+      return 'xlsx';
+    }
     return 'bin';
   }
 

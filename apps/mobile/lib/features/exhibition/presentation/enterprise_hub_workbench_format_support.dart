@@ -1,31 +1,5 @@
 part of 'enterprise_hub_workbench_pages.dart';
 
-String _placemarkAddress(List<Placemark> placemarks) {
-  if (placemarks.isEmpty) {
-    return '';
-  }
-  final placemark = placemarks.first;
-  final values = <String>[];
-  void addPart(String? value) {
-    final normalized = _normalizedText(value);
-    if (normalized == null || values.contains(normalized)) {
-      return;
-    }
-    values.add(normalized);
-  }
-
-  addPart(placemark.administrativeArea);
-  if (placemark.locality != placemark.administrativeArea) {
-    addPart(placemark.locality);
-  }
-  addPart(placemark.subAdministrativeArea);
-  addPart(placemark.subLocality);
-  addPart(placemark.thoroughfare);
-  addPart(placemark.subThoroughfare);
-  addPart(placemark.name);
-  return values.join();
-}
-
 String _locationFallbackAddress(DeviceLocationSnapshot snapshot) {
   return '当前位置：${snapshot.coordinatesLabel}';
 }
@@ -181,7 +155,7 @@ String _profileLabelOne(EnterpriseBoardType boardType) => switch (boardType) {
 String _profileLabelTwo(EnterpriseBoardType boardType) => switch (boardType) {
   EnterpriseBoardType.company => '服务项目',
   EnterpriseBoardType.factory => '核心产品',
-  EnterpriseBoardType.supplier => '供应模式',
+  EnterpriseBoardType.supplier => '核心产品/服务（逗号分隔）',
 };
 
 String _profileLabelThree(EnterpriseBoardType boardType) => switch (boardType) {
@@ -215,5 +189,5 @@ List<MapEntry<String, String>> _profileTwoOptions(
 ) => switch (boardType) {
   EnterpriseBoardType.company => enterpriseWorkbenchCompanyServiceItemOptions,
   EnterpriseBoardType.factory => enterpriseWorkbenchFactoryProcessOptions,
-  EnterpriseBoardType.supplier => enterpriseWorkbenchSupplierModeOptions,
+  EnterpriseBoardType.supplier => const <MapEntry<String, String>>[],
 };

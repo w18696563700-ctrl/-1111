@@ -282,12 +282,16 @@ extension _EnterpriseWorkbenchPageTruthSections
     }
     if (_selectedProfileOneOptions.isEmpty) {
       missing.add(_profileLabelOne(_boardType));
+    } else if (_boardType == EnterpriseBoardType.supplier &&
+        _selectedProfileOneOptions.length != 1) {
+      missing.add(_profileLabelOne(_boardType));
     }
     if (_boardType == EnterpriseBoardType.factory) {
       if ((_normalizedText(_profileTwoController.text)) == null) {
         missing.add(_profileLabelTwo(_boardType));
       }
-    } else if (_selectedProfileTwoOptions.isEmpty) {
+    } else if (_boardType == EnterpriseBoardType.company &&
+        _selectedProfileTwoOptions.isEmpty) {
       missing.add(_profileLabelTwo(_boardType));
     }
     if (_boardType == EnterpriseBoardType.supplier &&

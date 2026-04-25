@@ -27,6 +27,7 @@ export function readBidSubmissionSnapshotReadModel(value: unknown) {
     quoteAmount: readRequiredNumber(record.quoteAmount, 'quoteAmount'),
     proposalSummary: readRequiredString(record.proposalSummary, 'proposalSummary'),
     attachmentSummary: readLooseCarrier(record.attachmentSummary, 'attachmentSummary'),
+    attachments: readAttachmentList(record.attachments),
     availability: readLooseCarrier(record.availability, 'availability'),
   };
 }
@@ -50,6 +51,27 @@ function readBidderSummary(record: BidPayload) {
     organizationId: readRequiredString(record.organizationId, 'bidder.organizationId'),
     displayName: readRequiredString(record.displayName, 'bidder.displayName'),
     avatarUrl: readNullableString(record.avatarUrl),
+  };
+}
+
+function readAttachmentList(value: unknown) {
+  if (!Array.isArray(value)) {
+    throw new Error('Bid submission snapshot response is missing `attachments`.');
+  }
+  return value.map((item, index) =>
+    readAttachmentItem(
+      requireRecord(item, `Bid submission snapshot attachments[${index}] must be an object.`),
+    ),
+  );
+}
+
+function readAttachmentItem(record: BidPayload) {
+  return {
+    slotKey: readRequiredString(record.slotKey, 'attachments.slotKey'),
+    slotLabel: readRequiredString(record.slotLabel, 'attachments.slotLabel'),
+    fileAssetId: readRequiredString(record.fileAssetId, 'attachments.fileAssetId'),
+    fileKind: readRequiredString(record.fileKind, 'attachments.fileKind'),
+    mimeType: readRequiredString(record.mimeType, 'attachments.mimeType'),
   };
 }
 

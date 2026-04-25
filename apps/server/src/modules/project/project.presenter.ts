@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { ProjectEntity } from './entities/project.entity';
+import { ProjectNameAccessProjection } from '../project_name_access/project-name-access.types';
 
 @Injectable()
 export class ProjectPresenter {
@@ -11,16 +12,24 @@ export class ProjectPresenter {
     return { projectId, state: 'deleted' };
   }
 
-  toListResponse(projects: ProjectEntity[], page: number, pageSize: number, total: number) {
+  toListResponse(
+    projects: ProjectEntity[],
+    page: number,
+    pageSize: number,
+    total: number,
+    accessProjectionByProjectId: Map<string, ProjectNameAccessProjection> = new Map(),
+  ) {
     return {
-      items: projects.map((project) => this.toShowcaseListItem(project)),
+      items: projects.map((project) =>
+        this.toShowcaseListItem(project, accessProjectionByProjectId.get(project.id)),
+      ),
       pagination: this.toPagination(page, pageSize, total)
     };
   }
 
-  toReadModel(project: ProjectEntity) {
+  toReadModel(project: ProjectEntity, accessProjection?: ProjectNameAccessProjection) {
     return {
-      ...this.toShowcaseListItem(project),
+      ...this.toShowcaseListItem(project, accessProjection),
       buildingTypeRemark: this.toNullableText(project.buildingTypeRemark),
       provinceCode: this.toNullableText(project.provinceCode),
       provinceName: this.toNullableText(project.provinceName),
@@ -37,13 +46,15 @@ export class ProjectPresenter {
     };
   }
 
-  toShowcaseListItem(project: ProjectEntity) {
+  toShowcaseListItem(project: ProjectEntity, accessProjection?: ProjectNameAccessProjection) {
+    const access = accessProjection ?? this.toVisibleProjection(project);
     return {
       projectId: project.id,
       projectNo: project.projectNo,
-      title: project.title,
-      exhibitionName: this.toNullableText(project.exhibitionName),
-      brandName: this.toNullableText(project.brandName),
+      title: access.title,
+      displayTitle: access.displayTitle,
+      exhibitionName: access.exhibitionName,
+      brandName: access.brandName,
       buildingType: project.buildingType,
       budgetAmount: Number(project.budgetAmount),
       areaSqm: this.toNullableNumber(project.areaSqm),
@@ -54,7 +65,26 @@ export class ProjectPresenter {
       plannedStartAt: this.toNullableDate(project.plannedStartAt),
       plannedEndAt: this.toNullableDate(project.plannedEndAt),
       state: project.state,
+      nameAccess: {
+        status: access.nameAccess.status,
+        canRequest: access.nameAccess.canRequest,
+        requestId: access.nameAccess.requestId,
+      },
       summary: this.toSummary(project.summary, project.state)
+    };
+  }
+
+  private toVisibleProjection(project: ProjectEntity): ProjectNameAccessProjection {
+    return {
+      displayTitle: this.toNullableText(project.exhibitionName) ?? project.title,
+      title: project.title,
+      exhibitionName: this.toNullableText(project.exhibitionName),
+      brandName: this.toNullableText(project.brandName),
+      nameAccess: {
+        status: 'visible',
+        canRequest: false,
+        requestId: null,
+      },
     };
   }
 

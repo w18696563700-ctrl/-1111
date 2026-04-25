@@ -20,6 +20,7 @@ class _ExhibitionLoadService {
     ExhibitionCanonicalPaths.contractDetail,
     ExhibitionCanonicalPaths.inspectionDetail,
     ExhibitionCanonicalPaths.ratingEntry,
+    ExhibitionCanonicalPaths.projectCounterpartyRatingEntry,
     ExhibitionCanonicalPaths.bidResult,
     ExhibitionCanonicalPaths.projectPublicResources,
   };
@@ -117,6 +118,7 @@ class _ExhibitionLoadService {
 
   Future<ExhibitionLoadResult> loadOrderDetail({
     required String? orderId,
+    String? projectId,
     bool forceRefresh = false,
   }) async {
     final normalized = _normalize(orderId);
@@ -126,10 +128,14 @@ class _ExhibitionLoadService {
         queryName: 'orderId',
       );
     }
+    final normalizedProjectId = _normalize(projectId);
 
     return _loadGet(
       ExhibitionCanonicalPaths.orderDetail,
-      queryParameters: <String, String>{'orderId': normalized},
+      queryParameters: <String, String>{
+        'orderId': normalized,
+        if (normalizedProjectId != null) 'projectId': normalizedProjectId,
+      },
       forceRefresh: forceRefresh,
     );
   }
@@ -206,6 +212,45 @@ class _ExhibitionLoadService {
     return _loadGet(
       ExhibitionCanonicalPaths.ratingEntry,
       queryParameters: <String, String>{'orderId': normalized},
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectCounterpartyRatingEntry({
+    required String? orderId,
+    required String? projectId,
+    required String? rateeOrganizationId,
+    bool forceRefresh = false,
+  }) async {
+    final normalizedOrderId = _normalize(orderId);
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedRateeId = _normalize(rateeOrganizationId);
+    if (normalizedOrderId == null) {
+      return _missingQueryResult(
+        path: ExhibitionCanonicalPaths.projectCounterpartyRatingEntry,
+        queryName: 'orderId',
+      );
+    }
+    if (normalizedProjectId == null) {
+      return _missingQueryResult(
+        path: ExhibitionCanonicalPaths.projectCounterpartyRatingEntry,
+        queryName: 'projectId',
+      );
+    }
+    if (normalizedRateeId == null) {
+      return _missingQueryResult(
+        path: ExhibitionCanonicalPaths.projectCounterpartyRatingEntry,
+        queryName: 'rateeOrganizationId',
+      );
+    }
+
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectCounterpartyRatingEntry,
+      queryParameters: <String, String>{
+        'orderId': normalizedOrderId,
+        'projectId': normalizedProjectId,
+        'rateeOrganizationId': normalizedRateeId,
+      },
       forceRefresh: forceRefresh,
     );
   }

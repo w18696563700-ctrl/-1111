@@ -14,4 +14,17 @@ export class MessageInteractionController {
   ) {
     return this.queryService.listInteractions(lane, resolveRequestContext(headers));
   }
+
+  @Get('counterpart-conversation/detail')
+  getCounterpartConversationDetail(
+    @Query('conversationId') conversationId: string | undefined,
+    @Query('projectId') projectId: string | undefined,
+    @Headers() headers: HeaderBag,
+  ) {
+    return this.queryService.getCounterpartConversationDetail(
+      conversationId,
+      projectId,
+      resolveRequestContext(headers),
+    );
+  }
 }

@@ -14,6 +14,13 @@ String _frontStageStateLabel(String state) {
     'archived' => '已归档',
     'won' => '已中标',
     'active' => '进行中',
+    'completed' => '已完成',
+    'cancelled' => '已取消',
+    'none' => '未申请完工',
+    'requested' => '待发布方确认完工',
+    'rejected' => '已拒绝完工',
+    'dispute_reserved' => '已预留争议',
+    'confirmed' => '已确认完工',
     'pending_submission' => '待提交',
     'pending_confirm' => '待确认',
     'draft' => '草稿',
@@ -49,6 +56,8 @@ String _frontStageLoadMessage({required String path}) {
     ExhibitionCanonicalPaths.milestoneList => '里程碑清单已经到位，现在可以选择当前要推进的里程碑。',
     ExhibitionCanonicalPaths.ratingEntry =>
       '评价入口已经到位，可以先确认当前订单是否已承接评价锚点，再决定是否提交。',
+    ExhibitionCanonicalPaths.projectCounterpartyRatingEntry =>
+      '双方互评入口已经到位，可以先确认当前订单、项目与被评主体三锚点，再决定是否提交。',
     _ => '当前链路已经进入可继续状态，可以按下方动作继续推进。',
   };
 }
@@ -65,10 +74,18 @@ String _frontStageSuccessMessage({required String path}) {
     ExhibitionCanonicalPaths.projectClose => '项目已经下架关闭，后续只保留归档查看入口。',
     ExhibitionCanonicalPaths.bidAward =>
       '当前定标桥接已受理，页面会同步刷新项目详情与我的项目，并继续保留最小结果承接。',
+    ExhibitionCanonicalPaths.bidSelectAndCreateOrder =>
+      '合作方选择已受理，页面会同步刷新项目详情与我的项目，并继续以订单详情承接后续状态。',
     ExhibitionCanonicalPaths.contractConfirm =>
       '合同确认已受理，页面会继续回显最新合同状态，并同步刷新我的项目与项目工作台。',
     ExhibitionCanonicalPaths.contractAmend =>
       '合同改单已受理，页面会继续回显最新合同状态，并同步刷新我的项目与项目工作台。',
+    ExhibitionCanonicalPaths.orderCompleteRequest =>
+      '完工申请已受理，页面会继续回显订单状态，并等待发布方确认。',
+    ExhibitionCanonicalPaths.orderCompleteConfirm =>
+      '完工确认已受理，订单会进入完成链路；后续双方互评仍以后端评价入口为准。',
+    ExhibitionCanonicalPaths.orderCompleteReject =>
+      '完工拒绝已受理，订单会继续停留在受控沟通状态；是否进入争议以后端结果为准。',
     ExhibitionCanonicalPaths.bidSubmit => '竞标已经提交完成，下一步可以回看项目详情。',
     ExhibitionCanonicalPaths.milestoneSubmit =>
       '当前里程碑提交入口已受理，后续可以继续查看验收详情；这不代表里程碑 truth 已在本页推进。',
@@ -78,6 +95,8 @@ String _frontStageSuccessMessage({required String path}) {
       '当前验收复检入口已受理，页面会继续回显最新验收状态，并同步刷新项目工作台。',
     ExhibitionCanonicalPaths.ratingSubmit =>
       '当前评价提交入口已受理，页面会同步刷新我的项目与项目工作台，并继续保留最小结果承接。',
+    ExhibitionCanonicalPaths.projectCounterpartyRatingSubmit =>
+      '当前双方互评已提交，页面会刷新评价入口、订单与我的项目缓存；信用联动以后端为准。',
     ExhibitionCanonicalPaths.disputeOpen =>
       '当前争议开启入口已受理，后续仍停留在边界续接；这不代表争议 truth 已创建。',
     ExhibitionCanonicalPaths.disputeWithdraw =>
@@ -245,17 +264,35 @@ String _userFacingActionFailureMessage(ExhibitionActionResult result) {
 
 String? _controlledBusinessFailureMessage({required String? errorCode}) {
   return switch (errorCode) {
+    'AUTH_SESSION_INVALID' => '当前登录状态已失效，请重新登录后再继续当前动作。',
+    'AUTH_PERMISSION_INSUFFICIENT' => '当前账号没有权限执行这一步。请确认是否使用项目或订单所属组织账号进入。',
+    'AUTH_RESOURCE_UNAVAILABLE' => '当前资源暂时不可见。请确认入口是否来自当前项目、订单或组织上下文。',
+    'IDEMPOTENCY_KEY_CONFLICT' => '当前动作已被相同幂等键处理或正在处理，请刷新状态后再判断是否需要继续。',
     'PROJECT_WITHDRAW_INVALID' => '当前项目尚未提交，暂不支持撤回到草稿。',
     'PROJECT_ARCHIVE_INVALID' => '当前项目尚未提交，暂不支持作废归档。',
     'PROJECT_CLOSE_INVALID' => '当前项目状态暂不支持下架关闭。',
+    'BID_DUPLICATE_SUBMISSION' => '当前项目已提交过竞标，本页不再重复提交。请回到项目详情查看最新竞标状态。',
     'BID_AWARD_INVALID' => '当前定标参数未通过校验。请回到我的项目详情确认中标投标 ID 与定标原因后再试。',
     'BID_AWARD_INVALID_STATE' => '当前项目状态暂时不能继续定标。请先回到我的项目详情确认项目是否已进入后续链路。',
     'BID_AWARD_DUPLICATE' => '当前项目已经处理过定标，本页不再重复提交。你可以先查看项目详情或我的项目中的最新状态。',
     'BID_AWARD_CONCURRENT_CONFLICT' => '当前项目的定标正在被其他操作处理。请稍后重新读取项目状态，再决定是否继续。',
     'ORDER_CONVERSION_FAILED' => '当前定标已受理，但订单承接暂未完成。请稍后重新读取项目详情或我的项目。',
+    'PROJECT_ORDER_COMPLETE_INVALID' => '当前完工动作参数未通过校验。请重新读取订单后再试。',
+    'PROJECT_ORDER_COMPLETE_UNAVAILABLE' => '当前订单暂不可执行完工动作。请确认订单是否仍属于当前账号。',
+    'PROJECT_ORDER_COMPLETE_INVALID_STATE' =>
+      '当前订单状态暂不支持这个完工动作。请先刷新订单状态，确认是否已有待确认完工申请。',
+    'ORDER_INVALID_STATE' => '当前订单状态暂不支持这一步。请刷新订单详情后再继续。',
     'CONTRACT_SEED_FAILED' => '当前定标已受理，但合同承接暂未完成。请稍后重新读取项目详情或我的项目。',
     'BID_RESULT_INVALID' => '当前项目暂时不能读取竞标结果。请先确认是否从有效项目继续进入。',
     'BID_RESULT_UNAVAILABLE' => '当前竞标结果暂未开放读取。请稍后再试，或先回到项目详情确认当前状态。',
+    'PROJECT_COUNTERPARTY_RATING_INVALID' =>
+      '当前互评参数未通过校验。请从已完成订单或项目沟通头像入口重新进入。',
+    'PROJECT_COUNTERPARTY_RATING_FORBIDDEN' =>
+      '当前账号不能评价该订单对方主体。请确认订单、项目和被评主体是否都属于当前账号可操作范围。',
+    'PROJECT_COUNTERPARTY_RATING_UNAVAILABLE' => '当前订单暂未开放双方互评。只有订单完成后才可以评价对方。',
+    'PROJECT_COUNTERPARTY_RATING_DUPLICATE' =>
+      '当前双方互评已经提交过，本页不再重复提交。请刷新状态查看最新评价结果。',
+    'RATING_INVALID_STATE' => '当前评价状态暂不支持提交。请刷新订单或评价入口后再继续。',
     _ => null,
   };
 }
@@ -321,8 +358,10 @@ String _missingInstanceMessageForPath(String path) {
     ExhibitionCanonicalPaths.inspectionRecheck =>
       '当前入口还没有承接到所需里程碑或验收实例，这一页暂时不能继续。你现在可以先回到里程碑或验收详情，再从已承接里程碑重新进入。',
     ExhibitionCanonicalPaths.ratingEntry ||
-    ExhibitionCanonicalPaths.ratingSubmit =>
-      '当前入口还没有承接到所需订单或评价锚点，这一页暂时不能继续。你现在可以先回到订单详情，再从已承接订单重新进入。',
+    ExhibitionCanonicalPaths.ratingSubmit ||
+    ExhibitionCanonicalPaths.projectCounterpartyRatingEntry ||
+    ExhibitionCanonicalPaths.projectCounterpartyRatingSubmit =>
+      '当前入口还没有承接到所需订单、项目或被评主体锚点，这一页暂时不能继续。你现在可以先回到项目沟通头像入口，再从已完成订单重新进入。',
     ExhibitionCanonicalPaths.bidAward =>
       '当前入口还没有承接到所需项目或定标参数，这一页暂时不能继续。你现在可以先回到我的项目详情，再从当前项目重新进入。',
     ExhibitionCanonicalPaths.bidResult =>

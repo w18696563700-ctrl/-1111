@@ -19,6 +19,20 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   final TextEditingController _quoteAmountController = TextEditingController();
   final TextEditingController _proposalSummaryController =
       TextEditingController();
+  final TextEditingController _p0PayQuoteValidUntilController =
+      TextEditingController();
+  final TextEditingController _p0PayMaterialDescriptionController =
+      TextEditingController();
+  final TextEditingController _p0PayCraftDescriptionController =
+      TextEditingController();
+  final TextEditingController _p0PayBuildProcessController =
+      TextEditingController();
+  final TextEditingController _p0PayDeliveryMilestonesController =
+      TextEditingController();
+  final TextEditingController _p0PayRiskNotesController =
+      TextEditingController();
+  final TextEditingController _p0PayAttachmentFileAssetIdsController =
+      TextEditingController();
   late final List<_BidSubmitAttachmentSlotState> _attachmentSlots =
       _createBidSubmitAttachmentSlots();
 
@@ -38,6 +52,19 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   bool _resultLoading = false;
   bool _bidFlowExpanded = false;
   final Set<String> _openingBidMaterialIds = <String>{};
+  bool _p0PaySubmitting = false;
+  bool _p0PayTaxIncluded = true;
+  bool _p0PayTransportIncluded = true;
+  bool _p0PayInstallationIncluded = true;
+  bool _p0PayReadRuleConfirmed = false;
+  bool _p0PayAuthorizationAwarenessConfirmed = false;
+  bool _p0PayPublisherBreachReleaseConfirmed = false;
+  String _p0PayAuthorizationChannel = 'alipay_candidate';
+  ExhibitionActionResult? _p0PayFixedPriceBidResult;
+  ExhibitionActionResult? _p0PayAuthorizationResult;
+  ExhibitionActionResult? _p0PayAuthorizationInitResult;
+  ExhibitionLoadResult? _p0PayAuthorizationStatusResult;
+  P0PayPaymentPollResult? _p0PayAuthorizationPollResult;
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
 
@@ -91,6 +118,13 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     _projectIdController.dispose();
     _quoteAmountController.dispose();
     _proposalSummaryController.dispose();
+    _p0PayQuoteValidUntilController.dispose();
+    _p0PayMaterialDescriptionController.dispose();
+    _p0PayCraftDescriptionController.dispose();
+    _p0PayBuildProcessController.dispose();
+    _p0PayDeliveryMilestonesController.dispose();
+    _p0PayRiskNotesController.dispose();
+    _p0PayAttachmentFileAssetIdsController.dispose();
     super.dispose();
   }
 
@@ -303,30 +337,37 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
             result: result,
             projectId: projectId,
           ),
-      body: _buildBidSubmitBody(
-        context: context,
-        routeProjectId: routeProjectId,
-        guardLoading: _guardLoading,
-        accessGuard: _accessGuard,
-        flowExpanded: _bidFlowExpanded,
-        showContinueBidFlowAction: showContinueBidFlowAction,
-        canContinueBidFlow: canContinueBidFlow,
-        onContinueBidFlow: _continueBidFlow,
-        projectDetailResult: _projectDetailResult,
-        bidMaterialResult: _bidMaterialResult,
-        quoteAmountController: _quoteAmountController,
-        proposalSummaryController: _proposalSummaryController,
-        submitting: _submitting,
-        attachmentSlots: _attachmentSlots,
-        openingBidMaterialIds: _openingBidMaterialIds,
-        quoteAmountFieldKey: _quoteAmountFieldKey,
-        proposalSummaryFieldKey: _proposalSummaryFieldKey,
-        onUploadAttachment: _uploadBidSubmitAttachment,
-        onPreviewBidMaterial: _previewBidMaterial,
-        onRetryBidMaterials: () => _loadBidMaterials(forceRefresh: true),
-        onPreviewAttachment: (slot) =>
-            _BidSubmitAttachmentPreviewActions(this).previewAttachment(slot),
-      ),
+      body:
+          _buildBidSubmitBody(
+            context: context,
+            routeProjectId: routeProjectId,
+            guardLoading: _guardLoading,
+            accessGuard: _accessGuard,
+            flowExpanded: _bidFlowExpanded,
+            showContinueBidFlowAction: showContinueBidFlowAction,
+            canContinueBidFlow: canContinueBidFlow,
+            onContinueBidFlow: _continueBidFlow,
+            projectDetailResult: _projectDetailResult,
+            bidMaterialResult: _bidMaterialResult,
+            quoteAmountController: _quoteAmountController,
+            proposalSummaryController: _proposalSummaryController,
+            submitting: _submitting,
+            attachmentSlots: _attachmentSlots,
+            openingBidMaterialIds: _openingBidMaterialIds,
+            quoteAmountFieldKey: _quoteAmountFieldKey,
+            proposalSummaryFieldKey: _proposalSummaryFieldKey,
+            onUploadAttachment: _uploadBidSubmitAttachment,
+            onPreviewBidMaterial: _previewBidMaterial,
+            onRetryBidMaterials: () => _loadBidMaterials(forceRefresh: true),
+            onPreviewAttachment: (slot) => _BidSubmitAttachmentPreviewActions(
+              this,
+            ).previewAttachment(slot),
+          )..addAll(<Widget>[
+            if (_bidFlowExpanded && !_guardLoading && _accessGuard == null) ...[
+              const SizedBox(height: 16),
+              _buildP0PayFixedPriceBidAuthorizationSection(),
+            ],
+          ]),
     );
   }
 

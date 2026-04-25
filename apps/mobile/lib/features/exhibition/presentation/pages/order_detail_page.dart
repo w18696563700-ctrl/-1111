@@ -1,9 +1,10 @@
 part of '../exhibition_trade_pages.dart';
 
 class OrderDetailPage extends StatefulWidget {
-  const OrderDetailPage({super.key, this.orderId});
+  const OrderDetailPage({super.key, this.orderId, this.projectId});
 
   final String? orderId;
+  final String? projectId;
 
   @override
   State<OrderDetailPage> createState() => _OrderDetailPageState();
@@ -15,6 +16,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         futureRealLoader: ({bool forceRefresh = false}) {
           return ExhibitionConsumerLayer.instance.loadOrderDetail(
             orderId: widget.orderId,
+            projectId: widget.projectId,
             forceRefresh: forceRefresh,
           );
         },
@@ -68,8 +70,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
     return _LoadPageFrame(
       title: '订单详情',
-      summary:
-          '这里只读承接当前订单结果。页面会先讲清订单当前状态，并在需要时继续进入合同详情或最小评价入口；履约与争议不在这里直接放开。',
+      summary: '这里承接当前订单状态，并按发布方/承接方角色开放最小完工申请与确认动作；订单真值仍以后端为准。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -99,7 +100,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final payload = _payloadMap(result.payload);
     final orderId = _orderIdFromPayload(result.payload) ?? routeOrderId;
     final orderNo = _normalizeId(payload?['orderNo'] as String?);
-    final projectId = _normalizeId(payload?['projectId'] as String?);
+    final projectId =
+        _normalizeId(payload?['projectId'] as String?) ??
+        _normalizeId(widget.projectId);
     final bidId = _normalizeId(payload?['bidId'] as String?);
     final orderState = _normalizeId(payload?['state'] as String?);
     final summary = payload?['summary'];
@@ -118,7 +121,23 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         summary,
       ),
       const SizedBox(height: 16),
-      _buildReadOnlyContinuationCard(context, orderId),
+      _OrderStatusCard(
+        orderId: orderId,
+        projectId: projectId,
+        initialResult: result,
+        placement: _OrderStatusPlacement.orderDetail,
+        onChanged: () => _load(forceRefresh: true),
+      ),
+      const SizedBox(height: 16),
+      _buildReadOnlyContinuationCard(
+        context,
+        _EffectiveOrderStatus.from(
+          payload: payload ?? const <String, Object?>{},
+          actionPayload: null,
+          fallbackOrderId: orderId,
+          fallbackProjectId: projectId,
+        ),
+      ),
     ];
   }
 
@@ -132,7 +151,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   ) {
     return _ActionCard(
       title: '订单概览',
-      summary: '当前页先帮助你判断订单是否处于稳定可回看状态，并明确这轮只读承接还能继续到哪里。',
+      summary: '当前页先帮助你判断订单是否处于稳定可回看状态，完工动作由下方订单状态卡承接。',
       tone: _ActionCardTone.emphasis,
       eyebrow: '当前订单',
       children: <Widget>[
@@ -162,13 +181,17 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         const SizedBox(height: 12),
         const _DetailLine(
           label: '当前页面边界',
-          value: '当前页只承担订单读取与合同详情导流，不承担履约推进、争议处理或提交动作。',
+          value: '当前页只提交订单完成命令，不在 Flutter 本地生成订单完成、争议或评价真值。',
         ),
       ],
     );
   }
 
-  Widget _buildReadOnlyContinuationCard(BuildContext context, String orderId) {
+  Widget _buildReadOnlyContinuationCard(
+    BuildContext context,
+    _EffectiveOrderStatus order,
+  ) {
+    final ratingRoute = _projectCounterpartyRatingRouteForOrder(context, order);
     return _ActionCard(
       title: '当前可继续',
       summary: '订单详情当前只保留读侧续接。需要查看合同时，可继续进入合同详情；其余链路继续保持边界提示。',
@@ -181,21 +204,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
         const SizedBox(height: 12),
         FilledButton.tonal(
           onPressed: () {
-            Navigator.of(
-              context,
-            ).pushNamed(ExhibitionRoutes.contractDetailWithOrderId(orderId));
+            Navigator.of(context).pushNamed(
+              ExhibitionRoutes.contractDetailWithOrderId(order.orderId),
+            );
           },
           child: const Text('查看合同详情'),
         ),
         const SizedBox(height: 12),
-        FilledButton.tonal(
-          onPressed: () {
-            Navigator.of(
-              context,
-            ).pushNamed(ExhibitionRoutes.ratingEntryWithOrderId(orderId));
-          },
-          child: const Text('查看评价入口'),
-        ),
+        if (ratingRoute != null)
+          FilledButton.tonal(
+            onPressed: () {
+              Navigator.of(context).pushNamed(ratingRoute);
+            },
+            child: const Text('查看双方互评入口'),
+          )
+        else
+          const _StateMessage(
+            title: '双方互评暂不可从订单页进入',
+            body:
+                '当前订单未完成，或读模型缺少 projectId、buyer/sellerOrganizationId、当前账号组织锚点；请从项目沟通头像主体卡进入评价，避免本地推断被评主体。',
+          ),
         const SizedBox(height: 12),
         const _EmptyNotice(
           title: '当前不在这里开放',

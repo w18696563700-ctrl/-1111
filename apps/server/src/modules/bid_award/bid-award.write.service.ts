@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
@@ -8,6 +8,7 @@ import { createContractSeed } from '../contract/contract.seed';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { authPermissionInsufficient, authResourceUnavailable } from '../organization/organization-auth.errors';
 import { createOrderSeed } from '../order/order.seed';
+import { BidAwardFulfillmentSeedService } from './bid-award-fulfillment-seed.service';
 import { BidAwardPresenter } from './bid-award.presenter';
 import {
   bidAwardConcurrentConflict,
@@ -68,10 +69,16 @@ export class BidAwardWriteService {
     private readonly dataSource: DataSource,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
-    private readonly presenter: BidAwardPresenter
+    private readonly presenter: BidAwardPresenter,
+    @Optional()
+    private readonly fulfillmentSeedService?: BidAwardFulfillmentSeedService
   ) {}
 
   async award(payload: Record<string, unknown>, context: RequestContext) {
+    return this.selectBidAndCreateOrder(payload, context);
+  }
+
+  async selectBidAndCreateOrder(payload: Record<string, unknown>, context: RequestContext) {
     const command = this.toAwardCommand(payload);
     const { currentSession, scope } =
       await this.eligibilityService.requireProjectPublishEligibilityFromContext(
@@ -133,6 +140,10 @@ export class BidAwardWriteService {
 
       await this.insertOrder(manager, orderSeed);
       await this.insertContract(manager, contractSeed);
+      await this.fulfillmentSeedService?.seedDefaultFulfillment(manager, {
+        project,
+        order: orderSeed
+      });
       await this.updateBidResults(manager, project.id, winningBid.id);
       await this.updateProjectAwardTruth(manager, project.id, writeBidAwardTruth(project.summary, award));
       await auditRepository.save({

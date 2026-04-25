@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { TradingShellFulfillmentProgressService } from './trading-shell-fulfillment-progress.service';
 import { TradingShellHandoffController } from './trading-shell-handoff.controller';
 import { TradingShellHandoffPresenter } from './trading-shell-handoff.presenter';
 import { TradingShellHandoffService } from './trading-shell-handoff.service';
@@ -14,6 +15,10 @@ import { TradingShellHandoffService } from './trading-shell-handoff.service';
     OrganizationModule,
   ],
   controllers: [TradingShellHandoffController],
-  providers: [TradingShellHandoffPresenter, TradingShellHandoffService],
+  providers: [
+    TradingShellFulfillmentProgressService,
+    TradingShellHandoffPresenter,
+    TradingShellHandoffService,
+  ],
 })
 export class TradingShellHandoffModule {}

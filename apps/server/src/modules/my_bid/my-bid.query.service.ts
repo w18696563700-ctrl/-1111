@@ -4,11 +4,18 @@ import { In, Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import {
+  bidSubmissionAttachmentSlots,
+  buildBidSubmissionSnapshotAttachments,
+} from '../bid/bid-submission-attachment.support';
 import { BidEntity } from '../bid/entities/bid.entity';
+import { UserEntity } from '../identity/entities/user.entity';
 import { BidPrivateThreadEntity } from '../trading_im/entities/bid-private-thread.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { FileAssetEntity } from '../upload/entities/file-asset.entity';
+import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { MyBidPresenter } from './my-bid.presenter';
 import { myBidsForbidden, myBidsInvalid, myBidsUnavailable } from './my-bid.errors';
 
@@ -25,8 +32,13 @@ export class MyBidQueryService {
     private readonly threadRepository: Repository<BidPrivateThreadEntity>,
     @InjectRepository(OrganizationEntity)
     private readonly organizationRepository: Repository<OrganizationEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
+    @InjectRepository(FileAssetEntity)
+    private readonly fileAssetRepository: Repository<FileAssetEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly avatarUrlService: UploadPublicUrlService,
     private readonly presenter: MyBidPresenter,
   ) {}
 
@@ -125,30 +137,100 @@ export class MyBidQueryService {
       throw myBidsForbidden('Current actor cannot access the bid submission snapshot.');
     }
 
-    const bidderOrganization =
-      (await this.organizationRepository.findOneBy({
-        id: bid.bidderOrganizationId || bid.organizationId,
-      })) ?? null;
+    const bidderOrganizationId = bid.bidderOrganizationId || bid.organizationId;
+    const [bidderOrganization, bidderUser] = await Promise.all([
+      this.organizationRepository.findOneBy({
+        id: bidderOrganizationId,
+      }),
+      bid.userId?.trim()
+        ? this.userRepository.findOneBy({ id: bid.userId.trim() })
+        : Promise.resolve(null),
+    ]);
+    const attachments = await this.loadSnapshotAttachments(bid);
 
     return this.presenter.toSnapshot({
       projectId,
       bidId,
       bidder: {
-        organizationId: bid.bidderOrganizationId || bid.organizationId,
+        organizationId: bidderOrganizationId,
         displayName: bidderOrganization?.name ?? '当前竞标方',
-        avatarUrl: null,
+        avatarUrl: await this.readAvatarUrl(bidderUser?.avatarUrl ?? null),
       },
       submittedAt: bid.submittedAt,
       quoteAmount: Number(bid.quoteAmount),
       proposalSummary: bid.proposalSummary,
-      attachmentSummary: { count: 0 },
+      attachmentSummary: { count: attachments.length },
+      attachments,
       availability: {
         canOpenBidThread: true,
         canOpenBidResult: this.canOpenBidResult(project, bid),
         snapshotReadable: true,
+        participantCardReadable: true,
         reason: 'participant_allowed',
       },
     });
+  }
+
+  private async loadSnapshotAttachments(bid: BidEntity) {
+    const ids = [
+      bid.projectUnderstandingFileAssetId,
+      bid.quoteSheetFileAssetId,
+      bid.schedulePlanFileAssetId,
+    ]
+      .map((item) => item?.trim() ?? '')
+      .filter((item) => item.length > 0);
+    if (ids.length) {
+      const fileAssets = await this.fileAssetRepository.findBy({ id: In(ids) });
+      if (fileAssets.length !== ids.length) {
+        throw myBidsUnavailable('Current bid submission attachments are unavailable.');
+      }
+      return buildBidSubmissionSnapshotAttachments(
+        bid,
+        new Map(fileAssets.map((item) => [item.id, item])),
+      );
+    }
+    return this.loadLegacySnapshotAttachments(bid);
+  }
+
+  private async loadLegacySnapshotAttachments(bid: BidEntity) {
+    const bidderOrganizationId =
+      bid.bidderOrganizationId?.trim() || bid.organizationId?.trim() || '';
+    if (!bidderOrganizationId) {
+      return [];
+    }
+    const legacyAssets = await this.fileAssetRepository.find({
+      where: {
+        organizationId: bidderOrganizationId,
+        businessType: 'project',
+        businessId: bid.projectId,
+        fileKind: In(bidSubmissionAttachmentSlots.map((slot) => slot.fileKind)),
+      },
+      order: { createdAt: 'DESC' },
+    });
+    if (!legacyAssets.length) {
+      return [];
+    }
+    const resolvedBySlot = new Map<string, FileAssetEntity>();
+    for (const slot of bidSubmissionAttachmentSlots) {
+      const matched = legacyAssets.find(
+        (item) => item.fileKind === slot.fileKind && item.createdAt <= bid.submittedAt,
+      );
+      if (!matched) {
+        return [];
+      }
+      resolvedBySlot.set(slot.bidField, matched);
+    }
+    const legacyBid = {
+      ...bid,
+      projectUnderstandingFileAssetId:
+        resolvedBySlot.get('projectUnderstandingFileAssetId')?.id ?? null,
+      quoteSheetFileAssetId: resolvedBySlot.get('quoteSheetFileAssetId')?.id ?? null,
+      schedulePlanFileAssetId: resolvedBySlot.get('schedulePlanFileAssetId')?.id ?? null,
+    } satisfies BidEntity;
+    return buildBidSubmissionSnapshotAttachments(
+      legacyBid,
+      new Map(legacyAssets.map((item) => [item.id, item])),
+    );
   }
 
   private readFilter(value: string | undefined): MyBidFilter {
@@ -184,6 +266,14 @@ export class MyBidQueryService {
       return project.state;
     }
     return 'submitted';
+  }
+
+  private async readAvatarUrl(value: string | null) {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+      return null;
+    }
+    return (await this.avatarUrlService.buildAccessUrlFromObjectUrl(normalized)) ?? normalized;
   }
 
   private canOpenBidResult(project: ProjectEntity, bid: BidEntity) {

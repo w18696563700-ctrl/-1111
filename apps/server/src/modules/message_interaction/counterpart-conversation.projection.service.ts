@@ -1,0 +1,406 @@
+import { Injectable } from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { In, Repository } from 'typeorm';
+import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
+import { buildProjectDisplayTitle } from '../project_name_access/project-name-access.support';
+import { messageInteractionUnavailable } from './message-interaction.errors';
+import { CounterpartConversationBidThreadSource } from './counterpart-conversation.bid-thread-source';
+import { CounterpartConversationClarificationSource } from './counterpart-conversation.clarification-source';
+import { CounterpartConversationProjectNameAccessSource } from './counterpart-conversation.project-name-access-source';
+import {
+  CounterpartConversationCardSeed,
+  CounterpartConversationCardSource,
+} from './counterpart-conversation.seed';
+import {
+  CounterpartConversationBusinessCardProjection,
+  CounterpartConversationDetailProjection,
+  CounterpartConversationListItemProjection,
+  CounterpartConversationProjectGroupProjection,
+  CounterpartConversationRatingEntryProjection,
+} from './counterpart-conversation.types';
+import { buildCounterpartConversationRouteTarget } from './counterpart-conversation.support';
+
+type ConversationAggregate = {
+  conversationId: string;
+  counterpart: CounterpartConversationDetailProjection['counterpart'];
+  summary: CounterpartConversationDetailProjection['summary'];
+  focusProjectId: string;
+  p0PaySummary?: Record<string, unknown>;
+  latestActivityAt: string;
+  projectGroups: CounterpartConversationProjectGroupProjection[];
+};
+
+type RatingOrderRow = {
+  orderId: string;
+  projectId: string;
+  buyerOrganizationId: string;
+  supplierOrganizationId: string | null;
+  orderState: string | null;
+  ratingState: string | null;
+};
+
+type ProjectGroupAggregate = {
+  latestActivityAt: string;
+  p0PaySummary?: Record<string, unknown>;
+  cards: CounterpartConversationBusinessCardProjection[];
+};
+
+type SeedConversationAggregate = {
+  counterpart: CounterpartConversationDetailProjection['counterpart'];
+  latestActivityAt: string;
+  projectGroups: Map<string, ProjectGroupAggregate>;
+};
+
+@Injectable()
+export class CounterpartConversationProjectionService {
+  private readonly cardSources: CounterpartConversationCardSource[];
+
+  constructor(
+    @InjectRepository(ProjectEntity)
+    private readonly projectRepository: Repository<ProjectEntity>,
+    private readonly projectNameAccessProjectionService: ProjectNameAccessProjectionService,
+    bidThreadSource: CounterpartConversationBidThreadSource,
+    projectNameAccessSource: CounterpartConversationProjectNameAccessSource,
+    clarificationSource: CounterpartConversationClarificationSource,
+  ) {
+    this.cardSources = [
+      bidThreadSource,
+      projectNameAccessSource,
+      clarificationSource,
+    ];
+  }
+
+  async listConversations(
+    viewerOrganizationId: string,
+  ): Promise<CounterpartConversationListItemProjection[]> {
+    const catalog = await this.buildConversationCatalog(viewerOrganizationId);
+    return catalog.map((conversation) => ({
+      interactionId: conversation.conversationId,
+      interactionType: 'counterpart_conversation',
+      conversationId: conversation.conversationId,
+      projectId: conversation.focusProjectId,
+      counterpart: conversation.counterpart,
+      summary: conversation.summary,
+      ...(conversation.p0PaySummary ? { p0PaySummary: conversation.p0PaySummary } : {}),
+      updatedAt: conversation.latestActivityAt,
+      routeTarget: buildCounterpartConversationRouteTarget({
+        conversationId: conversation.conversationId,
+        projectId: conversation.focusProjectId,
+      }),
+    }));
+  }
+
+  async getConversationDetail(input: {
+    viewerOrganizationId: string;
+    conversationId: string;
+    focusProjectId?: string;
+  }): Promise<CounterpartConversationDetailProjection> {
+    const catalog = await this.buildConversationCatalog(input.viewerOrganizationId);
+    const conversation = catalog.find(
+      (item) => item.conversationId === input.conversationId,
+    );
+    if (!conversation) {
+      throw messageInteractionUnavailable(
+        'Current counterpart conversation is unavailable.',
+      );
+    }
+
+    if (
+      input.focusProjectId &&
+      !conversation.projectGroups.some(
+        (group) => group.projectId === input.focusProjectId,
+      )
+    ) {
+      throw messageInteractionUnavailable(
+        'Current counterpart conversation project group is unavailable.',
+      );
+    }
+
+    const focusProjectId = input.focusProjectId?.trim() || conversation.focusProjectId;
+    return {
+      conversationId: conversation.conversationId,
+      counterpart: conversation.counterpart,
+      summary: conversation.summary,
+      focusProjectId,
+      latestActivityAt: conversation.latestActivityAt,
+      projectGroups: this.sortProjectGroups(conversation.projectGroups, focusProjectId),
+    };
+  }
+
+  private async buildConversationCatalog(viewerOrganizationId: string) {
+    const seeds = await this.loadCardSeeds(viewerOrganizationId);
+    if (!seeds.length) {
+      return [];
+    }
+
+    const projectIds = [...new Set(seeds.map((item) => item.projectId))];
+    const [projects, ratingEntryMap] = await Promise.all([
+      this.projectRepository.findBy({ id: In(projectIds) }),
+      this.buildRatingEntryMap(projectIds, viewerOrganizationId),
+    ]);
+    const projectMap = new Map(projects.map((item) => [item.id, item]));
+    const nameAccessProjectionMap = await this.buildNameAccessProjectionMap({
+      projects,
+      viewerOrganizationId,
+    });
+    const conversationMap = this.groupSeedsByConversation(seeds);
+
+    return [...conversationMap.entries()]
+      .map(([conversationId, aggregate]): ConversationAggregate => {
+        const projectGroups = this.buildProjectGroups({
+          aggregate,
+          projectMap,
+          nameAccessProjectionMap,
+          viewerOrganizationId,
+          ratingEntryMap,
+        });
+        const focusProject = projectGroups[0];
+        const latestCard = focusProject.cards[0];
+        return {
+          conversationId,
+          counterpart: aggregate.counterpart,
+          summary: {
+            focusProjectId: focusProject.projectId,
+            title: latestCard.title,
+            text: latestCard.summary,
+            projectCount: projectGroups.length,
+            latestCardType: latestCard.cardType,
+          },
+          focusProjectId: focusProject.projectId,
+          ...(focusProject.p0PaySummary ? { p0PaySummary: focusProject.p0PaySummary } : {}),
+          latestActivityAt: aggregate.latestActivityAt,
+          projectGroups,
+        };
+      })
+      .sort((left, right) =>
+        right.latestActivityAt.localeCompare(left.latestActivityAt),
+      );
+  }
+
+  private async loadCardSeeds(viewerOrganizationId: string) {
+    const seedGroups = await Promise.all(
+      this.cardSources.map((source) => source.buildSeeds(viewerOrganizationId)),
+    );
+    return seedGroups
+      .flat()
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt));
+  }
+
+  private async buildNameAccessProjectionMap(input: {
+    projects: ProjectEntity[];
+    viewerOrganizationId: string;
+  }) {
+    const ownerProjectIds = new Set(
+      input.projects
+        .filter((item) => item.organizationId === input.viewerOrganizationId)
+        .map((item) => item.id),
+    );
+    return this.projectNameAccessProjectionService.buildPublicProjectionMap({
+      projects: input.projects,
+      viewerOrganizationId: input.viewerOrganizationId,
+      ownerProjectIds,
+    });
+  }
+
+  private groupSeedsByConversation(seeds: CounterpartConversationCardSeed[]) {
+    const conversationMap = new Map<
+      string,
+      SeedConversationAggregate
+    >();
+
+    for (const seed of seeds) {
+      const aggregate = conversationMap.get(seed.counterpartOrganizationId);
+      if (!aggregate) {
+        conversationMap.set(
+          seed.counterpartOrganizationId,
+          this.createConversationAggregate(seed),
+        );
+        continue;
+      }
+      this.appendSeedToAggregate(aggregate, seed);
+    }
+    return conversationMap;
+  }
+
+  private createConversationAggregate(seed: CounterpartConversationCardSeed): SeedConversationAggregate {
+    return {
+      counterpart: {
+        organizationId: seed.counterpartOrganizationId,
+        displayName: seed.counterpartDisplayName,
+        avatarUrl: seed.counterpartAvatarUrl,
+        role: 'counterpart' as const,
+      },
+      latestActivityAt: seed.updatedAt,
+      projectGroups: new Map([
+        [
+          seed.projectId,
+          {
+            latestActivityAt: seed.updatedAt,
+            p0PaySummary: seed.p0PaySummary,
+            cards: [seed.card],
+          },
+        ],
+      ]),
+    };
+  }
+
+  private appendSeedToAggregate(
+    aggregate: SeedConversationAggregate,
+    seed: CounterpartConversationCardSeed,
+  ) {
+    if (seed.updatedAt > aggregate.latestActivityAt) {
+      aggregate.latestActivityAt = seed.updatedAt;
+      aggregate.counterpart = {
+        organizationId: seed.counterpartOrganizationId,
+        displayName: seed.counterpartDisplayName,
+        avatarUrl: seed.counterpartAvatarUrl,
+        role: 'counterpart',
+      };
+    }
+
+    const group = aggregate.projectGroups.get(seed.projectId);
+    if (!group) {
+      aggregate.projectGroups.set(seed.projectId, {
+        latestActivityAt: seed.updatedAt,
+        p0PaySummary: seed.p0PaySummary,
+        cards: [seed.card],
+      });
+      return;
+    }
+    if (seed.updatedAt > group.latestActivityAt) {
+      group.latestActivityAt = seed.updatedAt;
+      group.p0PaySummary = seed.p0PaySummary;
+    }
+    group.cards.push(seed.card);
+  }
+
+  private buildProjectGroups(input: {
+    aggregate: SeedConversationAggregate;
+    projectMap: Map<string, ProjectEntity>;
+    viewerOrganizationId: string;
+    ratingEntryMap: Map<string, CounterpartConversationRatingEntryProjection>;
+    nameAccessProjectionMap: Awaited<
+      ReturnType<ProjectNameAccessProjectionService['buildPublicProjectionMap']>
+    >;
+  }) {
+    return [...input.aggregate.projectGroups.entries()]
+      .map(([projectId, group]): CounterpartConversationProjectGroupProjection => {
+        const project = input.projectMap.get(projectId);
+        const projection = input.nameAccessProjectionMap.get(projectId);
+        return {
+          projectId,
+          projectDisplayTitle:
+            projection?.displayTitle ??
+            (project ? buildProjectDisplayTitle(project) : '未命名项目'),
+          titleVisibility:
+            projection?.nameAccess.status === 'visible' ? 'visible' : 'masked',
+          projectState: project?.state ?? null,
+          latestActivityAt: group.latestActivityAt,
+          ...(group.p0PaySummary ? { p0PaySummary: group.p0PaySummary } : {}),
+          ratingEntry:
+            input.ratingEntryMap.get(
+              this.ratingEntryKey(projectId, input.aggregate.counterpart.organizationId),
+            ) ?? null,
+          cards: [...group.cards].sort((left, right) =>
+            right.updatedAt.localeCompare(left.updatedAt),
+          ),
+        };
+      })
+      .sort((left, right) =>
+        right.latestActivityAt.localeCompare(left.latestActivityAt),
+      );
+  }
+
+  private sortProjectGroups(
+    projectGroups: CounterpartConversationProjectGroupProjection[],
+    focusProjectId: string,
+  ) {
+    return [...projectGroups].sort((left, right) => {
+      if (left.projectId === focusProjectId) {
+        return -1;
+      }
+      if (right.projectId === focusProjectId) {
+        return 1;
+      }
+      return right.latestActivityAt.localeCompare(left.latestActivityAt);
+    });
+  }
+
+  private async buildRatingEntryMap(
+    projectIds: string[],
+    viewerOrganizationId: string,
+  ) {
+    if (!projectIds.length) {
+      return new Map<string, CounterpartConversationRatingEntryProjection>();
+    }
+    const rows = (await this.projectRepository.query(
+      `
+        select
+          "order".id as "orderId",
+          "order".project_id as "projectId",
+          "order".buyer_organization_id as "buyerOrganizationId",
+          "order".supplier_organization_id as "supplierOrganizationId",
+          "order".state as "orderState",
+          rating.state as "ratingState"
+        from public.orders "order"
+        left join lateral (
+          select state
+          from public.ratings rating
+          where rating.order_id = "order".id
+          order by rating.updated_at desc nulls last, rating.created_at desc nulls last, rating.id desc
+          limit 1
+        ) rating on true
+        where "order".project_id = any($1::varchar[])
+          and (
+            "order".buyer_organization_id = $2
+            or "order".supplier_organization_id = $2
+          )
+      `,
+      [projectIds, viewerOrganizationId],
+    )) as RatingOrderRow[];
+    const map = new Map<string, CounterpartConversationRatingEntryProjection>();
+    for (const row of rows) {
+      const counterpartOrganizationId =
+        row.buyerOrganizationId === viewerOrganizationId
+          ? row.supplierOrganizationId
+          : row.buyerOrganizationId;
+      if (!counterpartOrganizationId) {
+        continue;
+      }
+      const canRate =
+        row.buyerOrganizationId === viewerOrganizationId &&
+        row.orderState === 'completed' &&
+        row.ratingState === 'draft';
+      map.set(this.ratingEntryKey(row.projectId, counterpartOrganizationId), {
+        orderId: row.orderId,
+        projectId: row.projectId,
+        rateeOrganizationId: counterpartOrganizationId,
+        canRate,
+        reason: this.ratingUnavailableReason(row, viewerOrganizationId),
+        ratingState: row.ratingState,
+      });
+    }
+    return map;
+  }
+
+  private ratingUnavailableReason(
+    row: RatingOrderRow,
+    viewerOrganizationId: string,
+  ) {
+    if (row.buyerOrganizationId !== viewerOrganizationId) {
+      return '当前最小评价接口仅开放发布方/买方评价。';
+    }
+    if (row.orderState !== 'completed') {
+      return '当前项目尚未结束，评价入口不会开放。';
+    }
+    if (row.ratingState !== 'draft') {
+      return '当前评价已提交或暂不可重复提交。';
+    }
+    return null;
+  }
+
+  private ratingEntryKey(projectId: string, counterpartOrganizationId: string) {
+    return `${projectId}:${counterpartOrganizationId}`;
+  }
+}

@@ -2453,6 +2453,92 @@
         }
       }
     },
+    "/api/app/forum/author/profile": {
+      "get": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Forum public author profile canonical path for Flutter App",
+        "operationId": "getAppForumAuthorProfile",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "authorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimum public author profile read surface. This path carries only public author identity projection, public avatar projection, and bounded public forum counts.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumAuthorProfileReadModel"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Controlled author-unavailable response. When author truth is absent or hidden by visibility, the server must return `FORUM_AUTHOR_UNAVAILABLE`.\n"
+          }
+        }
+      }
+    },
+    "/api/app/forum/author/posts": {
+      "get": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Forum public author posts canonical path for Flutter App",
+        "operationId": "getAppForumAuthorPosts",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "authorId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimum public author post list. Default page size is 10 and this path must return public visible posts only.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumAuthorPostsResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Controlled author-unavailable response. When author truth is absent or hidden by visibility, the server must return `FORUM_AUTHOR_UNAVAILABLE`.\n"
+          }
+        }
+      }
+    },
     "/api/app/forum/post/comments": {
       "get": {
         "tags": [
@@ -9721,7 +9807,8 @@
         "type": "object",
         "required": [
           "authorId",
-          "displayName"
+          "displayName",
+          "avatarUrl"
         ],
         "description": "Minimum forum author summary only. This object is not profile truth, organization management truth, or a second identity contract.\n",
         "properties": {
@@ -9730,6 +9817,12 @@
           },
           "displayName": {
             "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "organizationName": {
             "type": [
@@ -10346,6 +10439,115 @@
           "publishedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ForumAuthorProfileReadModel": {
+        "type": "object",
+        "required": [
+          "authorId",
+          "displayName",
+          "avatarUrl",
+          "organizationName",
+          "publicPostCount",
+          "publicCommentCount"
+        ],
+        "description": "Minimum public author profile projection. This is not profile editing truth, DM truth, follow truth, or organization governance truth.\n",
+        "properties": {
+          "authorId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organizationName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "publicPostCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "publicCommentCount": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "ForumAuthorPostCard": {
+        "type": "object",
+        "required": [
+          "postId",
+          "topicId",
+          "topicTitle",
+          "title",
+          "excerpt",
+          "state",
+          "publishedAt",
+          "updatedAt",
+          "canEdit",
+          "canDelete"
+        ],
+        "description": "Minimum public author post card. This model may include public visible posts only and must not become private me-assets, drafts, or moderation truth.\n",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "topicId": {
+            "type": "string"
+          },
+          "topicTitle": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ForumPostState"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ForumAuthorPostsResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "page"
+        ],
+        "description": "Minimum public author posts carrier. Default first page size is 10.\n",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForumAuthorPostCard"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/ForumCursorPageInfo"
           }
         }
       },

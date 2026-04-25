@@ -33,6 +33,15 @@ export class AppTradingShellHandoffController {
     return this.service.recheckInspection(payload, headers);
   }
 
+  @Post('inspection/pass')
+  @HttpCode(HttpStatus.ACCEPTED)
+  passInspection(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.service.passInspection(payload, headers);
+  }
+
   @Post('contract/confirm')
   @HttpCode(HttpStatus.ACCEPTED)
   confirmContract(

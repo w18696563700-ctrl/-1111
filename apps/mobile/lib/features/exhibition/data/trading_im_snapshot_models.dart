@@ -7,6 +7,7 @@ class BidSubmissionSnapshotView {
     required this.quoteAmount,
     required this.proposalSummary,
     required this.attachmentSummary,
+    required this.attachments,
     required this.availability,
   });
 
@@ -17,6 +18,7 @@ class BidSubmissionSnapshotView {
   final num quoteAmount;
   final String proposalSummary;
   final Map<String, Object?> attachmentSummary;
+  final List<BidSubmissionAttachmentView> attachments;
   final Map<String, Object?> availability;
 }
 
@@ -32,6 +34,22 @@ class BidSubmissionBidderView {
   final String? avatarUrl;
 }
 
+class BidSubmissionAttachmentView {
+  const BidSubmissionAttachmentView({
+    required this.slotKey,
+    required this.slotLabel,
+    required this.fileAssetId,
+    required this.fileKind,
+    required this.mimeType,
+  });
+
+  final String slotKey;
+  final String slotLabel;
+  final String fileAssetId;
+  final String fileKind;
+  final String mimeType;
+}
+
 BidSubmissionSnapshotView parseBidSubmissionSnapshot(Object? payload) {
   final body = _readSnapshotMap(payload, 'bid submission snapshot');
   return BidSubmissionSnapshotView(
@@ -42,6 +60,7 @@ BidSubmissionSnapshotView parseBidSubmissionSnapshot(Object? payload) {
     quoteAmount: _requiredSnapshotNumber(body, 'quoteAmount'),
     proposalSummary: _requiredSnapshotString(body, 'proposalSummary'),
     attachmentSummary: _primitiveSnapshotMap(body['attachmentSummary']),
+    attachments: _attachmentList(body['attachments']),
     availability: _primitiveSnapshotMap(body['availability']),
   );
 }
@@ -91,4 +110,22 @@ Map<String, Object?> _primitiveSnapshotMap(Object? payload) {
     }
     throw FormatException('field "$key" must be primitive');
   });
+}
+
+List<BidSubmissionAttachmentView> _attachmentList(Object? payload) {
+  if (payload is! List<Object?>) {
+    throw FormatException('field "attachments" must be a list');
+  }
+  return payload.map(_parseAttachment).toList(growable: false);
+}
+
+BidSubmissionAttachmentView _parseAttachment(Object? payload) {
+  final body = _readSnapshotMap(payload, 'bid submission attachment');
+  return BidSubmissionAttachmentView(
+    slotKey: _requiredSnapshotString(body, 'slotKey'),
+    slotLabel: _requiredSnapshotString(body, 'slotLabel'),
+    fileAssetId: _requiredSnapshotString(body, 'fileAssetId'),
+    fileKind: _requiredSnapshotString(body, 'fileKind'),
+    mimeType: _requiredSnapshotString(body, 'mimeType'),
+  );
 }

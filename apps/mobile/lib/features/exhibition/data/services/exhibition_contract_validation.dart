@@ -85,10 +85,9 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
-    ExhibitionCanonicalPaths.bidAward => _validateBidAwardAcceptedPayload(
-      canonicalPath,
-      payload,
-    ),
+    ExhibitionCanonicalPaths.bidAward ||
+    ExhibitionCanonicalPaths.bidSelectAndCreateOrder =>
+      _validateBidAwardAcceptedPayload(canonicalPath, payload),
     ExhibitionCanonicalPaths.bidSubmit => _validateBidSubmitPayload(
       canonicalPath,
       payload,
@@ -101,11 +100,19 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
+    ExhibitionCanonicalPaths.orderCompleteRequest ||
+    ExhibitionCanonicalPaths.orderCompleteConfirm ||
+    ExhibitionCanonicalPaths.orderCompleteReject =>
+      _validateOrderCompletionAcceptedPayload(canonicalPath, payload),
     ExhibitionCanonicalPaths.ratingEntry ||
     ExhibitionCanonicalPaths.ratingSubmit => _sanitizeAndValidateEntryPayload(
       canonicalPath,
       payload,
     ),
+    ExhibitionCanonicalPaths.projectCounterpartyRatingEntry =>
+      _validateProjectCounterpartyRatingEntryPayload(canonicalPath, payload),
+    ExhibitionCanonicalPaths.projectCounterpartyRatingSubmit =>
+      _validateProjectCounterpartyRatingSubmitPayload(canonicalPath, payload),
     ExhibitionCanonicalPaths.milestoneList => _validateMilestoneListPayload(
       canonicalPath,
       payload,
@@ -299,6 +306,90 @@ _SuccessContractValidation _validateOrderPayload(
   sanitizedPayload: _sanitizeOrderPayload(payload),
   validator: _validateOrderEntity,
 );
+
+_SuccessContractValidation _validateOrderCompletionAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  final sanitized = _sanitizeOrderCompletionAcceptedPayload(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'orderId', canonicalPath),
+    _requireStringField(raw, 'projectId', canonicalPath),
+    _requireStateField(raw, 'state', _stableOrderStates, canonicalPath),
+    _requireStateField(
+      raw,
+      'completionRequestState',
+      _stableOrderCompletionRequestStates,
+      canonicalPath,
+    ),
+    _requireMapField(raw, 'summary', canonicalPath),
+  ]);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
+}
+
+_SuccessContractValidation _validateProjectCounterpartyRatingEntryPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  final sanitized = _sanitizeProjectCounterpartyRatingEntryPayload(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'orderId', canonicalPath),
+    _requireStringField(raw, 'projectId', canonicalPath),
+    _requireStringField(raw, 'raterOrganizationId', canonicalPath),
+    _requireStringField(raw, 'rateeOrganizationId', canonicalPath),
+    _requireBooleanField(raw, 'canRate', canonicalPath),
+    _requireNullableStringField(raw, 'reason', canonicalPath),
+    _requireNullableStringField(raw, 'ratingState', canonicalPath),
+  ]);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
+}
+
+_SuccessContractValidation _validateProjectCounterpartyRatingSubmitPayload(
+  String canonicalPath,
+  Object? payload,
+) {
+  final raw = _asMap(payload);
+  final sanitized = _sanitizeProjectCounterpartyRatingSubmitPayload(payload);
+  if (raw == null) {
+    return _invalidSuccessPayload(canonicalPath, 'response must be an object');
+  }
+
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'ratingId', canonicalPath),
+    _requireStringField(raw, 'orderId', canonicalPath),
+    _requireStringField(raw, 'projectId', canonicalPath),
+    _requireStringField(raw, 'raterOrganizationId', canonicalPath),
+    _requireStringField(raw, 'rateeOrganizationId', canonicalPath),
+    _requireStringField(raw, 'state', canonicalPath),
+    _requireStringField(raw, 'ratingState', canonicalPath),
+    _requireNumberField(raw, 'scoreValue', canonicalPath),
+    _requireStringField(raw, 'scoreLabel', canonicalPath),
+    _requireStringField(raw, 'submittedAt', canonicalPath),
+  ]);
+  if (message != null) {
+    return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
+  }
+
+  return _SuccessContractValidation(payload: sanitized);
+}
 
 _SuccessContractValidation _validateMilestoneListPayload(
   String canonicalPath,

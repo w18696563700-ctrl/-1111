@@ -29,8 +29,13 @@ final class ExhibitionCanonicalPaths {
   static const String projectBidMaterials = '/api/app/project/bid-materials';
   static const String bidSubmit = '/api/app/bid/submit';
   static const String bidAward = '/api/app/bid/award';
+  static const String bidSelectAndCreateOrder =
+      '/api/app/bid/select-bid-and-create-order';
   static const String bidResult = '/api/app/bid/result';
   static const String orderDetail = '/api/app/order/detail';
+  static const String orderCompleteRequest = '/api/app/order/complete/request';
+  static const String orderCompleteConfirm = '/api/app/order/complete/confirm';
+  static const String orderCompleteReject = '/api/app/order/complete/reject';
   static const String contractDetail = '/api/app/contract/detail';
   static const String contractConfirm = '/api/app/contract/confirm';
   static const String contractAmend = '/api/app/contract/amend';
@@ -41,11 +46,16 @@ final class ExhibitionCanonicalPaths {
   static const String inspectionRecheck = '/api/app/inspection/recheck';
   static const String ratingEntry = '/api/app/rating/entry';
   static const String ratingSubmit = '/api/app/rating/submit';
+  static const String projectCounterpartyRatingEntry =
+      '/api/app/project-counterparty-rating/entry';
+  static const String projectCounterpartyRatingSubmit =
+      '/api/app/project-counterparty-rating/submit';
   static const String disputeOpen = '/api/app/dispute/open';
   static const String disputeWithdraw = '/api/app/dispute/withdraw';
   static const String fileAccess = '/api/app/file/access';
   static const String uploadInit = '/api/app/file/upload/init';
   static const String uploadConfirm = '/api/app/file/upload/confirm';
+  static const String p0PayTradeTaskCreate = '/api/app/exhibition/trade-tasks';
 
   static String myProjectDetail(String projectId) {
     return '$myProjectList/${Uri.encodeComponent(projectId)}';
@@ -104,5 +114,59 @@ final class ExhibitionCanonicalPaths {
     return segments.length == 3 &&
         segments[1] == 'attachments' &&
         segments[2].trim().isNotEmpty;
+  }
+
+  static String p0PayTradeTaskDetail(String taskId) {
+    return '$p0PayTradeTaskCreate/${Uri.encodeComponent(taskId)}';
+  }
+
+  static String p0PayAuthenticityMaterials(String taskId) {
+    return '${p0PayTradeTaskDetail(taskId)}/authenticity-materials';
+  }
+
+  static String p0PayFixedPriceBids(String taskId) {
+    return '${p0PayTradeTaskDetail(taskId)}/fixed-price-bids';
+  }
+
+  static String p0PayServiceFeeAuthorizations(String taskId, String bidId) {
+    return '${p0PayFixedPriceBids(taskId)}/${Uri.encodeComponent(bidId)}/service-fee-authorizations';
+  }
+
+  static String p0PayServiceFeeAuthorizeInit(
+    String taskId,
+    String bidId,
+    String authorizationId,
+  ) {
+    return '${p0PayServiceFeeAuthorizations(taskId, bidId)}/${Uri.encodeComponent(authorizationId)}/authorize-init';
+  }
+
+  static String p0PayServiceFeeAuthorizationStatus(
+    String taskId,
+    String bidId,
+    String authorizationId,
+  ) {
+    return '${p0PayServiceFeeAuthorizations(taskId, bidId)}/${Uri.encodeComponent(authorizationId)}';
+  }
+
+  static String p0PayInquiryDepositOrders(String taskId) {
+    return '${p0PayTradeTaskDetail(taskId)}/inquiry-deposit/orders';
+  }
+
+  static String p0PayInquiryDepositPayInit(
+    String taskId,
+    String depositOrderId,
+  ) {
+    return '${p0PayInquiryDepositOrders(taskId)}/${Uri.encodeComponent(depositOrderId)}/pay-init';
+  }
+
+  static String p0PayInquiryDepositStatus(
+    String taskId,
+    String depositOrderId,
+  ) {
+    return '${p0PayInquiryDepositOrders(taskId)}/${Uri.encodeComponent(depositOrderId)}';
+  }
+
+  static String p0PaySummary(String taskId) {
+    return '${p0PayTradeTaskDetail(taskId)}/p0-pay-summary';
   }
 }

@@ -71,8 +71,7 @@ class _HomeWeatherProjection {
       hourlyForecast.isEmpty &&
       dailyForecast.isEmpty;
 
-  bool get isWeatherUnavailable =>
-      isControlledPlaceholder || isWeatherDegraded;
+  bool get isWeatherUnavailable => isControlledPlaceholder || isWeatherDegraded;
 }
 
 class _HomeForecastItem {
@@ -118,6 +117,31 @@ ExhibitionHomeLocationContextRequest _homeLocationContextFromSelection(
     districtName: selection.districtName,
     locationPermissionState: permissionState.contractName,
   );
+}
+
+ExhibitionHomeLocationContextRequest? _homeLocationContextFromResult(
+  ExhibitionLoadResult? result,
+) {
+  if (result?.state != AppPageState.content) {
+    return null;
+  }
+
+  final payload = _homeMap(result?.payload);
+  final currentLocation = _homeMap(payload?['currentLocation']);
+  if (payload == null || currentLocation == null) {
+    return null;
+  }
+
+  final locationContext = ExhibitionHomeLocationContextRequest(
+    latitude: _homeNumber(currentLocation['latitude']),
+    longitude: _homeNumber(currentLocation['longitude']),
+    provinceCode: _homeString(currentLocation['provinceCode']),
+    provinceName: _homeString(currentLocation['provinceName']),
+    cityName: _homeString(currentLocation['cityName']),
+    districtName: _homeString(currentLocation['districtName']),
+    locationPermissionState: _homeString(payload['locationPermissionState']),
+  );
+  return locationContext.hasUsableLocationHints ? locationContext : null;
 }
 
 _HomeWeatherProjection? _homeWeatherProjectionFromResult(
@@ -411,25 +435,24 @@ String _homeFrontStateLabel(String? state) => switch (state) {
 
 bool _homeCanContinueBid(String? state) => state == 'published';
 
-String _homeProjectGuidance(String? state) {
-  return switch (state) {
-    'published' => '当前项目仍处于竞标中，适合先进入详情，再判断是否立即参与竞标。',
-    'bidding_closed' => '当前项目投标窗口已结束，首页保留只读说明，不在这里开放参与竞标。',
-    'awarded' => '当前项目已经授标，后续私域推进回到我的项目继续。',
-    'converted_to_order' => '当前项目已被承接，首页只保留公开说明，不混入后续履约动作。',
-    null => '当前项目已经进入推荐区，可先查看详情，再确认下一步。',
-    _ => '当前项目处于 ${_homeFrontStateLabel(state)}，先看清详情，再决定后续承接。',
-  };
-}
-
-String _homeUpdatedAtLabel(String value) {
-  final parsed = DateTime.tryParse(value);
-  if (parsed == null) {
-    return value;
+String _homeProjectAreaLabel(Object? value) {
+  final areaSqm = _homeNumber(value);
+  if (areaSqm == null) {
+    return '当前项目暂未提供';
   }
 
-  final local = parsed.toLocal();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
-  return '${local.month}月${local.day}日 $hour:$minute';
+  final normalized = areaSqm
+      .toStringAsFixed(2)
+      .replaceFirst(RegExp(r'\.?0+$'), '');
+  return '$normalized ㎡';
+}
+
+String _homeProjectCityLabel(Map<String, Object?> item) {
+  return _homeTrimmedString(item['cityName']) ??
+      _homeTrimmedString(item['provinceName']) ??
+      '当前项目暂未提供';
+}
+
+String _homeProjectEntryTimeLabel(Map<String, Object?> item) {
+  return _homeTrimmedString(item['plannedStartAt']) ?? '当前项目暂未提供';
 }

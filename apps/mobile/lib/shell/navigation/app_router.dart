@@ -425,6 +425,7 @@ class AppRouter {
       ),
       ExhibitionRoutes.orderDetail => OrderDetailPage(
         orderId: routeUri.queryParameters['orderId'],
+        projectId: routeUri.queryParameters['projectId'],
       ),
       ExhibitionRoutes.contractDetail => ContractDetailPage(
         orderId: routeUri.queryParameters['orderId'],
@@ -443,6 +444,8 @@ class AppRouter {
       ),
       ExhibitionRoutes.ratingEntry => RatingEntryPage(
         orderId: routeUri.queryParameters['orderId'],
+        projectId: routeUri.queryParameters['projectId'],
+        rateeOrganizationId: routeUri.queryParameters['rateeOrganizationId'],
       ),
       ExhibitionRoutes.disputeOpen => DisputeOpenPage(
         orderId: routeUri.queryParameters['orderId'],
@@ -477,7 +480,7 @@ class AppRouter {
       ExhibitionRoutes.milestoneSubmit => '里程碑提交',
       ExhibitionRoutes.inspectionDetail => '验收详情',
       ExhibitionRoutes.inspectionSubmit => '验收提交',
-      ExhibitionRoutes.ratingEntry => '评价入口',
+      ExhibitionRoutes.ratingEntry => '双方互评入口',
       ExhibitionRoutes.disputeOpen => '争议开启入口',
       ExhibitionRoutes.disputeWithdraw => '争议撤回入口',
       _ => '展览',

@@ -23,6 +23,14 @@ class ExhibitionHomeLocationContextRequest {
   final String? districtName;
   final String? locationPermissionState;
 
+  bool get hasUsableLocationHints =>
+      latitude != null ||
+      longitude != null ||
+      _normalized(provinceCode) != null ||
+      _normalized(provinceName) != null ||
+      _normalized(cityName) != null ||
+      _normalized(districtName) != null;
+
   Map<String, String> toQueryParameters() {
     final parameters = <String, String>{};
     if (latitude != null) {
@@ -36,6 +44,12 @@ class ExhibitionHomeLocationContextRequest {
     }
     if (_normalized(provinceName) case final String value) {
       parameters['provinceName'] = value;
+    }
+    if (_normalized(cityName) case final String value) {
+      parameters['cityName'] = value;
+    }
+    if (_normalized(districtName) case final String value) {
+      parameters['districtName'] = value;
     }
     if (_normalized(locationPermissionState) case final String value) {
       parameters['locationPermissionState'] = value;

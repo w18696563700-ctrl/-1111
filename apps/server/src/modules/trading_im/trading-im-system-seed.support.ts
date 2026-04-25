@@ -12,7 +12,6 @@ export function buildBidThreadRouteTarget(input: {
     actionKey: 'bid_thread.open',
     canonicalPath: '/api/app/bid/thread/detail',
     params: {
-      threadId: input.threadId,
       projectId: input.projectId,
       bidId: input.bidId,
     },

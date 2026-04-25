@@ -1,6 +1,9 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 final class AppSessionLoginSource {
   const AppSessionLoginSource._();
@@ -43,6 +46,7 @@ class AppSessionSnapshot {
 class AppSessionStore extends ChangeNotifier {
   static AppSessionStore _instance = AppSessionStore();
   static final Random _deviceRandom = Random();
+  static const String _storageKeyBase = 'auth.app_session_store.v1';
 
   static AppSessionStore get instance => _instance;
 
@@ -54,12 +58,21 @@ class AppSessionStore extends ChangeNotifier {
     _instance = AppSessionStore();
   }
 
+  AppSessionStore({bool persistSession = false, String? storageNamespace})
+    : _persistSession = persistSession,
+      _storageKey =
+          '$_storageKeyBase.${_normalizeStorageNamespace(storageNamespace)}';
+
+  final bool _persistSession;
+  final String _storageKey;
   String? _accessToken;
   String? _refreshToken;
   DateTime? _expiresAt;
   String? _deviceId;
   String? _localLoginSource;
   bool _passwordSetupPromptDismissed = false;
+
+  bool get persistsSession => _persistSession;
 
   AppSessionSnapshot get snapshot => AppSessionSnapshot(
     accessToken: _accessToken,
@@ -114,6 +127,28 @@ class AppSessionStore extends ChangeNotifier {
       ensureDeviceId();
     }
     notifyListeners();
+    _persistCurrentSession();
+  }
+
+  bool establishBootstrapSessionFromEnvironment() {
+    const accessToken = String.fromEnvironment('APP_BOOTSTRAP_ACCESS_TOKEN');
+    const refreshToken = String.fromEnvironment('APP_BOOTSTRAP_REFRESH_TOKEN');
+    const expiresInSecondsRaw = String.fromEnvironment(
+      'APP_BOOTSTRAP_EXPIRES_IN_SECONDS',
+      defaultValue: '1800',
+    );
+    const deviceId = String.fromEnvironment('APP_BOOTSTRAP_DEVICE_ID');
+    if (accessToken.trim().isEmpty || refreshToken.trim().isEmpty) {
+      return false;
+    }
+    establishSession(
+      accessToken: accessToken,
+      refreshToken: refreshToken,
+      expiresInSeconds: int.tryParse(expiresInSecondsRaw) ?? 1800,
+      deviceId: deviceId.trim().isEmpty ? null : deviceId,
+      localLoginSource: AppSessionLoginSource.passwordLogin,
+    );
+    return true;
   }
 
   void clearSession() {
@@ -123,6 +158,7 @@ class AppSessionStore extends ChangeNotifier {
     _localLoginSource = null;
     _passwordSetupPromptDismissed = false;
     notifyListeners();
+    _clearPersistedSession();
   }
 
   String? get refreshToken {
@@ -155,6 +191,7 @@ class AppSessionStore extends ChangeNotifier {
 
     _passwordSetupPromptDismissed = true;
     notifyListeners();
+    _persistCurrentSession();
   }
 
   String _buildLocalDeviceId() {
@@ -173,5 +210,102 @@ class AppSessionStore extends ChangeNotifier {
       return normalized;
     }
     return null;
+  }
+
+  Future<void> restorePersistedSession() async {
+    if (!_persistSession || hasAnySession) {
+      return;
+    }
+
+    try {
+      final preferences = await SharedPreferences.getInstance();
+      final raw = preferences.getString(_storageKey);
+      if (raw == null || raw.trim().isEmpty) {
+        return;
+      }
+
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, Object?>) {
+        await preferences.remove(_storageKey);
+        return;
+      }
+
+      final refreshToken = _readNonEmptyString(decoded['refreshToken']);
+      if (refreshToken == null) {
+        await preferences.remove(_storageKey);
+        return;
+      }
+
+      _accessToken = null;
+      _refreshToken = refreshToken;
+      _expiresAt = null;
+      _deviceId = _readNonEmptyString(decoded['deviceId']);
+      _localLoginSource = _normalizeLocalLoginSource(
+        _readNonEmptyString(decoded['localLoginSource']),
+      );
+      _passwordSetupPromptDismissed =
+          decoded['passwordSetupPromptDismissed'] == true;
+      notifyListeners();
+    } catch (_) {
+      return;
+    }
+  }
+
+  void _persistCurrentSession() {
+    if (!_persistSession) {
+      return;
+    }
+
+    unawaited(() async {
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        if (!hasAnySession) {
+          await preferences.remove(_storageKey);
+          return;
+        }
+        await preferences.setString(
+          _storageKey,
+          jsonEncode(<String, Object?>{
+            'refreshToken': _refreshToken,
+            'deviceId': _deviceId,
+            'localLoginSource': _localLoginSource,
+            'passwordSetupPromptDismissed': _passwordSetupPromptDismissed,
+          }),
+        );
+      } catch (_) {
+        return;
+      }
+    }());
+  }
+
+  void _clearPersistedSession() {
+    if (!_persistSession) {
+      return;
+    }
+
+    unawaited(() async {
+      try {
+        final preferences = await SharedPreferences.getInstance();
+        await preferences.remove(_storageKey);
+      } catch (_) {
+        return;
+      }
+    }());
+  }
+
+  String? _readNonEmptyString(Object? value) {
+    if (value is! String) {
+      return null;
+    }
+    final trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
+  static String _normalizeStorageNamespace(String? value) {
+    final trimmed = value?.trim();
+    if (trimmed == null || trimmed.isEmpty) {
+      return 'default';
+    }
+    return trimmed.replaceAll(RegExp(r'[^a-zA-Z0-9_.-]'), '_');
   }
 }

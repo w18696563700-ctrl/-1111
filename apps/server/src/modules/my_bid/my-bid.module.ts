@@ -2,10 +2,13 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
 import { BidEntity } from '../bid/entities/bid.entity';
+import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { BidPrivateThreadEntity } from '../trading_im/entities/bid-private-thread.entity';
+import { FileAssetEntity } from '../upload/entities/file-asset.entity';
+import { UploadModule } from '../upload/upload.module';
 import { BidSubmissionSnapshotController, MyBidController } from './my-bid.controller';
 import { MyBidPresenter } from './my-bid.presenter';
 import { MyBidQueryService } from './my-bid.query.service';
@@ -16,10 +19,13 @@ import { MyBidQueryService } from './my-bid.query.service';
       BidEntity,
       ProjectEntity,
       BidPrivateThreadEntity,
-      OrganizationEntity
+      OrganizationEntity,
+      UserEntity,
+      FileAssetEntity,
     ]),
     AuthModule,
-    OrganizationModule
+    OrganizationModule,
+    UploadModule,
   ],
   controllers: [MyBidController, BidSubmissionSnapshotController],
   providers: [MyBidPresenter, MyBidQueryService]

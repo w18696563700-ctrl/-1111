@@ -4,19 +4,28 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
   const _ProjectShowcaseCompactCard({
     required this.item,
     required this.onPressed,
+    this.onRequestNameAccess,
+    this.requestInProgress = false,
   });
 
   final Map<String, Object?> item;
   final VoidCallback onPressed;
+  final VoidCallback? onRequestNameAccess;
+  final bool requestInProgress;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final exhibitionName = _projectDisplayTitle(item);
-    final brandName = _projectDisplayBrandLine(item) ?? '当前项目暂未提供';
-    final location = _projectRegionLabel(item) ?? '当前项目暂未提供';
+    final title = _projectDisplayTitle(item);
+    final brandName = _projectDisplayBrandLine(item);
+    final location = _projectPrimaryLocationText(item);
     final dateRange = _projectDateRangeLabel(item) ?? '当前项目暂未提供';
     final status = _stateFromPayload(item);
+    final projectNo = _normalizeId(item['projectNo'] as String?) ?? '未提供';
+    final shouldShowNameAccessControls = _projectShouldShowNameAccessControls(
+      item,
+    );
+    final nameAccessStatus = _projectNameAccessStatus(item);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -34,7 +43,7 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
               children: <Widget>[
                 Expanded(
                   child: Text(
-                    exhibitionName,
+                    title,
                     style: theme.textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w800,
                     ),
@@ -47,23 +56,32 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
                   ),
               ],
             ),
+            if (brandName != null) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                brandName,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
             const SizedBox(height: 14),
             Wrap(
               spacing: 14,
               runSpacing: 10,
               children: <Widget>[
-                _CompactProjectMeta(label: '展会', value: exhibitionName),
-                _CompactProjectMeta(label: '品牌', value: brandName),
+                _CompactProjectMeta(label: '项目编号', value: projectNo),
                 _CompactProjectMeta(
-                  label: '金额',
+                  label: '预算',
                   value: _currencyText(item['budgetAmount']),
                   highlight: true,
                 ),
                 _CompactProjectMeta(
                   label: '面积',
-                  value: _projectAreaLabel(item['areaSqm'] as num?),
+                  value: _projectAreaText(item['areaSqm'] as num?),
                 ),
-                _CompactProjectMeta(label: '地点', value: location),
+                _CompactProjectMeta(label: '搭建地', value: location),
               ],
             ),
             const SizedBox(height: 14),
@@ -107,32 +125,61 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
                 ),
               ],
             ),
+            if (shouldShowNameAccessControls) ...<Widget>[
+              const SizedBox(height: 14),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.surfaceContainerLow,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: theme.colorScheme.outlineVariant),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: <Widget>[
+                          _StatusPill(
+                            label: _projectNameAccessStatusLabel(
+                              nameAccessStatus,
+                            ),
+                            tone: _ActionCardTone.muted,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        _projectNameAccessStatusBody(item),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          height: 1.45,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      OutlinedButton(
+                        onPressed:
+                            requestInProgress ||
+                                !_projectCanRequestNameAccess(item)
+                            ? null
+                            : onRequestNameAccess,
+                        child: Text(
+                          requestInProgress
+                              ? '提交中...'
+                              : _projectNameAccessActionLabel(item),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
     );
-  }
-
-  String? _projectRegionLabel(Map<String, Object?> item) {
-    final provinceName = _normalizeId(item['provinceName'] as String?);
-    final cityName = _normalizeId(item['cityName'] as String?);
-    if (provinceName == null && cityName == null) {
-      return null;
-    }
-    if (provinceName != null && cityName != null) {
-      return '$provinceName / $cityName';
-    }
-    return provinceName ?? cityName;
-  }
-
-  String _projectAreaLabel(num? areaSqm) {
-    if (areaSqm == null) {
-      return '当前项目暂未提供';
-    }
-    final normalized = areaSqm
-        .toStringAsFixed(2)
-        .replaceFirst(RegExp(r'\.?0+$'), '');
-    return '$normalized ㎡';
   }
 }
 

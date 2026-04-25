@@ -3,8 +3,13 @@ import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/auth_action_result_presenter.dart';
 import 'package:mobile/core/auth/auth_contract.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  setUp(() {
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+  });
+
   test('session store creates a stable non-legacy device id', () {
     final store = AppSessionStore();
 
@@ -15,6 +20,45 @@ void main() {
     expect(first, startsWith('mobile-'));
     expect(first, isNot('mobile-local-device'));
   });
+
+  test(
+    'session store restores persisted refresh token without access token',
+    () async {
+      final store = AppSessionStore(
+        persistSession: true,
+        storageNamespace: 'day0606_uat',
+      );
+      store.establishSession(
+        accessToken: 'access-token',
+        refreshToken: 'refresh-token',
+        expiresInSeconds: 3600,
+        deviceId: 'device-1',
+        localLoginSource: AppSessionLoginSource.passwordLogin,
+      );
+
+      final preferences = await SharedPreferences.getInstance();
+      String? raw;
+      for (var attempts = 0; attempts < 10 && raw == null; attempts += 1) {
+        await Future<void>.delayed(Duration.zero);
+        raw = preferences.getString('auth.app_session_store.v1.day0606_uat');
+      }
+
+      expect(raw, isNotNull);
+      expect(raw, contains('refresh-token'));
+      expect(raw, isNot(contains('access-token')));
+
+      final restored = AppSessionStore(
+        persistSession: true,
+        storageNamespace: 'day0606_uat',
+      );
+      await restored.restorePersistedSession();
+
+      expect(restored.refreshToken, 'refresh-token');
+      expect(restored.deviceId, 'device-1');
+      expect(restored.authorizationHeaders, isEmpty);
+      expect(restored.shouldRefresh, isTrue);
+    },
+  );
 
   test('auth entry copy localizes error and status details', () {
     const failure = AuthActionResult<void>(

@@ -15,14 +15,17 @@ part 'commands/dispute_withdraw_command.dart';
 part 'commands/inspection_recheck_command.dart';
 part 'commands/inspection_submit_command.dart';
 part 'commands/milestone_submit_command.dart';
+part 'commands/order_completion_command.dart';
 part 'commands/project_attachment_bind_command.dart';
 part 'commands/project_create_command.dart';
 part 'commands/project_lifecycle_action_command.dart';
+part 'commands/p0_pay_commands.dart';
 part 'commands/project_save_command.dart';
 part 'commands/rating_submit_command.dart';
 part 'commands/upload_init_command.dart';
 part 'models/exhibition_action_result.dart';
 part 'models/exhibition_load_result.dart';
+part 'models/p0_pay_payment_polling.dart';
 part 'models/project_attachment_read_models.dart';
 part 'models/project_bid_material_read_models.dart';
 part 'models/project_public_resource_read_models.dart';
@@ -30,6 +33,7 @@ part 'models/upload_directive.dart';
 part 'models/upload_flow_result.dart';
 part 'services/exhibition_action_service.dart';
 part 'services/exhibition_canonical_paths.dart';
+part 'services/p0_pay_consumer_service.dart';
 part 'services/exhibition_contract_mapper.dart';
 part 'services/my_project_contract_mapper.dart';
 part 'services/my_bid_contract_mapper.dart';
@@ -218,10 +222,12 @@ class ExhibitionConsumerLayer {
 
   Future<ExhibitionLoadResult> loadOrderDetail({
     required String? orderId,
+    String? projectId,
     bool forceRefresh = false,
   }) {
     return _loadService.loadOrderDetail(
       orderId: orderId,
+      projectId: projectId,
       forceRefresh: forceRefresh,
     );
   }
@@ -266,6 +272,20 @@ class ExhibitionConsumerLayer {
   }) {
     return _loadService.loadRatingEntry(
       orderId: orderId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectCounterpartyRatingEntry({
+    required String? orderId,
+    required String? projectId,
+    required String? rateeOrganizationId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectCounterpartyRatingEntry(
+      orderId: orderId,
+      projectId: projectId,
+      rateeOrganizationId: rateeOrganizationId,
       forceRefresh: forceRefresh,
     );
   }
@@ -408,6 +428,12 @@ class ExhibitionConsumerLayer {
     return _actionService.awardBid(command);
   }
 
+  Future<ExhibitionActionResult> selectBidAndCreateOrder(
+    BidSelectAndCreateOrderCommand command,
+  ) {
+    return _actionService.selectBidAndCreateOrder(command);
+  }
+
   Future<ExhibitionActionResult> confirmContract(
     ContractConfirmCommand command,
   ) {
@@ -416,6 +442,24 @@ class ExhibitionConsumerLayer {
 
   Future<ExhibitionActionResult> amendContract(ContractAmendCommand command) {
     return _actionService.amendContract(command);
+  }
+
+  Future<ExhibitionActionResult> requestOrderCompletion(
+    OrderCompletionRequestCommand command,
+  ) {
+    return _actionService.requestOrderCompletion(command);
+  }
+
+  Future<ExhibitionActionResult> confirmOrderCompletion(
+    OrderCompletionConfirmCommand command,
+  ) {
+    return _actionService.confirmOrderCompletion(command);
+  }
+
+  Future<ExhibitionActionResult> rejectOrderCompletion(
+    OrderCompletionRejectCommand command,
+  ) {
+    return _actionService.rejectOrderCompletion(command);
   }
 
   Future<ExhibitionActionResult> submitMilestone(
@@ -448,6 +492,12 @@ class ExhibitionConsumerLayer {
 
   Future<ExhibitionActionResult> submitRating(RatingSubmitCommand command) {
     return _actionService.submitRating(command);
+  }
+
+  Future<ExhibitionActionResult> submitProjectCounterpartyRating(
+    ProjectCounterpartyRatingSubmitCommand command,
+  ) {
+    return _actionService.submitProjectCounterpartyRating(command);
   }
 
   Future<ExhibitionActionResult> bindProjectAttachment({

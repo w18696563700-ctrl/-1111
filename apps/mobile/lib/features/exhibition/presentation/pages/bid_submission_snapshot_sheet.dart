@@ -57,6 +57,46 @@ class _BidSubmissionSnapshotSheetState
     });
   }
 
+  Future<void> _openParticipantCard(BidSubmissionSnapshotView data) async {
+    await _showTradingImParticipantCardSheet(
+      context,
+      projectId: data.projectId,
+      bidId: data.bidId,
+      participantOrganizationId: data.bidder.organizationId,
+    );
+  }
+
+  Future<void> _openAttachment(BidSubmissionAttachmentView attachment) async {
+    final result = await ExhibitionConsumerLayer.instance
+        .requestProjectAttachmentAccess(
+          fileAssetId: attachment.fileAssetId,
+          mode: _projectAttachmentAccessMode(attachment.mimeType),
+        );
+    if (!mounted) {
+      return;
+    }
+    if (!result.isSuccess) {
+      _showMessage(_projectAttachmentFileAccessFailureMessage(result));
+      return;
+    }
+    final access = _projectAttachmentFileAccessFromPayload(result.payload);
+    if (access == null) {
+      _showMessage('当前竞标附件预览结果异常，请稍后再试。');
+      return;
+    }
+    final opened = await _openProjectAttachmentUrl(access.accessUrl);
+    if (!mounted || opened) {
+      return;
+    }
+    _showMessage('当前竞标附件暂不可在系统中打开，请稍后重试。');
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = _result;
@@ -117,6 +157,23 @@ class _BidSubmissionSnapshotSheetState
                       summary: '这里只承接最小只读竞标摘要，不扩成修改、重提或比较工作台。',
                       tone: _ActionCardTone.emphasis,
                       children: <Widget>[
+                        Center(
+                          child: CircleAvatar(
+                            radius: 28,
+                            backgroundImage:
+                                data.bidder.avatarUrl == null
+                                ? null
+                                : NetworkImage(data.bidder.avatarUrl!),
+                            child: data.bidder.avatarUrl == null
+                                ? Text(
+                                    data.bidder.displayName.trim().isEmpty
+                                        ? '?'
+                                        : data.bidder.displayName.trim().characters.first.toUpperCase(),
+                                  )
+                                : null,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
                         _DetailLine(
                           label: '组织 ID',
                           value: data.bidder.organizationId,
@@ -137,6 +194,15 @@ class _BidSubmissionSnapshotSheetState
                           label: '当前可用性',
                           value: _snapshotAvailabilityText(data.availability),
                         ),
+                        const SizedBox(height: 10),
+                        Align(
+                          alignment: Alignment.centerLeft,
+                          child: OutlinedButton.icon(
+                            onPressed: () => _openParticipantCard(data),
+                            icon: const Icon(Icons.badge_outlined),
+                            label: const Text('查看竞标方名片'),
+                          ),
+                        ),
                       ],
                     ),
                     const SizedBox(height: 16),
@@ -144,6 +210,52 @@ class _BidSubmissionSnapshotSheetState
                       title: '方案说明',
                       children: <Widget>[
                         _DetailLine(label: '内容', value: data.proposalSummary),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    _ActionCard(
+                      title: '已确认附件',
+                      children: <Widget>[
+                        _DetailLine(
+                          label: '摘要',
+                          value: _snapshotAttachmentSummaryText(
+                            data.attachmentSummary,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        if (data.attachments.isEmpty)
+                          const _StateMessage(
+                            title: '当前没有可读附件',
+                            body: '本次竞标尚未形成可读附件列表。',
+                          )
+                        else
+                          ...data.attachments.map(
+                            (BidSubmissionAttachmentView attachment) => Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: _ActionCard(
+                                title: attachment.slotLabel,
+                                children: <Widget>[
+                                  _DetailLine(
+                                    label: '文件类型',
+                                    value: attachment.mimeType,
+                                  ),
+                                  _DetailLine(
+                                    label: '附件 ID',
+                                    value: attachment.fileAssetId,
+                                  ),
+                                  const SizedBox(height: 10),
+                                  Align(
+                                    alignment: Alignment.centerLeft,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () => _openAttachment(attachment),
+                                      icon: const Icon(Icons.attach_file_rounded),
+                                      label: const Text('查看附件'),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
                       ],
                     ),
                   ],
@@ -168,7 +280,9 @@ String _snapshotAttachmentSummaryText(Map<String, Object?> summary) {
 String _snapshotAvailabilityText(Map<String, Object?> availability) {
   final canOpenBidThread = availability['canOpenBidThread'];
   if (canOpenBidThread is bool) {
-    return canOpenBidThread ? '可继续沟通与投标' : '当前不可继续沟通';
+    final participantCardReadable = availability['participantCardReadable'];
+    final participantLabel = participantCardReadable == true ? '，可查看竞标方名片' : '';
+    return canOpenBidThread ? '可继续沟通与投标$participantLabel' : '当前不可继续沟通';
   }
   return '未提供';
 }

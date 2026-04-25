@@ -462,6 +462,41 @@ test('upload init accepts project_attachment and keeps project binding truth', a
   assert.equal(state.savedSessions[0].fileKind, 'project_attachment');
 });
 
+test('upload init accepts project_album_photo images and rejects non-image truth', async () => {
+  const { service, state } = createUploadWriteHarness();
+
+  const response = await service.initUpload(
+    {
+      businessType: 'project',
+      businessId: 'project-1',
+      fileKind: 'project_album_photo',
+      mimeType: 'image/jpeg',
+      size: 128,
+      checksum: 'checksum-project-album-photo',
+    },
+    createRequestContext(),
+  );
+
+  assert.equal(response.fileKind, 'project_album_photo');
+  assert.equal(state.savedSessions.length, 1);
+  assert.equal(state.savedSessions[0].mimeType, 'image/jpeg');
+  await assert.rejects(
+    () =>
+      service.initUpload(
+        {
+          businessType: 'project',
+          businessId: 'project-1',
+          fileKind: 'project_album_photo',
+          mimeType: 'application/pdf',
+          size: 128,
+          checksum: 'checksum-project-album-pdf',
+        },
+        createRequestContext(),
+      ),
+    (error) => error?.response?.code === 'FILE_UPLOAD_INIT_INVALID',
+  );
+});
+
 test('upload init stores verified current session truth for project uploads', async () => {
   const { service, state } = createUploadWriteHarness({
     currentSession: {

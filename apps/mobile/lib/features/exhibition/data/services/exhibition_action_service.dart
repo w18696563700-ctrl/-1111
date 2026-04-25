@@ -135,6 +135,15 @@ class _ExhibitionActionService {
     );
   }
 
+  Future<ExhibitionActionResult> selectBidAndCreateOrder(
+    BidSelectAndCreateOrderCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.bidSelectAndCreateOrder,
+      body: command.toJson(),
+    );
+  }
+
   Future<ExhibitionActionResult> confirmContract(
     ContractConfirmCommand command,
   ) {
@@ -147,6 +156,33 @@ class _ExhibitionActionService {
   Future<ExhibitionActionResult> amendContract(ContractAmendCommand command) {
     return _submitProtected(
       ExhibitionCanonicalPaths.contractAmend,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> requestOrderCompletion(
+    OrderCompletionRequestCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.orderCompleteRequest,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> confirmOrderCompletion(
+    OrderCompletionConfirmCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.orderCompleteConfirm,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> rejectOrderCompletion(
+    OrderCompletionRejectCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.orderCompleteReject,
       body: command.toJson(),
     );
   }
@@ -188,6 +224,15 @@ class _ExhibitionActionService {
   Future<ExhibitionActionResult> submitRating(RatingSubmitCommand command) {
     return _submitProtected(
       ExhibitionCanonicalPaths.ratingSubmit,
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> submitProjectCounterpartyRating(
+    ProjectCounterpartyRatingSubmitCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectCounterpartyRatingSubmit,
       body: command.toJson(),
     );
   }

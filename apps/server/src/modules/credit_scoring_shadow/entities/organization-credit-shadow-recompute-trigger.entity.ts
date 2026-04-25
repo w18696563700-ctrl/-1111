@@ -11,6 +11,9 @@ export class OrganizationCreditShadowRecomputeTriggerEntity {
   @Column({ name: 'trigger_type', type: 'varchar', length: 64 })
   triggerType!: string;
 
+  @Column({ name: 'source_type', type: 'varchar', length: 64, default: 'order_rating' })
+  sourceType!: string;
+
   @Column({ name: 'source_order_id', type: 'varchar', length: 64, nullable: true })
   sourceOrderId!: string | null;
 
@@ -29,4 +32,3 @@ export class OrganizationCreditShadowRecomputeTriggerEntity {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 }
-

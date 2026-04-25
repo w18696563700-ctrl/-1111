@@ -66,6 +66,7 @@ export class CreditScoringShadowBootstrapService implements OnApplicationBootstr
             entry_id varchar(64) PRIMARY KEY,
             organization_id varchar(64) NOT NULL,
             trigger_type varchar(64) NOT NULL,
+            source_type varchar(64) NOT NULL DEFAULT 'order_rating',
             source_order_id varchar(64),
             source_rating_id varchar(64),
             before_score numeric(6,2),
@@ -92,6 +93,7 @@ export class CreditScoringShadowBootstrapService implements OnApplicationBootstr
             trigger_id varchar(64) PRIMARY KEY,
             organization_id varchar(64) NOT NULL,
             trigger_type varchar(64) NOT NULL,
+            source_type varchar(64) NOT NULL DEFAULT 'order_rating',
             source_order_id varchar(64),
             source_rating_id varchar(64),
             reason_codes jsonb NOT NULL DEFAULT '[]'::jsonb,
@@ -140,4 +142,3 @@ export class CreditScoringShadowBootstrapService implements OnApplicationBootstr
     }
   }
 }
-

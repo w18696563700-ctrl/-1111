@@ -1,39 +1,124 @@
-const path = require('path');
-require('ts-node').register({
+const path = require("path");
+require("ts-node").register({
   transpileOnly: true,
-  project: path.resolve(__dirname, '../tsconfig.json'),
+  project: path.resolve(__dirname, "../tsconfig.json"),
 });
-require('reflect-metadata');
+require("reflect-metadata");
 
-const test = require('node:test');
-const assert = require('node:assert/strict');
-const { AxiosError } = require('axios');
-const { Module, RequestMethod } = require('@nestjs/common');
-const { PATH_METADATA, METHOD_METADATA } = require('@nestjs/common/constants');
-const { NestFactory } = require('@nestjs/core');
+const test = require("node:test");
+const assert = require("node:assert/strict");
+const { AxiosError } = require("axios");
+const { Module, RequestMethod } = require("@nestjs/common");
+const { PATH_METADATA, METHOD_METADATA } = require("@nestjs/common/constants");
+const { NestFactory } = require("@nestjs/core");
 
-const { MessageInteractionController } = require('../src/routes/message_interaction/message-interaction.controller.ts');
-const { MessageInteractionService } = require('../src/routes/message_interaction/message-interaction.service.ts');
-const { ErrorNormalizerService } = require('../src/core/errors/error-normalizer.service.ts');
+const {
+  MessageInteractionController,
+} = require("../src/routes/message_interaction/message-interaction.controller.ts");
+const {
+  MessageInteractionService,
+} = require("../src/routes/message_interaction/message-interaction.service.ts");
+const {
+  ProjectCommunicationRealtimeGateway,
+} = require("../src/routes/message_interaction/project-communication-realtime.gateway.ts");
+const {
+  ErrorNormalizerService,
+} = require("../src/core/errors/error-normalizer.service.ts");
 
-function createAxiosResponseError(status, data, message = `Request failed with status code ${status}`) {
-  return new AxiosError(message, 'ERR_BAD_REQUEST', {}, null, {
+function createAxiosResponseError(
+  status,
+  data,
+  message = `Request failed with status code ${status}`,
+) {
+  return new AxiosError(message, "ERR_BAD_REQUEST", {}, null, {
     status,
-    statusText: 'error',
+    statusText: "error",
     headers: {},
     config: {},
     data,
   });
 }
 
-test('message interactions route is materialized and no longer router 404 locally', async () => {
+test("message interactions route is materialized and no longer router 404 locally", async () => {
   const calls = [];
   const service = {
     getInteractions(lane) {
       calls.push(lane ?? null);
       return {
-        lane: lane ?? 'project_communication',
+        lane: lane ?? "project_communication",
         items: [],
+      };
+    },
+    getCounterpartConversationDetail(conversationId, projectId) {
+      calls.push(`${conversationId}:${projectId}`);
+      return {
+        conversationId,
+        counterpart: {
+          organizationId: "org-1",
+          displayName: "重庆海川展览工厂",
+          avatarUrl: null,
+          role: "counterpart",
+        },
+        summary: {
+          focusProjectId: projectId,
+          title: "项目名称查看申请",
+          text: "重庆海川展览工厂 申请查看当前项目名称。",
+          projectCount: 1,
+          latestCardType: "project_name_access_request",
+        },
+        focusProjectId: projectId,
+        latestActivityAt: "2026-04-29T10:00:00.000Z",
+        projectGroups: [],
+      };
+    },
+    getProjectCommunicationThread(projectId, counterpartOrganizationId) {
+      calls.push(`thread:${projectId}:${counterpartOrganizationId}`);
+      return {
+        threadId: "thread-1",
+        projectId,
+        ownerOrganizationId: "owner-org",
+        counterpartOrganizationId,
+        threadState: "open",
+        lastMessageId: null,
+        lastMessageAt: null,
+        createdAt: "2026-04-30T10:00:00.000Z",
+        updatedAt: "2026-04-30T10:00:00.000Z",
+      };
+    },
+    listProjectCommunicationMessages(threadId, projectId) {
+      calls.push(`messages:${threadId}:${projectId}`);
+      return {
+        items: [],
+        nextCursor: null,
+      };
+    },
+    sendProjectCommunicationMessage(payload) {
+      calls.push(
+        `send:${payload.threadId}:${payload.projectId}:${payload.body}`,
+      );
+      return {
+        messageId: "message-1",
+        threadId: payload.threadId,
+        projectId: payload.projectId,
+        senderUserId: "user-1",
+        senderActorId: "actor-1",
+        senderOrganizationId: "org-1",
+        messageKind: "text",
+        body: payload.body,
+        clientMessageId: null,
+        messageState: "active",
+        createdAt: "2026-04-30T10:01:00.000Z",
+      };
+    },
+    markProjectCommunicationReadCursor(payload) {
+      calls.push(`read:${payload.threadId}:${payload.projectId}`);
+      return {
+        threadId: payload.threadId,
+        projectId: payload.projectId,
+        organizationId: "org-1",
+        lastReadMessageId: payload.lastReadMessageId ?? null,
+        lastReadAt: "2026-04-30T10:02:00.000Z",
+        updatedAt: "2026-04-30T10:02:00.000Z",
       };
     },
   };
@@ -45,18 +130,41 @@ test('message interactions route is materialized and no longer router 404 locall
   })(TestModule);
 
   const app = await NestFactory.create(TestModule, { logger: false });
-  await app.listen(0, '127.0.0.1');
+  await app.listen(0, "127.0.0.1");
 
   try {
     const url = await app.getUrl();
-    assert.equal(Reflect.getMetadata(PATH_METADATA, MessageInteractionController), 'api/app/message');
     assert.equal(
-      Reflect.getMetadata(PATH_METADATA, MessageInteractionController.prototype.getInteractions),
-      'interactions',
+      Reflect.getMetadata(PATH_METADATA, MessageInteractionController),
+      "api/app/message",
     );
     assert.equal(
-      Reflect.getMetadata(METHOD_METADATA, MessageInteractionController.prototype.getInteractions),
+      Reflect.getMetadata(
+        PATH_METADATA,
+        MessageInteractionController.prototype.getInteractions,
+      ),
+      "interactions",
+    );
+    assert.equal(
+      Reflect.getMetadata(
+        METHOD_METADATA,
+        MessageInteractionController.prototype.getInteractions,
+      ),
       RequestMethod.GET,
+    );
+    assert.equal(
+      Reflect.getMetadata(
+        PATH_METADATA,
+        MessageInteractionController.prototype.getCounterpartConversationDetail,
+      ),
+      "counterpart-conversation/detail",
+    );
+    assert.equal(
+      Reflect.getMetadata(
+        PATH_METADATA,
+        MessageInteractionController.prototype.listProjectCommunicationMessages,
+      ),
+      "project-communication/messages",
     );
 
     const response = await fetch(
@@ -64,35 +172,138 @@ test('message interactions route is materialized and no longer router 404 locall
     );
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
-      lane: 'project_communication',
+      lane: "project_communication",
       items: [],
     });
+
+    const detailResponse = await fetch(
+      `${url}/api/app/message/counterpart-conversation/detail?conversationId=org-1&projectId=project-1`,
+    );
+    assert.equal(detailResponse.status, 200);
+    assert.equal((await detailResponse.json()).conversationId, "org-1");
+
+    const threadResponse = await fetch(
+      `${url}/api/app/message/project-communication/thread?projectId=project-1&counterpartOrganizationId=org-1`,
+    );
+    assert.equal(threadResponse.status, 200);
+    assert.equal((await threadResponse.json()).threadId, "thread-1");
+
+    const messagesResponse = await fetch(
+      `${url}/api/app/message/project-communication/messages?threadId=thread-1&projectId=project-1`,
+    );
+    assert.equal(messagesResponse.status, 200);
+    assert.deepEqual(await messagesResponse.json(), {
+      items: [],
+      nextCursor: null,
+    });
+
+    const sendResponse = await fetch(
+      `${url}/api/app/message/project-communication/messages`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          threadId: "thread-1",
+          projectId: "project-1",
+          body: "在吗",
+        }),
+      },
+    );
+    assert.equal(sendResponse.status, 202);
+    assert.equal((await sendResponse.json()).messageId, "message-1");
+
+    const readResponse = await fetch(
+      `${url}/api/app/message/project-communication/read-cursor`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          threadId: "thread-1",
+          projectId: "project-1",
+          lastReadMessageId: "message-1",
+        }),
+      },
+    );
+    assert.equal(readResponse.status, 202);
+    assert.equal((await readResponse.json()).lastReadMessageId, "message-1");
   } finally {
     await app.close();
   }
 
-  assert.deepEqual(calls, ['project_communication']);
+  assert.deepEqual(calls, [
+    "project_communication",
+    "org-1:project-1",
+    "thread:project-1:org-1",
+    "messages:thread-1:project-1",
+    "send:thread-1:project-1:在吗",
+    "read:thread-1:project-1",
+  ]);
 });
 
-test('message interactions service forwards frozen server path and hides raw route drift', async () => {
+test("message interactions service forwards frozen server path and hides raw route drift", async () => {
   const service = new MessageInteractionService(
     {
       async get(pathName, options) {
-        assert.equal(pathName, '/server/message/interactions');
-        assert.deepEqual(options.params, { lane: 'project_communication' });
+        assert.equal(pathName, "/server/message/interactions");
+        assert.deepEqual(options.params, { lane: "project_communication" });
         return {
-          lane: 'project_communication',
-          items: [],
-          trimmed: 'ignore-me',
+          lane: "project_communication",
+          items: [
+            {
+              interactionId: "org-1",
+              interactionType: "counterpart_conversation",
+              conversationId: "org-1",
+              projectId: "project-1",
+              counterpart: {
+                organizationId: "org-1",
+                displayName: "重庆海川展览工厂",
+                avatarUrl: null,
+                role: "counterpart",
+              },
+              summary: {
+                focusProjectId: "project-1",
+                title: "订单状态已更新",
+                text: "重庆海川展览工厂 的当前项目订单已有新状态。",
+                projectCount: 1,
+                latestCardType: "project_order",
+              },
+              updatedAt: "2026-04-29T10:00:00.000Z",
+              p0PaySummary: {
+                taskId: "project-1",
+                taskType: "fixed_price_bid",
+                platformServiceFee: {
+                  status: "charged",
+                  finalFeeAmount: "2700.00",
+                },
+                contractConfirmation: { status: "confirmed" },
+                messageDisplaySummary: {
+                  displayAllowed: true,
+                  readOnly: true,
+                  statusTextKey: "charged",
+                },
+              },
+              routeTarget: {
+                objectType: "counterpart_conversation",
+                actionKey: "counterpart_conversation.open",
+                canonicalPath:
+                  "/api/app/message/counterpart-conversation/detail",
+                params: {
+                  conversationId: "org-1",
+                  projectId: "project-1",
+                },
+              },
+            },
+          ],
+          trimmed: "ignore-me",
         };
       },
     },
     {
       buildForwardHeaders() {
         return {
-          authorization: 'Bearer token',
-          'x-organization-id': 'org-1',
-          'x-actor-role': 'supplier_admin',
+          authorization: "Bearer token",
+          "x-organization-id": "org-1",
+          "x-actor-role": "supplier_admin",
         };
       },
     },
@@ -101,8 +312,52 @@ test('message interactions service forwards frozen server path and hides raw rou
 
   const result = await service.getInteractions(undefined, {});
   assert.deepEqual(result, {
-    lane: 'project_communication',
-    items: [],
+    lane: "project_communication",
+    items: [
+      {
+        interactionId: "org-1",
+        interactionType: "counterpart_conversation",
+        conversationId: "org-1",
+        projectId: "project-1",
+        counterpart: {
+          organizationId: "org-1",
+          displayName: "重庆海川展览工厂",
+          avatarUrl: null,
+          role: "counterpart",
+        },
+        summary: {
+          focusProjectId: "project-1",
+          title: "订单状态已更新",
+          text: "重庆海川展览工厂 的当前项目订单已有新状态。",
+          projectCount: 1,
+          latestCardType: "project_order",
+        },
+        p0PaySummary: {
+          taskId: "project-1",
+          taskType: "fixed_price_bid",
+          platformServiceFee: {
+            status: "charged",
+            finalFeeAmount: "2700.00",
+          },
+          contractConfirmation: { status: "confirmed" },
+          messageDisplaySummary: {
+            displayAllowed: true,
+            readOnly: true,
+            statusTextKey: "charged",
+          },
+        },
+        updatedAt: "2026-04-29T10:00:00.000Z",
+        routeTarget: {
+          objectType: "counterpart_conversation",
+          actionKey: "counterpart_conversation.open",
+          canonicalPath: "/api/app/message/counterpart-conversation/detail",
+          params: {
+            conversationId: "org-1",
+            projectId: "project-1",
+          },
+        },
+      },
+    ],
   });
 
   const brokenService = new MessageInteractionService(
@@ -110,8 +365,8 @@ test('message interactions service forwards frozen server path and hides raw rou
       async get() {
         throw createAxiosResponseError(404, {
           statusCode: 404,
-          message: 'Cannot GET /server/message/interactions',
-          source: 'server',
+          message: "Cannot GET /server/message/interactions",
+          source: "server",
         });
       },
     },
@@ -129,11 +384,574 @@ test('message interactions service forwards frozen server path and hides raw rou
       assert.equal(error.getStatus(), 404);
       assert.deepEqual(error.getResponse(), {
         statusCode: 404,
-        code: 'MESSAGE_INTERACTION_UNAVAILABLE',
-        message: '当前项目沟通入口暂不可用，请稍后再试。',
-        source: 'server',
+        code: "MESSAGE_INTERACTION_UNAVAILABLE",
+        message: "当前项目沟通入口暂不可用，请稍后再试。",
+        source: "server",
       });
       return true;
     },
   );
+});
+
+test("counterpart conversation detail service forwards frozen server path and hides raw route drift", async () => {
+  const service = new MessageInteractionService(
+    {
+      async get(pathName, options) {
+        assert.equal(
+          pathName,
+          "/server/message/counterpart-conversation/detail",
+        );
+        assert.deepEqual(options.params, {
+          conversationId: "org-1",
+          projectId: "project-1",
+        });
+        return {
+          conversationId: "org-1",
+          counterpart: {
+            organizationId: "org-1",
+            displayName: "重庆海川展览工厂",
+            avatarUrl: null,
+            role: "counterpart",
+          },
+          summary: {
+            focusProjectId: "project-1",
+            title: "项目名称查看申请",
+            text: "重庆海川展览工厂 申请查看当前项目名称。",
+            projectCount: 1,
+            latestCardType: "project_name_access_request",
+          },
+          focusProjectId: "project-1",
+          latestActivityAt: "2026-04-29T10:00:00.000Z",
+          projectGroups: [
+            {
+              projectId: "project-1",
+              projectDisplayTitle: "项目名称需申请查看",
+              titleVisibility: "masked",
+              projectState: "published",
+              latestActivityAt: "2026-04-29T10:00:00.000Z",
+              orderSummary: {
+                orderId: "order-1",
+                projectId: "project-1",
+                buyerOrganizationId: "owner-org",
+                sellerOrganizationId: "org-1",
+                state: "active",
+                completionRequestState: "requested",
+              },
+              ratingEntry: {
+                orderId: "order-1",
+                projectId: "project-1",
+                rateeOrganizationId: "org-1",
+                canRate: false,
+                reason: "当前项目尚未结束，评价入口不会开放。",
+                ratingState: "draft",
+              },
+              cards: [
+                {
+                  cardId: "project-name-access:request-1",
+                  cardType: "project_name_access_request",
+                  title: "项目名称查看申请",
+                  summary: "重庆海川展览工厂 申请查看当前项目名称。",
+                  status: "pending",
+                  updatedAt: "2026-04-29T10:00:00.000Z",
+                  truthAnchor: {
+                    truthType: "project_name_access_request",
+                    projectId: "project-1",
+                    requestId: "request-1",
+                    threadId: "request-1",
+                  },
+                  detailRouteTarget: {
+                    objectType: "project_name_access_thread",
+                    actionKey: "project_name_access_thread.open",
+                    canonicalPath: "/api/app/project/name-access/thread/detail",
+                    params: {
+                      threadId: "request-1",
+                      projectId: "project-1",
+                      requestId: "request-1",
+                    },
+                  },
+                  decisionAvailability: {
+                    canApprove: true,
+                    canReject: true,
+                  },
+                },
+                {
+                  cardId: "project-order:order-1",
+                  cardType: "project_order",
+                  title: "订单状态",
+                  summary: "当前订单正在履约中，承接方已申请完工。",
+                  status: "requested",
+                  updatedAt: "2026-04-29T10:01:00.000Z",
+                  truthAnchor: {
+                    truthType: "project_order",
+                    projectId: "project-1",
+                    orderId: "order-1",
+                  },
+                  detailRouteTarget: {
+                    objectType: "order",
+                    actionKey: "order_detail.open",
+                    canonicalPath: "/api/app/order/detail",
+                    params: {
+                      projectId: "project-1",
+                      orderId: "order-1",
+                    },
+                  },
+                  decisionAvailability: null,
+                },
+              ],
+            },
+          ],
+        };
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {
+          authorization: "Bearer token",
+          "x-organization-id": "org-owner",
+          "x-actor-role": "project_owner",
+        };
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  const result = await service.getCounterpartConversationDetail(
+    "org-1",
+    "project-1",
+    {},
+  );
+  assert.equal(
+    result.projectGroups[0].cards[0].truthAnchor.projectId,
+    "project-1",
+  );
+  assert.deepEqual(result.projectGroups[0].orderSummary, {
+    orderId: "order-1",
+    projectId: "project-1",
+    buyerOrganizationId: "owner-org",
+    sellerOrganizationId: "org-1",
+    state: "active",
+    completionRequestState: "requested",
+  });
+  const orderCard = result.projectGroups[0].cards.find(
+    (card) => card.cardType === "project_order",
+  );
+  assert.equal(orderCard.truthAnchor.orderId, "order-1");
+  assert.deepEqual(orderCard.detailRouteTarget.params, {
+    projectId: "project-1",
+    orderId: "order-1",
+  });
+  assert.deepEqual(result.projectGroups[0].ratingEntry, {
+    orderId: "order-1",
+    projectId: "project-1",
+    rateeOrganizationId: "org-1",
+    canRate: false,
+    reason: "当前项目尚未结束，评价入口不会开放。",
+    ratingState: "draft",
+  });
+
+  const brokenService = new MessageInteractionService(
+    {
+      async get() {
+        throw createAxiosResponseError(404, {
+          statusCode: 404,
+          message: "Cannot GET /server/message/counterpart-conversation/detail",
+          source: "server",
+        });
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {};
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  await assert.rejects(
+    () =>
+      brokenService.getCounterpartConversationDetail("org-1", "project-1", {}),
+    (error) => {
+      assert.equal(error.getStatus(), 404);
+      assert.deepEqual(error.getResponse(), {
+        statusCode: 404,
+        code: "COUNTERPART_CONVERSATION_UNAVAILABLE",
+        message: "当前对方沟通容器暂不可用，请稍后再试。",
+        source: "server",
+      });
+      return true;
+    },
+  );
+});
+
+test("project communication routes forward thread, message list, send, and read cursor paths", async () => {
+  const calls = [];
+  const service = new MessageInteractionService(
+    {
+      async get(pathName, options) {
+        calls.push({ method: "GET", pathName, params: options.params });
+        if (pathName === "/server/project-communication/thread") {
+          return {
+            threadId: "thread-1",
+            projectId: options.params.projectId,
+            ownerOrganizationId: "owner-org",
+            counterpartOrganizationId: options.params.counterpartOrganizationId,
+            threadState: "open",
+            lastMessageId: null,
+            lastMessageAt: null,
+            createdAt: "2026-04-30T10:00:00.000Z",
+            updatedAt: "2026-04-30T10:00:00.000Z",
+          };
+        }
+        return {
+          items: [
+            {
+              messageId: "message-1",
+              threadId: options.params.threadId,
+              projectId: options.params.projectId,
+              senderUserId: "user-1",
+              senderActorId: "actor-1",
+              senderOrganizationId: "org-1",
+              messageKind: "text",
+              body: "在吗",
+              clientMessageId: null,
+              messageState: "active",
+              createdAt: "2026-04-30T10:01:00.000Z",
+            },
+          ],
+          nextCursor: "2026-04-30T10:01:00.000Z",
+        };
+      },
+      async post(pathName, body) {
+        calls.push({ method: "POST", pathName, body });
+        if (pathName === "/server/project-communication/read-cursor") {
+          return {
+            threadId: body.threadId,
+            projectId: body.projectId,
+            organizationId: "org-1",
+            lastReadMessageId: body.lastReadMessageId,
+            lastReadAt: "2026-04-30T10:02:00.000Z",
+            updatedAt: "2026-04-30T10:02:00.000Z",
+          };
+        }
+        return {
+          messageId: "message-2",
+          threadId: body.threadId,
+          projectId: body.projectId,
+          senderUserId: "user-1",
+          senderActorId: "actor-1",
+          senderOrganizationId: "org-1",
+          messageKind: "text",
+          body: body.body,
+          clientMessageId: body.clientMessageId ?? null,
+          messageState: "active",
+          createdAt: "2026-04-30T10:03:00.000Z",
+        };
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {
+          authorization: "Bearer token",
+          "x-organization-id": "org-1",
+          "x-actor-role": "supplier_admin",
+        };
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  const thread = await service.getProjectCommunicationThread(
+    "project-1",
+    "owner-org",
+    {},
+  );
+  assert.equal(thread.threadId, "thread-1");
+
+  const messages = await service.listProjectCommunicationMessages(
+    "thread-1",
+    "project-1",
+    undefined,
+    "20",
+    {},
+  );
+  assert.equal(messages.items[0].messageId, "message-1");
+
+  const message = await service.sendProjectCommunicationMessage(
+    {
+      threadId: "thread-1",
+      projectId: "project-1",
+      body: "收到",
+      clientMessageId: "client-1",
+    },
+    {},
+  );
+  assert.equal(message.body, "收到");
+
+  const cursor = await service.markProjectCommunicationReadCursor(
+    {
+      threadId: "thread-1",
+      projectId: "project-1",
+      lastReadMessageId: "message-2",
+    },
+    {},
+  );
+  assert.equal(cursor.lastReadMessageId, "message-2");
+  assert.deepEqual(calls, [
+    {
+      method: "GET",
+      pathName: "/server/project-communication/thread",
+      params: {
+        projectId: "project-1",
+        counterpartOrganizationId: "owner-org",
+      },
+    },
+    {
+      method: "GET",
+      pathName: "/server/project-communication/messages",
+      params: {
+        threadId: "thread-1",
+        projectId: "project-1",
+        cursor: undefined,
+        limit: 20,
+      },
+    },
+    {
+      method: "POST",
+      pathName: "/server/project-communication/messages",
+      body: {
+        threadId: "thread-1",
+        projectId: "project-1",
+        body: "收到",
+        clientMessageId: "client-1",
+      },
+    },
+    {
+      method: "POST",
+      pathName: "/server/project-communication/read-cursor",
+      body: {
+        threadId: "thread-1",
+        projectId: "project-1",
+        lastReadMessageId: "message-2",
+      },
+    },
+  ]);
+});
+
+test("project communication service hides raw upstream route drift", async () => {
+  const service = new MessageInteractionService(
+    {
+      async get() {
+        throw createAxiosResponseError(404, {
+          statusCode: 404,
+          message: "Cannot GET /server/project-communication/messages",
+          source: "server",
+        });
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {};
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  await assert.rejects(
+    () =>
+      service.listProjectCommunicationMessages(
+        "thread-1",
+        "project-1",
+        undefined,
+        undefined,
+        {},
+      ),
+    (error) => {
+      assert.equal(error.getStatus(), 404);
+      assert.deepEqual(error.getResponse(), {
+        statusCode: 404,
+        code: "PROJECT_COMMUNICATION_UNAVAILABLE",
+        message: "当前项目沟通消息暂不可用，请稍后再试。",
+        source: "server",
+      });
+      return true;
+    },
+  );
+});
+
+test("project communication realtime gateway validates subscription through server truth", async () => {
+  const calls = [];
+  const sent = [];
+  const gateway = new ProjectCommunicationRealtimeGateway({
+    async listProjectCommunicationMessages(
+      threadId,
+      projectId,
+      cursor,
+      limit,
+      headers,
+    ) {
+      assert.equal(headers.authorization, "Bearer token");
+      calls.push({
+        pathName: "/server/project-communication/messages",
+        params: { projectId, threadId, limit: Number(limit) },
+        headers: {
+          authorization: headers.authorization,
+          "x-organization-id": headers["x-organization-id"],
+        },
+      });
+      return { items: [], nextCursor: null };
+    },
+  });
+
+  const accepted = await gateway.handleSubscribe(
+    {
+      send(message) {
+        sent.push(JSON.parse(message));
+      },
+    },
+    {
+      action: "project_communication.subscribe",
+      projectId: " project-1 ",
+      threadId: " thread-1 ",
+      counterpartOrganizationId: " org-2 ",
+    },
+    {
+      authorization: "Bearer token",
+      "x-organization-id": "org-1",
+    },
+  );
+
+  assert.deepEqual(calls, [
+    {
+      pathName: "/server/project-communication/messages",
+      params: {
+        projectId: "project-1",
+        threadId: "thread-1",
+        limit: 1,
+      },
+      headers: {
+        authorization: "Bearer token",
+        "x-organization-id": "org-1",
+      },
+    },
+  ]);
+  assert.deepEqual(accepted, {
+    eventType: "project_communication.subscription.accepted",
+    projectId: "project-1",
+    threadId: "thread-1",
+    counterpartOrganizationId: "org-2",
+  });
+  assert.deepEqual(sent, [accepted]);
+});
+
+test("project communication realtime gateway rejects missing fields and unauthorized subscriptions", async () => {
+  const gateway = new ProjectCommunicationRealtimeGateway({
+    async listProjectCommunicationMessages() {
+      throw {
+        getResponse() {
+          return {
+            statusCode: 403,
+            code: "PROJECT_COMMUNICATION_FORBIDDEN",
+            message: "Current organization is not a participant.",
+            source: "server",
+          };
+        },
+      };
+    },
+  });
+
+  assert.deepEqual(
+    await gateway.handleSubscribe(
+      {},
+      {
+        action: "project_communication.subscribe",
+        projectId: "project-1",
+      },
+    ),
+    {
+      eventType: "project_communication.subscription.rejected",
+      code: "PROJECT_COMMUNICATION_INVALID",
+      message: "Subscription requires projectId and threadId.",
+    },
+  );
+
+  assert.deepEqual(
+    await gateway.handleSubscribe(
+      {},
+      {
+        action: "project_communication.subscribe",
+        projectId: "project-1",
+        threadId: "thread-1",
+      },
+      { authorization: "Bearer token" },
+    ),
+    {
+      eventType: "project_communication.subscription.rejected",
+      code: "PROJECT_COMMUNICATION_FORBIDDEN",
+      message: "Current organization is not a participant.",
+    },
+  );
+});
+
+test("project communication realtime gateway forwards only matching message-created events", async () => {
+  const sentA = [];
+  const sentB = [];
+  const gateway = new ProjectCommunicationRealtimeGateway({
+    async listProjectCommunicationMessages() {
+      return { items: [], nextCursor: null };
+    },
+  });
+
+  await gateway.handleSubscribe(
+    {
+      send(message) {
+        sentA.push(JSON.parse(message));
+      },
+    },
+    {
+      action: "project_communication.subscribe",
+      projectId: "project-1",
+      threadId: "thread-1",
+    },
+  );
+  await gateway.handleSubscribe(
+    {
+      send(message) {
+        sentB.push(JSON.parse(message));
+      },
+    },
+    {
+      action: "project_communication.subscribe",
+      projectId: "project-2",
+      threadId: "thread-2",
+    },
+  );
+
+  assert.equal(
+    gateway.forwardMessageCreated({
+      eventType: "project_communication.message.created",
+      eventId: "event-1",
+      messageId: "message-1",
+      threadId: "thread-1",
+      projectId: "project-1",
+      senderOrganizationId: "org-1",
+      messageKind: "text",
+      body: "hello",
+      clientMessageId: "client-1",
+      createdAt: "2026-05-18T00:00:00.000Z",
+    }),
+    1,
+  );
+  assert.equal(
+    gateway.forwardMessageCreated({
+      eventType: "project_communication.typing",
+      threadId: "thread-1",
+      projectId: "project-1",
+    }),
+    0,
+  );
+
+  assert.equal(sentA.length, 2);
+  assert.equal(sentA[1].eventType, "project_communication.message.created");
+  assert.equal(sentA[1].messageId, "message-1");
+  assert.equal(sentB.length, 1);
 });

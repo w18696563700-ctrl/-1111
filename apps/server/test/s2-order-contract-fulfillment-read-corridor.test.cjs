@@ -30,6 +30,9 @@ function createQueryRepository({
         if (orderError) {
           throw orderError;
         }
+        if (params.length > 2 && params[2] && scopedOrder?.projectId !== params[2]) {
+          return [];
+        }
         return scopedOrder ? [scopedOrder] : [];
       }
       if (sql.includes('from public.contracts contract') && params[0] === 'order-1') {
@@ -106,6 +109,7 @@ test('S2 read corridor exposes scoped order, contract, milestone, and inspection
         title: '主场展台施工订单',
         totalAmount: 1200,
         state: 'active',
+        completionRequestState: 'none',
         activatedAt: '2026-04-09T10:00:00.000Z',
         createdAt: '2026-04-09T09:00:00.000Z',
         updatedAt: '2026-04-09T11:00:00.000Z',
@@ -169,6 +173,7 @@ test('S2 read corridor exposes scoped order, contract, milestone, and inspection
 
   const orderDetail = await service.getOrderDetail(
     'order-1',
+    'project-1',
     createContext('Bearer token', 'order-detail'),
   );
   assert.deepEqual(orderDetail, {
@@ -176,7 +181,11 @@ test('S2 read corridor exposes scoped order, contract, milestone, and inspection
     orderNo: 'ORD-1',
     projectId: 'project-1',
     bidId: 'bid-1',
+    buyerOrganizationId: 'org-buyer',
+    supplierOrganizationId: 'org-supplier',
+    sellerOrganizationId: 'org-supplier',
     state: 'active',
+    completionRequestState: 'none',
     summary: { heading: '主场展台施工订单' },
     milestones: [
       {
@@ -186,6 +195,14 @@ test('S2 read corridor exposes scoped order, contract, milestone, and inspection
         amount: 62000,
         state: 'pending_submission',
         summary: { heading: '当前里程碑待提交。' },
+      },
+      {
+        milestoneId: 'milestone-2',
+        orderId: 'order-1',
+        title: '超出冻结边界的已完工节点',
+        amount: 38000,
+        state: 'completed',
+        summary: { heading: 'done' },
       },
     ],
   });
@@ -215,6 +232,14 @@ test('S2 read corridor exposes scoped order, contract, milestone, and inspection
         state: 'pending_submission',
         summary: { heading: '当前里程碑待提交。' },
       },
+      {
+        milestoneId: 'milestone-2',
+        orderId: 'order-1',
+        title: '超出冻结边界的已完工节点',
+        amount: 38000,
+        state: 'completed',
+        summary: { heading: 'done' },
+      },
     ],
   });
 
@@ -228,6 +253,48 @@ test('S2 read corridor exposes scoped order, contract, milestone, and inspection
     state: 'submitted',
     summary: { heading: '验收单已提交' },
   });
+});
+
+test('S2 order detail rejects mismatched optional projectId boundary', async () => {
+  const {
+    TradingReadCorridorPresenter,
+  } = require('../dist/modules/trading_read_corridor/trading-read-corridor.presenter.js');
+  const {
+    TradingReadCorridorQueryService,
+  } = require('../dist/modules/trading_read_corridor/trading-read-corridor.query.service.js');
+
+  const { verifier, eligibility } = createVerifiedServices();
+  const service = new TradingReadCorridorQueryService(
+    createQueryRepository({
+      scopedOrder: {
+        orderId: 'order-1',
+        orderNo: 'ORD-1',
+        projectId: 'project-1',
+        bidId: 'bid-1',
+        buyerOrganizationId: 'owner-org',
+        supplierOrganizationId: 'supplier-org',
+        title: '主场展台施工订单',
+        totalAmount: 120000,
+        state: 'active',
+        activatedAt: '2026-04-09T10:00:00.000Z',
+        createdAt: '2026-04-09T09:00:00.000Z',
+        updatedAt: '2026-04-09T10:00:00.000Z',
+      },
+    }),
+    verifier,
+    eligibility,
+    new TradingReadCorridorPresenter(),
+  );
+
+  await assert.rejects(
+    () =>
+      service.getOrderDetail(
+        'order-1',
+        'project-other',
+        createContext('Bearer token', 'order-project-mismatch'),
+      ),
+    (error) => error?.response?.code === 'AUTH_RESOURCE_UNAVAILABLE',
+  );
 });
 
 test('S2 order and contract detail reject missing orderId with controlled invalid results', async () => {
@@ -247,7 +314,7 @@ test('S2 order and contract detail reject missing orderId with controlled invali
   );
 
   await assert.rejects(
-    () => service.getOrderDetail(undefined, createContext('Bearer token', 'order-missing-id')),
+    () => service.getOrderDetail(undefined, undefined, createContext('Bearer token', 'order-missing-id')),
     (error) => error?.response?.code === 'ORDER_DETAIL_INVALID',
   );
   await assert.rejects(
@@ -279,7 +346,7 @@ test('S2 read corridor fail-closes when current actor is outside the scoped orde
   );
 
   await assert.rejects(
-    () => service.getOrderDetail('order-1', createContext('Bearer token', 'order-miss')),
+    () => service.getOrderDetail('order-1', undefined, createContext('Bearer token', 'order-miss')),
     (error) => error?.response?.code === 'AUTH_RESOURCE_UNAVAILABLE',
   );
   await assert.rejects(
@@ -302,7 +369,7 @@ test('S2 read corridor fail-closes when current actor is outside the scoped orde
   );
 });
 
-test('S2 inspection and order read corridor keep out-of-bound states unavailable', async () => {
+test('S2 inspection and order read corridor expose completed production states', async () => {
   const {
     TradingReadCorridorPresenter,
   } = require('../dist/modules/trading_read_corridor/trading-read-corridor.presenter.js');
@@ -323,6 +390,7 @@ test('S2 inspection and order read corridor keep out-of-bound states unavailable
         title: '已完结订单',
         totalAmount: 1200,
         state: 'completed',
+        completionRequestState: 'confirmed',
         activatedAt: '2026-04-09T10:00:00.000Z',
         createdAt: '2026-04-09T09:00:00.000Z',
         updatedAt: '2026-04-09T11:00:00.000Z',
@@ -357,18 +425,37 @@ test('S2 inspection and order read corridor keep out-of-bound states unavailable
     new TradingReadCorridorPresenter(),
   );
 
-  await assert.rejects(
-    () =>
-      service.getOrderDetail('order-1', createContext('Bearer token', 'order-completed')),
-    (error) => error?.response?.code === 'AUTH_RESOURCE_UNAVAILABLE',
+  assert.deepEqual(
+    await service.getOrderDetail(
+      'order-1',
+      undefined,
+      createContext('Bearer token', 'order-completed')
+    ),
+    {
+      orderId: 'order-1',
+      orderNo: 'ORD-1',
+      projectId: 'project-1',
+      bidId: 'bid-1',
+      buyerOrganizationId: 'org-buyer',
+      supplierOrganizationId: 'org-supplier',
+      sellerOrganizationId: 'org-supplier',
+      state: 'completed',
+      completionRequestState: 'confirmed',
+      summary: { heading: '已完结订单' },
+      milestones: [],
+    },
   );
-  await assert.rejects(
-    () =>
-      service.getInspectionDetail(
-        'milestone-1',
-        createContext('Bearer token', 'inspection-passed'),
-      ),
-    (error) => error?.response?.code === 'INSPECTION_ENTRY_UNAVAILABLE',
+  assert.deepEqual(
+    await service.getInspectionDetail(
+      'milestone-1',
+      createContext('Bearer token', 'inspection-passed'),
+    ),
+    {
+      inspectionId: 'inspection-1',
+      milestoneId: 'milestone-1',
+      state: 'passed',
+      summary: { heading: 'outside frozen set' },
+    },
   );
 });
 
@@ -468,6 +555,7 @@ test('S2 order and contract detail hide upstream query failures behind controlle
     () =>
       orderFailureService.getOrderDetail(
         'order-1',
+        undefined,
         createContext('Bearer token', 'order-db-error'),
       ),
     (error) =>

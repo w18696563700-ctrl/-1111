@@ -24,12 +24,12 @@ final bool _hasCompileTimeApiOverrides =
 void main() {
   tearDown(AppApiConfig.resetRuntimeBaseUrlOverride);
 
-  test('default entry mode prefers cloud when configured cloud url exists', () {
+  test('default entry mode stays on ssh tunnel even when cloud url exists', () {
     expect(
       AppApiEntryTarget.defaultEntryMode(
         configuredCloudBaseUrl: 'http://formal-cloud.test/api/app',
       ),
-      AppApiEntryMode.cloud,
+      AppApiEntryMode.sshTunnel,
     );
   });
 
@@ -77,28 +77,40 @@ void main() {
     );
   });
 
-  test(
-    'entry mode labels distinguish cloud, tunnel, and local development',
-    () {
-      expect(
-        AppApiConfig(
-          baseUrl: 'http://formal-cloud.test/api/app',
-          entryMode: AppApiEntryMode.cloud,
-        ).userFacingEnvironmentLabel,
-        '正式云端',
-      );
-      expect(
-        AppApiConfig(
-          baseUrl: AppApiEntryTarget.sshTunnelBaseUrl,
-        ).userFacingEnvironmentLabel,
-        'SSH隧道',
-      );
-      expect(
-        AppApiConfig(
-          baseUrl: AppApiEntryTarget.localDevelopmentBaseUrl,
-        ).userFacingEnvironmentLabel,
-        '本地开发',
-      );
-    },
-  );
+  test('entry mode labels distinguish cloud and tunnel runtimes', () {
+    expect(
+      AppApiConfig(
+        baseUrl: 'http://formal-cloud.test/api/app',
+        entryMode: AppApiEntryMode.cloud,
+      ).userFacingEnvironmentLabel,
+      '正式云端',
+    );
+    expect(
+      AppApiConfig(
+        baseUrl: AppApiEntryTarget.sshTunnelBaseUrl,
+      ).userFacingEnvironmentLabel,
+      'SSH隧道',
+    );
+    expect(
+      () => AppApiConfig(baseUrl: AppApiEntryTarget.localDevelopmentBaseUrl),
+      throwsStateError,
+    );
+  });
+
+  test('local development mode is rejected for runtime configs', () {
+    expect(
+      () => AppApiEntryTarget.defaultBaseUrlForMode(AppApiEntryMode.localDev),
+      throwsStateError,
+    );
+    expect(
+      () => AppApiConfig(baseUrl: AppApiEntryTarget.localDevelopmentBaseUrl),
+      throwsStateError,
+    );
+    expect(
+      () => AppApiConfig.installRuntimeBaseUrlOverride(
+        AppApiEntryTarget.localDevelopmentBaseUrl,
+      ),
+      throwsStateError,
+    );
+  });
 }

@@ -6,12 +6,14 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
+import 'package:mobile/features/exhibition/data/exhibition_home_location_context_store.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/exhibition_home_test_doubles.dart';
 
@@ -61,7 +63,13 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(
     finder,
     220,
-    scrollable: find.byType(Scrollable).first,
+    scrollable: find
+        .byWidgetPredicate(
+          (Widget widget) =>
+              widget is Scrollable &&
+              widget.axisDirection == AxisDirection.down,
+        )
+        .first,
   );
   await tester.pumpAndSettle();
 }
@@ -396,11 +404,14 @@ ExhibitionConsumerLayer _projectListConsumer({
 
 void main() {
   setUp(() {
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    ExhibitionHomeLocationContextStore.reset();
     _installEnterpriseHubConsumer();
   });
 
   tearDown(() {
     EnterpriseHubConsumerLayer.reset();
+    ExhibitionHomeLocationContextStore.reset();
   });
 
   testWidgets(
@@ -428,17 +439,21 @@ void main() {
                       uri: request.uri,
                       body: <String, Object?>{
                         'items': <Object?>[
-                          <String, Object?>{
-                            'projectId': 'project-$requestCount',
-                            'projectNo': 'PROJ-$requestCount',
-                            'title': title,
-                            'buildingType': 'exhibition',
-                            'budgetAmount': 188000,
-                            'state': 'published',
-                            'summary': <String, Object?>{
-                              'heading': 'project-$requestCount',
+                          for (var index = 0; index < 3; index++)
+                            <String, Object?>{
+                              'projectId': 'project-$requestCount-$index',
+                              'projectNo': 'PROJ-$requestCount-$index',
+                              'title': index == 0 ? title : '$title-$index',
+                              'buildingType': 'exhibition',
+                              'budgetAmount': 188000 + index * 10000,
+                              'areaSqm': 200 + index * 50,
+                              'cityName': '重庆市',
+                              'plannedStartAt': '2026-05-${16 + index}',
+                              'state': 'published',
+                              'summary': <String, Object?>{
+                                'heading': 'project-$requestCount-$index',
+                              },
                             },
-                          },
                         ],
                       },
                     );
@@ -459,9 +474,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('天气与定位'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
       await _scrollTo(tester, find.text('重庆春季展台项目'));
       expect(find.text('重庆春季展台项目'), findsOneWidget);
+      expect(find.text('示意图'), findsNWidgets(3));
       expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
       expect(find.byTooltip('回到顶部'), findsOneWidget);
       expect(requestCount, 1);
@@ -469,6 +485,7 @@ void main() {
       expect(homeClient.refreshCount, 0);
       expect(locationService.requestCount, 1);
 
+      await _scrollTo(tester, find.widgetWithText(TextButton, '刷新'));
       await tester.tap(find.widgetWithText(TextButton, '刷新'));
       await tester.pump();
       await tester.pumpAndSettle();
@@ -551,7 +568,7 @@ void main() {
       expect(find.text('全国工厂样本'), findsOneWidget);
       expect(find.text('展台制作与木作工厂样本'), findsOneWidget);
       expect(find.text('工厂展示'), findsWidgets);
-      expect(find.widgetWithText(OutlinedButton, '进入工厂列表'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '进入工厂列表'), findsOneWidget);
     },
   );
 
@@ -591,7 +608,7 @@ void main() {
       await tester.pumpAndSettle();
       await _scrollTo(tester, find.text('重庆坤特工厂样本'));
       expect(find.text('重庆坤特工厂样本'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '进入工厂列表'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '进入工厂列表'), findsOneWidget);
     },
   );
 

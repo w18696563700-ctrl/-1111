@@ -14,6 +14,14 @@ type MyBidListItem = {
   snapshotReadable: boolean;
 };
 
+type BidSubmissionAttachmentItem = {
+  slotKey: string;
+  slotLabel: string;
+  fileAssetId: string;
+  fileKind: string;
+  mimeType: string;
+};
+
 @Injectable()
 export class MyBidPresenter {
   toListResponse(items: MyBidListItem[]) {
@@ -36,6 +44,7 @@ export class MyBidPresenter {
     attachmentSummary: {
       count: number;
     };
+    attachments: BidSubmissionAttachmentItem[];
     availability: Record<string, unknown>;
   }) {
     return {
@@ -46,6 +55,7 @@ export class MyBidPresenter {
       quoteAmount: input.quoteAmount,
       proposalSummary: input.proposalSummary,
       attachmentSummary: input.attachmentSummary,
+      attachments: input.attachments,
       availability: input.availability,
     };
   }

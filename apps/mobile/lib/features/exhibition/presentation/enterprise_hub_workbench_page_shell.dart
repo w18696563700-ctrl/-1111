@@ -113,7 +113,10 @@ extension _EnterpriseWorkbenchPageShell on _EnterpriseApplicationPageState {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: <Widget>[
-        _buildWorkbenchHeaderSection(),
+        if (_boardType != EnterpriseBoardType.supplier)
+          _buildWorkbenchHeaderSection(),
+        if (_boardType != EnterpriseBoardType.supplier)
+          const SizedBox(height: 16),
         if (_isPublishedChangeMode) ...<Widget>[
           const SizedBox(height: 16),
           _buildPublishedChangeSnapshotSection(publishedData),
@@ -127,8 +130,8 @@ extension _EnterpriseWorkbenchPageShell on _EnterpriseApplicationPageState {
             publishedData,
             AppShellScope.read(context).snapshot.shellContext,
           ),
+          const SizedBox(height: 16),
         ],
-        const SizedBox(height: 16),
         _buildDisplayIdentificationSection(),
         const SizedBox(height: 16),
         _buildAlbumSection(),

@@ -212,6 +212,15 @@ class _BidThreadPageState extends State<BidThreadPage> {
     );
   }
 
+  BidThreadParticipantView? _findBidderParticipant(BidThreadDetailView data) {
+    for (final participant in data.participants) {
+      if (participant.participantRole == 'bidder') {
+        return participant;
+      }
+    }
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = _result;
@@ -293,10 +302,14 @@ class _BidThreadPageState extends State<BidThreadPage> {
   Widget _buildParticipantTile(BidThreadParticipantView participant) {
     final result = _participantCardResults[participant.organizationId];
     final data = result?.data;
-    final title = data?.enterpriseSummary.displayName ?? participant.organizationId;
+    final title =
+        participant.displayName ??
+        data?.enterpriseSummary.displayName ??
+        participant.organizationId;
     final subtitle = data == null
         ? _tradingImRoleLabel(participant.participantRole)
         : '${_tradingImRoleLabel(participant.participantRole)} · ${data.enterpriseSummary.provinceName} / ${data.enterpriseSummary.cityName}';
+    final avatarUrl = participant.avatarUrl ?? data?.enterpriseSummary.logoUrl;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -312,10 +325,9 @@ class _BidThreadPageState extends State<BidThreadPage> {
             children: <Widget>[
               CircleAvatar(
                 radius: 22,
-                backgroundImage: data?.enterpriseSummary.logoUrl == null
-                    ? null
-                    : NetworkImage(data!.enterpriseSummary.logoUrl!),
-                child: data?.enterpriseSummary.logoUrl == null
+                backgroundImage:
+                    avatarUrl == null ? null : NetworkImage(avatarUrl),
+                child: avatarUrl == null
                     ? Text(
                         title.trim().isEmpty
                             ? '?'
@@ -470,6 +482,7 @@ class _BidThreadPageState extends State<BidThreadPage> {
   }
 
   Widget _buildMessages(BidThreadDetailView data) {
+    final bidderParticipant = _findBidderParticipant(data);
     if (data.messages.isEmpty) {
       return const _EmptyNotice(title: '当前还没有沟通消息', message: '可以从上方发送第一条消息。');
     }
@@ -493,6 +506,14 @@ class _BidThreadPageState extends State<BidThreadPage> {
                           : () => _openBidSubmissionSnapshot(message),
                       child: const Text('点击查看'),
                     ),
+                    if (bidderParticipant != null) ...<Widget>[
+                      const SizedBox(height: 10),
+                      OutlinedButton.icon(
+                        onPressed: () => _openParticipantCard(bidderParticipant),
+                        icon: const Icon(Icons.badge_outlined),
+                        label: const Text('查看竞标方'),
+                      ),
+                    ],
                   ],
                 ),
               );

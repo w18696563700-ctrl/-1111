@@ -25,8 +25,8 @@ class _LoadStateCard extends StatelessWidget {
       AppPageState.empty => '当前链路暂时没有可继续的内容，页面先停留在空态承接面。',
       AppPageState.errorRetryable => _userFacingLoadFailureMessage(result),
       AppPageState.errorNonRetryable => _userFacingLoadFailureMessage(result),
-      AppPageState.unauthorized => result.message ?? '当前账号还不能继续这一步，请先恢复授权状态。',
-      AppPageState.forbidden => result.message ?? '当前角色还不能继续这一步，页面保持在受控不可见边界。',
+      AppPageState.unauthorized => _userFacingLoadFailureMessage(result),
+      AppPageState.forbidden => _userFacingLoadFailureMessage(result),
       AppPageState.notFound => _userFacingLoadFailureMessage(result),
     };
     final showRawFailureMessage =
@@ -126,7 +126,7 @@ class _SubmissionResultPanel extends StatelessWidget {
     final borderColor = result.isSuccess
         ? colorScheme.primary.withValues(alpha: 0.18)
         : colorScheme.outlineVariant;
-    final entityState = _stateFromPayload(result.payload);
+    final entityStateLabel = _submissionResultStateLabel(result);
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -150,9 +150,9 @@ class _SubmissionResultPanel extends StatelessWidget {
                       ? _ActionCardTone.emphasis
                       : _ActionCardTone.muted,
                 ),
-                if (entityState != null)
+                if (entityStateLabel != null)
                   _StatusPill(
-                    label: '业务状态：${_frontStageStateLabel(entityState)}',
+                    label: '业务状态：$entityStateLabel',
                     tone: _ActionCardTone.muted,
                   ),
               ],
@@ -208,6 +208,16 @@ class _SubmissionResultPanel extends StatelessWidget {
       ),
     );
   }
+}
+
+String? _submissionResultStateLabel(ExhibitionActionResult result) {
+  if (result.path == ExhibitionCanonicalPaths.projectCounterpartyRatingSubmit) {
+    final payload = _payloadMap(result.payload);
+    final state = _counterpartyRatingState(payload);
+    return state == null ? null : _counterpartyRatingStateLabel(state);
+  }
+  final state = _stateFromPayload(result.payload);
+  return state == null ? null : _frontStageStateLabel(state);
 }
 
 class _StateMessage extends StatelessWidget {

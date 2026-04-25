@@ -32,6 +32,30 @@ export class BidEntity {
   @Column({ name: 'proposal_summary', type: 'text' })
   proposalSummary!: string;
 
+  @Column({
+    name: 'project_understanding_file_asset_id',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  projectUnderstandingFileAssetId!: string | null;
+
+  @Column({
+    name: 'quote_sheet_file_asset_id',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  quoteSheetFileAssetId!: string | null;
+
+  @Column({
+    name: 'schedule_plan_file_asset_id',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+  })
+  schedulePlanFileAssetId!: string | null;
+
   @Column({ type: 'varchar', length: 32, default: 'submitted' })
   state!: string;
 

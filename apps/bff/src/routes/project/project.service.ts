@@ -3,6 +3,12 @@ import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
+import {
+  readProjectDetailDisplayState,
+  readProjectListDisplayState,
+  type ProjectDetailNameAccessReadModel,
+  type ProjectListNameAccessReadModel,
+} from './project-display-state.read-model';
 
 type ProjectSummary = Record<string, unknown>;
 
@@ -17,6 +23,7 @@ type ProjectListItemReadModel = {
   projectId: string;
   projectNo: string;
   title: string;
+  displayTitle: string;
   exhibitionName: string | null;
   brandName: string | null;
   buildingType: string;
@@ -29,6 +36,7 @@ type ProjectListItemReadModel = {
   plannedStartAt: string | null;
   plannedEndAt: string | null;
   state: string;
+  nameAccess: ProjectListNameAccessReadModel;
   summary: ProjectSummary;
 };
 
@@ -48,6 +56,26 @@ type ProjectDetailReadModel = ProjectListItemReadModel & {
   scheduleDetail: string | null;
   viewerProjectRelation: ProjectViewerRelation;
   description: string | null;
+  nameAccess: ProjectDetailNameAccessReadModel;
+  bidCandidates: ProjectBidCandidateReadModel[];
+  bidSelection: ProjectBidSelectionReadModel | null;
+};
+
+type ProjectBidCandidateReadModel = {
+  bidId: string;
+  bidNo: string | null;
+  bidderOrganizationId: string | null;
+  bidderOrganizationName: string | null;
+  quoteAmount: number | null;
+  proposalSummary: string | null;
+  state: string | null;
+  submittedAt: string | null;
+};
+
+type ProjectBidSelectionReadModel = {
+  winningBidId: string | null;
+  orderId: string | null;
+  contractId: string | null;
 };
 
 type ProjectLifecycleAcceptedResponse = {
@@ -454,13 +482,17 @@ export class ProjectService {
   }
 
   private toProjectListItemReadModel(result: Record<string, unknown>): ProjectListItemReadModel {
+    const displayState = readProjectListDisplayState(result);
     const projectId = this.asString(result.projectId);
     const projectNo = this.asString(result.projectNo);
-    const title = this.asString(result.title);
     const buildingType = this.asString(result.buildingType);
     const budgetAmount = this.asFiniteNumber(result.budgetAmount);
     const state = this.asString(result.state);
     const summary = this.asOptionalRecord(result.summary);
+    const title =
+      displayState.nameAccess.status === 'visible'
+        ? this.asString(result.title) || displayState.displayTitle
+        : displayState.displayTitle;
 
     if (!projectId || !projectNo || !title || !buildingType || budgetAmount === undefined || !state || !summary) {
       throw new Error('Project detail response is missing required fields.');
@@ -470,8 +502,15 @@ export class ProjectService {
       projectId,
       projectNo,
       title,
-      exhibitionName: this.asNullableString(result.exhibitionName),
-      brandName: this.asNullableString(result.brandName),
+      displayTitle: displayState.displayTitle,
+      exhibitionName:
+        displayState.nameAccess.status === 'visible'
+          ? this.asNullableString(result.exhibitionName)
+          : null,
+      brandName:
+        displayState.nameAccess.status === 'visible'
+          ? this.asNullableString(result.brandName)
+          : null,
       buildingType,
       budgetAmount,
       areaSqm: this.asNullableFiniteNumber(result.areaSqm, 'Project list response contains an invalid areaSqm field.'),
@@ -482,13 +521,21 @@ export class ProjectService {
       plannedStartAt: this.asNullableDateString(result.plannedStartAt),
       plannedEndAt: this.asNullableDateString(result.plannedEndAt),
       state,
+      nameAccess: displayState.nameAccess,
       summary,
     };
   }
 
   private toProjectDetailReadModel(result: Record<string, unknown>): ProjectDetailReadModel {
+    const base = this.toProjectListItemReadModel(result);
+    const displayState = readProjectDetailDisplayState(result);
     return {
-      ...this.toProjectListItemReadModel(result),
+      ...base,
+      title:
+        displayState.nameAccess.status === 'visible'
+          ? this.asString(result.title) || displayState.displayTitle
+          : displayState.displayTitle,
+      displayTitle: displayState.displayTitle,
       areaSqm: this.asNullableFiniteNumber(result.areaSqm, 'Project detail response contains an invalid areaSqm field.'),
       buildingTypeRemark: this.asNullableString(result.buildingTypeRemark),
       provinceCode: this.asNullableString(result.provinceCode),
@@ -504,7 +551,53 @@ export class ProjectService {
       scheduleDetail: this.asNullableString(result.scheduleDetail),
       viewerProjectRelation: this.asViewerProjectRelation(result.viewerProjectRelation),
       description: this.asNullableString(result.description),
+      nameAccess: displayState.nameAccess,
+      bidCandidates: this.toProjectBidCandidates(result.bidCandidates),
+      bidSelection: this.toProjectBidSelection(result.bidSelection),
     };
+  }
+
+  private toProjectBidCandidates(value: unknown): ProjectBidCandidateReadModel[] {
+    if (!Array.isArray(value)) {
+      return [];
+    }
+    return value
+      .map((item) => this.asOptionalRecord(item))
+      .filter((item): item is Record<string, unknown> => item !== null)
+      .map((item) => this.toProjectBidCandidate(item))
+      .filter((item): item is ProjectBidCandidateReadModel => item !== null);
+  }
+
+  private toProjectBidCandidate(result: Record<string, unknown>) {
+    const bidId = this.asString(result.bidId);
+    if (!bidId) {
+      return null;
+    }
+    return {
+      bidId,
+      bidNo: this.asNullableString(result.bidNo),
+      bidderOrganizationId: this.asNullableString(result.bidderOrganizationId),
+      bidderOrganizationName: this.asNullableString(result.bidderOrganizationName),
+      quoteAmount: this.asNullableFiniteNumber(
+        result.quoteAmount,
+        'Project detail bidCandidates contains an invalid quoteAmount field.',
+      ),
+      proposalSummary: this.asNullableString(result.proposalSummary),
+      state: this.asNullableString(result.state),
+      submittedAt: this.asNullableString(result.submittedAt),
+    } satisfies ProjectBidCandidateReadModel;
+  }
+
+  private toProjectBidSelection(value: unknown) {
+    const record = this.asOptionalRecord(value);
+    if (!record) {
+      return null;
+    }
+    return {
+      winningBidId: this.asNullableString(record.winningBidId),
+      orderId: this.asNullableString(record.orderId),
+      contractId: this.asNullableString(record.contractId),
+    } satisfies ProjectBidSelectionReadModel;
   }
 
   private requireProjectRecord(value: unknown) {

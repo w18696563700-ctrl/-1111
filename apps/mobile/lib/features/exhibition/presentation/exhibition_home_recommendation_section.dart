@@ -18,30 +18,29 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: ExhibitionHomeVisualTokens.cardBackground,
+        borderRadius: BorderRadius.circular(22),
+        boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             _HomePill(
               label: badgeLabel,
-              backgroundColor: colorScheme.primaryContainer,
-              foregroundColor: colorScheme.onPrimaryContainer,
+              backgroundColor: ExhibitionHomeVisualTokens.brandGoldLight,
+              foregroundColor: ExhibitionHomeVisualTokens.brandGoldDeep,
               dense: true,
             ),
             const SizedBox(height: 8),
             Text(
               title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.titleMedium?.copyWith(
+                color: ExhibitionHomeVisualTokens.textPrimary,
+                fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 4),
@@ -49,7 +48,10 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
               summary,
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(height: 1.45),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: ExhibitionHomeVisualTokens.textSecondary,
+                height: 1.45,
+              ),
             ),
             const SizedBox(height: 12),
             OutlinedButton(

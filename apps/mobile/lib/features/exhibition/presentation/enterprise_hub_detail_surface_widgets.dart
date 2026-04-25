@@ -410,11 +410,6 @@ class EnterpriseDetailCapabilitySection extends StatelessWidget {
         values: _stringList(boardProfile['supplyCategories']),
       ),
       const SizedBox(height: 12),
-      _DetailCapabilityBlock(
-        title: '供应模式',
-        values: _stringList(boardProfile['supplyMode']),
-      ),
-      const SizedBox(height: 12),
       _DetailTextBlock(
         title: '核心产品或服务',
         value: _string(boardProfile['coreProductsOrServices']) ?? '暂未补充',

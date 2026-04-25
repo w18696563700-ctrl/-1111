@@ -24,6 +24,7 @@ export class TradingReadCorridorService {
 
   async getOrderDetail(
     orderId: string | undefined,
+    projectId: string | undefined,
     headers: IncomingHttpHeaders,
   ): Promise<OrderDetailViewModel> {
     const normalizedOrderId = this.requireQueryId(
@@ -31,12 +32,16 @@ export class TradingReadCorridorService {
       'ORDER_DETAIL_INVALID',
       '当前订单标识缺失，请重新进入订单详情后再试。',
     );
+    const normalizedProjectId = this.readOptionalQueryId(projectId);
     try {
       const result = await this.serverClient.get<Record<string, unknown>>(
         '/server/order/detail',
         {
           headers: this.authContext.buildReadOnlyForwardHeaders(headers),
-          params: { orderId: normalizedOrderId },
+          params: {
+            orderId: normalizedOrderId,
+            ...(normalizedProjectId ? { projectId: normalizedProjectId } : {}),
+          },
         },
       );
       return readOrderDetailViewModel(
@@ -136,5 +141,12 @@ export class TradingReadCorridorService {
       message,
       source: 'bff',
     });
+  }
+
+  private readOptionalQueryId(value: string | undefined): string | undefined {
+    if (typeof value === 'string' && value.trim().length > 0) {
+      return value.trim();
+    }
+    return undefined;
   }
 }

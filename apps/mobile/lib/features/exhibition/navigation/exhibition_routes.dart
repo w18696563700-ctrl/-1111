@@ -311,8 +311,12 @@ final class ExhibitionRoutes {
     return bidSubmitWithProjectId(projectId, mode: 'result');
   }
 
-  static String orderDetailWithOrderId(String orderId) {
-    return _withQuery(orderDetail, <String, String>{'orderId': orderId});
+  static String orderDetailWithOrderId(String orderId, {String? projectId}) {
+    return _withQuery(orderDetail, <String, String>{
+      'orderId': orderId,
+      if (projectId != null && projectId.trim().isNotEmpty)
+        'projectId': projectId.trim(),
+    });
   }
 
   static String contractDetailWithOrderId(String orderId) {
@@ -347,6 +351,18 @@ final class ExhibitionRoutes {
 
   static String ratingEntryWithOrderId(String orderId) {
     return _withQuery(ratingEntry, <String, String>{'orderId': orderId});
+  }
+
+  static String projectCounterpartyRatingEntry({
+    required String orderId,
+    required String projectId,
+    required String rateeOrganizationId,
+  }) {
+    return _withQuery(ratingEntry, <String, String>{
+      'orderId': orderId,
+      'projectId': projectId,
+      'rateeOrganizationId': rateeOrganizationId,
+    });
   }
 
   static String disputeWithdrawWithOrderId(String orderId) {

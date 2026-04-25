@@ -59,14 +59,19 @@ extension _EnterpriseWorkbenchPageDisplaySections
             ],
           ),
           const SizedBox(height: 12),
-          EnterpriseWorkbenchBoardProfileHeader(boardType: _boardType),
-          const SizedBox(height: 12),
+          if (_boardType != EnterpriseBoardType.supplier) ...<Widget>[
+            EnterpriseWorkbenchBoardProfileHeader(boardType: _boardType),
+            const SizedBox(height: 12),
+          ],
           EnterpriseWorkbenchMultiSelectField(
             label: _profileLabelOne(_boardType),
-            helperText: '请按系统预设标签选择，避免展示页筛选口径不一致。',
+            helperText: _boardType == EnterpriseBoardType.supplier
+                ? '请选择 1 个主营供应品类；前台左侧导航、筛选和工作台使用同一套口径。'
+                : '请按系统预设标签选择，避免展示页筛选口径不一致。',
             options: _profileOneOptions(_boardType),
             selectedValues: _selectedProfileOneOptions,
             required: true,
+            singleSelect: _boardType == EnterpriseBoardType.supplier,
             onChanged: (next) => _updateWorkbenchState(() {
               _selectedProfileOneOptions = next;
               _profileDraftDirty = true;
@@ -90,17 +95,18 @@ extension _EnterpriseWorkbenchPageDisplaySections
             ),
             const SizedBox(height: 12),
           ],
-          EnterpriseWorkbenchMultiSelectField(
-            label: _profileLabelTwo(_boardType),
-            helperText: '请按系统预设标签选择，和前台筛选保持同一套口径。',
-            options: _profileTwoOptions(_boardType),
-            selectedValues: _selectedProfileTwoOptions,
-            required: true,
-            onChanged: (next) => _updateWorkbenchState(() {
-              _selectedProfileTwoOptions = next;
-              _profileDraftDirty = true;
-            }),
-          ),
+          if (_boardType != EnterpriseBoardType.supplier)
+            EnterpriseWorkbenchMultiSelectField(
+              label: _profileLabelTwo(_boardType),
+              helperText: '请按系统预设标签选择，和前台筛选保持同一套口径。',
+              options: _profileTwoOptions(_boardType),
+              selectedValues: _selectedProfileTwoOptions,
+              required: true,
+              onChanged: (next) => _updateWorkbenchState(() {
+                _selectedProfileTwoOptions = next;
+                _profileDraftDirty = true;
+              }),
+            ),
           if (_boardType == EnterpriseBoardType.factory) ...<Widget>[
             const SizedBox(height: 12),
             _buildFactoryEquipmentField(),
@@ -353,7 +359,9 @@ extension _EnterpriseWorkbenchPageDisplaySections
     if (certificationLocationTruth != null) {
       return certificationLocationTruth;
     }
-    final organizationCityTruth = _normalizedText(_registeredCityController.text);
+    final organizationCityTruth = _normalizedText(
+      _registeredCityController.text,
+    );
     if (organizationCityTruth != null) {
       return organizationCityTruth;
     }

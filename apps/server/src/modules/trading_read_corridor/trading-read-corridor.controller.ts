@@ -10,9 +10,14 @@ export class TradingReadCorridorController {
   @Get('order/detail')
   getOrderDetail(
     @Query('orderId') orderId: string | undefined,
+    @Query('projectId') projectId: string | undefined,
     @Headers() headers: HeaderBag
   ) {
-    return this.queryService.getOrderDetail(orderId, resolveRequestContext(headers));
+    return this.queryService.getOrderDetail(
+      orderId,
+      projectId,
+      resolveRequestContext(headers)
+    );
   }
 
   @Get('contract/detail')

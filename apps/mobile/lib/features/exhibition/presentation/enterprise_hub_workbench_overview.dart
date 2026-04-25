@@ -12,7 +12,7 @@ class EnterpriseWorkbenchOverviewCard extends StatelessWidget {
     final profileFields = switch (boardType) {
       EnterpriseBoardType.company => '展会类型、服务项目、服务城市',
       EnterpriseBoardType.factory => '工艺类型、核心产品',
-      EnterpriseBoardType.supplier => '供应品类、供应模式、核心产品/服务',
+      EnterpriseBoardType.supplier => '供应品类、核心产品/服务、响应时效',
     };
 
     return EnterpriseSectionCard(

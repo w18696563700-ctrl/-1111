@@ -98,6 +98,7 @@ class EnterpriseHubListQuery {
     this.keyword,
     this.provinceCode,
     this.cityCode,
+    this.supplyCategory,
     this.plantAreaRange,
     this.page = 1,
     this.pageSize = 10,
@@ -107,6 +108,7 @@ class EnterpriseHubListQuery {
   final String? keyword;
   final String? provinceCode;
   final String? cityCode;
+  final String? supplyCategory;
   final String? plantAreaRange;
   final int page;
   final int pageSize;
@@ -115,12 +117,17 @@ class EnterpriseHubListQuery {
     final normalizedPlantAreaRange = boardType == EnterpriseBoardType.factory
         ? _normalized(plantAreaRange)
         : null;
+    final normalizedSupplyCategory = boardType == EnterpriseBoardType.supplier
+        ? _normalized(supplyCategory)
+        : null;
     return <String, String>{
       'boardType': boardType.contractName,
       if (_normalized(keyword) case final String value) 'keyword': value,
       if (_normalized(provinceCode) case final String value)
         'provinceCode': value,
       if (_normalized(cityCode) case final String value) 'cityCode': value,
+      if (normalizedSupplyCategory case final String value)
+        'supplyCategory': value,
       if (normalizedPlantAreaRange case final String value)
         'plantAreaRange': value,
       'page': '$page',
@@ -132,11 +139,16 @@ class EnterpriseHubListQuery {
     final normalizedPlantAreaRange = boardType == EnterpriseBoardType.factory
         ? _normalized(plantAreaRange)
         : null;
+    final normalizedSupplyCategory = boardType == EnterpriseBoardType.supplier
+        ? _normalized(supplyCategory)
+        : null;
     return <String, String>{
       if (_normalized(keyword) case final String value) 'keyword': value,
       if (_normalized(provinceCode) case final String value)
         'provinceCode': value,
       if (_normalized(cityCode) case final String value) 'cityCode': value,
+      if (normalizedSupplyCategory case final String value)
+        'supplyCategory': value,
       if (normalizedPlantAreaRange case final String value)
         'plantAreaRange': value,
       'page': '$page',
@@ -148,11 +160,13 @@ class EnterpriseHubListQuery {
     String? keyword,
     String? provinceCode,
     String? cityCode,
+    String? supplyCategory,
     String? plantAreaRange,
     int? page,
     int? pageSize,
     bool clearKeyword = false,
     bool clearCity = false,
+    bool clearSupplyCategory = false,
     bool clearPlantAreaRange = false,
   }) {
     return EnterpriseHubListQuery(
@@ -160,6 +174,9 @@ class EnterpriseHubListQuery {
       keyword: clearKeyword ? null : keyword ?? this.keyword,
       provinceCode: clearCity ? null : provinceCode ?? this.provinceCode,
       cityCode: clearCity ? null : cityCode ?? this.cityCode,
+      supplyCategory: clearSupplyCategory
+          ? null
+          : supplyCategory ?? this.supplyCategory,
       plantAreaRange: clearPlantAreaRange
           ? null
           : plantAreaRange ?? this.plantAreaRange,

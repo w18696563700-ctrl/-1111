@@ -18,9 +18,14 @@ import { MembershipModule } from './modules/membership/membership.module';
 import { MessageInteractionModule } from './modules/message_interaction/message-interaction.module';
 import { MyProjectModule } from './modules/my_project/my-project.module';
 import { MyBidModule } from './modules/my_bid/my-bid.module';
+import { OrderModule } from './modules/order/order.module';
+import { P0PayModule } from './modules/p0_pay/p0-pay.module';
 import { PaymentBillingModule } from './modules/payment_billing/payment-billing.module';
 import { ProfileModule } from './modules/profile/profile.module';
+import { ProjectCommunicationModule } from './modules/project_communication/project-communication.module';
+import { ProjectCounterpartyRatingModule } from './modules/project_counterparty_rating/project-counterparty-rating.module';
 import { ProjectModule } from './modules/project/project.module';
+import { ProjectNameAccessModule } from './modules/project_name_access/project-name-access.module';
 import { RatingModule } from './modules/rating/rating.module';
 import { ReviewModule } from './modules/review/review.module';
 import { ShellModule } from './modules/shell/shell.module';
@@ -61,6 +66,8 @@ import { UploadModule } from './modules/upload/upload.module';
     GovernanceModule,
     MembershipModule,
     MessageInteractionModule,
+    OrderModule,
+    P0PayModule,
     PaymentBillingModule,
     MyBidModule,
     MyProjectModule,
@@ -70,6 +77,9 @@ import { UploadModule } from './modules/upload/upload.module';
     ProfileModule,
     ReviewModule,
     ProjectModule,
+    ProjectCommunicationModule,
+    ProjectCounterpartyRatingModule,
+    ProjectNameAccessModule,
     TradingReadCorridorModule,
     TradingShellHandoffModule,
     TradingImModule,

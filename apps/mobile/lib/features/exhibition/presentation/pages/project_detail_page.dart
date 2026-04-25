@@ -24,7 +24,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       );
 
   ExhibitionStageLoadSnapshot? _snapshot;
+  ExhibitionLoadResult? _p0PaySummaryResult;
   bool _loading = false;
+  bool _p0PaySummaryLoading = false;
+  bool _requestingNameAccess = false;
+  int _p0PaySummaryLoadToken = 0;
 
   @override
   void initState() {
@@ -47,6 +51,113 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       _snapshot = snapshot;
       _loading = false;
     });
+
+    await _loadP0PaySummaryForSnapshot(snapshot, forceRefresh: forceRefresh);
+  }
+
+  Future<void> _loadP0PaySummaryForSnapshot(
+    ExhibitionStageLoadSnapshot snapshot, {
+    required bool forceRefresh,
+  }) async {
+    final result = snapshot.result;
+    final taskId = _p0PayTaskIdFromProjectPayload(result.payload);
+    if (result.state != AppPageState.content || taskId == null) {
+      setState(() {
+        _p0PaySummaryResult = null;
+        _p0PaySummaryLoading = false;
+      });
+      return;
+    }
+
+    final loadToken = ++_p0PaySummaryLoadToken;
+    setState(() {
+      _p0PaySummaryLoading = true;
+      _p0PaySummaryResult = null;
+    });
+
+    final summary = await ExhibitionConsumerLayer.instance.loadP0PaySummary(
+      taskId: taskId,
+      forceRefresh: forceRefresh,
+    );
+    if (!mounted || loadToken != _p0PaySummaryLoadToken) {
+      return;
+    }
+    setState(() {
+      _p0PaySummaryResult = summary;
+      _p0PaySummaryLoading = false;
+    });
+  }
+
+  Future<bool> _requestProjectNameAccess(String projectId) async {
+    if (_requestingNameAccess) {
+      return false;
+    }
+    setState(() => _requestingNameAccess = true);
+    final result = await ProjectNameAccessConsumerLayer.instance.requestAccess(
+      projectId: projectId,
+    );
+    if (!mounted) {
+      return false;
+    }
+    setState(() => _requestingNameAccess = false);
+    final messenger = ScaffoldMessenger.maybeOf(context);
+    messenger?.hideCurrentSnackBar();
+    messenger?.showSnackBar(
+      SnackBar(
+        content: Text(
+          result.isSuccess
+              ? '已提交项目名称查看申请，等待发布方审批。'
+              : (result.message ?? '当前申请未完成，请稍后再试。'),
+        ),
+      ),
+    );
+    if (result.isSuccess) {
+      await _load(forceRefresh: true);
+    }
+    return result.isSuccess;
+  }
+
+  void _showProjectNameAccessSheet({
+    required String projectId,
+    required Map<String, Object?> projectMap,
+  }) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (BuildContext sheetContext) {
+        return ProjectNameAccessPermissionSheet(
+          projectMap: projectMap,
+          requesting: _requestingNameAccess,
+          onRequest: () async {
+            final succeeded = await _requestProjectNameAccess(projectId);
+            if (succeeded && sheetContext.mounted) {
+              Navigator.of(sheetContext).maybePop();
+            }
+          },
+          onOpenStatus: () {
+            final requestId = _projectNameAccessRequestId(projectMap);
+            if (requestId == null) {
+              return;
+            }
+            Navigator.of(sheetContext).maybePop();
+            Navigator.of(context).pushNamed(
+              ExhibitionRoutes.projectNameAccessThreadWithIds(
+                threadId: requestId,
+                projectId: projectId,
+                requestId: requestId,
+              ),
+            );
+          },
+          onRefresh: () async {
+            await _load(forceRefresh: true);
+            if (sheetContext.mounted) {
+              Navigator.of(sheetContext).maybePop();
+            }
+          },
+        );
+      },
+    );
   }
 
   @override
@@ -75,8 +186,13 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         final projectId = _projectIdFromPayload(result.payload);
         final projectNo = _normalizeId(payload?['projectNo'] as String?);
         final projectMap = payload ?? const <String, Object?>{};
-        final exhibitionName = _projectExhibitionName(projectMap);
-        final brandName = _projectBrandName(projectMap);
+        final embeddedP0PaySummary = parseP0PayReadOnlySummary(
+          projectMap['p0PaySummary'],
+        );
+        final p0PaySummary =
+            parseP0PayReadOnlySummary(_p0PaySummaryResult?.payload) ??
+            embeddedP0PaySummary;
+        final brandName = _projectDisplayBrandLine(projectMap);
         final title = _projectDisplayTitle(projectMap);
         final buildingType = _normalizeId(payload?['buildingType'] as String?);
         final budgetAmount = payload?['budgetAmount'];
@@ -110,11 +226,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
               )
             : null;
         final summaryHeading = _normalizeId(summaryMap?['heading'] as String?);
-        final headline = exhibitionName ?? title;
-        final secondaryHeadline = exhibitionName != null
-            ? brandName ??
-                  _compatibilityTitle(headline: exhibitionName, title: title)
-            : brandName;
+        final headline = title;
+        final secondaryHeadline = brandName;
         final locationSummary = _locationSummary(
           provinceName: provinceName,
           cityName: cityName,
@@ -154,10 +267,17 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(
-                          headline,
-                          style: Theme.of(context).textTheme.titleMedium
-                              ?.copyWith(fontWeight: FontWeight.w800),
+                        _ProjectDetailHeadline(
+                          headline: headline,
+                          accessControlled:
+                              _projectShouldShowNameAccessControls(
+                                projectMap,
+                              ) &&
+                              !_isOwnerSurface(viewerProjectRelation),
+                          onTap: () => _showProjectNameAccessSheet(
+                            projectId: projectId,
+                            projectMap: projectMap,
+                          ),
                         ),
                         if (secondaryHeadline != null) ...<Widget>[
                           const SizedBox(height: 6),
@@ -201,7 +321,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
                   ),
                   _ProjectDetailCompactMetaItemData(
                     label: '项目面积',
-                    value: _areaSqmOrUnavailable(areaSqm),
+                    value: _projectAreaText(areaSqm),
                   ),
                 ],
               ),
@@ -278,6 +398,37 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ],
           ),
           const SizedBox(height: 16),
+          if (_isOwnerSurface(viewerProjectRelation)) ...<Widget>[
+            _buildOwnerBidSelectionCard(
+              projectId: projectId,
+              state: state,
+              projectMap: projectMap,
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (_orderIdFromProjectMap(projectMap) != null) ...<Widget>[
+            _OrderStatusCard(
+              orderId: _orderIdFromProjectMap(projectMap)!,
+              projectId: projectId,
+              placement: _OrderStatusPlacement.projectDetail,
+              onChanged: () => _load(forceRefresh: true),
+            ),
+            const SizedBox(height: 16),
+          ],
+          if (_shouldShowP0PayReadOnlySummary(
+            p0PaySummary,
+            _p0PaySummaryResult,
+          )) ...<Widget>[
+            _buildProjectDetailP0PayReadOnlyCard(
+              summary: p0PaySummary,
+              result: _p0PaySummaryResult,
+              loading: _p0PaySummaryLoading,
+              embeddedFallbackAvailable: embeddedP0PaySummary != null,
+              onRefresh: () =>
+                  _loadP0PaySummaryForSnapshot(snapshot!, forceRefresh: true),
+            ),
+            const SizedBox(height: 16),
+          ],
           _buildTradingImEntryCard(
             projectId: projectId,
             bidId: _normalizeId(payload?['bidId'] as String?),
@@ -289,215 +440,95 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       },
     );
   }
+}
 
-  Widget _buildTradingImEntryCard({
-    required String projectId,
-    required String? bidId,
-    required bool canStartBid,
-  }) {
-    final messageBody = bidId != null
-        ? '项目澄清面向当前项目；沟通与投标承接当前 bidId。'
-        : canStartBid
-        ? '项目澄清面向当前项目；沟通与投标需要先完成竞标并生成 bidId，当前请使用上方主入口继续参与竞标。'
-        : '项目澄清面向当前项目；沟通与投标需要承接具体 bidId。';
+String? _p0PayTaskIdFromProjectPayload(Object? payload) {
+  final map = _payloadMap(payload);
+  return _normalizeDynamicText(map?['taskId']) ??
+      _normalizeDynamicText(map?['tradeTaskId']) ??
+      _normalizeDynamicText(_payloadMap(map?['p0PaySummary'])?['taskId']);
+}
 
-    return _ActionCard(
-      title: '项目沟通',
-      children: <Widget>[
-        _StateMessage(title: '当前对象', body: messageBody),
+bool _shouldShowP0PayReadOnlySummary(
+  P0PayReadOnlySummaryView? summary,
+  ExhibitionLoadResult? result,
+) {
+  return summary != null ||
+      result?.state == AppPageState.content ||
+      result?.errorCode == 'P0_PAY_SUMMARY_UNAVAILABLE' ||
+      result?.errorCode == 'AUTH_SESSION_INVALID' ||
+      result?.errorCode == 'TRADE_TASK_INVALID_STATE';
+}
+
+Widget _buildProjectDetailP0PayReadOnlyCard({
+  required P0PayReadOnlySummaryView? summary,
+  required ExhibitionLoadResult? result,
+  required bool loading,
+  required bool embeddedFallbackAvailable,
+  required VoidCallback onRefresh,
+}) {
+  final statusLines = summary?.statusLines ?? const <P0PayReadOnlyStatusLine>[];
+  final failureText = _projectDetailP0PayFailureText(result);
+  final routeTarget = summary?.routeTarget;
+  return _ActionCard(
+    title: 'P0-Pay 只读状态',
+    summary: '这里只展示 BFF/Server 聚合后的交易资金状态，不执行支付、不修改资金状态、不裁定扣费。',
+    tone: _ActionCardTone.muted,
+    children: <Widget>[
+      const _StateMessage(
+        title: '只读边界',
+        body:
+            '项目详情只承接平台服务费预授权、发单诚意金、合同确认 handoff 的只读摘要；Flutter 不接收支付回调，也不生成资金真相。',
+      ),
+      if (loading) ...<Widget>[
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: <Widget>[
-            OutlinedButton.icon(
-              onPressed: () => Navigator.of(context).pushNamed(
-                ExhibitionRoutes.projectClarificationWithProjectId(projectId),
-              ),
-              icon: const Icon(Icons.forum_rounded),
-              label: const Text('项目澄清'),
-            ),
-            if (bidId != null)
-              OutlinedButton.icon(
-                onPressed: () => Navigator.of(context).pushNamed(
-                  ExhibitionRoutes.bidThreadWithIds(
-                    projectId: projectId,
-                    bidId: bidId,
-                  ),
-                ),
-                icon: const Icon(Icons.handshake_rounded),
-                label: const Text('沟通与投标'),
-              ),
-          ],
+        const LinearProgressIndicator(minHeight: 6),
+      ],
+      if (!loading && statusLines.isNotEmpty) ...<Widget>[
+        const SizedBox(height: 12),
+        ...statusLines.map(
+          (P0PayReadOnlyStatusLine line) =>
+              _DetailLine(label: line.label, value: line.value),
         ),
       ],
-    );
+      if (!loading && routeTarget != null) ...<Widget>[
+        const SizedBox(height: 8),
+        _DetailLine(
+          label: '只读 routeTarget',
+          value: routeTarget.displayText.isEmpty
+              ? 'BFF 已返回只读 handoff'
+              : routeTarget.displayText,
+        ),
+      ],
+      if (!loading && summary?.updatedAt != null)
+        _DetailLine(label: '更新时间', value: summary!.updatedAt!),
+      if (!loading && failureText != null) ...<Widget>[
+        const SizedBox(height: 12),
+        _StateMessage(title: '只读状态暂不可用', body: failureText),
+      ],
+      if (!loading && !embeddedFallbackAvailable) ...<Widget>[
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: onRefresh,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('刷新只读状态'),
+          ),
+        ),
+      ],
+    ],
+  );
+}
+
+String? _projectDetailP0PayFailureText(ExhibitionLoadResult? result) {
+  if (result == null || result.state == AppPageState.content) {
+    return null;
   }
-
-  bool _isOwnerSurface(String? viewerProjectRelation) {
-    return viewerProjectRelation == 'owner';
-  }
-
-  bool _canContinueBidFromState(String? state) => state == 'published';
-
-  bool _canReadBidResultFromState(String? state) {
-    return state == 'awarded' || state == 'converted_to_order';
-  }
-
-  String _ownerContinuationBody(String? state) {
-    if (state == null) {
-      return '你是当前项目发布方。当前页只保留公域展示；继续处理请进入我的项目。';
-    }
-
-    return '你是当前项目发布方。当前项目处于 ${_frontStageStateLabel(state)}；当前页仍只承接公开展示，继续处理请进入我的项目。';
-  }
-
-  String _detailContinuationBody(String? state) {
-    if (_canContinueBidFromState(state)) {
-      return state == null
-          ? '当前项目仍处于公开展示阶段，如需继续主链路可立即参与竞标；竞标资格当前要求主体属于供应商或需求方/供应商组织，且企业认证与我的认证同时通过。'
-          : '当前项目处于 ${_frontStageStateLabel(state)}；当前页只承接公开展示，下一步可立即参与竞标。竞标资格当前要求主体属于供应商或需求方/供应商组织，且企业认证与我的认证同时通过。';
-    }
-
-    return switch (state) {
-      'bidding_closed' => '当前项目投标已结束；当前页继续保留公开展示，不再开放参与竞标。',
-      'awarded' => '当前项目已授标；如你属于竞标方，可继续进入最小竞标结果读取出口。',
-      'converted_to_order' => '当前项目已被承接；如你属于竞标方，可继续读取最小竞标结果。',
-      _ => '当前项目暂不处于参与竞标阶段，当前页继续只读展示公开信息。',
-    };
-  }
-
-  static bool _addressRangeFullyMissing({
-    required String? provinceName,
-    required String? cityName,
-    required String? districtName,
-    required String? detailAddress,
-    required String? scopeSummary,
-    required String? plannedStartAt,
-    required String? plannedEndAt,
-    required String? scheduleDetail,
-  }) {
-    return provinceName == null &&
-        cityName == null &&
-        districtName == null &&
-        detailAddress == null &&
-        scopeSummary == null &&
-        plannedStartAt == null &&
-        plannedEndAt == null &&
-        scheduleDetail == null;
-  }
-
-  static String _areaSqmOrUnavailable(num? value) {
-    if (value == null) {
-      return '当前项目暂未提供';
-    }
-
-    final normalized = value
-        .toStringAsFixed(2)
-        .replaceFirst(RegExp(r'\.?0+$'), '');
-    return '$normalized ㎡';
-  }
-
-  static String _fieldOrUnavailable(String? value) {
-    return value ?? '当前项目暂未提供';
-  }
-
-  static String? _compatibilityTitle({
-    required String headline,
-    required String title,
-  }) {
-    return headline == title ? null : title;
-  }
-
-  static String? _locationSummary({
-    required String? provinceName,
-    required String? cityName,
-    required String? districtName,
-    required String? detailAddress,
-  }) {
-    final regionParts = <String?>[
-      provinceName,
-      cityName,
-      districtName,
-    ].nonNulls.toList(growable: false);
-    final regionLabel = regionParts.isEmpty ? null : regionParts.join(' / ');
-    if (regionLabel == null && detailAddress == null) {
-      return null;
-    }
-    if (regionLabel != null && detailAddress != null) {
-      return '$regionLabel · $detailAddress';
-    }
-    return regionLabel ?? detailAddress;
-  }
-
-  static String? _scheduleRangeSummary({
-    required String? plannedStartAt,
-    required String? plannedEndAt,
-  }) {
-    if (plannedStartAt == null && plannedEndAt == null) {
-      return null;
-    }
-    return '${_fieldOrUnavailable(plannedStartAt)} 至 ${_fieldOrUnavailable(plannedEndAt)}';
-  }
-
-  void _continueBidWithGuard(String projectId) {
-    final accessGuard = _deriveBidAccessGuard(
-      snapshot: AppShellScope.read(context).snapshot,
-      hasSession: AppSessionStore.instance.hasAnySession,
-    );
-
-    if (accessGuard == null) {
-      Navigator.of(
-        context,
-      ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(projectId));
-      return;
-    }
-
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(SnackBar(content: Text(accessGuard.message)));
-    Navigator.of(
-      context,
-    ).pushNamed(_resolveBidGuardRouteName(accessGuard, projectId: projectId));
-  }
-
-  Future<void> _openBidResultWithGuard(String projectId) async {
-    final shellGuard = _deriveBidAccessGuard(
-      snapshot: AppShellScope.read(context).snapshot,
-      hasSession: AppSessionStore.instance.hasAnySession,
-    );
-    if (shellGuard != null) {
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      messenger?.hideCurrentSnackBar();
-      messenger?.showSnackBar(SnackBar(content: Text(shellGuard.message)));
-      Navigator.of(
-        context,
-      ).pushNamed(_resolveBidGuardRouteName(shellGuard, projectId: projectId));
-      return;
-    }
-
-    final detailResult = await ExhibitionConsumerLayer.instance
-        .loadProjectDetail(projectId: projectId);
-    if (!mounted) {
-      return;
-    }
-
-    final projectGuard = _deriveBidResultProjectAccessGuard(
-      projectId: projectId,
-      detailResult: detailResult,
-    );
-    if (projectGuard != null) {
-      final messenger = ScaffoldMessenger.maybeOf(context);
-      messenger?.hideCurrentSnackBar();
-      messenger?.showSnackBar(SnackBar(content: Text(projectGuard.message)));
-      Navigator.of(context).pushNamed(
-        _resolveBidGuardRouteName(projectGuard, projectId: projectId),
-      );
-      return;
-    }
-
-    Navigator.of(
-      context,
-    ).pushNamed(ExhibitionRoutes.bidResultWithProjectId(projectId));
-  }
+  return switch (result.errorCode) {
+    'AUTH_SESSION_INVALID' => '登录状态失效后不能读取资金状态，请重新登录。',
+    'TRADE_TASK_INVALID_STATE' => '当前交易任务状态暂不可读取 P0-Pay 摘要。',
+    'P0_PAY_SUMMARY_UNAVAILABLE' => '当前 P0-Pay 摘要暂不可用，请稍后刷新。',
+    _ => result.message ?? result.errorCode ?? '当前 P0-Pay 摘要暂不可用。',
+  };
 }

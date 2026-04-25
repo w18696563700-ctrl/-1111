@@ -245,6 +245,8 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final avatarUrl = item.counterpart.avatarUrl?.trim();
+    final displayName = item.counterpart.displayName.trim();
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -256,37 +258,166 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Row(
               children: <Widget>[
-                _MessagesMetaPill(label: _projectCounterpartRoleLabel(item.counterpart.role)),
-                _MessagesMetaPill(label: item.seedSummary.title),
+                CircleAvatar(
+                  radius: 22,
+                  backgroundImage: avatarUrl == null || avatarUrl.isEmpty
+                      ? null
+                      : NetworkImage(avatarUrl),
+                  child: avatarUrl == null || avatarUrl.isEmpty
+                      ? Text(
+                          displayName.isEmpty
+                              ? '?'
+                              : displayName.characters.first.toUpperCase(),
+                        )
+                      : null,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        displayName,
+                        style: theme.textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 3),
+                      Text(
+                        '昵称',
+                        style: theme.textTheme.labelMedium?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 10),
             Text(
-              item.counterpart.displayName,
+              item.summary.title,
               style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 8),
-            Text(item.seedSummary.summary, style: theme.textTheme.bodyMedium),
-            const SizedBox(height: 8),
             Text(
-              item.lastMessageSummary?.text ?? '当前竞标已提交，可直接进入沟通。',
+              item.summary.text,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.45,
               ),
             ),
+            if (item.p0PaySummary != null) ...<Widget>[
+              const SizedBox(height: 12),
+              _MessagesP0PayReadOnlyStatus(summary: item.p0PaySummary!),
+            ],
             const SizedBox(height: 12),
-            FilledButton.tonalIcon(
-              onPressed: onOpen,
-              icon: const Icon(Icons.chat_bubble_outline_rounded),
-              label: const Text('进入沟通'),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                _MessagesMetaPill(
+                  label: _projectCommunicationCardTypeLabel(
+                    item.summary.latestCardType,
+                  ),
+                ),
+                _MessagesMetaPill(label: '项目 ${item.summary.projectCount} 个'),
+              ],
             ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.tonalIcon(
+                onPressed: onOpen,
+                icon: const Icon(Icons.forum_outlined),
+                label: Text(_projectCommunicationOpenLabel(item)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessagesP0PayReadOnlyStatus extends StatelessWidget {
+  const _MessagesP0PayReadOnlyStatus({required this.summary});
+
+  final P0PayReadOnlySummaryView summary;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final lines = summary.statusLines;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(
+                  Icons.lock_outline_rounded,
+                  size: 16,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'P0-Pay 只读状态',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const _MessagesMetaPill(label: '只读'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '消息楼只展示资金状态摘要，不执行支付、不裁定扣费、不处理履约保证金。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.45,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ),
+            if (lines.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: lines
+                    .take(4)
+                    .map(
+                      (P0PayReadOnlyStatusLine line) => _MessagesMetaPill(
+                        label: '${line.label}：${line.value}',
+                      ),
+                    )
+                    .toList(growable: false),
+              ),
+            ],
+            if (summary.routeTarget != null &&
+                summary.routeTarget!.displayText.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                '只读 handoff：${summary.routeTarget!.displayText}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  height: 1.45,
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -486,10 +617,20 @@ String _sourceActionLabel(String targetType) {
   return targetType == 'forum_comment' ? '查看说明' : '回到源对象';
 }
 
-String _projectCounterpartRoleLabel(String role) {
-  return switch (role) {
-    'project_owner' => '项目方',
-    'bidder' => '竞标方',
-    _ => role,
+String _projectCommunicationOpenLabel(MessageInteractionItemView item) {
+  return switch (item.interactionType) {
+    'counterpart_conversation' => '进入项目沟通',
+    _ => '进入沟通',
+  };
+}
+
+String _projectCommunicationCardTypeLabel(String cardType) {
+  return switch (cardType) {
+    'project_name_access_request' => '项目名称申请',
+    'bid_thread' => '竞标沟通',
+    'project_clarification' => '项目澄清',
+    'project_order' => '订单状态',
+    'system_notice' => '系统通知',
+    _ => cardType,
   };
 }

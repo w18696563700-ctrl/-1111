@@ -89,10 +89,14 @@ class BidThreadParticipantView {
   const BidThreadParticipantView({
     required this.participantRole,
     required this.organizationId,
+    required this.displayName,
+    required this.avatarUrl,
   });
 
   final String participantRole;
   final String organizationId;
+  final String? displayName;
+  final String? avatarUrl;
 }
 
 class BidThreadMessageView {
@@ -278,6 +282,8 @@ BidThreadParticipantView _parseParticipant(Object? payload) {
   return BidThreadParticipantView(
     participantRole: _participantRole(_requiredString(body, 'participantRole')),
     organizationId: _requiredString(body, 'organizationId'),
+    displayName: _optionalString(body['displayName']),
+    avatarUrl: _optionalString(body['avatarUrl']),
   );
 }
 

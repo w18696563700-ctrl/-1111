@@ -7,27 +7,23 @@ export type MessageInteractionRouteTarget = {
 
 export type MessageInteractionReadModel = {
   interactionId: string;
-  interactionType: string;
-  threadId: string;
+  interactionType: "counterpart_conversation";
+  conversationId: string;
   projectId: string;
-  bidId: string;
   counterpart: {
     organizationId: string;
     displayName: string;
     avatarUrl: string | null;
     role: string;
   };
-  seedSummary: {
-    seedType: string;
+  summary: {
+    focusProjectId: string;
     title: string;
-    summary: string;
-    ctaLabel: string;
-  };
-  lastMessageSummary: {
     text: string;
-    messageKind: string;
-    createdAt: string | null;
-  } | null;
+    projectCount: number;
+    latestCardType: string;
+  };
+  p0PaySummary?: Record<string, unknown>;
   updatedAt: string;
   routeTarget: MessageInteractionRouteTarget;
 };
@@ -37,89 +33,186 @@ export type MessageInteractionListReadModel = {
   items: MessageInteractionReadModel[];
 };
 
-const INTERACTION_LANES = new Set(['project_communication']);
-const ROUTE_ACTION_KEYS = new Set(['bid_thread.open']);
-const SEED_TYPES = new Set(['bid_submitted']);
+const INTERACTION_LANES = new Set(["project_communication"]);
+const INTERACTION_TYPES = new Set(["counterpart_conversation"]);
+const ROUTE_ACTION_KEYS = new Set(["counterpart_conversation.open"]);
+const CARD_TYPES = new Set([
+  "project_name_access_request",
+  "bid_thread",
+  "project_clarification",
+  "project_order",
+  "system_notice",
+]);
 
-export function readMessageInteractionListReadModel(value: unknown): MessageInteractionListReadModel {
-  const record = requireRecord(value, 'Message interactions response must be an object.');
-  const lane = readRequiredString(record.lane, 'lane');
+export function readMessageInteractionListReadModel(
+  value: unknown,
+): MessageInteractionListReadModel {
+  const record = requireRecord(
+    value,
+    "Message interactions response must be an object.",
+  );
+  const lane = readRequiredString(record.lane, "lane");
   if (!INTERACTION_LANES.has(lane)) {
-    throw new Error('Message interactions response returned an unsupported lane.');
+    throw new Error(
+      "Message interactions response returned an unsupported lane.",
+    );
   }
-  const items = readRequiredArray(record.items, 'items').map(readMessageInteractionItem);
+  const items = readRequiredArray(record.items, "items").map(
+    readMessageInteractionItem,
+  );
   return { lane, items };
 }
 
-function readMessageInteractionItem(value: unknown): MessageInteractionReadModel {
-  const record = requireRecord(value, 'Message interaction item must be an object.');
+function readMessageInteractionItem(
+  value: unknown,
+): MessageInteractionReadModel {
+  const record = requireRecord(
+    value,
+    "Message interaction item must be an object.",
+  );
+  const interactionType = readRequiredString(
+    record.interactionType,
+    "interactionType",
+  );
+  if (!INTERACTION_TYPES.has(interactionType)) {
+    throw new Error(
+      "Message interaction item returned an unsupported interactionType.",
+    );
+  }
+  const routeTarget = readRouteTarget(record.routeTarget);
+  const summary = readSummary(record.summary);
+  const p0PaySummary = readOptionalP0PaySummary(
+    record.p0PaySummary ?? record.paymentStatusSummary,
+  );
+  if (routeTarget.actionKey !== "counterpart_conversation.open") {
+    throw new Error(
+      "Message interaction counterpart_conversation item returned an unsupported routeTarget.actionKey.",
+    );
+  }
+
   return {
-    interactionId: readRequiredString(record.interactionId, 'interactionId'),
-    interactionType: readRequiredString(record.interactionType, 'interactionType'),
-    threadId: readRequiredString(record.threadId, 'threadId'),
-    projectId: readRequiredString(record.projectId, 'projectId'),
-    bidId: readRequiredString(record.bidId, 'bidId'),
+    interactionId: readRequiredString(record.interactionId, "interactionId"),
+    interactionType: "counterpart_conversation",
+    conversationId: readRequiredString(record.conversationId, "conversationId"),
+    projectId: readRequiredString(record.projectId, "projectId"),
     counterpart: readCounterpart(record.counterpart),
-    seedSummary: readSeedSummary(record.seedSummary),
-    lastMessageSummary: readLastMessageSummary(record.lastMessageSummary),
-    updatedAt: readRequiredString(record.updatedAt, 'updatedAt'),
-    routeTarget: readRouteTarget(record.routeTarget),
+    summary,
+    ...(p0PaySummary ? { p0PaySummary } : {}),
+    updatedAt: readRequiredString(record.updatedAt, "updatedAt"),
+    routeTarget,
   };
+}
+
+function readOptionalP0PaySummary(value: unknown) {
+  if (value == null) {
+    return undefined;
+  }
+  const record = requireRecord(
+    value,
+    "Message interaction p0PaySummary must be an object.",
+  );
+  const messageDisplaySummary = record.messageDisplaySummary == null
+    ? null
+    : requireRecord(
+        record.messageDisplaySummary,
+        "Message interaction p0PaySummary.messageDisplaySummary must be an object.",
+      );
+  const readOnly = record.readOnly ?? messageDisplaySummary?.readOnly;
+  if (readOnly !== true) {
+    throw new Error(
+      "Message interaction p0PaySummary must be read-only.",
+    );
+  }
+  return record;
 }
 
 function readCounterpart(value: unknown) {
-  const record = requireRecord(value, 'Message interaction counterpart must be an object.');
+  const record = requireRecord(
+    value,
+    "Message interaction counterpart must be an object.",
+  );
   return {
-    organizationId: readRequiredString(record.organizationId, 'counterpart.organizationId'),
-    displayName: readRequiredString(record.displayName, 'counterpart.displayName'),
+    organizationId: readRequiredString(
+      record.organizationId,
+      "counterpart.organizationId",
+    ),
+    displayName: readRequiredString(
+      record.displayName,
+      "counterpart.displayName",
+    ),
     avatarUrl: readNullableString(record.avatarUrl),
-    role: readRequiredString(record.role, 'counterpart.role'),
+    role: readRequiredString(record.role, "counterpart.role"),
   };
 }
 
-function readSeedSummary(value: unknown) {
-  const record = requireRecord(value, 'Message interaction seedSummary must be an object.');
-  const seedType = readRequiredString(record.seedType, 'seedSummary.seedType');
-  if (!SEED_TYPES.has(seedType)) {
-    throw new Error('Message interaction item returned an unsupported seedSummary.seedType.');
+function readSummary(value: unknown) {
+  const record = requireRecord(
+    value,
+    "Message interaction summary must be an object.",
+  );
+  const latestCardType = readRequiredString(
+    record.latestCardType,
+    "summary.latestCardType",
+  );
+  if (!CARD_TYPES.has(latestCardType)) {
+    throw new Error(
+      "Message interaction item returned an unsupported summary.latestCardType.",
+    );
   }
   return {
-    seedType,
-    title: readRequiredString(record.title, 'seedSummary.title'),
-    summary: readRequiredString(record.summary, 'seedSummary.summary'),
-    ctaLabel: readRequiredString(record.ctaLabel, 'seedSummary.ctaLabel'),
-  };
-}
-
-function readLastMessageSummary(value: unknown) {
-  if (value == null) {
-    return null;
-  }
-  const record = requireRecord(value, 'Message interaction lastMessageSummary must be an object.');
-  return {
-    text: readRequiredString(record.text, 'lastMessageSummary.text'),
-    messageKind: readRequiredString(record.messageKind, 'lastMessageSummary.messageKind'),
-    createdAt: readNullableString(record.createdAt),
+    focusProjectId: readRequiredString(
+      record.focusProjectId,
+      "summary.focusProjectId",
+    ),
+    title: readRequiredString(record.title, "summary.title"),
+    text: readRequiredString(record.text, "summary.text"),
+    projectCount: readRequiredNumber(
+      record.projectCount,
+      "summary.projectCount",
+    ),
+    latestCardType,
   };
 }
 
 function readRouteTarget(value: unknown): MessageInteractionRouteTarget {
-  const record = requireRecord(value, 'Message interaction routeTarget must be an object.');
-  const actionKey = readRequiredString(record.actionKey, 'routeTarget.actionKey');
+  const record = requireRecord(
+    value,
+    "Message interaction routeTarget must be an object.",
+  );
+  const actionKey = readRequiredString(
+    record.actionKey,
+    "routeTarget.actionKey",
+  );
   if (!ROUTE_ACTION_KEYS.has(actionKey)) {
-    throw new Error('Message interaction item returned an unsupported routeTarget.actionKey.');
+    throw new Error(
+      "Message interaction item returned an unsupported routeTarget.actionKey.",
+    );
   }
-  const params = requireStringMap(record.params, 'routeTarget.params');
+  const params = requireStringMap(record.params, "routeTarget.params");
+  if (
+    typeof params.conversationId !== "string" ||
+    typeof params.projectId !== "string"
+  ) {
+    throw new Error(
+      "Message interaction counterpart_conversation routeTarget.params must include conversationId and projectId.",
+    );
+  }
   return {
-    objectType: readRequiredString(record.objectType, 'routeTarget.objectType'),
+    objectType: readRequiredString(record.objectType, "routeTarget.objectType"),
     actionKey,
-    canonicalPath: readRequiredString(record.canonicalPath, 'routeTarget.canonicalPath'),
+    canonicalPath: readRequiredString(
+      record.canonicalPath,
+      "routeTarget.canonicalPath",
+    ),
     params,
   };
 }
 
 function requireStringMap(value: unknown, fieldName: string) {
-  const record = requireRecord(value, `Message interaction ${fieldName} must be an object.`);
+  const record = requireRecord(
+    value,
+    `Message interaction ${fieldName} must be an object.`,
+  );
   const result: Record<string, unknown> = {};
   for (const [key, rawValue] of Object.entries(record)) {
     result[key] = readRequiredString(rawValue, `${fieldName}.${key}`);
@@ -128,7 +221,7 @@ function requireStringMap(value: unknown, fieldName: string) {
 }
 
 function requireRecord(value: unknown, message: string) {
-  if (value !== null && typeof value === 'object' && !Array.isArray(value)) {
+  if (value !== null && typeof value === "object" && !Array.isArray(value)) {
     return value as Record<string, unknown>;
   }
   throw new Error(message);
@@ -136,28 +229,45 @@ function requireRecord(value: unknown, message: string) {
 
 function readRequiredArray(value: unknown, fieldName: string) {
   if (!Array.isArray(value)) {
-    throw new Error(`Message interactions response is missing \`${fieldName}\`.`);
+    throw new Error(
+      `Message interactions response is missing \`${fieldName}\`.`,
+    );
   }
   return value;
 }
 
 function readRequiredString(value: unknown, fieldName: string) {
-  if (typeof value !== 'string') {
-    throw new Error(`Message interactions response is missing \`${fieldName}\`.`);
+  if (typeof value !== "string") {
+    throw new Error(
+      `Message interactions response is missing \`${fieldName}\`.`,
+    );
   }
   const normalized = value.trim();
   if (!normalized) {
-    throw new Error(`Message interactions response is missing \`${fieldName}\`.`);
+    throw new Error(
+      `Message interactions response is missing \`${fieldName}\`.`,
+    );
   }
   return normalized;
+}
+
+function readRequiredNumber(value: unknown, fieldName: string) {
+  if (typeof value !== "number" || Number.isNaN(value)) {
+    throw new Error(
+      `Message interactions response is missing \`${fieldName}\`.`,
+    );
+  }
+  return value;
 }
 
 function readNullableString(value: unknown) {
   if (value == null) {
     return null;
   }
-  if (typeof value !== 'string') {
-    throw new Error('Message interactions response returned a non-string nullable field.');
+  if (typeof value !== "string") {
+    throw new Error(
+      "Message interactions response returned a non-string nullable field.",
+    );
   }
   return value;
 }

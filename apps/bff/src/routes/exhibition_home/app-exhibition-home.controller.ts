@@ -13,6 +13,8 @@ export class AppExhibitionHomeController {
     @Query('longitude') longitude?: string,
     @Query('provinceCode') provinceCode?: string,
     @Query('provinceName') provinceName?: string,
+    @Query('cityName') cityName?: string,
+    @Query('districtName') districtName?: string,
     @Query('locationPermissionState') locationPermissionState?: string,
   ) {
     return this.exhibitionHomeService.getHome(headers, {
@@ -20,6 +22,8 @@ export class AppExhibitionHomeController {
       longitude,
       provinceCode,
       provinceName,
+      cityName,
+      districtName,
       locationPermissionState,
     });
   }

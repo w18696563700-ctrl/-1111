@@ -286,6 +286,11 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
       },
     },
     {
+      async validateAndNormalize(command) {
+        return command;
+      },
+    },
+    {
       async createForSubmittedBid() {
         return {
           threadId: 'thread-1',
@@ -305,6 +310,9 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
       projectId: 'project-1',
       quoteAmount: 88888,
       proposalSummary: '供应商最小报价与执行方案',
+      projectUnderstandingFileAssetId: 'file-understanding-1',
+      quoteSheetFileAssetId: 'file-quote-1',
+      schedulePlanFileAssetId: 'file-schedule-1',
     },
     createContext('bid-submit'),
   );
@@ -315,6 +323,9 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   assert.equal(savedBids[0].bidderOrganizationId, 'supplier-org');
   assert.equal(savedBids[0].organizationId, 'supplier-org');
   assert.equal(savedBids[0].quoteAmount, '88888.00');
+  assert.equal(savedBids[0].projectUnderstandingFileAssetId, 'file-understanding-1');
+  assert.equal(savedBids[0].quoteSheetFileAssetId, 'file-quote-1');
+  assert.equal(savedBids[0].schedulePlanFileAssetId, 'file-schedule-1');
   assert.equal(savedBids[0].state, 'submitted');
   assert.equal(savedBids[0].submittedBy, 'supplier-user');
   assert.ok(savedBids[0].submittedAt instanceof Date);
@@ -406,6 +417,11 @@ test('bid submit rejects same organization duplicate submission with controlled 
       },
     },
     {
+      async validateAndNormalize(command) {
+        return command;
+      },
+    },
+    {
       async createForSubmittedBid() {
         throw new Error('should not seed duplicate bid');
       },
@@ -424,6 +440,9 @@ test('bid submit rejects same organization duplicate submission with controlled 
           projectId: 'project-1',
           quoteAmount: 88888,
           proposalSummary: '供应商最小报价与执行方案',
+          projectUnderstandingFileAssetId: 'file-understanding-1',
+          quoteSheetFileAssetId: 'file-quote-1',
+          schedulePlanFileAssetId: 'file-schedule-1',
         },
         createContext('bid-duplicate'),
       ),
@@ -454,6 +473,7 @@ test('bid submit rejects malformed body and unavailable project with controlled 
     },
     { async verifyCurrentSessionContext() { throw new Error('should not verify'); } },
     { async requireBidSubmitEligibilityFromContext() { throw new Error('should not check eligibility'); } },
+    { async validateAndNormalize() { throw new Error('should not validate attachments'); } },
     { toAcceptedResponse(bidId) { return { bidId }; } },
   );
 
@@ -464,7 +484,14 @@ test('bid submit rejects malformed body and unavailable project with controlled 
   await assert.rejects(
     () =>
       service.submitBid(
-        { projectId: 'missing-project', quoteAmount: 1, proposalSummary: 'x' },
+        {
+          projectId: 'missing-project',
+          quoteAmount: 1,
+          proposalSummary: 'x',
+          projectUnderstandingFileAssetId: 'file-understanding-1',
+          quoteSheetFileAssetId: 'file-quote-1',
+          schedulePlanFileAssetId: 'file-schedule-1',
+        },
         createContext('unavailable'),
       ),
     (error) => error?.response?.code === 'AUTH_RESOURCE_UNAVAILABLE',
@@ -485,5 +512,22 @@ test('bid duplicate submission migration registers explicit project plus bidder 
   assert.match(
     migration.statements.join('\n'),
     /CREATE UNIQUE INDEX IF NOT EXISTS idx_bids_project_bidder_unique/,
+  );
+});
+
+test('bid attachment truth migration registers canonical slots on bids', () => {
+  const {
+    bidSubmissionSnapshotAttachmentTruthMigrations,
+    serverMigrations,
+  } = require('../dist/core/migrations/migrations.js');
+  const migration = bidSubmissionSnapshotAttachmentTruthMigrations.find(
+    (item) => item.key === '20260424_bid_submission_snapshot_attachment_truth',
+  );
+
+  assert.ok(migration);
+  assert.ok(serverMigrations.includes(migration));
+  assert.match(
+    migration.statements.join('\n'),
+    /ALTER TABLE bids\s+ADD COLUMN IF NOT EXISTS project_understanding_file_asset_id varchar\(64\)/,
   );
 });

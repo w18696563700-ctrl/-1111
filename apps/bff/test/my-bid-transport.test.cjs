@@ -51,6 +51,7 @@ test('my bids and snapshot routes are materialized and no longer router 404 loca
         quoteAmount: 1000,
         proposalSummary: '最小摘要',
         attachmentSummary: { count: 0 },
+        attachments: [],
         availability: { canOpenBidThread: true },
       };
     },
@@ -165,8 +166,17 @@ test('my bids and snapshot services forward frozen server paths and accepted res
           submittedAt: '2026-04-24T00:00:00.000Z',
           quoteAmount: 1000,
           proposalSummary: '最小摘要',
-          attachmentSummary: { count: 0 },
-          availability: { canOpenBidThread: true },
+          attachmentSummary: { count: 3 },
+          attachments: [
+            {
+              slotKey: 'project_understanding',
+              slotLabel: '项目理解',
+              fileAssetId: 'file-understanding-1',
+              fileKind: 'bid_project_understanding',
+              mimeType: 'application/pdf',
+            },
+          ],
+          availability: { canOpenBidThread: true, participantCardReadable: true },
           trimmed: 'ignore-me',
         };
       },
@@ -190,7 +200,7 @@ test('my bids and snapshot services forward frozen server paths and accepted res
               objectType: 'bid_thread',
               actionKey: 'bid_thread.open',
               canonicalPath: '/bid/thread/detail',
-              params: { projectId: 'project-1', bidId: 'bid-1', threadId: 'thread-1' },
+              params: { projectId: 'project-1', bidId: 'bid-1' },
             },
           },
         };
@@ -216,6 +226,8 @@ test('my bids and snapshot services forward frozen server paths and accepted res
 
   const snapshot = await bidService.getBidSubmissionSnapshot('project-1', 'bid-1', {});
   assert.equal(snapshot.bidId, 'bid-1');
+  assert.equal(snapshot.attachments.length, 1);
+  assert.equal(snapshot.attachments[0].slotLabel, '项目理解');
 
   const brokenService = new BidService(
     {
@@ -262,6 +274,9 @@ test('my bids and snapshot services forward frozen server paths and accepted res
       projectId: 'project-1',
       quoteAmount: 1000,
       proposalSummary: '最小摘要',
+      projectUnderstandingFileAssetId: 'file-understanding-1',
+      quoteSheetFileAssetId: 'file-quote-1',
+      schedulePlanFileAssetId: 'file-schedule-1',
     },
     {},
   );

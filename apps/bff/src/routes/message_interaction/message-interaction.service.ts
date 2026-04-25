@@ -3,7 +3,15 @@ import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
+import { readCounterpartConversationDetailReadModel } from './counterpart-conversation.read-model';
 import { readMessageInteractionListReadModel } from './message-interaction.read-model';
+import {
+  readProjectCommunicationMessageListReadModel,
+  readProjectCommunicationMessageReadModel,
+  readProjectCommunicationReadCursorReadModel,
+  readProjectCommunicationThreadReadModel
+} from './project-communication.read-model';
+import { readProjectCommunicationRealtimeEventListReadModel } from './project-communication-realtime.read-model';
 
 @Injectable()
 export class MessageInteractionService {
@@ -37,6 +45,160 @@ export class MessageInteractionService {
     }
   }
 
+  async getCounterpartConversationDetail(
+    conversationId: string | undefined,
+    projectId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.get<unknown>(
+        '/server/message/counterpart-conversation/detail',
+        {
+          headers: this.buildScopedHeaders(headers),
+          params: {
+            conversationId: this.readConversationId(conversationId),
+            projectId: this.readProjectId(projectId),
+          },
+        },
+      );
+      return readCounterpartConversationDetailReadModel(result);
+    } catch (error) {
+      throw this.sanitizeCounterpartConversationError(
+        this.errors.toHttpException(
+          error,
+          'COUNTERPART_CONVERSATION_UNAVAILABLE',
+          '当前对方沟通容器暂不可用，请稍后再试。',
+          {
+            400: 'COUNTERPART_CONVERSATION_INVALID',
+            401: 'AUTH_SESSION_INVALID',
+            403: 'COUNTERPART_CONVERSATION_FORBIDDEN',
+            404: 'COUNTERPART_CONVERSATION_UNAVAILABLE',
+          },
+        ),
+      );
+    }
+  }
+
+  async getProjectCommunicationThread(
+    projectId: string | undefined,
+    counterpartOrganizationId: string | undefined,
+    headers: IncomingHttpHeaders
+  ) {
+    const path = '/server/project-communication/thread';
+    try {
+      const result = await this.serverClient.get<unknown>(path, {
+        headers: this.buildScopedHeaders(headers),
+        params: {
+          projectId: this.readRequiredProjectCommunicationParam(projectId),
+          counterpartOrganizationId: this.readOptionalParam(counterpartOrganizationId)
+        }
+      });
+      return readProjectCommunicationThreadReadModel(result);
+    } catch (error) {
+      throw this.sanitizeProjectCommunicationRouteDrift(
+        this.normalizeProjectCommunicationError(error),
+        'GET',
+        path
+      );
+    }
+  }
+
+  async listProjectCommunicationMessages(
+    threadId: string | undefined,
+    projectId: string | undefined,
+    cursor: string | undefined,
+    limit: string | undefined,
+    headers: IncomingHttpHeaders
+  ) {
+    const path = '/server/project-communication/messages';
+    try {
+      const result = await this.serverClient.get<unknown>(path, {
+        headers: this.buildScopedHeaders(headers),
+        params: {
+          threadId: this.readRequiredProjectCommunicationParam(threadId),
+          projectId: this.readRequiredProjectCommunicationParam(projectId),
+          cursor: this.readOptionalParam(cursor),
+          limit: this.readOptionalPositiveInt(limit)
+        }
+      });
+      return readProjectCommunicationMessageListReadModel(result);
+    } catch (error) {
+      throw this.sanitizeProjectCommunicationRouteDrift(
+        this.normalizeProjectCommunicationError(error),
+        'GET',
+        path
+      );
+    }
+  }
+
+  async sendProjectCommunicationMessage(
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders
+  ) {
+    const path = '/server/project-communication/messages';
+    try {
+      const result = await this.serverClient.post<unknown>(
+        path,
+        this.toProjectCommunicationMessagePayload(payload),
+        { headers: this.buildScopedHeaders(headers) }
+      );
+      return readProjectCommunicationMessageReadModel(result);
+    } catch (error) {
+      throw this.sanitizeProjectCommunicationRouteDrift(
+        this.normalizeProjectCommunicationError(error),
+        'POST',
+        path
+      );
+    }
+  }
+
+  async markProjectCommunicationReadCursor(
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders
+  ) {
+    const path = '/server/project-communication/read-cursor';
+    try {
+      const result = await this.serverClient.post<unknown>(
+        path,
+        this.toProjectCommunicationReadCursorPayload(payload),
+        { headers: this.buildScopedHeaders(headers) }
+      );
+      return readProjectCommunicationReadCursorReadModel(result);
+    } catch (error) {
+      throw this.sanitizeProjectCommunicationRouteDrift(
+        this.normalizeProjectCommunicationError(error),
+        'POST',
+        path
+      );
+    }
+  }
+
+  async listProjectCommunicationRealtimeEvents(
+    threadId: string | undefined,
+    projectId: string | undefined,
+    afterEventId: string | undefined,
+    headers: IncomingHttpHeaders
+  ) {
+    const path = '/server/project-communication/realtime/events';
+    try {
+      const result = await this.serverClient.get<unknown>(path, {
+        headers: this.buildScopedHeaders(headers),
+        params: {
+          threadId: this.readRequiredProjectCommunicationParam(threadId),
+          projectId: this.readRequiredProjectCommunicationParam(projectId),
+          afterEventId: this.readOptionalParam(afterEventId)
+        }
+      });
+      return readProjectCommunicationRealtimeEventListReadModel(result);
+    } catch (error) {
+      throw this.sanitizeProjectCommunicationRouteDrift(
+        this.normalizeProjectCommunicationError(error),
+        'GET',
+        path
+      );
+    }
+  }
+
   private sanitizeError(error: HttpException) {
     const payload = this.readErrorPayload(error);
     const message = String(payload.message ?? '');
@@ -51,6 +213,26 @@ export class MessageInteractionService {
         statusCode: error.getStatus(),
         code: 'MESSAGE_INTERACTION_UNAVAILABLE',
         message: '当前项目沟通入口暂不可用，请稍后再试。',
+        source: payload.source === 'bff' ? 'bff' : 'server'
+      },
+      error.getStatus()
+    );
+  }
+
+  private sanitizeCounterpartConversationError(error: HttpException) {
+    const payload = this.readErrorPayload(error);
+    const message = String(payload.message ?? '');
+    if (
+      error.getStatus() !== 404 &&
+      !message.includes('Cannot GET /server/message/counterpart-conversation/detail')
+    ) {
+      return error;
+    }
+    return new HttpException(
+      {
+        statusCode: error.getStatus(),
+        code: 'COUNTERPART_CONVERSATION_UNAVAILABLE',
+        message: '当前对方沟通容器暂不可用，请稍后再试。',
         source: payload.source === 'bff' ? 'bff' : 'server'
       },
       error.getStatus()
@@ -72,6 +254,145 @@ export class MessageInteractionService {
       message: '当前项目沟通查询参数无效，请检查后重试。',
       source: 'bff'
     });
+  }
+
+  private readConversationId(value: string | undefined) {
+    const normalized = value?.trim() ?? '';
+    if (normalized) {
+      return normalized;
+    }
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'COUNTERPART_CONVERSATION_INVALID',
+      message: '当前对方沟通容器参数无效，请检查后重试。',
+      source: 'bff'
+    });
+  }
+
+  private readProjectId(value: string | undefined) {
+    const normalized = value?.trim() ?? '';
+    if (normalized) {
+      return normalized;
+    }
+    throw new BadRequestException({
+      statusCode: 400,
+      code: 'COUNTERPART_CONVERSATION_INVALID',
+      message: '当前对方沟通容器参数无效，请检查后重试。',
+      source: 'bff'
+    });
+  }
+
+  private toProjectCommunicationMessagePayload(payload: Record<string, unknown>) {
+    const source = this.requireBodyRecord(payload);
+    return {
+      threadId: this.readRequiredProjectCommunicationField(source.threadId, 'threadId'),
+      projectId: this.readRequiredProjectCommunicationField(source.projectId, 'projectId'),
+      body: this.readRequiredProjectCommunicationField(source.body, 'body'),
+      clientMessageId: this.readOptionalPayloadString(source.clientMessageId)
+    };
+  }
+
+  private toProjectCommunicationReadCursorPayload(payload: Record<string, unknown>) {
+    const source = this.requireBodyRecord(payload);
+    return {
+      threadId: this.readRequiredProjectCommunicationField(source.threadId, 'threadId'),
+      projectId: this.readRequiredProjectCommunicationField(source.projectId, 'projectId'),
+      lastReadMessageId: this.readOptionalPayloadString(source.lastReadMessageId)
+    };
+  }
+
+  private requireBodyRecord(value: unknown) {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      throw this.badProjectCommunicationRequest('Project communication body must be an object.');
+    }
+    return value as Record<string, unknown>;
+  }
+
+  private readRequiredProjectCommunicationField(value: unknown, field: string) {
+    if (typeof value !== 'string' || !value.trim()) {
+      throw this.badProjectCommunicationRequest(`Field \`${field}\` is required.`);
+    }
+    return value.trim();
+  }
+
+  private readRequiredProjectCommunicationParam(value: string | undefined) {
+    const normalized = value?.trim() ?? '';
+    if (normalized) {
+      return normalized;
+    }
+    throw this.badProjectCommunicationRequest('Project communication query params are invalid.');
+  }
+
+  private readOptionalParam(value: string | undefined) {
+    const normalized = value?.trim() ?? '';
+    return normalized ? normalized : undefined;
+  }
+
+  private readOptionalPayloadString(value: unknown) {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    if (typeof value !== 'string') {
+      throw this.badProjectCommunicationRequest('Optional project communication field must be a string.');
+    }
+    const normalized = value.trim();
+    return normalized ? normalized : undefined;
+  }
+
+  private readOptionalPositiveInt(value: string | undefined) {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+      return undefined;
+    }
+    const parsed = Number(normalized);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw this.badProjectCommunicationRequest('Project communication limit must be a positive integer.');
+    }
+    return parsed;
+  }
+
+  private badProjectCommunicationRequest(message: string) {
+    return new BadRequestException({
+      statusCode: 400,
+      code: 'PROJECT_COMMUNICATION_INVALID',
+      message,
+      source: 'bff'
+    });
+  }
+
+  private normalizeProjectCommunicationError(error: unknown) {
+    return this.errors.toHttpException(
+      error,
+      'PROJECT_COMMUNICATION_UNAVAILABLE',
+      '当前项目沟通消息暂不可用，请稍后再试。',
+      {
+        400: 'PROJECT_COMMUNICATION_INVALID',
+        401: 'AUTH_SESSION_INVALID',
+        403: 'PROJECT_COMMUNICATION_FORBIDDEN',
+        404: 'PROJECT_COMMUNICATION_UNAVAILABLE'
+      }
+    );
+  }
+
+  private sanitizeProjectCommunicationRouteDrift(
+    error: HttpException,
+    method: 'GET' | 'POST',
+    path: string
+  ) {
+    const payload = this.readErrorPayload(error);
+    const message = String(payload.message ?? '');
+    if (error.getStatus() !== 404 && !message.includes(`Cannot ${method} ${path}`)) {
+      return error;
+    }
+    return new HttpException(
+      {
+        statusCode: error.getStatus(),
+        code: 'PROJECT_COMMUNICATION_UNAVAILABLE',
+        message: '当前项目沟通消息暂不可用，请稍后再试。',
+        source: payload.source === 'bff' ? 'bff' : 'server'
+      },
+      error.getStatus()
+    );
   }
 
   private buildScopedHeaders(headers: IncomingHttpHeaders) {

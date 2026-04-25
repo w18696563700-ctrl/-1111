@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_board_surface.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_filter_options.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_supplier_category_support.dart';
 
 class EnterpriseBoardListActionController {
   VoidCallback? onSearchPressed;
@@ -291,9 +292,11 @@ List<Widget> buildEnterpriseBoardFilterButtons({
   required EnterpriseBoardSurfaceSpec surfaceSpec,
   required String? selectedCityLabel,
   required String? selectedAreaLabel,
+  String? selectedSupplyCategoryLabel,
   required bool cityFilterEnabled,
   required VoidCallback onCityPressed,
   required ValueChanged<String> onAreaSelected,
+  VoidCallback? onSupplyCategoryPressed,
 }) {
   final buttons = <Widget>[
     EnterpriseActionFilterButton(
@@ -303,6 +306,17 @@ List<Widget> buildEnterpriseBoardFilterButtons({
       onPressed: onCityPressed,
     ),
   ];
+
+  if (boardType == EnterpriseBoardType.supplier &&
+      onSupplyCategoryPressed != null) {
+    buttons.add(
+      EnterpriseActionFilterButton(
+        label: '供应品类',
+        valueLabel: selectedSupplyCategoryLabel,
+        onPressed: onSupplyCategoryPressed,
+      ),
+    );
+  }
 
   if (boardType == EnterpriseBoardType.factory) {
     buttons.add(
@@ -325,4 +339,107 @@ List<Widget> buildEnterpriseBoardFilterButtons({
   }
 
   return buttons;
+}
+
+class EnterpriseSupplierCategoryRail extends StatelessWidget {
+  const EnterpriseSupplierCategoryRail({
+    super.key,
+    required this.selectedCategory,
+    required this.onSelected,
+  });
+
+  final String? selectedCategory;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 10, 8, 10),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Padding(
+              padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
+              child: Text(
+                '供应品类',
+                style: Theme.of(
+                  context,
+                ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+              ),
+            ),
+            _EnterpriseSupplierCategoryRailItem(
+              label: '全部',
+              selected: selectedCategory == null,
+              onTap: () => onSelected(null),
+            ),
+            ...enterpriseHubSupplierCategoryOptions.map(
+              (MapEntry<String, String> option) =>
+                  _EnterpriseSupplierCategoryRailItem(
+                    label: option.value,
+                    selected: selectedCategory == option.key,
+                    onTap: () => onSelected(option.key),
+                  ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _EnterpriseSupplierCategoryRailItem extends StatelessWidget {
+  const _EnterpriseSupplierCategoryRailItem({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 160),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+          decoration: BoxDecoration(
+            color: selected
+                ? colorScheme.primaryContainer
+                : colorScheme.surfaceContainerLowest,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: selected
+                  ? colorScheme.primary.withValues(alpha: 0.35)
+                  : colorScheme.outlineVariant,
+            ),
+          ),
+          child: Text(
+            label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+              color: selected
+                  ? colorScheme.onPrimaryContainer
+                  : colorScheme.onSurface,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }

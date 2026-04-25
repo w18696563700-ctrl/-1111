@@ -6,6 +6,7 @@ type TradingShellAction =
   | 'contract_amend'
   | 'contract_confirm'
   | 'dispute_withdraw'
+  | 'inspection_pass'
   | 'inspection_recheck'
   | 'milestone_submit'
   | 'inspection_submit'
@@ -15,6 +16,7 @@ const ROUTE_DRIFT_PREFIXES = {
   contract_amend: 'Cannot POST /server/contract/amend',
   contract_confirm: 'Cannot POST /server/contract/confirm',
   dispute_withdraw: 'Cannot POST /server/dispute/withdraw',
+  inspection_pass: 'Cannot POST /server/inspection/pass',
   inspection_recheck: 'Cannot POST /server/inspection/recheck',
   milestone_submit: 'Cannot POST /server/milestone/submit',
   inspection_submit: 'Cannot POST /server/inspection/submit',
@@ -97,6 +99,22 @@ export class TradingShellHandoffErrorService {
       '当前验收复检入口暂不可用，请稍后再试。',
       {
         400: 'INSPECTION_RECHECK_INVALID',
+        401: 'AUTH_SESSION_INVALID',
+        403: 'AUTH_PERMISSION_INSUFFICIENT',
+        404: 'AUTH_RESOURCE_UNAVAILABLE',
+        409: 'INSPECTION_ENTRY_UNAVAILABLE',
+      },
+    );
+  }
+
+  normalizeInspectionPassError(error: unknown) {
+    return this.normalizeError(
+      error,
+      'inspection_pass',
+      'INSPECTION_ENTRY_UNAVAILABLE',
+      '当前验收通过入口暂不可用，请稍后再试。',
+      {
+        400: 'INSPECTION_PASS_INVALID',
         401: 'AUTH_SESSION_INVALID',
         403: 'AUTH_PERMISSION_INSUFFICIENT',
         404: 'AUTH_RESOURCE_UNAVAILABLE',
@@ -199,6 +217,7 @@ export class TradingShellHandoffErrorService {
       code === 'MILESTONE_SUBMIT_INVALID' ||
       code === 'MILESTONE_INVALID_STATE' ||
       code === 'INSPECTION_RECHECK_INVALID' ||
+      code === 'INSPECTION_PASS_INVALID' ||
       code === 'INSPECTION_SUBMIT_INVALID' ||
       code === 'INSPECTION_ENTRY_UNAVAILABLE' ||
       code === 'INSPECTION_INVALID_STATE' ||
@@ -250,6 +269,9 @@ export class TradingShellHandoffErrorService {
     if (code === 'INSPECTION_RECHECK_INVALID') {
       return '当前验收复检参数无效，请检查后再试。';
     }
+    if (code === 'INSPECTION_PASS_INVALID') {
+      return '当前验收通过参数无效，请检查后再试。';
+    }
     if (code === 'INSPECTION_SUBMIT_INVALID') {
       return '当前验收提交参数无效，请检查后再试。';
     }
@@ -259,6 +281,9 @@ export class TradingShellHandoffErrorService {
     if (code === 'INSPECTION_INVALID_STATE') {
       if (action === 'inspection_recheck') {
         return originalMessage ? '当前验收状态暂不支持复检。' : '当前验收暂时不能继续复检承接。';
+      }
+      if (action === 'inspection_pass') {
+        return originalMessage ? '当前验收状态暂不支持通过。' : '当前验收暂时不能继续通过承接。';
       }
       return originalMessage || '当前验收暂时不能继续提交承接。';
     }
@@ -284,6 +309,8 @@ export class TradingShellHandoffErrorService {
       ? '当前合同确认入口暂不可用，请稍后再试。'
       : action === 'inspection_recheck'
       ? '当前验收复检入口暂不可用，请稍后再试。'
+      : action === 'inspection_pass'
+      ? '当前验收通过入口暂不可用，请稍后再试。'
       : action === 'inspection_submit'
       ? '当前验收提交入口暂不可用，请稍后再试。'
       : '当前里程碑提交入口暂不可用，请稍后再试。';
@@ -300,6 +327,7 @@ export class TradingShellHandoffErrorService {
       action === 'contract_confirm' ||
       action === 'dispute_withdraw' ||
       action === 'inspection_recheck' ||
+      action === 'inspection_pass' ||
       action === 'milestone_submit' ||
       action === 'inspection_submit'
     ) {

@@ -58,8 +58,14 @@ class MessagesRegisteredEntryDefinition {
           requiredParam: 'projectId',
           builder: ExhibitionRoutes.projectClarificationWithProjectId,
         );
+      case 'counterpart_conversation.open':
+        return _counterpartConversationRouteLocation(routeParams);
+      case 'project_name_access_thread.open':
+        return _projectNameAccessThreadRouteLocation(routeParams);
       case 'bid_thread.open':
         return _bidThreadRouteLocation(routeParams);
+      case 'order_detail.open':
+        return _orderDetailRouteLocation(routeParams);
     }
 
     return 'routeTarget actionKey "$actionKey" is unsupported';
@@ -70,26 +76,38 @@ const Set<String> messagesAllowedObjectTypes = <String>{
   'inspection',
   'dispute',
   'project_clarification',
+  'counterpart_conversation',
+  'project_name_access_thread',
   'bid_thread',
+  'order',
 };
 
 const Set<String> messagesAllowedActionKeys = <String>{
   'inspection.submit',
   'dispute.open',
   'project_clarification.open',
+  'counterpart_conversation.open',
+  'project_name_access_thread.open',
   'bid_thread.open',
+  'order_detail.open',
 };
 
 const Set<String> messagesProjectCommunicationActionKeys = <String>{
+  'counterpart_conversation.open',
   'project_clarification.open',
+  'project_name_access_thread.open',
   'bid_thread.open',
+  'order_detail.open',
 };
 
 const Map<String, String> messagesActionKeyToObjectType = <String, String>{
   'inspection.submit': 'inspection',
   'dispute.open': 'dispute',
   'project_clarification.open': 'project_clarification',
+  'counterpart_conversation.open': 'counterpart_conversation',
+  'project_name_access_thread.open': 'project_name_access_thread',
   'bid_thread.open': 'bid_thread',
+  'order_detail.open': 'order',
 };
 
 const Map<String, MessagesRegisteredEntryDefinition>
@@ -116,12 +134,33 @@ messagesRegisteredEntryByActionKey =
         localEntryKey: 'registered.project_clarification.open',
         requiredParams: <String>['projectId'],
       ),
+      'counterpart_conversation.open': MessagesRegisteredEntryDefinition(
+        objectType: 'counterpart_conversation',
+        actionKey: 'counterpart_conversation.open',
+        canonicalPath: '/api/app/message/counterpart-conversation/detail',
+        localEntryKey: 'registered.counterpart_conversation.open',
+        requiredParams: <String>['conversationId', 'projectId'],
+      ),
+      'project_name_access_thread.open': MessagesRegisteredEntryDefinition(
+        objectType: 'project_name_access_thread',
+        actionKey: 'project_name_access_thread.open',
+        canonicalPath: '/api/app/project/name-access/thread/detail',
+        localEntryKey: 'registered.project_name_access_thread.open',
+        requiredParams: <String>['threadId', 'projectId', 'requestId'],
+      ),
       'bid_thread.open': MessagesRegisteredEntryDefinition(
         objectType: 'bid_thread',
         actionKey: 'bid_thread.open',
         canonicalPath: '/api/app/bid/thread/detail',
         localEntryKey: 'registered.bid_thread.open',
         requiredParams: <String>['projectId', 'bidId'],
+      ),
+      'order_detail.open': MessagesRegisteredEntryDefinition(
+        objectType: 'order',
+        actionKey: 'order_detail.open',
+        canonicalPath: '/api/app/order/detail',
+        localEntryKey: 'registered.order_detail.open',
+        requiredParams: <String>['projectId', 'orderId'],
       ),
     };
 
@@ -140,6 +179,26 @@ String? _singleParamRouteLocation({
   return builder(value);
 }
 
+String? _counterpartConversationRouteLocation(Map<String, String> routeParams) {
+  if (routeParams.length != 2 ||
+      !routeParams.containsKey('conversationId') ||
+      !routeParams.containsKey('projectId')) {
+    return 'routeTarget.routeParams must include only "conversationId" and "projectId"';
+  }
+  final conversationId = routeParams['conversationId'];
+  final projectId = routeParams['projectId'];
+  if (conversationId == null ||
+      conversationId.trim().isEmpty ||
+      projectId == null ||
+      projectId.trim().isEmpty) {
+    return 'routeTarget.routeParams conversationId and projectId must be non-empty';
+  }
+  return ExhibitionRoutes.counterpartConversationWithIds(
+    conversationId: conversationId,
+    projectId: projectId,
+  );
+}
+
 String? _bidThreadRouteLocation(Map<String, String> routeParams) {
   if (routeParams.length != 2 ||
       !routeParams.containsKey('projectId') ||
@@ -155,6 +214,48 @@ String? _bidThreadRouteLocation(Map<String, String> routeParams) {
     return 'routeTarget.routeParams projectId and bidId must be non-empty';
   }
   return ExhibitionRoutes.bidThreadWithIds(projectId: projectId, bidId: bidId);
+}
+
+String? _orderDetailRouteLocation(Map<String, String> routeParams) {
+  if (routeParams.length != 2 ||
+      !routeParams.containsKey('projectId') ||
+      !routeParams.containsKey('orderId')) {
+    return 'routeTarget.routeParams must include only "projectId" and "orderId"';
+  }
+  final projectId = routeParams['projectId'];
+  final orderId = routeParams['orderId'];
+  if (projectId == null ||
+      projectId.trim().isEmpty ||
+      orderId == null ||
+      orderId.trim().isEmpty) {
+    return 'routeTarget.routeParams projectId and orderId must be non-empty';
+  }
+  return ExhibitionRoutes.orderDetailWithOrderId(orderId, projectId: projectId);
+}
+
+String? _projectNameAccessThreadRouteLocation(Map<String, String> routeParams) {
+  if (routeParams.length != 3 ||
+      !routeParams.containsKey('threadId') ||
+      !routeParams.containsKey('projectId') ||
+      !routeParams.containsKey('requestId')) {
+    return 'routeTarget.routeParams must include only "threadId", "projectId", and "requestId"';
+  }
+  final threadId = routeParams['threadId'];
+  final projectId = routeParams['projectId'];
+  final requestId = routeParams['requestId'];
+  if (threadId == null ||
+      threadId.trim().isEmpty ||
+      projectId == null ||
+      projectId.trim().isEmpty ||
+      requestId == null ||
+      requestId.trim().isEmpty) {
+    return 'routeTarget.routeParams threadId, projectId, and requestId must be non-empty';
+  }
+  return ExhibitionRoutes.projectNameAccessThreadWithIds(
+    threadId: threadId,
+    projectId: projectId,
+    requestId: requestId,
+  );
 }
 
 bool _sameOrderedList(List<String> left, List<String> right) {

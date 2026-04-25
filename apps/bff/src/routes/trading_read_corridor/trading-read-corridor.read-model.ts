@@ -1,7 +1,13 @@
-export type OrderDetailState = 'active';
-export type MilestoneState = 'pending_submission' | 'submitted';
+export type OrderDetailState = 'active' | 'completed';
+export type OrderCompletionRequestState =
+  | 'none'
+  | 'requested'
+  | 'confirmed'
+  | 'rejected'
+  | 'dispute_reserved';
+export type MilestoneState = 'pending_submission' | 'submitted' | 'completed';
 export type ContractState = 'pending_confirm' | 'active' | 'amended';
-export type InspectionState = 'draft' | 'submitted' | 'rechecked';
+export type InspectionState = 'draft' | 'submitted' | 'rechecked' | 'passed';
 
 export type SummaryViewModel = Record<string, unknown>;
 
@@ -19,7 +25,11 @@ export type OrderDetailViewModel = {
   orderNo: string;
   projectId: string;
   bidId: string;
+  buyerOrganizationId: string;
+  supplierOrganizationId: string;
+  sellerOrganizationId: string;
   state: OrderDetailState;
+  completionRequestState: OrderCompletionRequestState;
   summary: SummaryViewModel;
   milestones: MilestoneItemViewModel[];
 };
@@ -42,10 +52,18 @@ export type InspectionDetailViewModel = {
   summary: SummaryViewModel;
 };
 
-const ORDER_STATES = new Set<OrderDetailState>(['active']);
+const ORDER_STATES = new Set<OrderDetailState>(['active', 'completed']);
+const ORDER_COMPLETION_REQUEST_STATES = new Set<OrderCompletionRequestState>([
+  'none',
+  'requested',
+  'confirmed',
+  'rejected',
+  'dispute_reserved',
+]);
 const MILESTONE_STATES = new Set<MilestoneState>([
   'pending_submission',
   'submitted',
+  'completed',
 ]);
 const CONTRACT_STATES = new Set<ContractState>([
   'pending_confirm',
@@ -56,6 +74,7 @@ const INSPECTION_STATES = new Set<InspectionState>([
   'draft',
   'submitted',
   'rechecked',
+  'passed',
 ]);
 
 export function readOrderDetailViewModel(
@@ -66,7 +85,22 @@ export function readOrderDetailViewModel(
     orderNo: readRequiredString(value.orderNo, 'orderNo must be a string.'),
     projectId: readRequiredString(value.projectId, 'projectId must be a string.'),
     bidId: readRequiredString(value.bidId, 'bidId must be a string.'),
+    buyerOrganizationId: readRequiredString(
+      value.buyerOrganizationId,
+      'buyerOrganizationId must be a string.',
+    ),
+    supplierOrganizationId: readRequiredString(
+      value.supplierOrganizationId,
+      'supplierOrganizationId must be a string.',
+    ),
+    sellerOrganizationId: readRequiredString(
+      value.sellerOrganizationId ?? value.supplierOrganizationId,
+      'sellerOrganizationId must be a string.',
+    ),
     state: readOrderState(value.state),
+    completionRequestState: readOrderCompletionRequestState(
+      value.completionRequestState,
+    ),
     summary: readSummary(value.summary, 'order summary must be an object.'),
     milestones: readMilestoneItems(
       value.milestones,
@@ -142,7 +176,19 @@ function readOrderState(value: unknown): OrderDetailState {
   if (typeof value === 'string' && ORDER_STATES.has(value as OrderDetailState)) {
     return value as OrderDetailState;
   }
-  throw new Error('order state must be `active`.');
+  throw new Error('order state is unsupported.');
+}
+
+function readOrderCompletionRequestState(
+  value: unknown,
+): OrderCompletionRequestState {
+  if (
+    typeof value === 'string' &&
+    ORDER_COMPLETION_REQUEST_STATES.has(value as OrderCompletionRequestState)
+  ) {
+    return value as OrderCompletionRequestState;
+  }
+  throw new Error('order completion request state is unsupported.');
 }
 
 function readMilestoneState(value: unknown): MilestoneState {

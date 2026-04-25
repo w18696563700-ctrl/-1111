@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/features/exhibition/data/p0_pay_read_only_summary.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
@@ -77,17 +78,24 @@ class _MessagesPageState extends State<MessagesPage> {
       return;
     }
     _lastRefreshTick = tick;
-    _refreshAll();
+    _refreshAll(showLoading: false);
   }
 
-  Future<void> _refreshAll() async {
-    await Future.wait<void>(<Future<void>>[_load(), _loadProjectCommunication()]);
+  Future<void> _refreshAll({bool showLoading = true}) async {
+    await Future.wait<void>(<Future<void>>[
+      _load(showLoading: showLoading),
+      _loadProjectCommunication(showLoading: showLoading),
+    ]);
   }
 
-  Future<void> _load() async {
+  Future<void> _load({bool showLoading = true}) async {
     final requestedTab = _selectedTab;
     final loadToken = ++_latestLoadToken;
-    setState(() => _loading = true);
+    final shouldShowLoading =
+        showLoading || !_results.containsKey(requestedTab);
+    if (shouldShowLoading) {
+      setState(() => _loading = true);
+    }
     final result = await ForumConsumerLayer.instance.loadInteractionInbox(
       tab: _tabKey(requestedTab),
     );
@@ -102,9 +110,13 @@ class _MessagesPageState extends State<MessagesPage> {
     });
   }
 
-  Future<void> _loadProjectCommunication() async {
+  Future<void> _loadProjectCommunication({bool showLoading = true}) async {
     final loadToken = ++_latestReminderLoadToken;
-    setState(() => _projectCommunicationLoading = true);
+    final shouldShowLoading =
+        showLoading || _projectCommunicationResult == null;
+    if (shouldShowLoading) {
+      setState(() => _projectCommunicationLoading = true);
+    }
     final result = await MessagesConsumerLayer.instance.loadInteractions();
     if (!mounted) {
       return;
@@ -206,7 +218,14 @@ class _MessagesPageState extends State<MessagesPage> {
     if (result?.state != AppPageState.content) {
       return const <MessageInteractionItemView>[];
     }
-    return result!.items;
+    final itemsByConversationId = <String, MessageInteractionItemView>{};
+    for (final item in result!.items) {
+      if (item.interactionType != 'counterpart_conversation') {
+        continue;
+      }
+      itemsByConversationId.putIfAbsent(item.conversationId, () => item);
+    }
+    return itemsByConversationId.values.toList(growable: false);
   }
 
   void _openProjectCommunication(

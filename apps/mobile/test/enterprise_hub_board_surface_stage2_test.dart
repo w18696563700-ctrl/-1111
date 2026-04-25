@@ -71,4 +71,35 @@ void main() {
       '4.6 分',
     ]);
   });
+
+  test('supplier card summary ignores retired supplyMode highlight', () {
+    const item = EnterpriseHubListItem(
+      enterpriseId: 'enterprise-supplier-1',
+      boardType: EnterpriseBoardType.supplier,
+      name: '重庆坤特展览展示有限公司',
+      provinceName: '重庆',
+      cityName: '重庆市',
+      primaryBoardLabel: '优秀供应商',
+      secondaryCapabilityLabels: <String>['桁架舞台搭建厂'],
+      shortIntro: '供应商履约',
+      certificationLabel: '已认证',
+      caseCount: 1,
+      keywordTags: <String>[],
+      boardHighlights: <String, Object?>{
+        'supplier': <String, Object?>{
+          'supplyCategories': <String>['桁架舞台搭建厂'],
+          'supplyMode': <String>['现货供应'],
+          'responseSlaDesc': '2小时内响应',
+        },
+      },
+    );
+
+    expect(enterpriseBoardCardSummaryText(item), '品类：桁架舞台搭建厂');
+    expect(enterpriseBoardCardSummaryChips(item), <String>[
+      '桁架舞台搭建厂',
+      '响应 2小时内响应',
+      '已认证',
+      '1 个案例',
+    ]);
+  });
 }

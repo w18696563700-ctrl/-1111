@@ -40,8 +40,8 @@ export type RatingScoreSourceMode =
 
 export type RecomputeTriggerInput = {
   organizationId: string;
+  sourceType?: string;
   sourceOrderId: string;
   sourceRatingId: string;
   triggeredAt?: Date;
 };
-

@@ -77,7 +77,8 @@ _exhibitionHandlers() {
     'GET /api/app/contract/detail': _handleContractDetail,
     'POST /api/app/contract/confirm': _handleContractConfirm,
     'POST /api/app/dispute/open': _handleDisputeOpen,
-    'GET /api/app/rating/entry': _handleRatingEntry,
+    'GET /api/app/project-counterparty-rating/entry': _handleRatingEntry,
+    'POST /api/app/project-counterparty-rating/submit': _handleRatingSubmit,
   };
 }
 
@@ -409,13 +410,54 @@ Future<AppApiResponse> _handleDisputeOpen(AppApiRequest request) async {
 
 Future<AppApiResponse> _handleRatingEntry(AppApiRequest request) async {
   final orderId = request.uri.queryParameters['orderId'] ?? 'order-1';
+  final projectId = request.uri.queryParameters['projectId'] ?? 'project-1';
+  final rateeOrganizationId =
+      request.uri.queryParameters['rateeOrganizationId'] ?? 'org-counterpart';
   return AppApiResponse(
     statusCode: 200,
     uri: request.uri,
     body: <String, Object?>{
       'orderId': orderId,
-      'state': 'draft',
-      'summary': _summary('评价入口已就位'),
+      'projectId': projectId,
+      'raterOrganizationId': 'org-owner',
+      'rateeOrganizationId': rateeOrganizationId,
+      'canRate': true,
+      'reason': null,
+      'ratingState': 'eligible',
+    },
+  );
+}
+
+Future<AppApiResponse> _handleRatingSubmit(AppApiRequest request) async {
+  final body = request.body is Map<String, Object?>
+      ? request.body! as Map<String, Object?>
+      : const <String, Object?>{};
+  final orderId = body['orderId'] is String
+      ? body['orderId']! as String
+      : 'order-1';
+  final projectId = body['projectId'] is String
+      ? body['projectId']! as String
+      : 'project-1';
+  final rateeOrganizationId = body['rateeOrganizationId'] is String
+      ? body['rateeOrganizationId']! as String
+      : 'org-counterpart';
+  final scoreLabel = body['scoreLabel'] is String
+      ? body['scoreLabel']! as String
+      : 'very_satisfied';
+  return AppApiResponse(
+    statusCode: 202,
+    uri: request.uri,
+    body: <String, Object?>{
+      'ratingId': 'rating-1',
+      'orderId': orderId,
+      'projectId': projectId,
+      'raterOrganizationId': 'org-owner',
+      'rateeOrganizationId': rateeOrganizationId,
+      'state': 'submitted',
+      'ratingState': 'submitted',
+      'scoreValue': 5,
+      'scoreLabel': scoreLabel,
+      'submittedAt': '2026-06-03T10:00:00Z',
     },
   );
 }

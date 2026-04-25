@@ -47,25 +47,22 @@ export class TradingImPresenter {
   toThreadDetail(params: {
     thread: BidPrivateThreadEntity;
     participantRole: TradingImParticipantRole;
+    participants: Array<{
+      participantRole: Exclude<TradingImParticipantRole, 'viewer'>;
+      organizationId: string;
+      displayName: string | null;
+      avatarUrl: string | null;
+    }>;
     messages: BidThreadMessageEntity[];
     confirmationCards: BidThreadConfirmationCardEntity[];
     availability: TradingImAvailability;
   }) {
-    const { thread, participantRole, messages, confirmationCards, availability } = params;
+    const { thread, participantRole, participants, messages, confirmationCards, availability } = params;
     return {
       threadId: thread.id,
       projectId: thread.projectId,
       bidId: thread.bidId,
-      participants: [
-        {
-          participantRole: 'project_owner',
-          organizationId: thread.projectOwnerOrganizationId
-        },
-        {
-          participantRole: 'bidder',
-          organizationId: thread.bidderOrganizationId
-        }
-      ],
+      participants,
       viewerParticipantRole: participantRole,
       state: thread.lifecycleState,
       availability,

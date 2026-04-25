@@ -71,7 +71,7 @@ function createShadowDataSourceMock({
           dataType: columnName.includes('level') || columnName.includes('grade') ? 'text' : 'numeric',
         }));
       }
-      if (sql.includes('select distinct on (o.id)')) {
+      if (sql.includes('candidate_ratings')) {
         return ratingRows;
       }
       throw new Error(`Unexpected SQL branch: ${sql}`);
@@ -236,6 +236,10 @@ test('shadow aggregation service persists aggregate, ledger, and recompute trigg
   assert.equal(state.aggregateSaved.publicScore, 100);
   assert.equal(state.aggregateSaved.tierCode, 'T4');
   assert.ok(state.ledgerSaved);
+  assert.equal(state.ledgerSaved.triggerType, 'formal_rating_submitted');
+  assert.equal(state.ledgerSaved.sourceType, 'order_rating');
+  assert.equal(state.ledgerSaved.sourceOrderId, 'order-5');
+  assert.equal(state.ledgerSaved.sourceRatingId, 'rating-5');
   assert.equal(state.ledgerSaved.beforeScore, 72);
   assert.equal(state.ledgerSaved.afterScore, 100);
   assert.equal(state.ledgerSaved.beforeTierCode, 'T2');
@@ -243,8 +247,85 @@ test('shadow aggregation service persists aggregate, ledger, and recompute trigg
   assert.equal(state.ledgerSaved.beforeRiskPosture, 'observe');
   assert.equal(state.ledgerSaved.afterRiskPosture, 'normal');
   assert.ok(state.triggerSaved);
+  assert.equal(state.triggerSaved.triggerType, 'formal_rating_submitted');
+  assert.equal(state.triggerSaved.sourceType, 'order_rating');
+  assert.equal(state.triggerSaved.sourceOrderId, 'order-5');
+  assert.equal(state.triggerSaved.sourceRatingId, 'rating-5');
   assert.equal(state.triggerSaved.triggerStatus, 'pending');
   assert.deepEqual(state.triggerSaved.reasonCodes, ['RATING_ONLY_MODE_ACTIVE']);
   assert.ok(state.triggerUpdated);
   assert.equal(state.triggerUpdated.patch.triggerStatus, 'processed');
+  assert.ok(
+    state.queries.some((sql) => sql.includes('public.project_counterparty_ratings')),
+  );
+});
+
+test('shadow aggregation service accepts project counterparty rating rows as bridge input', async () => {
+  const { state, dataSource } = createShadowDataSourceMock({
+    columns: ['score'],
+    ratingRows: [
+      {
+        orderId: 'order-counterparty-1',
+        ratingId: 'project-counterparty-rating-1',
+        submittedAt: new Date('2026-05-08T08:00:00Z'),
+        scoreValue: null,
+        scoreLabel: 'very_satisfied',
+      },
+      {
+        orderId: 'order-counterparty-2',
+        ratingId: 'project-counterparty-rating-2',
+        submittedAt: new Date('2026-05-08T08:01:00Z'),
+        scoreValue: null,
+        scoreLabel: 'satisfied',
+      },
+      {
+        orderId: 'order-counterparty-3',
+        ratingId: 'project-counterparty-rating-3',
+        submittedAt: new Date('2026-05-08T08:02:00Z'),
+        scoreValue: null,
+        scoreLabel: 'passable',
+      },
+      {
+        orderId: 'order-counterparty-4',
+        ratingId: 'project-counterparty-rating-4',
+        submittedAt: new Date('2026-05-08T08:03:00Z'),
+        scoreValue: null,
+        scoreLabel: 'very_satisfied',
+      },
+      {
+        orderId: 'order-counterparty-5',
+        ratingId: 'project-counterparty-rating-5',
+        submittedAt: new Date('2026-05-08T08:04:00Z'),
+        scoreValue: null,
+        scoreLabel: 'very_satisfied',
+      },
+    ],
+  });
+
+  const service = new CreditScoringShadowAggregationService(dataSource);
+  const snapshot = await service.recomputeAfterFormalRatingSubmit({
+    organizationId: 'ratee-org',
+    sourceType: 'project_counterparty_rating',
+    sourceOrderId: 'order-counterparty-5',
+    sourceRatingId: 'project-counterparty-rating-5',
+    triggeredAt: new Date('2026-05-08T09:00:00Z'),
+  });
+
+  assert.equal(snapshot.organizationId, 'ratee-org');
+  assert.equal(snapshot.sampleStatus, 'ready');
+  assert.equal(snapshot.ratedCompletedOrderCount, 5);
+  assert.equal(snapshot.publicScore, 91);
+  assert.ok(state.triggerSaved);
+  assert.equal(state.triggerSaved.triggerType, 'formal_rating_submitted');
+  assert.equal(state.triggerSaved.sourceType, 'project_counterparty_rating');
+  assert.equal(state.triggerSaved.sourceOrderId, 'order-counterparty-5');
+  assert.equal(state.triggerSaved.sourceRatingId, 'project-counterparty-rating-5');
+  assert.ok(state.ledgerSaved);
+  assert.equal(state.ledgerSaved.triggerType, 'formal_rating_submitted');
+  assert.equal(state.ledgerSaved.sourceType, 'project_counterparty_rating');
+  assert.equal(state.ledgerSaved.sourceOrderId, 'order-counterparty-5');
+  assert.equal(state.ledgerSaved.sourceRatingId, 'project-counterparty-rating-5');
+  assert.ok(
+    state.queries.some((sql) => sql.includes('public.project_counterparty_ratings')),
+  );
 });

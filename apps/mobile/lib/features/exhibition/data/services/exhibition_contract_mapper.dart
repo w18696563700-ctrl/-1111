@@ -15,7 +15,26 @@ const Set<String> _stableProjectViewerRelations = <String>{
   'non_owner',
 };
 
-const Set<String> _stableOrderStates = <String>{'active'};
+const Set<String> _stableProjectNameAccessStates = <String>{
+  'visible',
+  'requestable',
+  'pending',
+  'rejected',
+};
+
+const Set<String> _stableOrderStates = <String>{
+  'active',
+  'completed',
+  'cancelled',
+};
+
+const Set<String> _stableOrderCompletionRequestStates = <String>{
+  'none',
+  'requested',
+  'rejected',
+  'dispute_reserved',
+  'confirmed',
+};
 
 const Set<String> _stableContractStates = <String>{
   'pending_confirm',
@@ -89,6 +108,9 @@ const Set<String> _stableErrorCodes = <String>{
   'BID_PACKAGE_COMPLETENESS_UNAVAILABLE',
   'ORDER_INVALID_STATE',
   'ORDER_CONVERSION_FAILED',
+  'PROJECT_ORDER_COMPLETE_INVALID',
+  'PROJECT_ORDER_COMPLETE_UNAVAILABLE',
+  'PROJECT_ORDER_COMPLETE_INVALID_STATE',
   'CONTRACT_ENTRY_UNAVAILABLE',
   'CONTRACT_CONFIRM_INVALID',
   'CONTRACT_INVALID_STATE',
@@ -105,6 +127,10 @@ const Set<String> _stableErrorCodes = <String>{
   'RATING_ENTRY_UNAVAILABLE',
   'RATING_SUBMIT_INVALID',
   'RATING_INVALID_STATE',
+  'PROJECT_COUNTERPARTY_RATING_INVALID',
+  'PROJECT_COUNTERPARTY_RATING_FORBIDDEN',
+  'PROJECT_COUNTERPARTY_RATING_UNAVAILABLE',
+  'PROJECT_COUNTERPARTY_RATING_DUPLICATE',
   'DISPUTE_OPEN_INVALID',
   'DISPUTE_WITHDRAW_INVALID',
   'DISPUTE_INVALID_STATE',
@@ -118,6 +144,27 @@ const Set<String> _stableErrorCodes = <String>{
   'FILE_ACCESS_NOT_FOUND',
   'FILE_ACCESS_PERMISSION_DENIED',
   'FILE_ACCESS_UNAVAILABLE',
+  'ORGANIZATION_CERTIFICATION_REQUIRED',
+  'TRADE_TASK_CREATE_REJECTED',
+  'TRADE_TASK_NOT_FOUND',
+  'TRADE_TASK_INVALID_STATE',
+  'TRADE_TASK_AUTHENTICITY_MATERIAL_REQUIRED',
+  'TRADE_TASK_AUTHENTICITY_DECLARATION_REQUIRED',
+  'FIXED_PRICE_BID_CREATE_REJECTED',
+  'SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED',
+  'SERVICE_FEE_AUTHORIZATION_INIT_REJECTED',
+  'SERVICE_FEE_AUTHORIZATION_RESULT_UNAVAILABLE',
+  'INQUIRY_DEPOSIT_ORDER_CREATE_REJECTED',
+  'INQUIRY_DEPOSIT_PAY_INIT_REJECTED',
+  'INQUIRY_DEPOSIT_RESULT_UNAVAILABLE',
+  'INQUIRY_QUOTE_SEAT_FULL',
+  'INQUIRY_QUOTATION_CREATE_REJECTED',
+  'INQUIRY_RESULT_PROCESSING_REJECTED',
+  'CONTRACT_CONFIRMATION_REJECTED',
+  'P0_PAY_SUMMARY_UNAVAILABLE',
+  'PAYMENT_CHANNEL_UNAVAILABLE',
+  'PAYMENT_CHANNEL_CONSTRAINT_REQUIRES_REVERIFICATION',
+  'IDEMPOTENCY_KEY_CONFLICT',
 };
 
 Object? _sanitizeFailurePayload(Object? payload) {
@@ -295,7 +342,31 @@ Map<String, Object?>? _sanitizeBidAwardPayload(Object? payload) {
     'orderId': _normalize(map['orderId'] as String?),
     'contractId': _normalize(map['contractId'] as String?),
     'state': _sanitizeState(map['state'], _stableBidAwardStates),
+    'actionKey': _normalize(map['actionKey'] as String?),
+    'routeTarget': _asMap(map['routeTarget']),
   };
+}
+
+Map<String, Object?>? _sanitizeOrderCompletionAcceptedPayload(Object? payload) {
+  if (payload is! Map) {
+    return null;
+  }
+
+  final map = payload.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  return _compactMap(<String, Object?>{
+    'orderId': _normalize(map['orderId'] as String?),
+    'projectId': _normalize(map['projectId'] as String?),
+    'state': _sanitizeState(map['state'], _stableOrderStates),
+    'completionRequestState': _sanitizeState(
+      map['completionRequestState'],
+      _stableOrderCompletionRequestStates,
+    ),
+    'summary': _asMap(map['summary']),
+    'actionKey': _normalize(map['actionKey'] as String?),
+    'routeTarget': _asMap(map['routeTarget']),
+  });
 }
 
 Map<String, Object?>? _sanitizeBidResultPayload(Object? payload) {
@@ -398,6 +469,7 @@ Map<String, Object?> _sanitizeProjectMap(Map<String, Object?> payload) {
     'projectId': _normalize(payload['projectId'] as String?),
     'projectNo': _normalize(payload['projectNo'] as String?),
     'title': _normalize(payload['title'] as String?),
+    'displayTitle': _normalize(payload['displayTitle'] as String?),
     'exhibitionName': _normalize(payload['exhibitionName'] as String?),
     'brandName': _normalize(payload['brandName'] as String?),
     'buildingType': _normalize(payload['buildingType'] as String?),
@@ -410,6 +482,10 @@ Map<String, Object?> _sanitizeProjectMap(Map<String, Object?> payload) {
     'plannedStartAt': _normalize(payload['plannedStartAt'] as String?),
     'plannedEndAt': _normalize(payload['plannedEndAt'] as String?),
     'state': _sanitizeState(payload['state'], _stableProjectStates),
+    'nameAccess': _sanitizeProjectNameAccess(
+      payload['nameAccess'],
+      includeRequestId: false,
+    ),
     'summary': _sanitizeSummary(payload['summary']),
   });
 }
@@ -426,10 +502,48 @@ Map<String, Object?> _sanitizeProjectDetailMap(Map<String, Object?> payload) {
     'plannedStartAt': _normalize(payload['plannedStartAt'] as String?),
     'plannedEndAt': _normalize(payload['plannedEndAt'] as String?),
     'scheduleDetail': _normalize(payload['scheduleDetail'] as String?),
+    'taskId': _normalize(payload['taskId'] as String?),
+    'tradeTaskId': _normalize(payload['tradeTaskId'] as String?),
+    'p0PaySummary': _asMap(payload['p0PaySummary']),
+    'bidCandidates': _sanitizeEntityList(
+      payload['bidCandidates'] ?? payload['bids'],
+      _sanitizeProjectBidCandidateMap,
+    ),
+    'bidSelection': _asMap(payload['bidSelection']),
+    'orderSummary': _asMap(payload['orderSummary']),
+    'order': _asMap(payload['order']),
+    'orderId': _normalize(payload['orderId'] as String?),
+    'nameAccess': _sanitizeProjectNameAccess(
+      payload['nameAccess'],
+      includeRequestId: true,
+    ),
     'viewerProjectRelation': _sanitizeState(
       payload['viewerProjectRelation'],
       _stableProjectViewerRelations,
     ),
+  });
+}
+
+Map<String, Object?> _sanitizeProjectBidCandidateMap(
+  Map<String, Object?> payload,
+) {
+  return _compactMap(<String, Object?>{
+    'bidId': _normalize(payload['bidId'] as String?),
+    'bidNo': _normalize(payload['bidNo'] as String?),
+    'bidderOrganizationId': _normalize(
+      payload['bidderOrganizationId'] as String?,
+    ),
+    'bidderOrganizationName':
+        _normalize(payload['bidderOrganizationName'] as String?) ??
+        _normalize(payload['bidderName'] as String?) ??
+        _normalize(payload['organizationName'] as String?) ??
+        _normalize(payload['companyName'] as String?),
+    'quoteAmount': _sanitizeNumber(payload['quoteAmount']),
+    'proposalSummary':
+        _normalize(payload['proposalSummary'] as String?) ??
+        _normalize(payload['proposalSummaryPreview'] as String?),
+    'state': _normalize(payload['state'] as String?),
+    'submittedAt': _normalize(payload['submittedAt'] as String?),
   });
 }
 
@@ -439,7 +553,23 @@ Map<String, Object?> _sanitizeOrderMap(Map<String, Object?> payload) {
     'orderNo': _normalize(payload['orderNo'] as String?),
     'projectId': _normalize(payload['projectId'] as String?),
     'bidId': _normalize(payload['bidId'] as String?),
+    'buyerOrganizationId': _normalize(
+      payload['buyerOrganizationId'] as String?,
+    ),
+    'sellerOrganizationId':
+        _normalize(payload['sellerOrganizationId'] as String?) ??
+        _normalize(payload['supplierOrganizationId'] as String?),
     'state': _sanitizeState(payload['state'], _stableOrderStates),
+    'completionRequestState': _sanitizeState(
+      payload['completionRequestState'],
+      _stableOrderCompletionRequestStates,
+    ),
+    'completionRequestNote': _normalize(
+      payload['completionRequestNote'] as String?,
+    ),
+    'completionRejectionReason': _normalize(
+      payload['completionRejectionReason'] as String?,
+    ),
     'summary': _sanitizeSummary(payload['summary']),
     'milestones': _sanitizeEntityList(
       payload['milestones'],
@@ -492,6 +622,63 @@ Map<String, Object?> _sanitizeRatingMap(Map<String, Object?> payload) {
     'orderId': _normalize(payload['orderId'] as String?),
     'state': _sanitizeState(payload['state'], _stableRatingStates),
     'summary': _sanitizeSummary(payload['summary']),
+  });
+}
+
+Map<String, Object?>? _sanitizeProjectCounterpartyRatingEntryPayload(
+  Object? payload,
+) {
+  final map = _asMap(payload);
+  if (map == null) {
+    return null;
+  }
+  return _compactMap(<String, Object?>{
+    'orderId': _normalize(map['orderId'] as String?),
+    'projectId': _normalize(map['projectId'] as String?),
+    'raterOrganizationId': _normalize(map['raterOrganizationId'] as String?),
+    'rateeOrganizationId': _normalize(map['rateeOrganizationId'] as String?),
+    'canRate': _sanitizeBool(map['canRate']),
+    'reason': _normalize(map['reason'] as String?),
+    'ratingState': _normalize(map['ratingState'] as String?),
+  });
+}
+
+Map<String, Object?>? _sanitizeProjectCounterpartyRatingSubmitPayload(
+  Object? payload,
+) {
+  final map = _asMap(payload);
+  if (map == null) {
+    return null;
+  }
+  return _compactMap(<String, Object?>{
+    'ratingId': _normalize(map['ratingId'] as String?),
+    'orderId': _normalize(map['orderId'] as String?),
+    'projectId': _normalize(map['projectId'] as String?),
+    'raterOrganizationId': _normalize(map['raterOrganizationId'] as String?),
+    'rateeOrganizationId': _normalize(map['rateeOrganizationId'] as String?),
+    'state': _normalize(map['state'] as String?),
+    'ratingState': _normalize(map['ratingState'] as String?),
+    'scoreValue': _sanitizeNumber(map['scoreValue']),
+    'scoreLabel': _normalize(map['scoreLabel'] as String?),
+    'submittedAt': _normalize(map['submittedAt'] as String?),
+  });
+}
+
+Map<String, Object?>? _sanitizeProjectNameAccess(
+  Object? payload, {
+  required bool includeRequestId,
+}) {
+  if (payload is! Map) {
+    return null;
+  }
+
+  final map = payload.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  return _compactMap(<String, Object?>{
+    'status': _sanitizeState(map['status'], _stableProjectNameAccessStates),
+    'canRequest': _sanitizeBool(map['canRequest']),
+    if (includeRequestId) 'requestId': _normalize(map['requestId'] as String?),
   });
 }
 

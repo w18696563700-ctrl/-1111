@@ -9,6 +9,8 @@ EnterpriseHubListQuery buildEnterpriseBoardListQuery({
   String? cityCode,
   String? provinceCode,
   bool clearCity = false,
+  String? supplyCategory,
+  bool clearSupplyCategory = false,
   String? plantAreaRange,
   bool clearPlantAreaRange = false,
   int? page,
@@ -18,6 +20,11 @@ EnterpriseHubListQuery buildEnterpriseBoardListQuery({
     keyword: clearKeyword ? null : keyword ?? current.keyword,
     provinceCode: clearCity ? null : provinceCode ?? current.provinceCode,
     cityCode: clearCity ? null : cityCode ?? current.cityCode,
+    supplyCategory: boardType == EnterpriseBoardType.supplier
+        ? (clearSupplyCategory
+              ? null
+              : supplyCategory ?? current.supplyCategory)
+        : null,
     plantAreaRange: boardType == EnterpriseBoardType.factory
         ? (clearPlantAreaRange
               ? null
@@ -60,5 +67,6 @@ bool enterpriseBoardListHasActiveFilters({
   return (query.keyword?.trim().isNotEmpty ?? false) ||
       query.provinceCode != null ||
       query.cityCode != null ||
+      query.supplyCategory != null ||
       query.plantAreaRange != null;
 }

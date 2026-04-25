@@ -306,6 +306,38 @@ test('BidAward P0 order conversion stays compatible when orders schema requires 
   assert.equal(harness.state.orders[0].createdBy, 'buyer-user');
 });
 
+test('BidAward explicit select-bid-and-create-order command reuses the award transaction', async () => {
+  const { BidAwardWriteService } = require('../dist/modules/bid_award/bid-award.write.service.js');
+  const { BidAwardPresenter } = require('../dist/modules/bid_award/bid-award.presenter.js');
+
+  const harness = createAwardHarness();
+  const service = new BidAwardWriteService(
+    harness.dataSource,
+    { async verifyCurrentSessionContext() { throw new Error('should not verify directly'); } },
+    createEligibilityService('select-bid-create-order'),
+    new BidAwardPresenter(),
+  );
+
+  const result = await service.selectBidAndCreateOrder(
+    {
+      projectId: 'project-1',
+      winningBidId: 'bid-winning',
+      reasonCode: 'commercial_fit',
+      reasonText: '显式选择合作方并生成订单',
+    },
+    createContext('select-bid-create-order'),
+  );
+
+  assert.equal(result.projectId, 'project-1');
+  assert.equal(result.winningBidId, 'bid-winning');
+  assert.equal(result.state, 'converted_to_order');
+  assert.equal(harness.state.orders.length, 1);
+  assert.equal(harness.state.contracts.length, 1);
+  assert.equal(harness.state.bids[0].state, 'awarded');
+  assert.equal(harness.state.bids[1].state, 'lost');
+  assert.equal(harness.state.auditLogs[0].action, 'BidAwarded');
+});
+
 test('BidAward P0 contract seed stays compatible when contracts schema requires contract_no NOT NULL', async () => {
   const { BidAwardWriteService } = require('../dist/modules/bid_award/bid-award.write.service.js');
   const { BidAwardPresenter } = require('../dist/modules/bid_award/bid-award.presenter.js');

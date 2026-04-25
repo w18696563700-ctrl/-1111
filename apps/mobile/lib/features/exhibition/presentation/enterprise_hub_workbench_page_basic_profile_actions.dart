@@ -192,8 +192,8 @@ extension _EnterpriseWorkbenchPageBasicProfileActions
             deliveryRadiusText: _profileFiveController.text,
           ),
         EnterpriseBoardType.supplier => <String, Object?>{
-          'supplyCategories': _selectedProfileOneOptions.toList()..sort(),
-          'supplyMode': _selectedProfileTwoOptions.toList()..sort(),
+          'supplyCategories': _selectedProfileOneOptions.take(1).toList()
+            ..sort(),
           'coreProductsOrServices': _csvList(_profileThreeController.text),
           'responseSlaDesc': _emptyToNull(_profileFourController.text),
           'deliveryRange': _emptyToNull(_profileFiveController.text),

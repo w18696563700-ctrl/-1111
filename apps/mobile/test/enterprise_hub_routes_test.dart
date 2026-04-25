@@ -50,6 +50,19 @@ void main() {
     bool submitReady = true,
     List<String> blockers = const <String>[],
   }) {
+    final boardProfile = switch (boardType) {
+      'supplier' => <String, Object?>{
+        'supplyCategories': <String>['桁架舞台搭建厂'],
+        'coreProductsOrServices': <String>['标准展具'],
+        'responseSlaDesc': '2小时内响应',
+        'deliveryRange': '西南地区',
+      },
+      _ => <String, Object?>{
+        'exhibitionTypes': <String>['特装展台'],
+        'serviceItems': <String>['设计搭建'],
+        'serviceCities': serviceCities,
+      },
+    };
     return <String, Object?>{
       'organizationId': 'org-1',
       'enterpriseId': enterpriseId,
@@ -77,11 +90,7 @@ void main() {
         'contactVisible': true,
         'albumImageFileAssetIds': albumImageFileAssetIds,
       },
-      'boardProfile': <String, Object?>{
-        'exhibitionTypes': <String>['特装展台'],
-        'serviceItems': <String>['设计搭建'],
-        'serviceCities': serviceCities,
-      },
+      'boardProfile': boardProfile,
       'primaryContact': <String, Object?>{
         'contactName': '王伟伟',
         'mobile': '13800000000',
@@ -474,11 +483,11 @@ void main() {
     return boardFamily(boardType).updateBasic(enterpriseId);
   }
 
-  String boardSubmitApplicationPath(
+  String boardUpdateProfilePath(
     EnterpriseBoardType boardType,
-    String applicationId,
+    String enterpriseId,
   ) {
-    return boardFamily(boardType).submitApplication(applicationId);
+    return boardFamily(boardType).updateProfile(enterpriseId);
   }
 
   String boardApplicationStatusPath(
@@ -1103,6 +1112,12 @@ void main() {
   testWidgets('enterprise supplier list renders differentiated landing copy', (
     WidgetTester tester,
   ) async {
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = const Size(1200, 2200);
+    addTearDown(() {
+      tester.view.resetPhysicalSize();
+      tester.view.resetDevicePixelRatio();
+    });
     EnterpriseHubConsumerLayer.install(
       EnterpriseHubConsumerLayer(
         client: AppApiClient(
@@ -1133,8 +1148,7 @@ void main() {
                                 'caseCount': 5,
                                 'boardHighlights': <String, Object?>{
                                   'supplier': <String, Object?>{
-                                    'supplyCategories': <String>['家具租赁'],
-                                    'supplyMode': <String>['按天租赁'],
+                                    'supplyCategories': <String>['桁架舞台搭建厂'],
                                     'responseSlaDesc': '2 小时响应',
                                   },
                                 },
@@ -1173,7 +1187,9 @@ void main() {
 
     expect(find.text('优秀供应商'), findsOneWidget);
     expect(find.text('城市'), findsOneWidget);
-    expect(find.text('供应品类'), findsNothing);
+    expect(find.text('供应品类'), findsOneWidget);
+    expect(find.text('全部'), findsOneWidget);
+    expect(find.text('桁架舞台搭建厂'), findsWidgets);
     expect(find.text('默认排序'), findsNothing);
     await tester.scrollUntilVisible(
       find.text('华南物料租赁服务商'),
@@ -1181,8 +1197,9 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    expect(find.text('家具租赁'), findsWidgets);
+    expect(find.text('桁架舞台搭建厂'), findsWidgets);
     expect(find.textContaining('响应'), findsWidgets);
+    expect(find.text('按天租赁'), findsNothing);
   });
 
   testWidgets(
@@ -2465,13 +2482,20 @@ void main() {
       }
 
       await pumpHome();
-      expect(find.text('优秀公司'), findsOneWidget);
-      expect(find.text('优秀工厂'), findsOneWidget);
-      expect(find.text('优秀供应商'), findsOneWidget);
-      expect(find.text('查看公司'), findsOneWidget);
+      expect(find.text('公司'), findsOneWidget);
+      expect(find.text('工厂'), findsOneWidget);
+      expect(find.text('供应商'), findsOneWidget);
 
-      await tester.ensureVisible(find.text('查看公司'));
-      await tester.tap(find.text('查看公司'));
+      await tester.tap(find.text('公司'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('进入公司列表'), findsOneWidget);
+      expect(find.text('查看公司详情'), findsOneWidget);
+
+      await tester.ensureVisible(find.text('进入公司列表'));
+      await tester.tap(find.text('进入公司列表'));
       await tester.pump();
       await tester.pump(const Duration(milliseconds: 300));
       await tester.pump(const Duration(milliseconds: 300));
@@ -2910,6 +2934,104 @@ void main() {
   );
 
   testWidgets(
+    'enterprise supplier workbench keeps single category save and hides retired supply mode UI',
+    (WidgetTester tester) async {
+      final actionTransport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'PUT ${boardUpdateProfilePath(EnterpriseBoardType.supplier, 'ent-supplier-1')}':
+              (AppApiRequest request) async {
+                final body = request.body as Map<String, Object?>;
+                expect(body['supplyCategories'], <String>['广告喷绘公司']);
+                expect(body.containsKey('supplyMode'), isFalse);
+                expect(body['coreProductsOrServices'], <String>['标准展具']);
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{'ok': true},
+                );
+              },
+        },
+      );
+      installEnterpriseWorkbenchApplyDependencies(
+        boardType: EnterpriseBoardType.supplier,
+        workbenchPayload: buildWorkbenchPayload(
+          boardType: 'supplier',
+          enterpriseId: 'ent-supplier-1',
+          name: '重庆坤特展览展示有限公司',
+          shortIntro: '供应商展示',
+          fullIntro: '供应商完整介绍',
+          cases: const <Object?>[],
+        ),
+      );
+      EnterpriseHubConsumerLayer.install(
+        EnterpriseHubConsumerLayer(
+          client: AppApiClient(transport: actionTransport),
+        ),
+      );
+
+      await tester.pumpWidget(
+        ExhibitionMobileApp(
+          initialRoute: ExhibitionRoutes.enterpriseApplyWithBoardType(
+            'supplier',
+          ),
+          bootstrapShellContext: buildEnterpriseShellContext(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 100));
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(
+          const ValueKey<String>('enterprise-workbench-header-section'),
+        ),
+        findsNothing,
+      );
+      expect(find.text('供应模式'), findsNothing);
+      expect(find.text('当前主板块为供应商，重点维护品类、供应模式与响应能力。'), findsNothing);
+
+      await tester.tap(find.widgetWithText(FilterChip, '广告喷绘公司').first);
+      await tester.pumpAndSettle();
+
+      final selectedNewChip = tester.widget<FilterChip>(
+        find.widgetWithText(FilterChip, '广告喷绘公司').first,
+      );
+      final deselectedOldChip = tester.widget<FilterChip>(
+        find.widgetWithText(FilterChip, '桁架舞台搭建厂').first,
+      );
+      expect(selectedNewChip.selected, isTrue);
+      expect(deselectedOldChip.selected, isFalse);
+
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const ValueKey<String>(
+            'enterprise-workbench-save-display-identification',
+          ),
+        ),
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.ensureVisible(
+        find.byKey(
+          const ValueKey<String>(
+            'enterprise-workbench-save-display-identification',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>(
+            'enterprise-workbench-save-display-identification',
+          ),
+        ),
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+    },
+  );
+
+  testWidgets(
     'enterprise factory workbench keeps local board-profile draft when remote hydration runs',
     (WidgetTester tester) async {
       installEnterpriseWorkbenchApplyDependencies(
@@ -3040,7 +3162,9 @@ void main() {
       );
       await tester.pump();
 
-      final dynamic state = tester.state(find.byType(EnterpriseApplicationPage));
+      final dynamic state = tester.state(
+        find.byType(EnterpriseApplicationPage),
+      );
       expect(state.debugIsPublishedChangeModeForTest, isFalse);
       expect(state.debugCaseSaveActionLabelForTest, '保存案例');
       expect(find.text('案例编辑器'), findsOneWidget);

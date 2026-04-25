@@ -10,9 +10,12 @@ import { RequestContext } from '../../shared/request-context';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { BidEntity } from '../bid/entities/bid.entity';
+import { UserEntity } from '../identity/entities/user.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
+import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
+import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { BidThreadConfirmationCardEntity } from './entities/bid-thread-confirmation-card.entity';
 import { BidThreadMessageEntity } from './entities/bid-thread-message.entity';
 import { BidPrivateThreadEntity } from './entities/bid-private-thread.entity';
@@ -61,11 +64,16 @@ export class TradingImService {
     private readonly projectRepository: Repository<ProjectEntity>,
     @InjectRepository(BidEntity)
     private readonly bidRepository: Repository<BidEntity>,
+    @InjectRepository(OrganizationEntity)
+    private readonly organizationRepository: Repository<OrganizationEntity>,
+    @InjectRepository(UserEntity)
+    private readonly userRepository: Repository<UserEntity>,
     @InjectRepository(FileAssetEntity)
     private readonly fileAssetRepository: Repository<FileAssetEntity>,
     private readonly dataSource: DataSource,
     private readonly sessionVerifier: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly avatarUrlService: UploadPublicUrlService,
     private readonly presenter: TradingImPresenter
   ) {}
 
@@ -214,13 +222,15 @@ export class TradingImService {
   }
 
   private async toThreadDetail(thread: BidPrivateThreadEntity, access: ThreadAccess) {
-    const [messages, confirmationCards] = await Promise.all([
+    const [messages, confirmationCards, participants] = await Promise.all([
       this.messageRepository.find({ where: { threadId: thread.id }, order: { createdAt: 'ASC' } }),
-      this.confirmationRepository.find({ where: { threadId: thread.id }, order: { createdAt: 'ASC' } })
+      this.confirmationRepository.find({ where: { threadId: thread.id }, order: { createdAt: 'ASC' } }),
+      this.buildThreadParticipants(access.project, access.bid, thread)
     ]);
     return this.presenter.toThreadDetail({
       thread,
       participantRole: access.participantRole,
+      participants,
       messages,
       confirmationCards,
       availability: {
@@ -229,6 +239,52 @@ export class TradingImService {
         reason: thread.lifecycleState === 'open' ? 'participant_allowed' : 'thread_not_open'
       }
     });
+  }
+
+  private async buildThreadParticipants(
+    project: ProjectEntity,
+    bid: BidEntity,
+    thread: BidPrivateThreadEntity
+  ) {
+    const organizationIds = [thread.projectOwnerOrganizationId, thread.bidderOrganizationId].filter(Boolean);
+    const userIds = [project.creatorUserId?.trim() ?? '', bid.userId?.trim() ?? ''].filter(Boolean);
+    const [organizations, users] = await Promise.all([
+      organizationIds.length
+        ? this.organizationRepository.findBy({ id: In(organizationIds) })
+        : Promise.resolve([]),
+      userIds.length ? this.userRepository.findBy({ id: In(userIds) }) : Promise.resolve([])
+    ]);
+    const organizationMap = new Map(organizations.map((item) => [item.id, item]));
+    const userMap = new Map(users.map((item) => [item.id, item]));
+
+    return Promise.all([
+      this.toThreadParticipantProjection({
+        participantRole: 'project_owner',
+        organizationId: thread.projectOwnerOrganizationId,
+        displayName: organizationMap.get(thread.projectOwnerOrganizationId)?.name ?? null,
+        avatarUrl: userMap.get(project.creatorUserId?.trim() ?? '')?.avatarUrl ?? null
+      }),
+      this.toThreadParticipantProjection({
+        participantRole: 'bidder',
+        organizationId: thread.bidderOrganizationId,
+        displayName: organizationMap.get(thread.bidderOrganizationId)?.name ?? null,
+        avatarUrl: userMap.get(bid.userId?.trim() ?? '')?.avatarUrl ?? null
+      })
+    ]);
+  }
+
+  private async toThreadParticipantProjection(params: {
+    participantRole: Exclude<TradingImParticipantRole, 'viewer'>;
+    organizationId: string;
+    displayName: string | null;
+    avatarUrl: string | null;
+  }) {
+    return {
+      participantRole: params.participantRole,
+      organizationId: params.organizationId,
+      displayName: this.readOptionalText(params.displayName),
+      avatarUrl: await this.readAvatarUrl(params.avatarUrl)
+    };
   }
 
   private async resolveProjectAccess(projectId: string | undefined, context: RequestContext) {
@@ -388,6 +444,19 @@ export class TradingImService {
       throw factory('Required string field is missing.');
     }
     return normalized;
+  }
+
+  private readOptionalText(value: string | null | undefined) {
+    const normalized = value?.trim() ?? '';
+    return normalized ? normalized : null;
+  }
+
+  private async readAvatarUrl(value: string | null | undefined) {
+    const normalized = this.readOptionalText(value);
+    if (!normalized) {
+      return null;
+    }
+    return (await this.avatarUrlService.buildAccessUrlFromObjectUrl(normalized)) ?? normalized;
   }
 
   private asRecord(value: unknown, factory: (message: string) => Error) {

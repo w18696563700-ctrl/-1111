@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
@@ -35,6 +38,7 @@ Map<String, Object?> _inboxItem({
 Widget _buildApp({
   required FakeAppApiTransport forumTransport,
   FakeAppApiTransport? messageTransport,
+  ValueListenable<int>? refreshSignal,
 }) {
   ForumConsumerLayer.install(
     ForumConsumerLayer(
@@ -60,7 +64,9 @@ Widget _buildApp({
       ),
     ),
   );
-  return const MaterialApp(home: Scaffold(body: MessagesPage()));
+  return MaterialApp(
+    home: Scaffold(body: MessagesPage(refreshSignal: refreshSignal)),
+  );
 }
 
 Map<String, Object?> _messageInteractionItem({
@@ -70,37 +76,40 @@ Map<String, Object?> _messageInteractionItem({
   required String counterpartName,
   required String summary,
   required String lastMessageText,
+  Map<String, Object?>? p0PaySummary,
+  String latestCardType = 'bid_thread',
+  String summaryTitle = '新的竞标已提交',
 }) {
-  final definition = messagesRegisteredEntryByActionKey['bid_thread.open']!;
+  final definition =
+      messagesRegisteredEntryByActionKey['counterpart_conversation.open']!;
   return <String, Object?>{
     'interactionId': interactionId,
-    'interactionType': 'bid_thread',
-    'threadId': 'thread-$interactionId',
+    'interactionType': 'counterpart_conversation',
+    'conversationId': 'org-$interactionId',
     'projectId': projectId,
-    'bidId': bidId,
     'counterpart': <String, Object?>{
       'organizationId': 'org-$interactionId',
       'displayName': counterpartName,
       'avatarUrl': null,
-      'role': 'bidder',
+      'role': 'counterpart',
     },
-    'seedSummary': <String, Object?>{
-      'seedType': 'bid_submitted',
-      'title': '新的竞标已提交',
-      'summary': summary,
-      'ctaLabel': '点击查看',
-    },
-    'lastMessageSummary': <String, Object?>{
+    'summary': <String, Object?>{
+      'focusProjectId': projectId,
+      'title': summaryTitle,
       'text': lastMessageText,
-      'messageKind': 'plain_text',
-      'createdAt': '2026-03-27T10:00:00Z',
+      'projectCount': 1,
+      'latestCardType': latestCardType,
     },
+    if (p0PaySummary != null) 'p0PaySummary': p0PaySummary,
     'updatedAt': '2026-03-27T10:00:00Z',
     'routeTarget': <String, Object?>{
       'objectType': definition.objectType,
       'actionKey': definition.actionKey,
       'canonicalPath': definition.canonicalPath,
-      'params': <String, String>{'projectId': projectId, 'bidId': bidId},
+      'params': <String, String>{
+        'conversationId': 'org-$interactionId',
+        'projectId': projectId,
+      },
     },
   };
 }
@@ -209,41 +218,60 @@ void main() {
             },
       );
       final messageTransport = FakeAppApiTransport(
-        handlers:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'GET /api/app/message/interactions':
-                  (AppApiRequest request) async {
-                expect(
-                  request.uri.queryParameters['lane'],
-                  'project_communication',
-                );
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: <String, Object?>{
-                    'lane': 'project_communication',
-                    'items': <Object?>[
-                      _messageInteractionItem(
-                        interactionId: 'interaction-1',
-                        projectId: 'project-1',
-                        bidId: 'bid-1',
-                        counterpartName: '杭州搭建公司',
-                        summary: '杭州搭建公司已对当前项目提交竞标。',
-                        lastMessageText: '当前竞标已提交，可继续进入沟通。',
-                      ),
-                      _messageInteractionItem(
-                        interactionId: 'interaction-2',
-                        projectId: 'project-2',
-                        bidId: 'bid-2',
-                        counterpartName: '苏州执行团队',
-                        summary: '苏州执行团队已对当前项目提交竞标。',
-                        lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
-                      ),
-                    ],
-                  },
-                );
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          'GET /api/app/message/interactions': (AppApiRequest request) async {
+            expect(
+              request.uri.queryParameters['lane'],
+              'project_communication',
+            );
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[
+                  _messageInteractionItem(
+                    interactionId: 'interaction-1',
+                    projectId: 'project-1',
+                    bidId: 'bid-1',
+                    counterpartName: '杭州搭建公司',
+                    summary: '杭州搭建公司已对当前项目提交竞标。',
+                    lastMessageText: '当前竞标已提交，可继续进入沟通。',
+                    p0PaySummary: const <String, Object?>{
+                      'taskId': 'task-1',
+                      'taskType': 'inquiry_quote',
+                      'inquiryDeposit': <String, Object?>{
+                        'depositStatus': 'paid',
+                        'amount': '200.00',
+                      },
+                      'messageDisplaySummary': <String, Object?>{
+                        'displayAllowed': true,
+                        'readOnly': true,
+                        'statusTextKey': 'inquiry_deposit_paid',
+                        'routeTarget': <String, Object?>{
+                          'objectType': 'trade_task',
+                          'actionKey': 'p0_pay_summary.read',
+                          'canonicalPath':
+                              '/api/app/exhibition/trade-tasks/task-1/p0-pay-summary',
+                        },
+                      },
+                    },
+                  ),
+                  _messageInteractionItem(
+                    interactionId: 'interaction-2',
+                    projectId: 'project-2',
+                    bidId: 'bid-2',
+                    counterpartName: '苏州执行团队',
+                    summary: '苏州执行团队已对当前项目提交竞标。',
+                    lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
+                    latestCardType: 'project_order',
+                    summaryTitle: '订单状态已更新',
+                  ),
+                ],
               },
-            },
+            );
+          },
+        },
       );
 
       await tester.pumpWidget(
@@ -257,9 +285,16 @@ void main() {
       expect(find.text('项目沟通'), findsOneWidget);
       expect(find.text('杭州搭建公司'), findsOneWidget);
       expect(find.text('苏州执行团队'), findsOneWidget);
-      expect(find.text('杭州搭建公司已对当前项目提交竞标。'), findsOneWidget);
+      expect(find.text('昵称'), findsNWidgets(2));
+      expect(find.text('对方主体'), findsNothing);
+      expect(find.text('1 个项目'), findsNothing);
       expect(find.text('项目方在沟通与投标里回复了新的交付问题。'), findsOneWidget);
-      expect(find.text('进入沟通'), findsNWidgets(2));
+      expect(find.text('订单状态'), findsOneWidget);
+      expect(find.text('P0-Pay 只读状态'), findsOneWidget);
+      expect(find.textContaining('发单诚意金：已支付'), findsOneWidget);
+      expect(find.textContaining('只读 handoff'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '支付'), findsNothing);
+      expect(find.text('进入项目沟通'), findsNWidgets(2));
       await tester.scrollUntilVisible(find.text('回复了你在《材料交接节点》里的问题'), 240);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
       expect(find.text('回复我的'), findsWidgets);
@@ -307,28 +342,28 @@ void main() {
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
               'GET /api/app/message/interactions':
                   (AppApiRequest request) async {
-                messageRequestCount += 1;
-                final title = messageRequestCount == 1
-                    ? '第一次项目沟通会话'
-                    : '第二次项目沟通会话';
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: <String, Object?>{
-                    'lane': 'project_communication',
-                    'items': <Object?>[
-                      _messageInteractionItem(
-                        interactionId: 'interaction-$messageRequestCount',
-                        projectId: 'project-1',
-                        bidId: 'bid-1',
-                        counterpartName: title,
-                        summary: '$title 已生成。',
-                        lastMessageText: '$title 最近有更新。',
-                      ),
-                    ],
+                    messageRequestCount += 1;
+                    final title = messageRequestCount == 1
+                        ? '第一次项目沟通会话'
+                        : '第二次项目沟通会话';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          _messageInteractionItem(
+                            interactionId: 'interaction-$messageRequestCount',
+                            projectId: 'project-1',
+                            bidId: 'bid-1',
+                            counterpartName: title,
+                            summary: '$title 已生成。',
+                            lastMessageText: '$title 最近有更新。',
+                          ),
+                        ],
+                      },
+                    );
                   },
-                );
-              },
             },
       );
 
@@ -358,6 +393,114 @@ void main() {
       await tester.scrollUntilVisible(find.text('第二次论坛回复'), 240);
       expect(find.text('第二次论坛回复'), findsOneWidget);
       expect(find.text('第二次项目沟通会话'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'background refresh keeps existing message center content stable',
+    (WidgetTester tester) async {
+      var forumRequestCount = 0;
+      var messageRequestCount = 0;
+      final secondForumRequest = Completer<void>();
+      final secondMessageRequest = Completer<void>();
+      final refreshSignal = ValueNotifier<int>(0);
+      addTearDown(refreshSignal.dispose);
+
+      final forumTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/interaction/inbox':
+                  (AppApiRequest request) async {
+                    forumRequestCount += 1;
+                    if (forumRequestCount > 1) {
+                      await secondForumRequest.future;
+                    }
+                    final title = forumRequestCount == 1
+                        ? '首次论坛回复'
+                        : '后台刷新后的论坛回复';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          _inboxItem(
+                            notificationId: 'notice-reply-$forumRequestCount',
+                            tab: 'replies',
+                            targetType: 'forum_post',
+                            targetId: 'post-1',
+                            title: title,
+                          ),
+                        ],
+                        'page': const <String, Object?>{
+                          'nextCursor': null,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+      final messageTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    messageRequestCount += 1;
+                    if (messageRequestCount > 1) {
+                      await secondMessageRequest.future;
+                    }
+                    final title = messageRequestCount == 1
+                        ? '首次项目沟通会话'
+                        : '后台刷新后的项目沟通会话';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          _messageInteractionItem(
+                            interactionId: 'interaction-$messageRequestCount',
+                            projectId: 'project-1',
+                            bidId: 'bid-1',
+                            counterpartName: title,
+                            summary: '$title 已生成。',
+                            lastMessageText: '$title 最近有更新。',
+                          ),
+                        ],
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          forumTransport: forumTransport,
+          messageTransport: messageTransport,
+          refreshSignal: refreshSignal,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('首次论坛回复'), findsOneWidget);
+      expect(find.text('首次项目沟通会话'), findsOneWidget);
+
+      refreshSignal.value += 1;
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 50));
+
+      expect(forumRequestCount, 2);
+      expect(messageRequestCount, 2);
+      expect(find.text('首次论坛回复'), findsOneWidget);
+      expect(find.text('首次项目沟通会话'), findsOneWidget);
+      expect(find.byType(LinearProgressIndicator), findsNothing);
+
+      secondForumRequest.complete();
+      secondMessageRequest.complete();
+      await tester.pumpAndSettle();
+
+      expect(find.text('后台刷新后的论坛回复'), findsOneWidget);
+      expect(find.text('后台刷新后的项目沟通会话'), findsOneWidget);
     },
   );
 

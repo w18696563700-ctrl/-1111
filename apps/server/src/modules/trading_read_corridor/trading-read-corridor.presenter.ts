@@ -5,9 +5,12 @@ type OrderTruthRow = {
   orderNo: string;
   projectId: string;
   bidId: string;
+  buyerOrganizationId: string | null;
+  supplierOrganizationId: string | null;
   title: string | null;
   totalAmount: number | string | null;
   state: string | null;
+  completionRequestState: string | null;
 };
 
 type ContractTruthRow = {
@@ -40,7 +43,13 @@ export class TradingReadCorridorPresenter {
       orderNo: order.orderNo,
       projectId: order.projectId,
       bidId: order.bidId,
-      state: 'active',
+      buyerOrganizationId: order.buyerOrganizationId,
+      supplierOrganizationId: order.supplierOrganizationId,
+      sellerOrganizationId: order.supplierOrganizationId,
+      state: this.normalizeOrderState(order.state),
+      completionRequestState: this.normalizeCompletionRequestState(
+        order.completionRequestState
+      ),
       summary: this.toHeadingSummary(
         this.readOptionalText(order.title) ?? '当前订单已进入最小履约承接走廊。'
       ),
@@ -103,14 +112,29 @@ export class TradingReadCorridorPresenter {
     return 'amended';
   }
 
+  private normalizeOrderState(value: string | null) {
+    return this.readOptionalText(value) === 'completed' ? 'completed' : 'active';
+  }
+
+  private normalizeCompletionRequestState(value: string | null) {
+    const normalized = this.readOptionalText(value);
+    if (normalized === 'requested') return normalized;
+    if (normalized === 'confirmed') return normalized;
+    if (normalized === 'rejected') return normalized;
+    if (normalized === 'dispute_reserved') return normalized;
+    return 'none';
+  }
+
   private normalizeMilestoneState(value: string | null) {
-    return this.readOptionalText(value) === 'submitted'
-      ? 'submitted'
-      : 'pending_submission';
+    const normalized = this.readOptionalText(value);
+    if (normalized === 'completed') return normalized;
+    if (normalized === 'submitted') return normalized;
+    return 'pending_submission';
   }
 
   private normalizeInspectionState(value: string | null) {
     const normalized = this.readOptionalText(value);
+    if (normalized === 'passed') return normalized;
     if (normalized === 'submitted') return normalized;
     if (normalized === 'rechecked') return normalized;
     return 'draft';
@@ -128,13 +152,18 @@ export class TradingReadCorridorPresenter {
   }
 
   private describeMilestoneState(value: string | null) {
-    return this.readOptionalText(value) === 'submitted'
-      ? '当前里程碑已提交。'
-      : '当前里程碑待提交。';
+    const normalized = this.readOptionalText(value);
+    if (normalized === 'completed') {
+      return '当前里程碑已完成。';
+    }
+    return normalized === 'submitted' ? '当前里程碑已提交。' : '当前里程碑待提交。';
   }
 
   private describeInspectionState(value: string | null) {
     const normalized = this.readOptionalText(value);
+    if (normalized === 'passed') {
+      return '当前验收已通过。';
+    }
     if (normalized === 'submitted') {
       return '当前验收已提交。';
     }

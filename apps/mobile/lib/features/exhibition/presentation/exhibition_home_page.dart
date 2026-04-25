@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:mobile/core/location/china_region_picker.dart';
@@ -9,6 +10,7 @@ import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
+import 'package:mobile/features/exhibition/data/exhibition_home_location_context_store.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
@@ -47,6 +49,7 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
   ExhibitionLoadResult? _projectResult;
   DeviceLocationSnapshot? _locationSnapshot;
   ExhibitionHomeLocationSelectRequest? _manualLocationSelection;
+  String _sessionRefreshSignature = '';
   bool _refreshing = false;
   bool _locating = false;
   bool _showScrollToTop = false;
@@ -56,6 +59,8 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
   @override
   void initState() {
     super.initState();
+    _sessionRefreshSignature = _buildSessionRefreshSignature();
+    AppSessionStore.instance.addListener(_handleSessionStateChanged);
     _scrollController.addListener(_handleScroll);
     _refreshWholePage(useRefreshPath: false);
     _autoRefreshTimer = Timer.periodic(const Duration(minutes: 5), (_) {
@@ -66,6 +71,7 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
   @override
   void dispose() {
     _autoRefreshTimer?.cancel();
+    AppSessionStore.instance.removeListener(_handleSessionStateChanged);
     _scrollController
       ..removeListener(_handleScroll)
       ..dispose();
@@ -122,15 +128,39 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
     });
   }
 
+  void _handleSessionStateChanged() {
+    final nextSignature = _buildSessionRefreshSignature();
+    if (_sessionRefreshSignature == nextSignature) {
+      return;
+    }
+
+    _sessionRefreshSignature = nextSignature;
+    unawaited(_refreshWholePage(useRefreshPath: true));
+  }
+
+  String _buildSessionRefreshSignature() {
+    final snapshot = AppSessionStore.instance.snapshot;
+    return [
+      snapshot.refreshToken ?? '',
+      snapshot.deviceId ?? '',
+      snapshot.localLoginSource ?? '',
+    ].join('|');
+  }
+
   void _applyManualLocationSelection(
     ExhibitionHomeLocationSelectRequest selection,
   ) {
+    final permissionState =
+        _locationSnapshot?.permissionState ??
+        ExhibitionHomeLocationContextStore.instance.lastPermissionState;
+    ExhibitionHomeLocationContextStore.instance.storeManualSelection(
+      selection,
+      permissionState: permissionState,
+    );
     setState(() {
       _manualLocationSelection = selection;
       _locationSnapshot = DeviceLocationSnapshot(
-        permissionState:
-            _locationSnapshot?.permissionState ??
-            DeviceLocationPermissionState.unknown,
+        permissionState: permissionState,
         provinceCode: selection.provinceCode,
         provinceName: selection.provinceName,
       );
@@ -164,6 +194,7 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
                 refreshing: _refreshing,
                 locating: _locating,
                 locationSnapshot: _locationSnapshot,
+                manualLocationSelection: _manualLocationSelection,
                 homeResult: _homeResult,
                 weatherProjection: weatherProjection,
                 onToggleExpanded: () {

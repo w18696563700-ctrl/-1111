@@ -35,10 +35,12 @@ export class CreditScoringShadowAggregationService {
       const aggregateRepo = manager.getRepository(OrganizationCreditShadowAggregateEntity);
       const ledgerRepo = manager.getRepository(OrganizationCreditShadowLedgerEntryEntity);
       const triggeredAt = input.triggeredAt ?? new Date();
+      const sourceType = this.normalizeNullableId(input.sourceType) ?? 'order_rating';
       const trigger = triggerRepo.create({
         triggerId: randomUUID(),
         organizationId,
         triggerType: 'formal_rating_submitted',
+        sourceType,
         sourceOrderId: this.normalizeNullableId(input.sourceOrderId),
         sourceRatingId: this.normalizeNullableId(input.sourceRatingId),
         reasonCodes: ['RATING_ONLY_MODE_ACTIVE'],
@@ -82,6 +84,7 @@ export class CreditScoringShadowAggregationService {
         entryId: randomUUID(),
         organizationId,
         triggerType: 'formal_rating_submitted',
+        sourceType,
         sourceOrderId: this.normalizeNullableId(input.sourceOrderId),
         sourceRatingId: this.normalizeNullableId(input.sourceRatingId),
         beforeScore: this.resolveLedgerScore(previousAggregate),
@@ -106,38 +109,70 @@ export class CreditScoringShadowAggregationService {
 
   private async fetchShadowRatingRows(manager: EntityManager, organizationId: string) {
     const scoreSource = await this.discoverRatingScoreSource(manager);
-    const selectPieces = [
-      `o.id as "orderId"`,
-      `r.id as "ratingId"`,
-      `r.submitted_at as "submittedAt"`
-    ];
-
-    if (scoreSource.mode === 'numeric' && scoreSource.columnNames.length > 0) {
-      selectPieces.push(`coalesce(${scoreSource.columnNames.map((column) => `r.${this.quoteIdentifier(column)}::numeric`).join(', ')}) as "scoreValue"`);
-      selectPieces.push(`null::varchar as "scoreLabel"`);
-    } else if (scoreSource.mode === 'label' && scoreSource.columnNames.length > 0) {
-      selectPieces.push(`null::numeric as "scoreValue"`);
-      selectPieces.push(`coalesce(${scoreSource.columnNames.map((column) => `lower(nullif(trim(r.${this.quoteIdentifier(column)}), ''))`).join(', ')}) as "scoreLabel"`);
-    } else {
-      selectPieces.push(`null::numeric as "scoreValue"`);
-      selectPieces.push(`null::varchar as "scoreLabel"`);
-    }
+    const scoreValueExpression =
+      scoreSource.mode === 'numeric' && scoreSource.columnNames.length > 0
+        ? `coalesce(${scoreSource.columnNames.map((column) => `r.${this.quoteIdentifier(column)}::numeric`).join(', ')})`
+        : `null::numeric`;
+    const scoreLabelExpression =
+      scoreSource.mode === 'label' && scoreSource.columnNames.length > 0
+        ? `coalesce(${scoreSource.columnNames.map((column) => `lower(nullif(trim(r.${this.quoteIdentifier(column)}), ''))`).join(', ')})`
+        : `null::varchar`;
 
     const rows = (await manager.query(
       `
-        select distinct on (o.id)
-          ${selectPieces.join(',\n          ')}
-        from public.orders o
-        join public.ratings r on r.order_id = o.id
-        where o.supplier_organization_id = $1
-          and o.state = 'completed'
-          and r.state = 'submitted'
-        order by
-          o.id asc,
-          r.submitted_at desc nulls last,
-          r.updated_at desc nulls last,
-          r.created_at desc nulls last,
-          r.id desc
+        with candidate_ratings as (
+          select
+            o.id as "orderId",
+            r.id as "ratingId",
+            r.submitted_at as "submittedAt",
+            ${scoreValueExpression} as "scoreValue",
+            ${scoreLabelExpression} as "scoreLabel",
+            1 as "sourcePriority"
+          from public.orders o
+          join public.ratings r on r.order_id = o.id
+          where o.supplier_organization_id = $1
+            and o.state = 'completed'
+            and r.state = 'submitted'
+
+          union all
+
+          select
+            pcr.order_id as "orderId",
+            pcr.id as "ratingId",
+            pcr.submitted_at as "submittedAt",
+            null::numeric as "scoreValue",
+            lower(nullif(trim(pcr.score_label), '')) as "scoreLabel",
+            0 as "sourcePriority"
+          from public.project_counterparty_ratings pcr
+          join public.orders o
+            on o.id = pcr.order_id
+           and o.project_id = pcr.project_id
+          where pcr.ratee_organization_id = $1
+            and o.state = 'completed'
+            and pcr.rating_state = 'submitted'
+        ),
+        deduped_ratings as (
+          select distinct on ("orderId")
+            "orderId",
+            "ratingId",
+            "submittedAt",
+            "scoreValue",
+            "scoreLabel"
+          from candidate_ratings
+          order by
+            "orderId" asc,
+            "sourcePriority" asc,
+            "submittedAt" desc nulls last,
+            "ratingId" desc
+        )
+        select
+          "orderId",
+          "ratingId",
+          "submittedAt",
+          "scoreValue",
+          "scoreLabel"
+        from deduped_ratings
+        order by "submittedAt" desc nulls last, "ratingId" desc
       `,
       [organizationId]
     )) as Array<{

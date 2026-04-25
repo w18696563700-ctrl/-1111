@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile/features/custom_furniture/presentation/custom_furniture_page.dart';
 import 'package:mobile/features/exhibition/presentation/exhibition_hub_page.dart';
@@ -31,19 +33,23 @@ class _PersistentShellPage extends StatefulWidget {
 }
 
 class _PersistentShellPageState extends State<_PersistentShellPage> {
+  static const Duration _messagesAutoRefreshInterval = Duration(seconds: 3);
   final Map<AppBuilding, Widget> _cachedPages = <AppBuilding, Widget>{};
   final Set<AppBuilding> _activatedBottomBuildings = <AppBuilding>{};
   final ValueNotifier<int> _messagesRefreshSignal = ValueNotifier<int>(0);
+  Timer? _messagesRefreshTimer;
   late AppBuilding _currentBuilding = widget.initialBuilding;
 
   @override
   void initState() {
     super.initState();
     _activateBuilding(_currentBuilding);
+    _syncMessagesRefreshTimer();
   }
 
   @override
   void dispose() {
+    _messagesRefreshTimer?.cancel();
     _messagesRefreshSignal.dispose();
     super.dispose();
   }
@@ -54,6 +60,7 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
     if (oldWidget.initialBuilding != widget.initialBuilding) {
       _currentBuilding = widget.initialBuilding;
       _activateBuilding(_currentBuilding);
+      _syncMessagesRefreshTimer();
     }
   }
 
@@ -74,7 +81,29 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
     setState(() {
       _currentBuilding = building;
       _activateBuilding(building);
+      _syncMessagesRefreshTimer();
     });
+  }
+
+  void _syncMessagesRefreshTimer() {
+    final shouldPoll = _currentBuilding == AppBuilding.messages;
+    if (!shouldPoll) {
+      _messagesRefreshTimer?.cancel();
+      _messagesRefreshTimer = null;
+      return;
+    }
+    if (_messagesRefreshTimer != null) {
+      return;
+    }
+    _messagesRefreshTimer = Timer.periodic(
+      _messagesAutoRefreshInterval,
+      (_) {
+        if (!mounted || _currentBuilding != AppBuilding.messages) {
+          return;
+        }
+        _messagesRefreshSignal.value += 1;
+      },
+    );
   }
 
   @override

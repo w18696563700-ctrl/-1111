@@ -3,11 +3,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/location/china_region_catalog.dart';
+import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
+import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
+import 'package:mobile/features/exhibition/data/exhibition_home_location_context_store.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'support/exhibition_home_test_doubles.dart';
 
@@ -15,6 +20,7 @@ ExhibitionMobileApp _buildApp({
   required FakeExhibitionHomeAggregationClient homeClient,
   required FakeDeviceLocationService locationService,
   required FakeAppApiTransport transport,
+  AppSessionStore? sessionStore,
 }) {
   return ExhibitionMobileApp(
     initialRoute: '/',
@@ -26,6 +32,7 @@ ExhibitionMobileApp _buildApp({
     ),
     exhibitionHomeAggregationClient: homeClient,
     deviceLocationService: locationService,
+    sessionStore: sessionStore,
     messagesConsumerLayer: MessagesConsumerLayer(
       client: AppApiClient(
         config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
@@ -55,6 +62,8 @@ ExhibitionMobileApp _buildApp({
 
 void main() {
   setUp(() {
+    SharedPreferences.setMockInitialValues(const <String, Object>{});
+    ExhibitionHomeLocationContextStore.reset();
     ChinaRegionCatalogLoader.installLoadOverrideForTest(
       () async => ChinaRegionCatalog(
         provinces: const <ChinaProvinceOption>[
@@ -116,8 +125,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('天气与定位'), findsOneWidget);
-      expect(find.text('当前地区说明：正在识别所在地区'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
+      expect(find.text('城市已定位，天气加载中'), findsOneWidget);
       expect(find.text('地区识别中'), findsOneWidget);
       expect(find.textContaining('5 分钟自动整页刷新'), findsNothing);
       expect(find.textContaining('30.5728'), findsNothing);
@@ -133,7 +142,7 @@ void main() {
       expect(find.text('天气与施工说明'), findsOneWidget);
       expect(find.text('当前地区说明尚未就绪'), findsOneWidget);
       expect(find.text('当前位置已获取，但当前还未拿到可展示的天气结果。'), findsOneWidget);
-      expect(find.text('所在地区识别中'), findsOneWidget);
+      expect(find.text('所在地区识别中'), findsWidgets);
       expect(find.textContaining('/api/app/exhibition/home'), findsNothing);
     },
   );
@@ -180,8 +189,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('今日施工重点：今晚雷雨风险升高，户外工序建议顺延。'), findsOneWidget);
-      expect(find.text('风险：极高风险'), findsOneWidget);
+      expect(find.textContaining('今晚雷雨风险升高'), findsOneWidget);
+      expect(find.text('施工极高风险'), findsOneWidget);
       expect(find.text('5 分钟自动整页刷新'), findsNothing);
 
       await tester.tap(find.byTooltip('展开天气卡'));
@@ -237,8 +246,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('当前地区说明：地区已同步，天气暂不可用'), findsOneWidget);
-      expect(find.text('天气：暂不可用'), findsOneWidget);
+      expect(find.text('重庆市 已同步，天气暂不可用'), findsOneWidget);
+      expect(find.text('天气暂不可用'), findsOneWidget);
       expect(find.textContaining('受控占位'), findsNothing);
       expect(find.text('待同步'), findsNothing);
 
@@ -458,7 +467,7 @@ void main() {
       expect(homeClient.refreshCount, 1);
       expect(homeClient.loadCount, 2);
       expect(find.textContaining('登录状态已失效'), findsNothing);
-      expect(find.textContaining('今日施工重点：'), findsWidgets);
+      expect(find.textContaining('天气条件整体平稳'), findsWidgets);
       expect(find.textContaining('上海'), findsWidgets);
     },
   );
@@ -532,7 +541,7 @@ void main() {
       );
       expect(homeClient.lastRefreshLocationContext?.latitude, isNull);
       expect(
-        find.text('地区：${homeClient.lastSelectedLocation?.provinceName}'),
+        find.text(homeClient.lastSelectedLocation?.provinceName ?? ''),
         findsOneWidget,
       );
 
@@ -546,7 +555,7 @@ void main() {
         homeClient.lastSelectedLocation?.provinceName,
       );
       expect(
-        find.text('地区：${homeClient.lastSelectedLocation?.provinceName}'),
+        find.text(homeClient.lastSelectedLocation?.provinceName ?? ''),
         findsOneWidget,
       );
     },
@@ -610,7 +619,7 @@ void main() {
         homeClient.lastSelectedLocation?.provinceName,
       );
       expect(
-        find.text('地区：${homeClient.lastSelectedLocation?.provinceName}'),
+        find.text(homeClient.lastSelectedLocation?.provinceName ?? ''),
         findsOneWidget,
       );
       expect(find.textContaining('登录状态已失效'), findsNothing);
@@ -665,7 +674,340 @@ void main() {
 
       expect(homeClient.selectLocationCount, 1);
       expect(homeClient.lastSelectedLocation?.provinceName, '重庆');
-      expect(find.textContaining('今日施工重点：'), findsOneWidget);
+      expect(find.textContaining('天气平稳'), findsOneWidget);
     },
   );
+
+  testWidgets(
+    'last known location context survives account-scoped page rebuilds',
+    (WidgetTester tester) async {
+      final firstHomeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: locationContext?.provinceName ?? '当前地区',
+          provinceName: locationContext?.provinceName ?? '当前地区',
+        ),
+      );
+      final firstLocationService = FakeDeviceLocationService(
+        resolver: () => const DeviceLocationSnapshot(
+          permissionState: DeviceLocationPermissionState.granted,
+          latitude: 29.5630,
+          longitude: 106.5516,
+          provinceCode: '500000',
+          provinceName: '重庆',
+        ),
+      );
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/project/list': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{'items': <Object?>[]},
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          homeClient: firstHomeClient,
+          locationService: firstLocationService,
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(firstHomeClient.lastLoadLocationContext?.provinceName, '重庆');
+      expect(firstHomeClient.lastLoadLocationContext?.latitude, 29.5630);
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+
+      final secondHomeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: locationContext?.provinceName ?? '当前地区',
+          provinceName: locationContext?.provinceName ?? '当前地区',
+        ),
+      );
+      final unavailableLocationService = FakeDeviceLocationService(
+        resolver: () => const DeviceLocationSnapshot(
+          permissionState: DeviceLocationPermissionState.unavailable,
+          errorMessage: '设备定位当前不可用。',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          homeClient: secondHomeClient,
+          locationService: unavailableLocationService,
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(secondHomeClient.lastLoadLocationContext?.provinceName, '重庆');
+      expect(secondHomeClient.lastLoadLocationContext?.latitude, 29.5630);
+      expect(find.textContaining('重庆'), findsWidgets);
+      expect(find.text('当前地区说明：地区已同步，天气暂不可用'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'persisted location context survives store reset and unavailable relaunch',
+    (WidgetTester tester) async {
+      final firstHomeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: locationContext?.cityName ?? '重庆南岸',
+          provinceName: locationContext?.provinceName ?? '重庆市',
+        ),
+      );
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/project/list': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{'items': <Object?>[]},
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          homeClient: firstHomeClient,
+          locationService: FakeDeviceLocationService(
+            resolver: () => const DeviceLocationSnapshot(
+              permissionState: DeviceLocationPermissionState.granted,
+              latitude: 29.5630,
+              longitude: 106.5516,
+              provinceCode: '500000',
+              provinceName: '重庆市',
+            ),
+          ),
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 1));
+
+      ExhibitionHomeLocationContextStore.reset();
+
+      final secondHomeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: locationContext?.provinceName ?? '当前地区',
+          provinceName: locationContext?.provinceName ?? '当前地区',
+        ),
+      );
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        _buildApp(
+          homeClient: secondHomeClient,
+          locationService: FakeDeviceLocationService(
+            resolver: () => const DeviceLocationSnapshot(
+              permissionState: DeviceLocationPermissionState.unavailable,
+              errorMessage: '设备定位当前不可用。',
+            ),
+          ),
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(secondHomeClient.lastLoadLocationContext?.provinceName, '重庆市');
+      expect(secondHomeClient.lastLoadLocationContext?.latitude, 29.5630);
+      expect(find.textContaining('重庆市'), findsWidgets);
+      expect(find.text('当前地区说明：地区已同步，天气暂不可用'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'successful home result seeds device-level location fallback across accounts',
+    (WidgetTester tester) async {
+      final firstHomeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(
+          displayName: '重庆市南岸区',
+          provinceCode: '500000',
+          provinceName: '重庆市',
+          cityName: '重庆市',
+          districtName: '南岸区',
+          latitude: null,
+          longitude: null,
+        ),
+      );
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/project/list': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{'items': <Object?>[]},
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          homeClient: firstHomeClient,
+          locationService: FakeDeviceLocationService(
+            resolver: () => const DeviceLocationSnapshot(
+              permissionState: DeviceLocationPermissionState.unavailable,
+              errorMessage: '设备定位当前不可用。',
+            ),
+          ),
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 1));
+
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pumpAndSettle();
+
+      final secondHomeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: locationContext?.districtName == null
+              ? (locationContext?.cityName ??
+                    locationContext?.provinceName ??
+                    '当前地区')
+              : '${locationContext!.cityName}${locationContext.districtName}',
+          provinceCode: locationContext?.provinceCode,
+          provinceName: locationContext?.provinceName ?? '当前地区',
+          cityName: locationContext?.cityName,
+          districtName: locationContext?.districtName,
+          latitude: locationContext?.latitude,
+          longitude: locationContext?.longitude,
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          homeClient: secondHomeClient,
+          locationService: FakeDeviceLocationService(
+            resolver: () => const DeviceLocationSnapshot(
+              permissionState: DeviceLocationPermissionState.unavailable,
+              errorMessage: '设备定位当前不可用。',
+            ),
+          ),
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(secondHomeClient.lastLoadLocationContext?.provinceCode, '500000');
+      expect(secondHomeClient.lastLoadLocationContext?.provinceName, '重庆市');
+      expect(secondHomeClient.lastLoadLocationContext?.cityName, '重庆市');
+      expect(secondHomeClient.lastLoadLocationContext?.districtName, '南岸区');
+      expect(find.textContaining('重庆市南岸区'), findsWidgets);
+      expect(find.text('当前地区 已同步，天气暂不可用'), findsNothing);
+    },
+  );
+
+  test('GET weather query keeps city and district hints', () {
+    final query = ExhibitionHomeLocationContextRequest(
+      provinceCode: '500000',
+      provinceName: '重庆市',
+      cityName: '重庆市',
+      districtName: '南岸区',
+      locationPermissionState: 'granted',
+    ).toQueryParameters();
+
+    expect(query['provinceCode'], '500000');
+    expect(query['provinceName'], '重庆市');
+    expect(query['cityName'], '重庆市');
+    expect(query['districtName'], '南岸区');
+    expect(query['locationPermissionState'], 'granted');
+  });
+
+  testWidgets('home refreshes after account session changes', (
+    WidgetTester tester,
+  ) async {
+    final sessionStore = AppSessionStore();
+    var locationRequests = 0;
+    final locationService = FakeDeviceLocationService(
+      resolver: () {
+        locationRequests += 1;
+        if (locationRequests == 1) {
+          return const DeviceLocationSnapshot(
+            permissionState: DeviceLocationPermissionState.unavailable,
+            errorMessage: '设备定位当前不可用。',
+          );
+        }
+
+        return const DeviceLocationSnapshot(
+          permissionState: DeviceLocationPermissionState.granted,
+          latitude: 29.5630,
+          longitude: 106.5516,
+          provinceCode: '500000',
+          provinceName: '重庆市',
+        );
+      },
+    );
+    final homeClient = FakeExhibitionHomeAggregationClient(
+      onLoad: (locationContext) =>
+          locationContext?.hasUsableLocationHints == true
+          ? contentHomeResult(
+              displayName: '重庆南岸',
+              provinceName: '重庆市',
+              currentWeather: '小雨',
+            )
+          : degradedWeatherHomeResult(
+              displayName: '当前地区',
+              provinceName: '当前地区',
+            ),
+      onRefresh: (locationContext) =>
+          locationContext?.hasUsableLocationHints == true
+          ? contentHomeResult(
+              displayName: '重庆南岸',
+              provinceName: '重庆市',
+              currentWeather: '小雨',
+            )
+          : degradedWeatherHomeResult(
+              displayName: '当前地区',
+              provinceName: '当前地区',
+            ),
+    );
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/project/list': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{'items': <Object?>[]},
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        homeClient: homeClient,
+        locationService: locationService,
+        transport: transport,
+        sessionStore: sessionStore,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前地区 已同步，天气暂不可用'), findsOneWidget);
+
+    sessionStore.establishSession(
+      accessToken: 'access-token-a',
+      refreshToken: 'refresh-token-a',
+      expiresInSeconds: 3600,
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(homeClient.refreshCount, greaterThanOrEqualTo(1));
+    expect(find.text('当前地区 已同步，天气暂不可用'), findsNothing);
+    expect(find.textContaining('重庆南岸'), findsWidgets);
+  });
 }

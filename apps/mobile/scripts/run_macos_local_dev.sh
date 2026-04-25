@@ -1,8 +1,5 @@
 #!/bin/zsh
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-
-export APP_RUNTIME_ENTRY_MODE="${APP_RUNTIME_ENTRY_MODE:-local_dev}"
-
-exec "$SCRIPT_DIR/run_macos_formal.sh"
+echo "run_macos_local_dev.sh is disabled. Flutter App must run against the Aliyun BFF through the approved SSH tunnel on 127.0.0.1:8080." >&2
+exit 1

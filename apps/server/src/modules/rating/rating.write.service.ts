@@ -76,6 +76,7 @@ export class RatingWriteService {
       await this.shadowAggregationService
         .recomputeAfterFormalRatingSubmit({
           organizationId: order.supplierOrganizationId,
+          sourceType: 'order_rating',
           sourceOrderId: order.orderId,
           sourceRatingId: rating.ratingId,
           triggeredAt: new Date(),

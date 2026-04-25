@@ -79,17 +79,19 @@ extension _EnterpriseWorkbenchPageHydration on _EnterpriseApplicationPageState {
         boardProfile['exhibitionTypes'] ??
             boardProfile['processTypes'] ??
             boardProfile['supplyCategories'],
-      ).toSet();
-      _selectedProfileTwoOptions = _readStringList(
-        boardProfile['serviceItems'] ??
-            boardProfile['coreProducts'] ??
-            boardProfile['supplyMode'],
-      ).toSet();
-      _profileTwoController.text = _joinList(
-        boardProfile['serviceItems'],
-        boardProfile['coreProducts'],
-        boardProfile['supplyMode'],
-      );
+      ).take(_boardType == EnterpriseBoardType.supplier ? 1 : 999).toSet();
+      if (_boardType == EnterpriseBoardType.supplier) {
+        _selectedProfileTwoOptions = <String>{};
+        _profileTwoController.clear();
+      } else {
+        _selectedProfileTwoOptions = _readStringList(
+          boardProfile['serviceItems'] ?? boardProfile['coreProducts'],
+        ).toSet();
+        _profileTwoController.text = _joinList(
+          boardProfile['serviceItems'],
+          boardProfile['coreProducts'],
+        );
+      }
       _profileThreeController.text = _joinList(
         boardProfile['serviceCities'],
         boardProfile['coreProductsOrServices'],
@@ -196,17 +198,19 @@ extension _EnterpriseWorkbenchPageHydration on _EnterpriseApplicationPageState {
         boardProfile['exhibitionTypes'] ??
             boardProfile['processTypes'] ??
             boardProfile['supplyCategories'],
-      ).toSet();
-      _selectedProfileTwoOptions = _readStringList(
-        boardProfile['serviceItems'] ??
-            boardProfile['coreProducts'] ??
-            boardProfile['supplyMode'],
-      ).toSet();
-      _profileTwoController.text = _joinList(
-        boardProfile['serviceItems'],
-        boardProfile['coreProducts'],
-        boardProfile['supplyMode'],
-      );
+      ).take(_boardType == EnterpriseBoardType.supplier ? 1 : 999).toSet();
+      if (_boardType == EnterpriseBoardType.supplier) {
+        _selectedProfileTwoOptions = <String>{};
+        _profileTwoController.clear();
+      } else {
+        _selectedProfileTwoOptions = _readStringList(
+          boardProfile['serviceItems'] ?? boardProfile['coreProducts'],
+        ).toSet();
+        _profileTwoController.text = _joinList(
+          boardProfile['serviceItems'],
+          boardProfile['coreProducts'],
+        );
+      }
       _profileThreeController.text = _joinList(
         boardProfile['serviceCities'],
         boardProfile['coreProductsOrServices'],
@@ -327,7 +331,8 @@ extension _EnterpriseWorkbenchPageHydration on _EnterpriseApplicationPageState {
       _nameController.text = legalName;
     }
     _certificationRegisteredLocationTruth = _certificationLocationLabel(
-      _normalizedText(ocrView?.address) ?? _normalizedText(certification?.address),
+      _normalizedText(ocrView?.address) ??
+          _normalizedText(certification?.address),
     );
     final foundedAt =
         _normalizedText(ocrView?.establishedAt) ??
@@ -376,8 +381,9 @@ extension _EnterpriseWorkbenchPageHydration on _EnterpriseApplicationPageState {
       }
     }
 
-    final provinceMatch =
-        RegExp(r'^(.*?省)(.*?(?:市|州|地区|盟))').firstMatch(normalized);
+    final provinceMatch = RegExp(
+      r'^(.*?省)(.*?(?:市|州|地区|盟))',
+    ).firstMatch(normalized);
     if (provinceMatch != null) {
       final province = _normalizedText(provinceMatch.group(1));
       final city = _normalizedText(provinceMatch.group(2));

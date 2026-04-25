@@ -11,6 +11,9 @@ export class OrganizationCreditShadowLedgerEntryEntity {
   @Column({ name: 'trigger_type', type: 'varchar', length: 64 })
   triggerType!: string;
 
+  @Column({ name: 'source_type', type: 'varchar', length: 64, default: 'order_rating' })
+  sourceType!: string;
+
   @Column({ name: 'source_order_id', type: 'varchar', length: 64, nullable: true })
   sourceOrderId!: string | null;
 
@@ -41,4 +44,3 @@ export class OrganizationCreditShadowLedgerEntryEntity {
   @Column({ name: 'changed_at', type: 'timestamptz' })
   changedAt!: Date;
 }
-

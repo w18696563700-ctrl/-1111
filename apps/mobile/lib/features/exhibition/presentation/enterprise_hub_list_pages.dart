@@ -8,6 +8,7 @@ import 'package:mobile/features/exhibition/presentation/enterprise_hub_filter_op
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_list_controls.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_list_state_support.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_shared.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_supplier_category_support.dart';
 
 class EnterpriseBoardListPage extends StatefulWidget {
   const EnterpriseBoardListPage({
@@ -62,6 +63,13 @@ class _EnterpriseBoardListPageState extends State<EnterpriseBoardListPage> {
     enterpriseHubFactoryAreaOptions,
     _query.plantAreaRange,
   );
+
+  String? get _selectedSupplyCategoryLabel =>
+      enterpriseHubSupplierCategoryLabel(_query.supplyCategory);
+
+  bool _showSupplierCategoryRail(BuildContext context) =>
+      widget.boardType == EnterpriseBoardType.supplier &&
+      MediaQuery.sizeOf(context).width >= 375;
 
   @override
   void initState() {
@@ -301,6 +309,19 @@ class _EnterpriseBoardListPageState extends State<EnterpriseBoardListPage> {
     await _load();
   }
 
+  Future<void> _selectSupplyCategory(String? value) async {
+    setState(() {
+      _query = buildEnterpriseBoardListQuery(
+        boardType: widget.boardType,
+        current: _query,
+        supplyCategory: value,
+        clearSupplyCategory: value == null || value.isEmpty,
+        page: 1,
+      );
+    });
+    await _load();
+  }
+
   Future<void> _loadMore() async {
     final pagination = _listResult?.data?.pagination;
     if (pagination == null || !pagination.hasMore || _loadingMore) {
@@ -347,67 +368,144 @@ class _EnterpriseBoardListPageState extends State<EnterpriseBoardListPage> {
     );
   }
 
+  Future<void> _openSupplierCategoryPicker() async {
+    final picked = await showModalBottomSheet<String?>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: ListView(
+            shrinkWrap: true,
+            children: <Widget>[
+              const ListTile(title: Text('选择供应品类')),
+              ListTile(
+                title: const Text('全部'),
+                trailing: _query.supplyCategory == null
+                    ? const Icon(Icons.check_rounded)
+                    : null,
+                onTap: () => Navigator.of(context).pop(null),
+              ),
+              ...enterpriseHubSupplierCategoryOptions.map(
+                (MapEntry<String, String> option) => ListTile(
+                  title: Text(option.value),
+                  trailing: _query.supplyCategory == option.key
+                      ? const Icon(Icons.check_rounded)
+                      : null,
+                  onTap: () => Navigator.of(context).pop(option.key),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    if (!mounted) {
+      return;
+    }
+    await _selectSupplyCategory(picked);
+  }
+
+  List<Widget> _buildPageContentChildren({
+    required BuildContext context,
+    required EnterpriseHubListData? listData,
+  }) {
+    final showSupplierCategoryRail = _showSupplierCategoryRail(context);
+    return <Widget>[
+      EnterpriseListToolbarCard(
+        searchFieldVisible:
+            _searchFieldVisible || (_query.keyword?.trim().isNotEmpty ?? false),
+        searchField: EnterpriseInlineSearchField(
+          controller: _searchController,
+          focusNode: _searchFocusNode,
+          hintText: _surfaceSpec.searchHint,
+          onSubmitted: _applySearch,
+          onClear: _clearSearch,
+          onClose: _closeSearch,
+        ),
+        filterButtons: buildEnterpriseBoardFilterButtons(
+          boardType: widget.boardType,
+          surfaceSpec: _surfaceSpec,
+          selectedCityLabel: _selectedCityLabel,
+          selectedAreaLabel: _selectedAreaLabel,
+          selectedSupplyCategoryLabel: _selectedSupplyCategoryLabel,
+          cityFilterEnabled: _cityFilterEnabled,
+          onCityPressed: _openCityPicker,
+          onAreaSelected: _selectPlantArea,
+          onSupplyCategoryPressed:
+              widget.boardType == EnterpriseBoardType.supplier &&
+                  !showSupplierCategoryRail
+              ? _openSupplierCategoryPicker
+              : null,
+        ),
+        toolbarNoticeText: _effectiveCityFilterNotice,
+        resultSummaryText: enterpriseBoardListResultSummaryText(
+          boardType: widget.boardType,
+          result: _listResult,
+          loading: _loading,
+        ),
+      ),
+      if (_loading) ...<Widget>[
+        const SizedBox(height: 12),
+        const LinearProgressIndicator(minHeight: 2),
+      ],
+      const SizedBox(height: 16),
+      _buildListBody(listData?.items ?? const <EnterpriseHubListItem>[]),
+      if (listData != null) ...<Widget>[
+        const SizedBox(height: 16),
+        Center(
+          child: OutlinedButton(
+            onPressed: listData.pagination.hasMore && !_loadingMore
+                ? _loadMore
+                : null,
+            child: Text(
+              _loadingMore
+                  ? '加载中'
+                  : listData.pagination.hasMore
+                  ? '加载更多'
+                  : '没有更多了',
+            ),
+          ),
+        ),
+      ],
+    ];
+  }
+
   @override
   Widget build(BuildContext context) {
     final listData = _listResult?.data;
+    final contentChildren = _buildPageContentChildren(
+      context: context,
+      listData: listData,
+    );
+    final showSupplierCategoryRail = _showSupplierCategoryRail(context);
 
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
-        children: <Widget>[
-          EnterpriseListToolbarCard(
-            searchFieldVisible:
-                _searchFieldVisible ||
-                (_query.keyword?.trim().isNotEmpty ?? false),
-            searchField: EnterpriseInlineSearchField(
-              controller: _searchController,
-              focusNode: _searchFocusNode,
-              hintText: _surfaceSpec.searchHint,
-              onSubmitted: _applySearch,
-              onClear: _clearSearch,
-              onClose: _closeSearch,
-            ),
-            filterButtons: buildEnterpriseBoardFilterButtons(
-              boardType: widget.boardType,
-              surfaceSpec: _surfaceSpec,
-              selectedCityLabel: _selectedCityLabel,
-              selectedAreaLabel: _selectedAreaLabel,
-              cityFilterEnabled: _cityFilterEnabled,
-              onCityPressed: _openCityPicker,
-              onAreaSelected: _selectPlantArea,
-            ),
-            toolbarNoticeText: _effectiveCityFilterNotice,
-            resultSummaryText: enterpriseBoardListResultSummaryText(
-              boardType: widget.boardType,
-              result: _listResult,
-              loading: _loading,
-            ),
-          ),
-          if (_loading) ...<Widget>[
-            const SizedBox(height: 12),
-            const LinearProgressIndicator(minHeight: 2),
-          ],
-          const SizedBox(height: 16),
-          _buildListBody(listData?.items ?? const <EnterpriseHubListItem>[]),
-          if (listData != null) ...<Widget>[
-            const SizedBox(height: 16),
-            Center(
-              child: OutlinedButton(
-                onPressed: listData.pagination.hasMore && !_loadingMore
-                    ? _loadMore
-                    : null,
-                child: Text(
-                  _loadingMore
-                      ? '加载中'
-                      : listData.pagination.hasMore
-                      ? '加载更多'
-                      : '没有更多了',
+        children: showSupplierCategoryRail
+            ? <Widget>[
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    SizedBox(
+                      width: 104,
+                      child: EnterpriseSupplierCategoryRail(
+                        selectedCategory: _query.supplyCategory,
+                        onSelected: _selectSupplyCategory,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: contentChildren,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ),
-          ],
-        ],
+              ]
+            : contentChildren,
       ),
     );
   }

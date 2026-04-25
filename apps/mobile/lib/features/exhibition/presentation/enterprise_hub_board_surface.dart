@@ -33,7 +33,7 @@ EnterpriseBoardSurfaceSpec enterpriseBoardSurfaceSpec(
       plantAreaLabel: '厂房面积',
     ),
     EnterpriseBoardType.supplier => const EnterpriseBoardSurfaceSpec(
-      searchHint: '搜索供应商名称、物料品类、所在城市',
+      searchHint: '搜索供应商名称、供应品类、所在城市',
       cityFilterLabel: '城市',
     ),
   };
@@ -65,12 +65,14 @@ List<String> enterpriseBoardCardSummaryChips(EnterpriseHubListItem item) {
     case EnterpriseBoardType.factory:
       chips.addAll(_takeList(highlights['processTypes'], 1));
       chips.addAll(_takeList(highlights['coreProducts'], 1));
+      chips.addAll(
+        _singleChip('配送', _string(highlights['deliveryRadiusDesc'])),
+      );
       if (_bool(highlights['warehouseCapability']) == true) {
         chips.add('支持仓储');
       }
     case EnterpriseBoardType.supplier:
       chips.addAll(_takeList(highlights['supplyCategories'], 1));
-      chips.addAll(_takeList(highlights['supplyMode'], 1));
       chips.addAll(_singleChip('响应', _string(highlights['responseSlaDesc'])));
   }
 
@@ -104,7 +106,6 @@ String? enterpriseBoardCardSummaryText(EnterpriseHubListItem item) {
     ]),
     EnterpriseBoardType.supplier => _joinPieces(<String?>[
       _labelledList('品类', _list(highlights['supplyCategories']), maxItems: 99),
-      _labelledList('方式', _list(highlights['supplyMode']), maxItems: 99),
     ]),
   };
 
@@ -217,13 +218,6 @@ String? _labelledList(String label, List<String> values, {int maxItems = 2}) {
     return null;
   }
   return '$label：${values.take(maxItems).join(' / ')}';
-}
-
-String? _labelledValue(String label, String? value) {
-  if (value == null || value.isEmpty) {
-    return null;
-  }
-  return '$label：$value';
 }
 
 String? _joinPieces(List<String?> pieces) {

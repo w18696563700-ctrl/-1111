@@ -85,6 +85,54 @@ void main() {
   });
 
   test(
+    'supplier enterprise list sends canonical supplyCategory filter',
+    () async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/exhibition/enterprise-hub/supplier/enterprises':
+              (AppApiRequest request) async {
+                expect(request.uri.queryParameters['boardType'], isNull);
+                expect(
+                  request.uri.queryParameters['supplyCategory'],
+                  '桁架舞台搭建厂',
+                );
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'recommended': <Object?>[],
+                    'items': <Object?>[],
+                    'pagination': <String, Object?>{
+                      'page': 1,
+                      'pageSize': 10,
+                      'total': 0,
+                      'hasMore': false,
+                    },
+                  },
+                );
+              },
+        },
+      );
+      final consumer = EnterpriseHubConsumerLayer(
+        client: AppApiClient(transport: transport),
+      );
+
+      final result = await consumer.loadEnterprises(
+        const EnterpriseHubListQuery(
+          boardType: EnterpriseBoardType.supplier,
+          supplyCategory: '桁架舞台搭建厂',
+        ),
+      );
+
+      expect(result.state, AppPageState.empty);
+      expect(
+        result.path,
+        '/api/app/exhibition/enterprise-hub/supplier/enterprises',
+      );
+    },
+  );
+
+  test(
     'factory application draft create omits applyBoardType in body',
     () async {
       final transport = FakeAppApiTransport(

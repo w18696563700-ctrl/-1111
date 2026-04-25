@@ -64,6 +64,31 @@ class _TradingImParticipantCardSheetState
     });
   }
 
+  Future<void> _openQichacha(TradingImParticipantCardView data) async {
+    final keyword = _participantCardSearchKeyword(data);
+    if (keyword == null) {
+      _showMessage('当前合作方缺少可搜索的主体名称。');
+      return;
+    }
+    final url = Uri.https('www.qcc.com', '/web/search', <String, String>{
+      'key': keyword,
+    }).toString();
+    final opened = await launchUrlString(
+      url,
+      mode: LaunchMode.externalApplication,
+    );
+    if (!mounted || opened) {
+      return;
+    }
+    _showMessage('当前无法打开企查查，请稍后再试。');
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context)
+      ..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
+  }
+
   @override
   Widget build(BuildContext context) {
     final result = _result;
@@ -134,10 +159,10 @@ class _TradingImParticipantCardSheetState
                             child: data.enterpriseSummary.logoUrl == null
                                 ? Text(
                                     data.enterpriseSummary.displayName
-                                            .trim()
-                                            .characters
-                                            .first
-                                            .toUpperCase(),
+                                        .trim()
+                                        .characters
+                                        .first
+                                        .toUpperCase(),
                                   )
                                 : null,
                           ),
@@ -149,17 +174,23 @@ class _TradingImParticipantCardSheetState
                           highlight: true,
                         ),
                         _DetailLine(
-                          label: '企业类型',
-                          value: data.enterpriseSummary.primaryBoardType,
+                          label: '平台类型',
+                          value: _participantCardBoardTypeLabel(
+                            data.enterpriseSummary.primaryBoardType,
+                          ),
                         ),
                         _DetailLine(
                           label: '所在地区',
-                          value:
-                              '${data.enterpriseSummary.provinceName} / ${data.enterpriseSummary.cityName}',
+                          value: _participantCardLocationText(
+                            data.enterpriseSummary.provinceName,
+                            data.enterpriseSummary.cityName,
+                          ),
                         ),
                         _DetailLine(
                           label: '认证状态',
-                          value: data.enterpriseSummary.verificationStatus,
+                          value: _participantCardStatusLabel(
+                            data.enterpriseSummary.verificationStatus,
+                          ),
                         ),
                         _DetailLine(
                           label: '法定名称',
@@ -196,8 +227,10 @@ class _TradingImParticipantCardSheetState
                           value: data.formalInfoSummary.legalName,
                         ),
                         _DetailLine(
-                          label: '企业类型',
-                          value: data.formalInfoSummary.businessType ?? '未提供',
+                          label: '工商类型',
+                          value: _participantCardBusinessTypeText(
+                            data.formalInfoSummary.businessType,
+                          ),
                         ),
                         _DetailLine(
                           label: '注册资本',
@@ -210,7 +243,9 @@ class _TradingImParticipantCardSheetState
                         ),
                         _DetailLine(
                           label: '认证状态',
-                          value: data.formalInfoSummary.certificationStatus,
+                          value: _participantCardStatusLabel(
+                            data.formalInfoSummary.certificationStatus,
+                          ),
                         ),
                         _DetailLine(
                           label: '经营范围',
@@ -219,10 +254,14 @@ class _TradingImParticipantCardSheetState
                       ],
                     ),
                     const SizedBox(height: 16),
-                    const _ActionCard(
+                    _ActionCard(
                       title: '合作建议',
-                      summary: '合作前建议查看对方的企查查信息，并在平台内保留关键沟通记录。',
-                      children: <Widget>[],
+                      titleColor: const Color(0xFFB42318),
+                      children: <Widget>[
+                        _ParticipantAdviceText(
+                          onTapQichacha: () => _openQichacha(data),
+                        ),
+                      ],
                     ),
                   ],
                 ],
@@ -235,10 +274,115 @@ class _TradingImParticipantCardSheetState
   }
 }
 
-String _participantScoreText(TradingImParticipantReviewSummaryView reviewSummary) {
+String _participantScoreText(
+  TradingImParticipantReviewSummaryView reviewSummary,
+) {
   final avgScore = reviewSummary.avgScore;
   if (avgScore == null) {
     return '暂无';
   }
   return avgScore.toStringAsFixed(1);
+}
+
+String _participantCardBoardTypeLabel(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'supplier':
+      return '供应方';
+    case 'company':
+      return '公司';
+    case 'factory':
+      return '工厂';
+    case 'team':
+      return '团队';
+    default:
+      return value.trim().isEmpty ? '未提供' : value.trim();
+  }
+}
+
+String _participantCardStatusLabel(String value) {
+  switch (value.trim().toLowerCase()) {
+    case 'approved':
+    case 'verified':
+      return '认证通过';
+    case 'pending':
+      return '待审核';
+    case 'rejected':
+      return '未通过';
+    case 'draft':
+      return '未提交';
+    default:
+      return value.trim().isEmpty ? '未提供' : value.trim();
+  }
+}
+
+String _participantCardLocationText(String provinceName, String cityName) {
+  final province = _participantCardNormalizeText(provinceName);
+  final city = _participantCardNormalizeText(cityName);
+  final parts = <String>[
+    if (province != null) province,
+    if (city != null && city != province) city,
+  ];
+  return parts.isEmpty ? '未提供' : parts.join(' / ');
+}
+
+String _participantCardBusinessTypeText(String? value) {
+  final normalized = _participantCardNormalizeText(value);
+  return normalized ?? '未提供';
+}
+
+String? _participantCardSearchKeyword(TradingImParticipantCardView data) {
+  return _participantCardNormalizeText(data.formalInfoSummary.legalName) ??
+      _participantCardNormalizeText(data.enterpriseSummary.displayName);
+}
+
+String? _participantCardNormalizeText(String? value) {
+  final normalized = value?.trim();
+  if (normalized == null || normalized.isEmpty || normalized == '未提供') {
+    return null;
+  }
+  return normalized;
+}
+
+class _ParticipantAdviceText extends StatelessWidget {
+  const _ParticipantAdviceText({required this.onTapQichacha});
+
+  final VoidCallback onTapQichacha;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    const warningColor = Color(0xFFB42318);
+    final textStyle = theme.textTheme.bodyLarge?.copyWith(
+      color: theme.colorScheme.onSurface,
+      fontWeight: FontWeight.w600,
+      height: 1.5,
+      fontSize: 15,
+    );
+    final linkStyle = textStyle?.copyWith(
+      color: warningColor,
+      decoration: TextDecoration.underline,
+      fontWeight: FontWeight.w800,
+      fontSize: 16,
+    );
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Wrap(
+          spacing: 0,
+          runSpacing: 2,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          children: <Widget>[
+            Text('合作前建议先查看对方的', style: textStyle),
+            GestureDetector(
+              onTap: onTapQichacha,
+              child: Text('企查查', style: linkStyle),
+            ),
+            Text('信息，', style: textStyle),
+          ],
+        ),
+        const SizedBox(height: 2),
+        Text('并在平台内保留关键沟通证据记录。', style: textStyle),
+      ],
+    );
+  }
 }

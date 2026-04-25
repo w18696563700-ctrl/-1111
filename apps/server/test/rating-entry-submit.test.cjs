@@ -195,6 +195,7 @@ test('E5 rating submit triggers shadow recompute for supplier organization witho
   });
   assert.equal(shadowCalls.length, 1);
   assert.equal(shadowCalls[0].organizationId, 'supplier-org');
+  assert.equal(shadowCalls[0].sourceType, 'order_rating');
   assert.equal(shadowCalls[0].sourceOrderId, 'order-1');
   assert.equal(shadowCalls[0].sourceRatingId, 'rating-1');
   assert.ok(shadowCalls[0].triggeredAt instanceof Date);
