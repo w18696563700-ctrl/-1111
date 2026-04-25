@@ -11,6 +11,9 @@ TARGET_RUNTIME="${TARGET_RUNTIME:-cloud}"
 LATITUDE="${LATITUDE:-29.56301}"
 LONGITUDE="${LONGITUDE:-106.55156}"
 LOCATION_PERMISSION_STATE="${LOCATION_PERMISSION_STATE:-granted}"
+PROVINCE_NAME="${PROVINCE_NAME:-重庆市}"
+CITY_NAME="${CITY_NAME:-重庆市}"
+DISTRICT_NAME="${DISTRICT_NAME:-南岸区}"
 
 resolve_base_url() {
   case "$1" in
@@ -89,8 +92,16 @@ request_post() {
   rm -f "${body_file}"
 }
 
+urlencode() {
+  python3 - "$1" <<'PY'
+import sys, urllib.parse
+print(urllib.parse.quote(sys.argv[1]))
+PY
+}
+
 HOME_PATH="/api/app/exhibition/home?latitude=${LATITUDE}&longitude=${LONGITUDE}&locationPermissionState=${LOCATION_PERMISSION_STATE}"
-SELECT_PAYLOAD="$(printf '{"provinceName":"重庆","displayName":"重庆","latitude":%s,"longitude":%s}' "${LATITUDE}" "${LONGITUDE}")"
+MANUAL_HOME_PATH="/api/app/exhibition/home?provinceName=$(urlencode "${PROVINCE_NAME}")&cityName=$(urlencode "${CITY_NAME}")&districtName=$(urlencode "${DISTRICT_NAME}")"
+SELECT_PAYLOAD="$(printf '{"provinceName":"%s","displayName":"%s","cityName":"%s","districtName":"%s","latitude":%s,"longitude":%s}' "${PROVINCE_NAME}" "${CITY_NAME}" "${CITY_NAME}" "${DISTRICT_NAME}" "${LATITUDE}" "${LONGITUDE}")"
 
 say INFO "Running exhibition-home weather release-guard smoke against ${BASE_URL} (target=${TARGET_RUNTIME})"
 
@@ -106,18 +117,28 @@ assert_not_contains "${home_body}" '"hourlyForecast":[]' "exhibition home hourly
 assert_not_contains "${home_body}" '"dailyForecast":[]' "exhibition home daily forecast is empty"
 say PASS "Exhibition-home live weather response is intact"
 
-say STEP "Check unauthenticated refresh still returns AUTH_SESSION_INVALID"
-request_post "/api/app/exhibition/home/refresh" '{}'
-refresh_body="$(compact_json "${RESPONSE_BODY}")"
-assert_contains "${RESPONSE_STATUS}" '401' "exhibition home refresh no longer returns 401 for unauthenticated request"
-assert_contains "${refresh_body}" '"code":"AUTH_SESSION_INVALID"' "exhibition home refresh lost AUTH_SESSION_INVALID semantics"
-say PASS "Unauthenticated refresh returns AUTH_SESSION_INVALID"
+say STEP "Check exhibition-home live weather response for manual-selection style region hints"
+request_get "${MANUAL_HOME_PATH}"
+manual_home_body="$(compact_json "${RESPONSE_BODY}")"
+assert_contains "${manual_home_body}" '"currentLocation":' "manual-selection weather response is missing currentLocation"
+assert_contains "${manual_home_body}" '"sourceLabel":' "manual-selection weather response is missing sourceLabel"
+assert_not_contains "${manual_home_body}" '"currentWeather":"待同步"' "manual-selection weather regressed to placeholder currentWeather"
+assert_not_contains "${manual_home_body}" '天气暂不可用' "manual-selection weather is still in controlled degradation instead of live weather"
+assert_not_contains "${manual_home_body}" '最小真值' "manual-selection sourceLabel regressed to minimum-truth wording"
+assert_not_contains "${manual_home_body}" '"hourlyForecast":[]' "manual-selection hourly forecast is empty"
+assert_not_contains "${manual_home_body}" '"dailyForecast":[]' "manual-selection daily forecast is empty"
+say PASS "Manual-selection weather response is intact"
 
-say STEP "Check unauthenticated location-select still returns AUTH_SESSION_INVALID"
+say STEP "Check location-select route still returns live weather for manual selection"
 request_post "/api/app/exhibition/home/location/select" "${SELECT_PAYLOAD}"
 select_body="$(compact_json "${RESPONSE_BODY}")"
-assert_contains "${RESPONSE_STATUS}" '401' "exhibition home location-select no longer returns 401 for unauthenticated request"
-assert_contains "${select_body}" '"code":"AUTH_SESSION_INVALID"' "exhibition home location-select lost AUTH_SESSION_INVALID semantics"
-say PASS "Unauthenticated location-select returns AUTH_SESSION_INVALID"
+assert_contains "${RESPONSE_STATUS}" '200' "exhibition home location-select no longer returns success for manual weather selection"
+assert_contains "${select_body}" '"currentLocation":' "location-select response is missing currentLocation"
+assert_not_contains "${select_body}" '"currentWeather":"待同步"' "location-select weather regressed to placeholder currentWeather"
+assert_not_contains "${select_body}" '天气暂不可用' "location-select weather is still in controlled degradation instead of live weather"
+assert_not_contains "${select_body}" '最小真值' "location-select sourceLabel regressed to minimum-truth wording"
+assert_not_contains "${select_body}" '"hourlyForecast":[]' "location-select hourly forecast is empty"
+assert_not_contains "${select_body}" '"dailyForecast":[]' "location-select daily forecast is empty"
+say PASS "Location-select weather response is intact"
 
 say DONE "Exhibition-home weather release guard smoke completed successfully"

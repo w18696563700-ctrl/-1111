@@ -79,6 +79,9 @@ test('server runtime guard rejects production implicit postgres fallback', async
       UPLOAD_BUCKET: 'exhibition-uploads',
       UPLOAD_S3_ACCESS_KEY_ID: 'minioadmin',
       UPLOAD_S3_SECRET_ACCESS_KEY: 'minioadmin',
+      QWEATHER_ENABLED: 'true',
+      QWEATHER_API_HOST: 'https://weather.example.com',
+      QWEATHER_API_KEY: 'weather-key',
     },
     async () => {
       const { RuntimeConfigService } = require('../dist/core/runtime-config.service.js');
@@ -111,6 +114,9 @@ test('server runtime guard allows explicit cloud loopback internals in productio
       UPLOAD_BUCKET: 'exhibition-uploads',
       UPLOAD_S3_ACCESS_KEY_ID: 'minioadmin',
       UPLOAD_S3_SECRET_ACCESS_KEY: 'minioadmin',
+      QWEATHER_ENABLED: 'true',
+      QWEATHER_API_HOST: 'https://weather.example.com',
+      QWEATHER_API_KEY: 'weather-key',
     },
     async () => {
       const { RuntimeConfigService } = require('../dist/core/runtime-config.service.js');
@@ -120,6 +126,92 @@ test('server runtime guard allows explicit cloud loopback internals in productio
 
       assert.doesNotThrow(() =>
         assertServerRuntimeBoundary(new RuntimeConfigService(), createLogger()),
+      );
+    },
+  );
+});
+
+test('server runtime guard rejects weather runtime when QWEATHER_ENABLED is missing in strict runtime', async () => {
+  await withEnv(
+    {
+      NODE_ENV: 'production',
+      APP_NAME: 'exhibition-server',
+      RUNTIME_ENTRY_LABEL: 'cloud-host',
+      POSTGRES_HOST: '127.0.0.1',
+      POSTGRES_DB: 'exhibition_app',
+      POSTGRES_USER: 'exhibition',
+      POSTGRES_PASSWORD: 'secret',
+      REDIS_ENABLED: 'true',
+      REDIS_HOST: '127.0.0.1',
+      UPLOAD_S3_ENDPOINT: 'http://127.0.0.1:9000',
+      UPLOAD_S3_PUBLIC_ENDPOINT: 'https://assets.example.com',
+      UPLOAD_BUCKET: 'exhibition-uploads',
+      UPLOAD_S3_ACCESS_KEY_ID: 'minioadmin',
+      UPLOAD_S3_SECRET_ACCESS_KEY: 'minioadmin',
+      QWEATHER_ENABLED: undefined,
+      QWEATHER_API_HOST: 'https://weather.example.com',
+      QWEATHER_API_KEY: 'weather-key',
+    },
+    async () => {
+      await withArtifactTree(
+        createWeatherArtifactFiles('exports.currentWeather = "小雨"; exports.sourceLabel = "真实天气";'),
+        async (artifactRoot) => {
+          const { RuntimeConfigService } = require('../dist/core/runtime-config.service.js');
+          const {
+            assertServerRuntimeBoundary,
+          } = require('../dist/core/runtime-startup.guard.js');
+
+          assert.throws(
+            () =>
+              assertServerRuntimeBoundary(new RuntimeConfigService(), createLogger(), {
+                artifactRootOverride: artifactRoot,
+              }),
+            /QWEATHER_ENABLED/,
+          );
+        },
+      );
+    },
+  );
+});
+
+test('server runtime guard rejects weather runtime when QWEATHER_ENABLED is explicitly false', async () => {
+  await withEnv(
+    {
+      NODE_ENV: 'production',
+      APP_NAME: 'exhibition-server',
+      RUNTIME_ENTRY_LABEL: 'cloud-host',
+      POSTGRES_HOST: '127.0.0.1',
+      POSTGRES_DB: 'exhibition_app',
+      POSTGRES_USER: 'exhibition',
+      POSTGRES_PASSWORD: 'secret',
+      REDIS_ENABLED: 'true',
+      REDIS_HOST: '127.0.0.1',
+      UPLOAD_S3_ENDPOINT: 'http://127.0.0.1:9000',
+      UPLOAD_S3_PUBLIC_ENDPOINT: 'https://assets.example.com',
+      UPLOAD_BUCKET: 'exhibition-uploads',
+      UPLOAD_S3_ACCESS_KEY_ID: 'minioadmin',
+      UPLOAD_S3_SECRET_ACCESS_KEY: 'minioadmin',
+      QWEATHER_ENABLED: 'false',
+      QWEATHER_API_HOST: 'https://weather.example.com',
+      QWEATHER_API_KEY: 'weather-key',
+    },
+    async () => {
+      await withArtifactTree(
+        createWeatherArtifactFiles('exports.currentWeather = "小雨"; exports.sourceLabel = "真实天气";'),
+        async (artifactRoot) => {
+          const { RuntimeConfigService } = require('../dist/core/runtime-config.service.js');
+          const {
+            assertServerRuntimeBoundary,
+          } = require('../dist/core/runtime-startup.guard.js');
+
+          assert.throws(
+            () =>
+              assertServerRuntimeBoundary(new RuntimeConfigService(), createLogger(), {
+                artifactRootOverride: artifactRoot,
+              }),
+            /must remain true/,
+          );
+        },
       );
     },
   );

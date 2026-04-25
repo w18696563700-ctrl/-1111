@@ -78,7 +78,7 @@ function assertWeatherReleaseIntegrity(
   strictRuntime: boolean,
   options?: ServerRuntimeBoundaryOptions,
 ) {
-  if (!strictRuntime || !config.qweatherEnabled) {
+  if (!strictRuntime) {
     return;
   }
 
@@ -91,6 +91,21 @@ function assertWeatherReleaseIntegrity(
     throw new Error(
       'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
         `because weather release artifacts are missing: ${missingArtifacts.join(', ')}.`,
+    );
+  }
+
+  const explicitQweatherEnabled = readExplicitEnv('QWEATHER_ENABLED');
+  if (!explicitQweatherEnabled) {
+    throw new Error(
+      'Refusing to start compiled/production Server with the admitted weather release chain ' +
+        'because QWEATHER_ENABLED is not explicitly set in the active runtime environment.',
+    );
+  }
+
+  if (!config.qweatherEnabled) {
+    throw new Error(
+      'Refusing to start compiled/production Server with the admitted weather release chain ' +
+        'because QWEATHER_ENABLED must remain true for live weather runtime.',
     );
   }
 
@@ -121,6 +136,20 @@ function assertWeatherReleaseIntegrity(
     throw new Error(
       'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
         `because compiled exhibition-home presenter still contains placeholder marker "${placeholderMarker}".`,
+    );
+  }
+
+  if (!readExplicitEnv('QWEATHER_API_HOST')) {
+    throw new Error(
+      'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
+        'because QWEATHER_API_HOST is missing from the active runtime environment.',
+    );
+  }
+
+  if (!readExplicitEnv('QWEATHER_API_KEY')) {
+    throw new Error(
+      'Refusing to start compiled/production Server with QWEATHER_ENABLED=true ' +
+        'because QWEATHER_API_KEY is missing from the active runtime environment.',
     );
   }
 }
@@ -190,6 +219,9 @@ export function assertServerRuntimeBoundary(
     if (!readExplicitEnv('UPLOAD_S3_ENDPOINT')) missing.push('UPLOAD_S3_ENDPOINT');
     if (!config.isIsolatedRuntime && !readExplicitEnv('UPLOAD_S3_PUBLIC_ENDPOINT')) {
       missing.push('UPLOAD_S3_PUBLIC_ENDPOINT');
+    }
+    if (!readExplicitEnv('QWEATHER_ENABLED')) {
+      missing.push('QWEATHER_ENABLED');
     }
     if (config.qweatherEnabled && !readExplicitEnv('QWEATHER_API_HOST')) {
       missing.push('QWEATHER_API_HOST');
