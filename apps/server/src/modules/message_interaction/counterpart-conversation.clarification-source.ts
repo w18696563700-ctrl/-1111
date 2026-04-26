@@ -11,6 +11,7 @@ import {
   trimConversationText,
 } from './counterpart-conversation.support';
 import { CounterpartConversationAvatarService } from './counterpart-conversation-avatar.service';
+import { CounterpartConversationDisplayNameService } from './counterpart-conversation-display-name.service';
 import {
   CounterpartConversationCardSeed,
   CounterpartConversationCardSource,
@@ -32,6 +33,7 @@ export class CounterpartConversationClarificationSource
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly avatarService: CounterpartConversationAvatarService,
+    private readonly displayNameService: CounterpartConversationDisplayNameService,
   ) {}
 
   async buildSeeds(viewerOrganizationId: string) {
@@ -128,15 +130,21 @@ export class CounterpartConversationClarificationSource
       }
     }
     if (!organizationIds.size) {
-      return { organizationMap: new Map<string, OrganizationEntity>(), userMap: new Map<string, UserEntity>() };
+      return {
+        organizationMap: new Map<string, OrganizationEntity>(),
+        userMap: new Map<string, UserEntity>(),
+        approvedLegalNameByOrganizationId: new Map<string, string>(),
+      };
     }
-    const [organizations, users] = await Promise.all([
+    const [organizations, users, approvedLegalNameByOrganizationId] = await Promise.all([
       this.organizationRepository.findBy({ id: In([...organizationIds]) }),
       userIds.size ? this.userRepository.findBy({ id: In([...userIds]) }) : Promise.resolve([]),
+      this.displayNameService.loadApprovedLegalNameMap(organizationIds),
     ]);
     return {
       organizationMap: new Map(organizations.map((item) => [item.id, item])),
       userMap: new Map(users.map((item) => [item.id, item])),
+      approvedLegalNameByOrganizationId,
     };
   }
 
@@ -221,13 +229,14 @@ export class CounterpartConversationClarificationSource
     counterpart: Awaited<ReturnType<CounterpartConversationClarificationSource['loadCounterpartContext']>>,
   ) {
     const counterpartUser = userId ? counterpart.userMap.get(userId) : null;
-    const counterpartOrganization = counterpart.organizationMap.get(organizationId);
     return {
       counterpartOrganizationId: organizationId,
-      counterpartDisplayName:
-        counterpartUser?.nickname?.trim() ||
-        counterpartOrganization?.name?.trim() ||
-        '当前沟通对象',
+      counterpartDisplayName: this.displayNameService.resolveDisplayName({
+        organizationId,
+        organizationMap: counterpart.organizationMap,
+        approvedLegalNameByOrganizationId:
+          counterpart.approvedLegalNameByOrganizationId,
+      }),
       counterpartAvatarUrl: await this.avatarService.readAvatarUrl(
         counterpartUser?.avatarUrl ?? null,
       ),

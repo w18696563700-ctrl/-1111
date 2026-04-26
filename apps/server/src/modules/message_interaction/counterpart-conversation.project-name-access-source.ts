@@ -10,6 +10,7 @@ import {
   buildProjectNameAccessThreadSummary,
 } from '../project_name_access/project-name-access.support';
 import { CounterpartConversationAvatarService } from './counterpart-conversation-avatar.service';
+import { CounterpartConversationDisplayNameService } from './counterpart-conversation-display-name.service';
 import {
   CounterpartConversationCardSeed,
   CounterpartConversationCardSource,
@@ -29,6 +30,7 @@ export class CounterpartConversationProjectNameAccessSource
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly avatarService: CounterpartConversationAvatarService,
+    private readonly displayNameService: CounterpartConversationDisplayNameService,
   ) {}
 
   async buildSeeds(viewerOrganizationId: string) {
@@ -98,13 +100,15 @@ export class CounterpartConversationProjectNameAccessSource
         userIds.add(userId);
       }
     }
-    const [organizations, users] = await Promise.all([
+    const [organizations, users, approvedLegalNameByOrganizationId] = await Promise.all([
       this.organizationRepository.findBy({ id: In([...organizationIds]) }),
       userIds.size ? this.userRepository.findBy({ id: In([...userIds]) }) : Promise.resolve([]),
+      this.displayNameService.loadApprovedLegalNameMap(organizationIds),
     ]);
     return {
       organizationMap: new Map(organizations.map((item) => [item.id, item])),
       userMap: new Map(users.map((item) => [item.id, item])),
+      approvedLegalNameByOrganizationId,
     };
   }
 
@@ -128,15 +132,15 @@ export class CounterpartConversationProjectNameAccessSource
     const counterpartUser = counterpartUserId
       ? input.counterpart.userMap.get(counterpartUserId)
       : null;
-    const counterpartOrganization =
-      input.counterpart.organizationMap.get(counterpartOrganizationId);
-    const counterpartDisplayName =
-      counterpartUser?.nickname?.trim() ||
-      counterpartOrganization?.name?.trim() ||
-      '当前沟通对象';
+    const counterpartDisplayName = this.displayNameService.resolveDisplayName({
+      organizationId: counterpartOrganizationId,
+      organizationMap: input.counterpart.organizationMap,
+      approvedLegalNameByOrganizationId:
+        input.counterpart.approvedLegalNameByOrganizationId,
+    });
     const requesterOrganizationName =
       input.request.requesterOrganizationId === counterpartOrganizationId
-        ? counterpartOrganization?.name?.trim() || counterpartDisplayName
+        ? counterpartDisplayName
         : '当前申请组织';
     const updatedAt = (
       input.request.reviewedAt ??

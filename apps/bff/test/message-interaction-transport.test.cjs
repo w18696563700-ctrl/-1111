@@ -46,7 +46,38 @@ test("message interactions route is materialized and no longer router 404 locall
       calls.push(lane ?? null);
       return {
         lane: lane ?? "project_communication",
-        items: [],
+        items: [
+          {
+            interactionId: "org-1",
+            interactionType: "counterpart_conversation",
+            conversationId: "org-1",
+            projectId: "project-1",
+            counterpart: {
+              organizationId: "org-1",
+              displayName: "重庆海川展览工厂",
+              avatarUrl: null,
+              role: "counterpart",
+            },
+            summary: {
+              focusProjectId: "project-1",
+              title: "项目名称查看申请",
+              text: "重庆海川展览工厂 申请查看当前项目名称。",
+              projectCount: 1,
+              latestCardType: "project_name_access_request",
+            },
+            updatedAt: "2026-04-29T10:00:00.000Z",
+            routeTarget: {
+              objectType: "counterpart_conversation",
+              actionKey: "counterpart_conversation.open",
+              canonicalPath:
+                "/api/app/message/counterpart-conversation/detail",
+              params: {
+                conversationId: "org-1",
+                projectId: "project-1",
+              },
+            },
+          },
+        ],
       };
     },
     getCounterpartConversationDetail(conversationId, projectId) {
@@ -173,7 +204,37 @@ test("message interactions route is materialized and no longer router 404 locall
     assert.equal(response.status, 200);
     assert.deepEqual(await response.json(), {
       lane: "project_communication",
-      items: [],
+      items: [
+        {
+          interactionId: "org-1",
+          interactionType: "counterpart_conversation",
+          conversationId: "org-1",
+          projectId: "project-1",
+          counterpart: {
+            organizationId: "org-1",
+            displayName: "重庆海川展览工厂",
+            avatarUrl: null,
+            role: "counterpart",
+          },
+          summary: {
+            focusProjectId: "project-1",
+            title: "项目名称查看申请",
+            text: "重庆海川展览工厂 申请查看当前项目名称。",
+            projectCount: 1,
+            latestCardType: "project_name_access_request",
+          },
+          updatedAt: "2026-04-29T10:00:00.000Z",
+          routeTarget: {
+            objectType: "counterpart_conversation",
+            actionKey: "counterpart_conversation.open",
+            canonicalPath: "/api/app/message/counterpart-conversation/detail",
+            params: {
+              conversationId: "org-1",
+              projectId: "project-1",
+            },
+          },
+        },
+      ],
     });
 
     const detailResponse = await fetch(
@@ -391,6 +452,79 @@ test("message interactions service forwards frozen server path and hides raw rou
       return true;
     },
   );
+});
+
+test("message interactions service preserves counterpart displayName shape without name ownership", async () => {
+  const service = new MessageInteractionService(
+    {
+      async get(pathName, options) {
+        assert.equal(pathName, "/server/message/interactions");
+        assert.deepEqual(options.params, { lane: "project_communication" });
+        return {
+          lane: "project_communication",
+          items: [
+            {
+              interactionId: "org-certified",
+              interactionType: "counterpart_conversation",
+              conversationId: "org-certified",
+              projectId: "project-1",
+              counterpart: {
+                organizationId: "org-certified",
+                displayName: "重庆海川展览展示有限公司",
+                legalName: "BFF 不应读取这个字段",
+                certifiedCompanyName: "BFF 不应新增这个字段",
+                nickname: "BFF 不应回退到昵称",
+                avatarUrl: null,
+                role: "counterpart",
+              },
+              summary: {
+                focusProjectId: "project-1",
+                title: "新的竞标已提交",
+                text: "重庆海川展览展示有限公司 已对当前项目提交竞标。",
+                projectCount: 1,
+                latestCardType: "bid_thread",
+              },
+              updatedAt: "2026-04-29T10:00:00.000Z",
+              routeTarget: {
+                objectType: "counterpart_conversation",
+                actionKey: "counterpart_conversation.open",
+                canonicalPath:
+                  "/api/app/message/counterpart-conversation/detail",
+                params: {
+                  conversationId: "org-certified",
+                  projectId: "project-1",
+                },
+              },
+            },
+          ],
+        };
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {
+          authorization: "Bearer token",
+          "x-organization-id": "org-1",
+          "x-actor-role": "supplier_admin",
+        };
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  const result = await service.getInteractions(undefined, {});
+  assert.deepEqual(Object.keys(result.items[0].counterpart).sort(), [
+    "avatarUrl",
+    "displayName",
+    "organizationId",
+    "role",
+  ]);
+  assert.deepEqual(result.items[0].counterpart, {
+    organizationId: "org-certified",
+    displayName: "重庆海川展览展示有限公司",
+    avatarUrl: null,
+    role: "counterpart",
+  });
 });
 
 test("counterpart conversation detail service forwards frozen server path and hides raw route drift", async () => {

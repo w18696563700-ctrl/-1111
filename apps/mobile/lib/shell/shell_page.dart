@@ -121,6 +121,7 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
 
     return AppShellScaffold(
       currentBuilding: _currentBuilding,
+      titleOverride: _currentBuilding == AppBuilding.messages ? '互动中心' : null,
       onBuildingSelected: _selectBuilding,
       showStageBanner: _currentBuilding != AppBuilding.exhibition,
       child: body,

@@ -21,6 +21,45 @@ function createContext(requestId) {
   };
 }
 
+function createDisplayNameService(certifications = []) {
+  const {
+    CounterpartConversationDisplayNameService,
+  } = require('../dist/modules/message_interaction/counterpart-conversation-display-name.service.js');
+  return new CounterpartConversationDisplayNameService({
+    async find() {
+      return certifications;
+    },
+  });
+}
+
+function createProjectNameAccessRequestRepository(requests) {
+  return {
+    createQueryBuilder() {
+      const builder = {
+        innerJoin() {
+          return builder;
+        },
+        where() {
+          return builder;
+        },
+        orWhere() {
+          return builder;
+        },
+        orderBy() {
+          return builder;
+        },
+        addOrderBy() {
+          return builder;
+        },
+        async getMany() {
+          return requests;
+        },
+      };
+      return builder;
+    },
+  };
+}
+
 test('my bids list returns controlled empty list when current bidder scope has no bids', async () => {
   const { MyBidQueryService } = require('../dist/modules/my_bid/my-bid.query.service.js');
   const service = new MyBidQueryService(
@@ -96,6 +135,243 @@ test('my bids list returns controlled empty list when current bidder scope has n
 
   const result = await service.listMyBids(undefined, createContext('my-bids-empty'));
   assert.deepEqual(result, { items: [] });
+});
+
+test('bid-thread counterpart displayName uses approved certification legalName first', async () => {
+  const {
+    CounterpartConversationBidThreadSource,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.bid-thread-source.js');
+  const submittedAt = new Date('2026-04-24T08:00:00.000Z');
+  const updatedAt = new Date('2026-04-24T08:05:00.000Z');
+  const source = new CounterpartConversationBidThreadSource(
+    {
+      async find() {
+        return [
+          {
+            id: 'thread-1',
+            projectId: 'project-1',
+            bidId: 'bid-1',
+            updatedAt,
+            lifecycleState: 'active',
+          },
+        ];
+      },
+    },
+    {
+      async find() {
+        return [];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'bid-1',
+            projectId: 'project-1',
+            bidderOrganizationId: 'org-bidder',
+            organizationId: 'org-bidder',
+            userId: 'user-bidder',
+            submittedBy: '提交人昵称',
+            submittedAt,
+          },
+        ];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'project-1',
+            organizationId: 'org-owner',
+            creatorUserId: 'user-owner',
+          },
+        ];
+      },
+    },
+    {
+      async find() {
+        return [];
+      },
+    },
+    {
+      async find() {
+        return [];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'org-bidder', name: '海川组织简称' }];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'user-bidder',
+            nickname: '江北嘴嘴帅',
+            avatarUrl: null,
+          },
+        ];
+      },
+    },
+    {
+      async readAvatarUrl() {
+        return null;
+      },
+    },
+    createDisplayNameService([
+      {
+        organizationId: 'org-bidder',
+        legalName: '重庆海川展览展示有限公司',
+      },
+    ]),
+  );
+
+  const seeds = await source.buildSeeds('org-owner');
+  assert.equal(seeds.length, 1);
+  assert.equal(seeds[0].counterpartDisplayName, '重庆海川展览展示有限公司');
+  assert.equal(
+    seeds[0].card.summary,
+    '重庆海川展览展示有限公司 已对当前项目提交竞标。',
+  );
+});
+
+test('project-name-access counterpart displayName falls back to organization name', async () => {
+  const {
+    CounterpartConversationProjectNameAccessSource,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.project-name-access-source.js');
+  const now = new Date('2026-04-24T08:00:00.000Z');
+  const source = new CounterpartConversationProjectNameAccessSource(
+    createProjectNameAccessRequestRepository([
+      {
+        id: 'request-1',
+        projectId: 'project-1',
+        requesterOrganizationId: 'org-requester',
+        requestedByUserId: 'user-requester',
+        state: 'pending',
+        createdAt: now,
+        updatedAt: now,
+        reviewedAt: null,
+      },
+    ]),
+    {
+      async findBy() {
+        return [
+          {
+            id: 'project-1',
+            organizationId: 'org-owner',
+            creatorUserId: 'user-owner',
+            state: 'published',
+            publishedAt: now,
+          },
+        ];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'org-requester', name: '海川组织简称' }];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'user-requester',
+            nickname: '申请人昵称',
+            avatarUrl: null,
+          },
+        ];
+      },
+    },
+    {
+      async readAvatarUrl() {
+        return null;
+      },
+    },
+    createDisplayNameService(),
+  );
+
+  const seeds = await source.buildSeeds('org-owner');
+  assert.equal(seeds.length, 1);
+  assert.equal(seeds[0].counterpartDisplayName, '海川组织简称');
+  assert.match(seeds[0].card.summary, /海川组织简称/);
+});
+
+test('clarification counterpart displayName uses approved certification legalName first', async () => {
+  const {
+    CounterpartConversationClarificationSource,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.clarification-source.js');
+  const now = new Date('2026-04-24T08:00:00.000Z');
+  const project = {
+    id: 'project-1',
+    organizationId: 'org-owner',
+    creatorUserId: 'user-owner',
+    state: 'published',
+    publishedAt: now,
+  };
+  const source = new CounterpartConversationClarificationSource(
+    {
+      async find() {
+        return [];
+      },
+    },
+    {
+      async find() {
+        return [project];
+      },
+      async findBy() {
+        return [project];
+      },
+    },
+    {
+      async find() {
+        return [
+          {
+            id: 'clarification-1',
+            projectId: 'project-1',
+            authorOrganizationId: 'org-supplier',
+            authorUserId: 'user-supplier',
+            body: '请确认进场时间。',
+            lifecycleState: 'active',
+            createdAt: now,
+            updatedAt: now,
+          },
+        ];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'org-supplier', name: '供应商组织简称' }];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'user-supplier',
+            nickname: '供应商昵称',
+            avatarUrl: null,
+          },
+        ];
+      },
+    },
+    {
+      async readAvatarUrl() {
+        return null;
+      },
+    },
+    createDisplayNameService([
+      {
+        organizationId: 'org-supplier',
+        legalName: '重庆供应商认证公司',
+      },
+    ]),
+  );
+
+  const seeds = await source.buildSeeds('org-owner');
+  assert.equal(seeds.length, 1);
+  assert.equal(seeds[0].counterpartDisplayName, '重庆供应商认证公司');
+  assert.equal(seeds[0].card.cardType, 'project_clarification');
 });
 
 test('message interactions list returns project communication lane and empty items when no admitted interaction exists', async () => {

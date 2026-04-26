@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
+import { OrganizationCertificationEntity } from '../organization/entities/organization-certification.entity';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
 import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
@@ -15,6 +16,7 @@ import { BidPrivateThreadEntity } from '../trading_im/entities/bid-private-threa
 import { ProjectClarificationEntity } from '../trading_im/entities/project-clarification.entity';
 import { UploadModule } from '../upload/upload.module';
 import { CounterpartConversationAvatarService } from './counterpart-conversation-avatar.service';
+import { CounterpartConversationDisplayNameService } from './counterpart-conversation-display-name.service';
 import { CounterpartConversationBidThreadSource } from './counterpart-conversation.bid-thread-source';
 import { CounterpartConversationClarificationSource } from './counterpart-conversation.clarification-source';
 import { CounterpartConversationProjectionService } from './counterpart-conversation.projection.service';
@@ -34,6 +36,7 @@ import { MessageInteractionQueryService } from './message-interaction.query.serv
       InquiryQuoteDepositEntity,
       ProjectNameAccessRequestEntity,
       ProjectClarificationEntity,
+      OrganizationCertificationEntity,
       OrganizationEntity,
       UserEntity,
     ]),
@@ -45,6 +48,7 @@ import { MessageInteractionQueryService } from './message-interaction.query.serv
   controllers: [MessageInteractionController],
   providers: [
     CounterpartConversationAvatarService,
+    CounterpartConversationDisplayNameService,
     CounterpartConversationBidThreadSource,
     CounterpartConversationClarificationSource,
     CounterpartConversationProjectionService,

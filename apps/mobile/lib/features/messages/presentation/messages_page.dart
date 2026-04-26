@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
-import 'package:mobile/features/exhibition/data/p0_pay_read_only_summary.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
@@ -143,22 +142,8 @@ class _MessagesPageState extends State<MessagesPage> {
       onRefresh: _refreshAll,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: <Widget>[
-          Text(
-            '互动中心',
-            style: Theme.of(
-              context,
-            ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 10),
-          Text(
-            '这里集中查看别人对你的回复、点赞、关注，以及项目沟通会话。',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(height: 1.45),
-          ),
-          const SizedBox(height: 16),
           if (_projectCommunicationLoading ||
               _projectCommunicationResult != null) ...<Widget>[
             _MessagesProjectCommunicationSection(
@@ -168,9 +153,9 @@ class _MessagesPageState extends State<MessagesPage> {
               onOpen: (MessageInteractionItemView item) =>
                   _openProjectCommunication(context, item),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
           ],
-          _MessagesInboxTabBar(
+          _MessagesForumInteractionSection(
             selectedTab: _selectedTab,
             onSelectTab: (_MessagesInteractionTab tab) {
               if (tab == _selectedTab) {
@@ -179,34 +164,14 @@ class _MessagesPageState extends State<MessagesPage> {
               setState(() => _selectedTab = tab);
               _load();
             },
+            loading: _loading,
+            state: state,
+            message: result?.message,
+            items: items,
+            onRetry: _load,
+            onOpenSource: (ForumInteractionInboxItemView item) =>
+                _openSource(context, item),
           ),
-          const SizedBox(height: 12),
-          _MessagesTabHintCard(currentTab: _selectedTab),
-          const SizedBox(height: 16),
-          if (_loading || (state != null && state != AppPageState.content))
-            _MessagesInteractionStateCard(
-              loading: _loading,
-              state: state,
-              onRetry: _load,
-              currentTab: _selectedTab,
-              message: result?.message,
-            )
-          else if (items.isEmpty)
-            _MessagesStaticCard(title: '当前没有新互动', body: _tabHint(_selectedTab))
-          else
-            ...items.map(
-              (ForumInteractionInboxItemView item) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: _MessagesInteractionCard(
-                  item: item,
-                  sourceActionLabel: _sourceActionLabel(item.targetType),
-                  showQuickReply:
-                      item.canQuickReply == true &&
-                      item.targetType != 'forum_comment',
-                  onOpenSource: () => _openSource(context, item),
-                ),
-              ),
-            ),
         ],
       ),
     );

@@ -15,7 +15,7 @@ class _MessagesInboxTabBar extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Row(
@@ -27,12 +27,12 @@ class _MessagesInboxTabBar extends StatelessWidget {
               onTap: () => onSelectTab(tab),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 180),
-                padding: const EdgeInsets.symmetric(vertical: 14),
+                padding: const EdgeInsets.symmetric(vertical: 10),
                 decoration: BoxDecoration(
                   color: selected
                       ? theme.colorScheme.primaryContainer
                       : Colors.transparent,
-                  borderRadius: BorderRadius.circular(22),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -48,11 +48,11 @@ class _MessagesInboxTabBar extends StatelessWidget {
                             : theme.colorScheme.onSurfaceVariant,
                       ),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 5),
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 180),
                       width: selected ? 24 : 10,
-                      height: 4,
+                      height: 3,
                       decoration: BoxDecoration(
                         color: selected
                             ? theme.colorScheme.primary
@@ -164,6 +164,89 @@ class _MessagesInteractionCard extends StatelessWidget {
   }
 }
 
+class _MessagesForumInteractionSection extends StatelessWidget {
+  const _MessagesForumInteractionSection({
+    required this.selectedTab,
+    required this.onSelectTab,
+    required this.loading,
+    required this.state,
+    required this.items,
+    required this.onRetry,
+    required this.onOpenSource,
+    this.message,
+  });
+
+  final _MessagesInteractionTab selectedTab;
+  final ValueChanged<_MessagesInteractionTab> onSelectTab;
+  final bool loading;
+  final AppPageState? state;
+  final String? message;
+  final List<ForumInteractionInboxItemView> items;
+  final VoidCallback onRetry;
+  final ValueChanged<ForumInteractionInboxItemView> onOpenSource;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final showState =
+        loading || (state != null && state != AppPageState.content);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '论坛互动',
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 12),
+            _MessagesInboxTabBar(
+              selectedTab: selectedTab,
+              onSelectTab: onSelectTab,
+            ),
+            const SizedBox(height: 12),
+            if (showState)
+              _MessagesInteractionStatePanel(
+                loading: loading,
+                state: state,
+                onRetry: onRetry,
+                currentTab: selectedTab,
+                message: message,
+              )
+            else if (items.isEmpty)
+              _MessagesInlinePanel(
+                title: '${_tabLabel(selectedTab)}当前为空',
+                body: '暂无新的${_tabLabel(selectedTab)}提醒。',
+              )
+            else
+              ...items.map(
+                (ForumInteractionInboxItemView item) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _MessagesInteractionCard(
+                    item: item,
+                    sourceActionLabel: _sourceActionLabel(item.targetType),
+                    showQuickReply:
+                        item.canQuickReply == true &&
+                        item.targetType != 'forum_comment',
+                    onOpenSource: () => onOpenSource(item),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _MessagesProjectCommunicationSection extends StatelessWidget {
   const _MessagesProjectCommunicationSection({
     required this.loading,
@@ -198,28 +281,28 @@ class _MessagesProjectCommunicationSection extends StatelessWidget {
               ),
             ),
             if (loading) ...<Widget>[
-              const SizedBox(height: 12),
-              const LinearProgressIndicator(minHeight: 6),
+              const SizedBox(height: 10),
+              const LinearProgressIndicator(minHeight: 5),
             ] else if (result?.state == AppPageState.errorRetryable ||
                 result?.state == AppPageState.errorNonRetryable ||
                 result?.state == AppPageState.unauthorized ||
                 result?.state == AppPageState.forbidden ||
                 result?.state == AppPageState.notFound) ...<Widget>[
-              const SizedBox(height: 12),
-              Text(
-                result?.message ?? '当前项目沟通入口暂不可用，请稍后再试。',
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              const SizedBox(height: 10),
+              _MessagesInlinePanel(
+                title: '项目沟通暂不可用',
+                body: result?.message ?? '请稍后再试。',
               ),
             ] else if (items.isEmpty) ...<Widget>[
-              const SizedBox(height: 12),
-              Text(
-                '当前还没有新的项目沟通会话。',
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              const SizedBox(height: 10),
+              const _MessagesInlinePanel(
+                title: '当前没有新的项目沟通',
+                body: '有新的项目沟通后会在这里进入。',
               ),
             ] else
               ...items.map(
                 (MessageInteractionItemView item) => Padding(
-                  padding: const EdgeInsets.only(top: 12),
+                  padding: const EdgeInsets.only(top: 10),
                   child: _MessagesProjectCommunicationCard(
                     item: item,
                     onOpen: () => onOpen(item),
@@ -245,8 +328,8 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final avatarUrl = item.counterpart.avatarUrl?.trim();
     final displayName = item.counterpart.displayName.trim();
+    final counterpartLabel = displayName.isEmpty ? '对方主体' : displayName;
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -254,42 +337,48 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
         border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Row(
               children: <Widget>[
-                CircleAvatar(
-                  radius: 22,
-                  backgroundImage: avatarUrl == null || avatarUrl.isEmpty
-                      ? null
-                      : NetworkImage(avatarUrl),
-                  child: avatarUrl == null || avatarUrl.isEmpty
-                      ? Text(
-                          displayName.isEmpty
-                              ? '?'
-                              : displayName.characters.first.toUpperCase(),
-                        )
-                      : null,
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.primaryContainer.withValues(
+                      alpha: 0.58,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.business_center_outlined,
+                    size: 18,
+                    color: theme.colorScheme.primary,
+                  ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        displayName,
+                        counterpartLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
                           fontWeight: FontWeight.w900,
                         ),
                       ),
-                      const SizedBox(height: 3),
+                      const SizedBox(height: 2),
                       Text(
-                        '昵称',
+                        '项目 ${item.summary.projectCount} 个',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelMedium?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
                     ],
@@ -298,41 +387,14 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 10),
-            Text(
-              item.summary.title,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              item.summary.text,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.45,
-              ),
-            ),
-            if (item.p0PaySummary != null) ...<Widget>[
-              const SizedBox(height: 12),
-              _MessagesP0PayReadOnlyStatus(summary: item.p0PaySummary!),
-            ],
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                _MessagesMetaPill(
-                  label: _projectCommunicationCardTypeLabel(
-                    item.summary.latestCardType,
-                  ),
-                ),
-                _MessagesMetaPill(label: '项目 ${item.summary.projectCount} 个'),
-              ],
-            ),
-            const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,
               child: FilledButton.tonalIcon(
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(38),
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                  visualDensity: VisualDensity.compact,
+                ),
                 onPressed: onOpen,
                 icon: const Icon(Icons.forum_outlined),
                 label: Text(_projectCommunicationOpenLabel(item)),
@@ -345,116 +407,8 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
   }
 }
 
-class _MessagesP0PayReadOnlyStatus extends StatelessWidget {
-  const _MessagesP0PayReadOnlyStatus({required this.summary});
-
-  final P0PayReadOnlySummaryView summary;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final lines = summary.statusLines;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Icon(
-                  Icons.lock_outline_rounded,
-                  size: 16,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'P0-Pay 只读状态',
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      fontWeight: FontWeight.w900,
-                    ),
-                  ),
-                ),
-                const _MessagesMetaPill(label: '只读'),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '消息楼只展示资金状态摘要，不执行支付、不裁定扣费、不处理履约保证金。',
-              style: theme.textTheme.bodySmall?.copyWith(
-                height: 1.45,
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (lines.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 10),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: lines
-                    .take(4)
-                    .map(
-                      (P0PayReadOnlyStatusLine line) => _MessagesMetaPill(
-                        label: '${line.label}：${line.value}',
-                      ),
-                    )
-                    .toList(growable: false),
-              ),
-            ],
-            if (summary.routeTarget != null &&
-                summary.routeTarget!.displayText.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
-              Text(
-                '只读 handoff：${summary.routeTarget!.displayText}',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  height: 1.45,
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MessagesTabHintCard extends StatelessWidget {
-  const _MessagesTabHintCard({required this.currentTab});
-
-  final _MessagesInteractionTab currentTab;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-        child: Text(
-          _tabHint(currentTab),
-          style: theme.textTheme.bodySmall?.copyWith(
-            height: 1.45,
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MessagesInteractionStateCard extends StatelessWidget {
-  const _MessagesInteractionStateCard({
+class _MessagesInteractionStatePanel extends StatelessWidget {
+  const _MessagesInteractionStatePanel({
     required this.loading,
     required this.state,
     required this.onRetry,
@@ -486,7 +440,7 @@ class _MessagesInteractionStateCard extends StatelessWidget {
     };
     final body = switch (resolved) {
       AppPageState.loading => '请稍候片刻。',
-      AppPageState.empty => _tabHint(currentTab),
+      AppPageState.empty => '暂无新的$tabLabel提醒。',
       AppPageState.errorRetryable => '你可以稍后重试。',
       AppPageState.errorNonRetryable => '当前暂时还不能查看，请稍后再试。',
       AppPageState.unauthorized => '登录后可以继续查看。',
@@ -495,11 +449,11 @@ class _MessagesInteractionStateCard extends StatelessWidget {
       AppPageState.content => '$tabLabel已经可以继续查看。',
     };
 
-    return _MessagesStaticCard(
+    return _MessagesInlinePanel(
       title: title,
       body: body,
       trailing: resolved == AppPageState.loading
-          ? const LinearProgressIndicator(minHeight: 6)
+          ? const LinearProgressIndicator(minHeight: 5)
           : (resolved == AppPageState.content || resolved == AppPageState.empty)
           ? null
           : FilledButton.tonal(onPressed: onRetry, child: const Text('重试')),
@@ -507,8 +461,8 @@ class _MessagesInteractionStateCard extends StatelessWidget {
   }
 }
 
-class _MessagesStaticCard extends StatelessWidget {
-  const _MessagesStaticCard({
+class _MessagesInlinePanel extends StatelessWidget {
+  const _MessagesInlinePanel({
     required this.title,
     required this.body,
     this.trailing,
@@ -520,27 +474,34 @@ class _MessagesStaticCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(14),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               title,
-              style: Theme.of(
-                context,
-              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 6),
             Text(
               body,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(height: 1.45),
+              style: theme.textTheme.bodySmall?.copyWith(
+                height: 1.45,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
             if (trailing != null) ...<Widget>[
-              const SizedBox(height: 14),
+              const SizedBox(height: 12),
               trailing!,
             ],
           ],
@@ -597,14 +558,6 @@ String _targetTypeLabel(String targetType) {
   return forumDisplayInteractionTargetType(targetType);
 }
 
-String _tabHint(_MessagesInteractionTab tab) {
-  return switch (tab) {
-    _MessagesInteractionTab.replies => '这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。',
-    _MessagesInteractionTab.likes => '这里只显示别人给你的帖子或评论点的赞。',
-    _MessagesInteractionTab.follows => '这里只显示已经进入消息楼的新关注提醒。',
-  };
-}
-
 String _notFoundHint(_MessagesInteractionTab tab) {
   return switch (tab) {
     _MessagesInteractionTab.replies => '当前“回复我的”入口暂不可用，请稍后再试。',
@@ -621,16 +574,5 @@ String _projectCommunicationOpenLabel(MessageInteractionItemView item) {
   return switch (item.interactionType) {
     'counterpart_conversation' => '进入项目沟通',
     _ => '进入沟通',
-  };
-}
-
-String _projectCommunicationCardTypeLabel(String cardType) {
-  return switch (cardType) {
-    'project_name_access_request' => '项目名称申请',
-    'bid_thread' => '竞标沟通',
-    'project_clarification' => '项目澄清',
-    'project_order' => '订单状态',
-    'system_notice' => '系统通知',
-    _ => cardType,
   };
 }

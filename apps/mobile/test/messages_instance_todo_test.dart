@@ -100,7 +100,7 @@ Map<String, Object?> _messageInteractionItem({
       'projectCount': 1,
       'latestCardType': latestCardType,
     },
-    if (p0PaySummary != null) 'p0PaySummary': p0PaySummary,
+    'p0PaySummary': ?p0PaySummary,
     'updatedAt': '2026-03-27T10:00:00Z',
     'routeTarget': <String, Object?>{
       'objectType': definition.objectType,
@@ -172,18 +172,19 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
-    expect(find.text('互动中心'), findsOneWidget);
+    expect(find.text('互动中心'), findsNothing);
+    expect(find.text('论坛互动'), findsOneWidget);
     expect(find.text('回复我的'), findsWidgets);
     expect(find.text('收到的赞'), findsWidgets);
     expect(find.text('新关注'), findsWidgets);
-    expect(find.text('这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。'), findsOneWidget);
+    expect(find.text('这里集中查看别人对你的回复、点赞、关注，以及项目沟通会话。'), findsNothing);
     expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
     expect(find.text('回到源对象'), findsOneWidget);
 
     await tester.tap(find.text('收到的赞').last);
     await tester.pumpAndSettle();
     expect(find.text('赞了你在《搭建夜班排班》下的评论'), findsOneWidget);
-    expect(find.text('这里只显示别人给你的帖子或评论点的赞。'), findsOneWidget);
+    expect(find.text('这里只显示别人给你的帖子或评论点的赞。'), findsNothing);
   });
 
   testWidgets(
@@ -285,14 +286,14 @@ void main() {
       expect(find.text('项目沟通'), findsOneWidget);
       expect(find.text('杭州搭建公司'), findsOneWidget);
       expect(find.text('苏州执行团队'), findsOneWidget);
-      expect(find.text('昵称'), findsNWidgets(2));
+      expect(find.text('昵称'), findsNothing);
       expect(find.text('对方主体'), findsNothing);
-      expect(find.text('1 个项目'), findsNothing);
-      expect(find.text('项目方在沟通与投标里回复了新的交付问题。'), findsOneWidget);
-      expect(find.text('订单状态'), findsOneWidget);
-      expect(find.text('P0-Pay 只读状态'), findsOneWidget);
-      expect(find.textContaining('发单诚意金：已支付'), findsOneWidget);
-      expect(find.textContaining('只读 handoff'), findsOneWidget);
+      expect(find.text('项目 1 个'), findsNWidgets(2));
+      expect(find.text('项目方在沟通与投标里回复了新的交付问题。'), findsNothing);
+      expect(find.text('订单状态'), findsNothing);
+      expect(find.text('P0-Pay 只读状态'), findsNothing);
+      expect(find.textContaining('发单诚意金：已支付'), findsNothing);
+      expect(find.textContaining('只读 handoff'), findsNothing);
       expect(find.widgetWithText(FilledButton, '支付'), findsNothing);
       expect(find.text('进入项目沟通'), findsNWidgets(2));
       await tester.scrollUntilVisible(find.text('回复了你在《材料交接节点》里的问题'), 240);
@@ -531,7 +532,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('回复我的当前为空'), findsOneWidget);
-    expect(find.text('这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。'), findsWidgets);
+    expect(find.text('暂无新的回复我的提醒。'), findsOneWidget);
+    expect(find.text('这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。'), findsNothing);
   });
 
   testWidgets(

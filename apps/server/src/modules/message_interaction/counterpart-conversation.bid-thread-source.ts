@@ -15,6 +15,7 @@ import {
 } from '../trading_im/trading-im-system-seed.support';
 import { trimConversationText } from './counterpart-conversation.support';
 import { CounterpartConversationAvatarService } from './counterpart-conversation-avatar.service';
+import { CounterpartConversationDisplayNameService } from './counterpart-conversation-display-name.service';
 import {
   CounterpartConversationCardSeed,
   CounterpartConversationCardSource,
@@ -42,6 +43,7 @@ export class CounterpartConversationBidThreadSource
     @InjectRepository(UserEntity)
     private readonly userRepository: Repository<UserEntity>,
     private readonly avatarService: CounterpartConversationAvatarService,
+    private readonly displayNameService: CounterpartConversationDisplayNameService,
   ) {}
 
   async buildSeeds(viewerOrganizationId: string) {
@@ -140,13 +142,15 @@ export class CounterpartConversationBidThreadSource
         userIds.add(userId);
       }
     }
-    const [organizations, users] = await Promise.all([
+    const [organizations, users, approvedLegalNameByOrganizationId] = await Promise.all([
       this.organizationRepository.findBy({ id: In([...organizationIds]) }),
       userIds.size ? this.userRepository.findBy({ id: In([...userIds]) }) : Promise.resolve([]),
+      this.displayNameService.loadApprovedLegalNameMap(organizationIds),
     ]);
     return {
       organizationMap: new Map(organizations.map((item) => [item.id, item])),
       userMap: new Map(users.map((item) => [item.id, item])),
+      approvedLegalNameByOrganizationId,
     };
   }
 
@@ -171,13 +175,13 @@ export class CounterpartConversationBidThreadSource
     const counterpartUser = counterpartUserId
       ? input.counterpart.userMap.get(counterpartUserId)
       : null;
-    const counterpartOrganization =
-      input.counterpart.organizationMap.get(counterpartOrganizationId);
-    const counterpartDisplayName =
-      counterpartUser?.nickname?.trim() ||
-      counterpartOrganization?.name?.trim() ||
-      bid.submittedBy?.trim() ||
-      '当前沟通对象';
+    const counterpartDisplayName = this.displayNameService.resolveDisplayName({
+      organizationId: counterpartOrganizationId,
+      organizationMap: input.counterpart.organizationMap,
+      approvedLegalNameByOrganizationId:
+        input.counterpart.approvedLegalNameByOrganizationId,
+      fallback: bid.submittedBy,
+    });
     const latestMessage = input.context.latestMessageByThreadId.get(input.thread.id);
     const updatedAt = (
       latestMessage?.createdAt ??
