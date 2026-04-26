@@ -407,6 +407,7 @@ export class ForumPresenter {
     return {
       items: posts.map((post) => {
         const topic = post.topicId ? this.toTopicTitle(post.topicId) : null;
+        const ownerActionable = post.state === 'published' || post.state === 'hidden';
         return {
           postId: post.id,
           title: post.title,
@@ -416,8 +417,8 @@ export class ForumPresenter {
           state: post.state,
           publishedAt: post.publishedAt.toISOString(),
           updatedAt: post.updatedAt.toISOString(),
-          canEdit: post.state === 'published',
-          canDelete: post.state === 'published'
+          canEdit: ownerActionable,
+          canDelete: ownerActionable
         };
       }),
       page: this.toPage()

@@ -82,6 +82,9 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
   @override
   Widget build(BuildContext context) {
     final config = _meConfig(widget.scope);
+    final cleanPostsContent =
+        widget.scope == ForumMeScope.posts &&
+        _activeState == AppPageState.content;
     return ForumPageFrame(
       eyebrow: '我的论坛',
       title: config.title,
@@ -89,6 +92,7 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
       scopeLabel: config.scopeLabel,
       routeLabel: config.routeLabel,
       showRouteMeta: false,
+      showHero: widget.scope != ForumMeScope.posts,
       heroActions: <Widget>[
         FilledButton.tonal(
           onPressed: () =>
@@ -97,21 +101,25 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
         ),
       ],
       children: <Widget>[
-        ForumReadStateCard(
-          loading: _loading,
-          state: _activeState,
-          emptyMessage: '${config.title}当前还没有内容。',
-          onRetry: _load,
-          message: _activeMessage,
-          errorCode: _activeErrorCode,
-        ),
-        if (_activeState == AppPageState.content) ...<Widget>[
-          ForumSectionCard(
-            eyebrow: '资产列表',
-            title: config.listTitle,
-            summary: config.listSummary,
-            children: _scopeChildren(context),
+        if (!cleanPostsContent)
+          ForumReadStateCard(
+            loading: _loading,
+            state: _activeState,
+            emptyMessage: '${config.title}当前还没有内容。',
+            onRetry: _load,
+            message: _activeMessage,
+            errorCode: _activeErrorCode,
           ),
+        if (_activeState == AppPageState.content) ...<Widget>[
+          if (widget.scope == ForumMeScope.posts)
+            ..._scopeChildren(context)
+          else
+            ForumSectionCard(
+              eyebrow: '资产列表',
+              title: config.listTitle,
+              summary: config.listSummary,
+              children: _scopeChildren(context),
+            ),
         ],
       ],
     );

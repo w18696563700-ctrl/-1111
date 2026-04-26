@@ -134,6 +134,18 @@ export class ForumController {
     return this.commentService.createComment(body, resolveRequestContext(headers));
   }
 
+  @Post('post/edit')
+  @HttpCode(202)
+  enterPostEdit(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.writeService.enterPostEdit(body, resolveRequestContext(headers));
+  }
+
+  @Post('post/delete')
+  @HttpCode(202)
+  deletePost(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.writeService.deletePost(body, resolveRequestContext(headers));
+  }
+
   @Post('post/like')
   @HttpCode(202)
   toggleLike(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {

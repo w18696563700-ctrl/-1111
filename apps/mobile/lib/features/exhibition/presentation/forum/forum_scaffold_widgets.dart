@@ -11,6 +11,7 @@ class ForumPageFrame extends StatelessWidget {
     required this.children,
     this.heroActions = const <Widget>[],
     this.showRouteMeta = false,
+    this.showHero = true,
   });
 
   final String eyebrow;
@@ -21,35 +22,37 @@ class ForumPageFrame extends StatelessWidget {
   final List<Widget> heroActions;
   final List<Widget> children;
   final bool showRouteMeta;
+  final bool showHero;
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
       children: <Widget>[
-        ForumSectionCard(
-          eyebrow: eyebrow,
-          title: title,
-          summary: summary,
-          emphasis: true,
-          children: <Widget>[
-            if (showRouteMeta)
-              Wrap(
-                spacing: 10,
-                runSpacing: 10,
-                children: <Widget>[
-                  ForumInfoPill(label: scopeLabel, highlighted: true),
-                  ForumInfoPill(label: routeLabel),
-                ],
-              ),
-            if (heroActions.isNotEmpty) ...<Widget>[
-              SizedBox(height: showRouteMeta ? 16 : 4),
-              Wrap(spacing: 12, runSpacing: 12, children: heroActions),
+        if (showHero)
+          ForumSectionCard(
+            eyebrow: eyebrow,
+            title: title,
+            summary: summary,
+            emphasis: true,
+            children: <Widget>[
+              if (showRouteMeta)
+                Wrap(
+                  spacing: 10,
+                  runSpacing: 10,
+                  children: <Widget>[
+                    ForumInfoPill(label: scopeLabel, highlighted: true),
+                    ForumInfoPill(label: routeLabel),
+                  ],
+                ),
+              if (heroActions.isNotEmpty) ...<Widget>[
+                SizedBox(height: showRouteMeta ? 16 : 4),
+                Wrap(spacing: 12, runSpacing: 12, children: heroActions),
+              ],
             ],
-          ],
-        ),
+          ),
         for (final Widget child in children) ...<Widget>[
-          const SizedBox(height: 16),
+          if (showHero || child != children.first) const SizedBox(height: 16),
           child,
         ],
       ],

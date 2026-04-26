@@ -30,6 +30,10 @@ type PublishDraftCommand = {
   draftId: string;
 };
 
+type OwnPostCommand = {
+  postId: string;
+};
+
 @Injectable()
 export class ForumWriteService {
   constructor(
@@ -119,26 +123,40 @@ export class ForumWriteService {
     }
 
     const publishedAt = new Date();
-    const post = this.postRepository.create({
-      id: randomUUID(),
-      postNo: this.createPostNo(),
-      organizationId: scope.organization.id,
-      authorUserId: currentSession.userId,
-      authorActorId: currentSession.actorId,
-      authorOrganizationId: scope.organization.id,
-      sourceDraftId: draft.id,
-      topicId: topic.topicId,
-      title: draft.title,
-      body: draft.body,
-      excerpt: this.presenter.toExcerpt(draft.body),
-      attachmentFileAssetIds: draft.attachmentFileAssetIds,
-      state: 'published',
-      commentCount: 0,
-      lastModerationCaseId: null,
-      hiddenAt: null,
-      archivedAt: null,
-      publishedAt
-    });
+    const targetPost = draft.targetPostId
+      ? await this.loadOwnActionablePost(draft.targetPostId, currentSession.userId, scope.organization.id)
+      : null;
+    const post =
+      targetPost ??
+      this.postRepository.create({
+        id: randomUUID(),
+        postNo: this.createPostNo(),
+        organizationId: scope.organization.id,
+        authorUserId: currentSession.userId,
+        authorActorId: currentSession.actorId,
+        authorOrganizationId: scope.organization.id,
+        sourceDraftId: draft.id,
+        topicId: topic.topicId,
+        title: draft.title,
+        body: draft.body,
+        excerpt: this.presenter.toExcerpt(draft.body),
+        attachmentFileAssetIds: draft.attachmentFileAssetIds,
+        state: 'published',
+        commentCount: 0,
+        lastModerationCaseId: null,
+        hiddenAt: null,
+        archivedAt: null,
+        publishedAt
+      });
+
+    if (targetPost) {
+      post.topicId = topic.topicId;
+      post.title = draft.title;
+      post.body = draft.body;
+      post.excerpt = this.presenter.toExcerpt(draft.body);
+      post.attachmentFileAssetIds = draft.attachmentFileAssetIds;
+      post.sourceDraftId = draft.id;
+    }
 
     draft.state = 'published';
     draft.publishedPostId = post.id;
@@ -150,6 +168,88 @@ export class ForumWriteService {
     });
 
     return this.presenter.toPublishResponse({ draft, post, topic });
+  }
+
+  async enterPostEdit(payload: Record<string, unknown>, context: RequestContext) {
+    const command = this.toOwnPostCommand(payload);
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+    if (!scope) {
+      throw forumDraftUnavailable('organizationId is unavailable for forum post edit.');
+    }
+
+    const post = await this.loadOwnActionablePost(command.postId, currentSession.userId, scope.organization.id);
+    const existingDraft = await this.draftRepository.findOne({
+      where: {
+        creatorUserId: currentSession.userId,
+        organizationId: scope.organization.id,
+        targetPostId: post.id,
+        state: In(['draft', 'ready_to_publish'])
+      },
+      order: { updatedAt: 'DESC' }
+    });
+    if (existingDraft) {
+      return {
+        status: 'resumed_active_edit_draft',
+        draftId: existingDraft.id,
+        targetPostId: post.id,
+        state: existingDraft.state
+      };
+    }
+
+    const draft = this.draftRepository.create({
+      id: randomUUID(),
+      draftNo: this.createDraftNo(),
+      organizationId: scope.organization.id,
+      creatorUserId: currentSession.userId,
+      creatorActorId: currentSession.actorId,
+      ownerActorId: currentSession.actorId,
+      ownerOrganizationId: scope.organization.id,
+      draftType: 'topic_edit',
+      targetPostId: post.id,
+      parentCommentId: null,
+      topicId: post.topicId,
+      title: post.title,
+      body: post.body,
+      attachmentFileAssetIds: post.attachmentFileAssetIds,
+      state: 'ready_to_publish',
+      publishedPostId: null
+    });
+    const savedDraft = await this.draftRepository.save(draft);
+    return {
+      status: 'accepted_edit_draft',
+      draftId: savedDraft.id,
+      targetPostId: post.id,
+      state: savedDraft.state
+    };
+  }
+
+  async deletePost(payload: Record<string, unknown>, context: RequestContext) {
+    const command = this.toOwnPostCommand(payload);
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+    if (!scope) {
+      throw forumDraftUnavailable('organizationId is unavailable for forum post delete.');
+    }
+
+    const post = await this.loadOwnActionablePost(command.postId, currentSession.userId, scope.organization.id);
+    const archivedAt = new Date();
+    post.state = 'archived';
+    post.archivedAt = archivedAt;
+    await this.postRepository.save(post);
+    return {
+      postId: post.id,
+      state: post.state,
+      archivedAt: archivedAt.toISOString()
+    };
   }
 
   private async loadEditableDraft(draftId: string, userId: string, organizationId: string) {
@@ -165,6 +265,19 @@ export class ForumWriteService {
       throw forumDraftUnavailable('Forum draft is not editable in the current state.');
     }
     return draft;
+  }
+
+  private async loadOwnActionablePost(postId: string, userId: string, organizationId: string) {
+    const post = await this.postRepository.findOneBy({
+      id: postId,
+      authorUserId: userId,
+      organizationId,
+      state: In(['published', 'hidden'])
+    });
+    if (!post) {
+      throw forumDraftUnavailable('Forum post is unavailable for owner action.');
+    }
+    return post;
   }
 
   private createDraftNo() {
@@ -216,10 +329,20 @@ export class ForumWriteService {
     } satisfies PublishDraftCommand;
   }
 
+  private toOwnPostCommand(payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    return {
+      postId: this.readRequiredString(source.postId, 'postId')
+    } satisfies OwnPostCommand;
+  }
+
   private readRequiredString(value: unknown, field: string) {
     if (typeof value !== 'string') {
       if (field === 'draftId') {
         throw forumPublishInvalid('draftId is required.');
+      }
+      if (field === 'postId') {
+        throw forumDraftInvalid('postId is required for forum post owner action.');
       }
       throw forumDraftInvalid(`${field} is required for forum draft save.`);
     }
@@ -227,6 +350,9 @@ export class ForumWriteService {
     if (!normalized) {
       if (field === 'draftId') {
         throw forumPublishInvalid('draftId is required.');
+      }
+      if (field === 'postId') {
+        throw forumDraftInvalid('postId is required for forum post owner action.');
       }
       throw forumDraftInvalid(`${field} is required for forum draft save.`);
     }

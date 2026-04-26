@@ -183,6 +183,18 @@ export class AppForumController {
     return this.forumInteractionService.createComment(payload, headers);
   }
 
+  @Post('post/edit')
+  @HttpCode(HttpStatus.ACCEPTED)
+  enterPostEdit(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.forumOwnPostContinuityService.enterEditDraft(payload, headers);
+  }
+
+  @Post('post/delete')
+  @HttpCode(HttpStatus.ACCEPTED)
+  deletePost(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.forumOwnPostContinuityService.deletePost(payload, headers);
+  }
+
   @Post('post/like')
   @HttpCode(HttpStatus.ACCEPTED)
   toggleLike(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
