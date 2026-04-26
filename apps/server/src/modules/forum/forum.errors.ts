@@ -77,3 +77,10 @@ export function forumInteractionUnavailable(message: string) {
     message
   });
 }
+
+export function forumInteractionInboxInvalid(message: string) {
+  return new BadRequestException({
+    code: 'FORUM_INTERACTION_INBOX_INVALID',
+    message
+  });
+}

@@ -435,7 +435,7 @@ class _MessagesInteractionStatePanel extends StatelessWidget {
       AppPageState.errorNonRetryable => message ?? '$tabLabel暂不可用',
       AppPageState.unauthorized => message ?? '请先登录后查看$tabLabel',
       AppPageState.forbidden => message ?? '当前账号暂不能查看$tabLabel',
-      AppPageState.notFound => message ?? '$tabLabel入口暂不可用',
+      AppPageState.notFound => '互动通知暂不可用',
       AppPageState.content => '$tabLabel已准备好',
     };
     final body = switch (resolved) {

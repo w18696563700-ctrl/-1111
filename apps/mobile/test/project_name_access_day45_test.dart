@@ -533,9 +533,18 @@ void main() {
       await _tapVisible(tester, find.widgetWithText(FilledButton, '进入项目沟通'));
 
       expect(find.text('项目名称需申请查看'), findsOneWidget);
-      expect(find.text('项目名称查看申请'), findsWidgets);
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('项目名称查看申请'), findsNothing);
 
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '查看申请'));
+      await _tapVisible(tester, find.widgetWithText(FilledButton, '进入此项目竞标沟通'));
+
+      expect(find.text('竞标沟通'), findsOneWidget);
+      expect(find.text('项目名称查看申请 / 审核'), findsOneWidget);
+
+      await _tapVisible(
+        tester,
+        find.widgetWithText(FilledButton, '项目名称查看申请 / 审核'),
+      );
 
       expect(find.text('项目名称查看申请'), findsWidgets);
       expect(

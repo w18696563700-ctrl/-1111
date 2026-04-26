@@ -25,6 +25,7 @@ import { OrganizationEntity } from './entities/organization.entity';
 
 const ADMIN_ROLE_KEYS = new Set(['buyer_admin', 'supplier_admin']);
 const PROJECT_PUBLISH_ROLE_KEYS = new Set(['buyer_admin', 'buyer_member(scoped)']);
+const PROJECT_PUBLISH_ORGANIZATION_TYPES = new Set(['demand', 'buyer', 'both']);
 const BID_PARTICIPATION_ORGANIZATION_TYPES = new Set(['supplier', 'both']);
 const REVIEWER_ROLE_KEYS = new Set(['platform_reviewer', 'platform_super_admin']);
 const MANUAL_REVIEWER_ROLE_KEYS = new Set([
@@ -35,6 +36,7 @@ const MANUAL_REVIEWER_ROLE_KEYS = new Set([
 type BidEligibilityAction = 'bid submit' | 'bid result';
 export type ProjectPublishEligibilityDenyReason =
   | 'organization_scope_missing'
+  | 'organization_type_not_allowed'
   | 'buyer_role_not_allowed'
   | 'certification_not_approved';
 
@@ -245,7 +247,17 @@ export class CurrentActorEligibilityService {
         }
       );
     }
-    if (!scope.roleKeys.some((roleKey) => PROJECT_PUBLISH_ROLE_KEYS.has(roleKey))) {
+    if (!this.isProjectPublishOrganizationType(scope)) {
+      throw authPermissionInsufficient(
+        'Current organization type is not allowed for project create.',
+        {
+          reason: 'organization_type_not_allowed' satisfies ProjectPublishEligibilityDenyReason,
+          organizationType: scope.organization.organizationType,
+          currentRoleKeys: scope.roleKeys,
+        }
+      );
+    }
+    if (!this.hasProjectPublishRole(scope)) {
       throw authPermissionInsufficient(
         'Current actor lacks the required buyer role for project create.',
         {
@@ -270,7 +282,8 @@ export class CurrentActorEligibilityService {
       return false;
     }
     return (
-      scope.roleKeys.some((roleKey) => PROJECT_PUBLISH_ROLE_KEYS.has(roleKey)) &&
+      this.isProjectPublishOrganizationType(scope) &&
+      this.hasProjectPublishRole(scope) &&
       scope.certification.certificationStatus === 'approved'
     );
   }
@@ -606,6 +619,22 @@ export class CurrentActorEligibilityService {
       scope.personalCertification.qualifiedForCurrentActor &&
       scope.personalCertification.lockedToOtherActor !== true
     );
+  }
+
+  private isProjectPublishOrganizationType(scope: CurrentOrganizationScope) {
+    const organizationType = this.readOptionalText(scope.organization.organizationType);
+    return (
+      organizationType !== null &&
+      PROJECT_PUBLISH_ORGANIZATION_TYPES.has(organizationType)
+    );
+  }
+
+  private hasProjectPublishRole(scope: CurrentOrganizationScope) {
+    const organizationType = this.readOptionalText(scope.organization.organizationType);
+    if (organizationType === 'both') {
+      return true;
+    }
+    return scope.roleKeys.some((roleKey) => PROJECT_PUBLISH_ROLE_KEYS.has(roleKey));
   }
 
   private readOptionalText(value: string | null | undefined) {

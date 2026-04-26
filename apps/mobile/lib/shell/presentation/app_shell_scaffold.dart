@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
@@ -67,9 +66,13 @@ class AppShellScaffold extends StatelessWidget {
       appBar: hideRootExhibitionAppBar
           ? null
           : AppBar(
-              automaticallyImplyLeading: canPop,
+              automaticallyImplyLeading: false,
               leading: canPop
-                  ? CupertinoNavigationBarBackButton(
+                  ? IconButton(
+                      tooltip: MaterialLocalizations.of(
+                        context,
+                      ).backButtonTooltip,
+                      icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       onPressed: () => Navigator.of(context).maybePop(),
                     )
                   : null,

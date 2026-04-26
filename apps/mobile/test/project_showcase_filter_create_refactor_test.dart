@@ -644,21 +644,54 @@ void main() {
     expect(find.text('展会'), findsOneWidget);
     expect(find.text('品牌'), findsOneWidget);
     expect(find.text('项目名称'), findsNothing);
-    expect(find.text('报价方式意向'), findsOneWidget);
-    expect(find.text('明价意向'), findsOneWidget);
-    expect(find.text('询价意向'), findsOneWidget);
+    expect(find.text('报价方式'), findsNothing);
+    expect(find.text('明价'), findsOneWidget);
+    expect(find.text('询价'), findsOneWidget);
     expect(find.text('P0-Pay 交易任务'), findsNothing);
     expect(find.text('创建明价竞标单'), findsNothing);
     expect(find.text('创建询价报价单并拉起发单诚意金'), findsNothing);
     expect(_projectCreateField('project-create-title'), findsOneWidget);
     expect(_projectCreateField('project-create-brand-name'), findsOneWidget);
+    final typeFieldHeight = tester
+        .getSize(_projectCreateField('project-create-building-type'))
+        .height;
+    final budgetFieldHeight = tester
+        .getSize(_projectCreateField('project-create-budget-amount'))
+        .height;
+    final areaFieldHeight = tester
+        .getSize(_projectCreateField('project-create-area-sqm'))
+        .height;
+    expect(typeFieldHeight, greaterThan(budgetFieldHeight));
+    expect(areaFieldHeight, greaterThan(budgetFieldHeight));
 
-    await tester.tap(find.text('明价意向'));
+    await tester.tap(find.text('明价'));
+    await tester.pumpAndSettle();
+    expect(find.text('明价'), findsOneWidget);
+    expect(
+      (tester.getTopLeft(find.text('明价')).dy -
+              tester.getTopLeft(find.text('询价')).dy)
+          .abs(),
+      lessThan(1),
+    );
+
+    final fixedPriceBudgetField = tester.widget<TextField>(
+      _projectCreateField('project-create-budget-amount'),
+    );
+    expect(fixedPriceBudgetField.decoration?.prefixText, '* ');
+
+    await tester.tap(find.text('询价'));
     await tester.pumpAndSettle();
     expect(
-      find.textContaining('当前只记录沟通意向，正式竞标仍需进入预发布详情检查无误后再发布'),
-      findsOneWidget,
+      (tester.getTopLeft(find.text('明价')).dy -
+              tester.getTopLeft(find.text('询价')).dy)
+          .abs(),
+      lessThan(1),
     );
+
+    final inquiryBudgetField = tester.widget<TextField>(
+      _projectCreateField('project-create-budget-amount'),
+    );
+    expect(inquiryBudgetField.decoration?.prefixText, isNull);
   });
 
   testWidgets(

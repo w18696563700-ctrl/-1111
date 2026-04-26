@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
-import { buildProjectDisplayTitle } from '../project_name_access/project-name-access.support';
+import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
 import { CounterpartConversationBidThreadSource } from './counterpart-conversation.bid-thread-source';
 import { CounterpartConversationClarificationSource } from './counterpart-conversation.clarification-source';
@@ -288,13 +288,16 @@ export class CounterpartConversationProjectionService {
       .map(([projectId, group]): CounterpartConversationProjectGroupProjection => {
         const project = input.projectMap.get(projectId);
         const projection = input.nameAccessProjectionMap.get(projectId);
+        const titleVisibility =
+          projection?.nameAccess.status === 'visible' ? 'visible' : 'masked';
         return {
           projectId,
-          projectDisplayTitle:
-            projection?.displayTitle ??
-            (project ? buildProjectDisplayTitle(project) : '未命名项目'),
-          titleVisibility:
-            projection?.nameAccess.status === 'visible' ? 'visible' : 'masked',
+          projectDisplayTitle: this.buildCounterpartProjectDisplayTitle({
+            project,
+            projection,
+            titleVisibility,
+          }),
+          titleVisibility,
           projectState: project?.state ?? null,
           latestActivityAt: group.latestActivityAt,
           ...(group.p0PaySummary ? { p0PaySummary: group.p0PaySummary } : {}),
@@ -310,6 +313,48 @@ export class CounterpartConversationProjectionService {
       .sort((left, right) =>
         right.latestActivityAt.localeCompare(left.latestActivityAt),
       );
+  }
+
+  private buildCounterpartProjectDisplayTitle(input: {
+    project: ProjectEntity | undefined;
+    projection:
+      | {
+          displayTitle: string;
+          nameAccess: { status: string };
+        }
+      | undefined;
+    titleVisibility: 'masked' | 'visible';
+  }) {
+    if (input.titleVisibility === 'masked') {
+      return (
+        this.normalizeTitle(input.projection?.displayTitle) ??
+        PROJECT_NAME_ACCESS_MASKED_TITLE
+      );
+    }
+
+    return (
+      this.normalizeTitle(input.project?.title) ??
+      this.composeExhibitionBrandTitle(input.project) ??
+      this.normalizeTitle(input.projection?.displayTitle) ??
+      '未命名项目'
+    );
+  }
+
+  private composeExhibitionBrandTitle(project: ProjectEntity | undefined) {
+    if (!project) {
+      return null;
+    }
+    const exhibitionName = this.normalizeTitle(project.exhibitionName);
+    const brandName = this.normalizeTitle(project.brandName);
+    if (exhibitionName && brandName) {
+      return `${exhibitionName} - ${brandName}`;
+    }
+    return exhibitionName ?? brandName;
+  }
+
+  private normalizeTitle(value: string | null | undefined) {
+    const normalized = value?.trim() ?? '';
+    return normalized || null;
   }
 
   private sortProjectGroups(

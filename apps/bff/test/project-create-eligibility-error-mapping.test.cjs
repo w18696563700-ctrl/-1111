@@ -91,6 +91,20 @@ test('BFF project/create maps missing organization scope to organization-specifi
   );
 });
 
+test('BFF project/create maps publish organization type rejection to subject message', async () => {
+  await expectCreateError(
+    createAxiosError(
+      403,
+      'AUTH_PERMISSION_INSUFFICIENT',
+      'Forbidden by upstream.',
+      { reason: 'organization_type_not_allowed' },
+    ),
+    403,
+    'AUTH_PERMISSION_INSUFFICIENT',
+    '当前主体不是发布方类型，请切换到可发布项目的组织后再试。',
+  );
+});
+
 test('BFF project/create maps role-specific eligibility rejection to role message', async () => {
   await expectCreateError(
     createAxiosError(

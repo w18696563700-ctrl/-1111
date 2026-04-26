@@ -196,7 +196,7 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
     if (current == null) {
       return '先返回公司与组织建立主体，再回来切换。';
     }
-    return '${profileDisplayOrganizationCapabilitySummary(current.organizationType)} · '
+    return '${profileDisplayOrganizationCapabilitySummary(current.organizationType, roleKeys: current.roleKeys)} · '
         '${profileBuildOrganizationCapabilityStatusBadges(certificationStatus: current.certificationStatus, membershipStatus: current.membershipStatus).join(' · ')}';
   }
 
@@ -403,7 +403,7 @@ class _OrganizationSwitchRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    '能力：${profileDisplayOrganizationCapabilitySummary(item.organizationType)}；'
+                    '能力：${profileDisplayOrganizationCapabilitySummary(item.organizationType, roleKeys: item.roleKeys)}；'
                     '企业认证：${profileDisplayCertificationStatus(item.certificationStatus)}；'
                     '成员：${profileDisplayMembershipStatus(item.membershipStatus)}',
                     style: subtitleStyle,

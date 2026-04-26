@@ -33,6 +33,40 @@ Map<String, Object?> _summary([String heading = 'summary']) {
   return <String, Object?>{'heading': heading};
 }
 
+CounterpartConversationConsumerLayer _counterpartConsumerWithNoopRealtime(
+  FakeAppApiTransport transport,
+) {
+  return CounterpartConversationConsumerLayer(
+    client: AppApiClient(
+      config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+      transport: transport,
+    ),
+    realtimeClient: const _NoopProjectCommunicationRealtimeClient(),
+  );
+}
+
+final class _NoopProjectCommunicationRealtimeClient
+    implements ProjectCommunicationRealtimeClient {
+  const _NoopProjectCommunicationRealtimeClient();
+
+  @override
+  Future<ProjectCommunicationRealtimeSubscription> subscribe({
+    required String threadId,
+    required String projectId,
+    required String counterpartOrganizationId,
+  }) async {
+    final controller =
+        StreamController<ProjectCommunicationMessageCreatedEvent>.broadcast();
+    return ProjectCommunicationRealtimeSubscription(
+      events: controller.stream,
+      done: Completer<void>().future,
+      close: () async {
+        await controller.close();
+      },
+    );
+  }
+}
+
 Map<String, Object?> _publicResourceItem({
   required String resourceId,
   required String resourceCategory,
@@ -1718,106 +1752,163 @@ void main() {
     },
   );
 
-  testWidgets('messages interactions jump stably to bid thread routes', (
-    WidgetTester tester,
-  ) async {
-    final messagesTransport = FakeAppApiTransport(
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/message/interactions': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'lane': 'project_communication',
-                  'items': <Object?>[
-                    _messageInteractionItem(
-                      interactionId: 'interaction-1',
-                      projectId: 'project-1',
-                      bidId: 'bid-1',
-                      counterpartName: '杭州搭建公司',
-                      summary: '杭州搭建公司已对当前项目提交竞标。',
-                      lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
-                    ),
-                  ],
-                },
-              );
+  testWidgets(
+    'messages interactions jump stably to project communication page',
+    (WidgetTester tester) async {
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          _messageInteractionItem(
+                            interactionId: 'interaction-1',
+                            projectId: 'project-1',
+                            bidId: 'bid-1',
+                            counterpartName: '杭州搭建公司',
+                            summary: '杭州搭建公司已对当前项目提交竞标。',
+                            lastMessageText: '项目方在沟通与投标里回复了新的交付问题。',
+                          ),
+                        ],
+                      },
+                    );
+                  },
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['conversationId'],
+                      'org-interaction-1',
+                    );
+                    expect(
+                      request.uri.queryParameters['projectId'],
+                      'project-1',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _counterpartConversationBidDetailPayload(
+                        interactionId: 'interaction-1',
+                        projectId: 'project-1',
+                        bidId: 'bid-1',
+                        counterpartName: '杭州搭建公司',
+                      ),
+                    );
+                  },
+              'GET /api/app/message/project-communication/thread':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['projectId'],
+                      'project-1',
+                    );
+                    expect(
+                      request.uri.queryParameters['counterpartOrganizationId'],
+                      'org-interaction-1',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'threadId': 'project-thread-1',
+                        'projectId': 'project-1',
+                        'ownerOrganizationId': 'org-owner',
+                        'counterpartOrganizationId': 'org-interaction-1',
+                        'threadState': 'open',
+                        'lastMessageId': null,
+                        'lastMessageAt': null,
+                        'createdAt': '2026-04-20T10:00:00Z',
+                        'updatedAt': '2026-04-20T10:00:00Z',
+                      },
+                    );
+                  },
+              'GET /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['threadId'],
+                      'project-thread-1',
+                    );
+                    expect(
+                      request.uri.queryParameters['projectId'],
+                      'project-1',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'nextCursor': null,
+                      },
+                    );
+                  },
             },
-            'GET /api/app/message/counterpart-conversation/detail':
-                (AppApiRequest request) async {
-                  expect(
-                    request.uri.queryParameters['conversationId'],
-                    'org-interaction-1',
-                  );
-                  expect(request.uri.queryParameters['projectId'], 'project-1');
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: _counterpartConversationBidDetailPayload(
-                      interactionId: 'interaction-1',
-                      projectId: 'project-1',
-                      bidId: 'bid-1',
-                      counterpartName: '杭州搭建公司',
-                    ),
-                  );
+      );
+      final tradingImConsumerLayer = TradingImConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/project/clarification/list':
+                      (AppApiRequest request) async =>
+                          throw UnimplementedError(),
+                  'GET /api/app/bid/thread/detail':
+                      (AppApiRequest request) async {
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: _bidThreadDetailPayload(
+                            threadId: 'thread-1',
+                            projectId: 'project-1',
+                            bidId: 'bid-1',
+                          ),
+                        );
+                      },
                 },
-          },
-    );
-    final tradingImConsumerLayer = TradingImConsumerLayer(
-      client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-        transport: FakeAppApiTransport(
-          handlers:
-              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/project/clarification/list':
-                    (AppApiRequest request) async => throw UnimplementedError(),
-                'GET /api/app/bid/thread/detail':
-                    (AppApiRequest request) async {
-                      return AppApiResponse(
-                        statusCode: 200,
-                        uri: request.uri,
-                        body: _bidThreadDetailPayload(
-                          threadId: 'thread-1',
-                          projectId: 'project-1',
-                          bidId: 'bid-1',
-                        ),
-                      );
-                    },
-              },
+          ),
         ),
-      ),
-    );
+      );
 
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: AppBuilding.messages.routePath,
-        messagesTransport: messagesTransport,
-        tradingImConsumerLayer: tradingImConsumerLayer,
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: AppBuilding.messages.routePath,
+          messagesTransport: messagesTransport,
+          tradingImConsumerLayer: tradingImConsumerLayer,
+          counterpartConversationConsumerLayer:
+              _counterpartConsumerWithNoopRealtime(messagesTransport),
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('项目沟通'), findsOneWidget);
+      expect(find.text('项目沟通'), findsOneWidget);
 
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(FilledButton, '进入项目沟通').first,
-    );
-    expect(find.text('展览项目 1'), findsOneWidget);
+      await _scrollAndTap(
+        tester,
+        find.widgetWithText(FilledButton, '进入项目沟通').first,
+      );
+      expect(find.text('展览项目 1'), findsOneWidget);
 
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(FilledButton, '进入竞标沟通').first,
-    );
-    expect(find.text('沟通与投标'), findsWidgets);
-    await tester.scrollUntilVisible(
-      find.widgetWithText(FilledButton, '发送消息'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.widgetWithText(FilledButton, '发送消息'), findsOneWidget);
-  });
+      await _scrollAndTap(
+        tester,
+        find.widgetWithText(FilledButton, '进入此项目竞标沟通').first,
+      );
+      expect(find.text('竞标沟通'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.text('聊天'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('聊天'), findsOneWidget);
+      expect(find.text('想跟TA说点什么...'), findsOneWidget);
+    },
+  );
 
   testWidgets('messages building can be hidden by manifest and stays guarded', (
     WidgetTester tester,
@@ -3696,15 +3787,9 @@ void main() {
       expect(_projectCreateField('计划结束日期'), findsOneWidget);
       expect(find.byTooltip('选择计划开始日期'), findsOneWidget);
       expect(find.byTooltip('选择计划结束日期'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('补充说明与附件'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('补充说明与附件'), findsOneWidget);
-      expect(_projectCreateField('补充说明'), findsOneWidget);
-      expect(find.text('资料补充'), findsOneWidget);
+      expect(find.text('补充说明与附件', skipOffstage: false), findsNothing);
+      expect(_projectCreateField('补充说明'), findsNothing);
+      expect(find.text('资料补充', skipOffstage: false), findsNothing);
       expect(find.text('title'), findsNothing);
       expect(find.text('buildingType'), findsNothing);
       expect(find.text('budgetAmount'), findsNothing);
@@ -3929,7 +4014,7 @@ void main() {
           initialRoute: ExhibitionRoutes.projectCreate,
           shellContextConsumer: buildShellContextConsumer(
             organizationId: 'org-1',
-            roleKeys: const <String>['buyer_member(scoped)'],
+            roleKeys: const <String>['supplier_admin'],
             certificationStatus: 'verified',
             canCreateProject: false,
           ),
@@ -3939,22 +4024,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final workbenchBackButton = find.ancestor(
-        of: find.text('返回我的项目', skipOffstage: false),
-        matching: find.byType(FilledButton, skipOffstage: false),
-      );
-      final submitButton = find.ancestor(
-        of: find.text('发布项目', skipOffstage: false),
-        matching: find.byType(FilledButton, skipOffstage: false),
-      );
-
-      expect(find.text('当前角色不允许创建项目'), findsOneWidget);
-      expect(
-        find.text('当前组织角色暂不允许创建项目；最终是否可继续仍以当前创建资格返回结果为准，请先返回我的项目查看当前可继续入口。'),
-        findsOneWidget,
-      );
-      expect(workbenchBackButton, findsOneWidget);
-      expect(submitButton, findsNothing);
+      expect(find.text('当前角色不允许创建项目'), findsNothing);
+      expect(find.text('返回我的项目'), findsNothing);
+      expect(find.text('当前组织角色暂不允许创建项目'), findsNothing);
     },
   );
 
@@ -4472,6 +4544,45 @@ void main() {
                       ),
                     );
                   },
+              'GET /api/app/message/project-communication/thread':
+                  (AppApiRequest request) async {
+                    expect(request.uri.queryParameters['projectId'], 'proj-1');
+                    expect(
+                      request.uri.queryParameters['counterpartOrganizationId'],
+                      'org-interaction-1',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'threadId': 'project-thread-proj-1',
+                        'projectId': 'proj-1',
+                        'ownerOrganizationId': 'org-owner',
+                        'counterpartOrganizationId': 'org-interaction-1',
+                        'threadState': 'open',
+                        'lastMessageId': null,
+                        'lastMessageAt': null,
+                        'createdAt': '2026-04-20T10:00:00Z',
+                        'updatedAt': '2026-04-20T10:00:00Z',
+                      },
+                    );
+                  },
+              'GET /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['threadId'],
+                      'project-thread-proj-1',
+                    );
+                    expect(request.uri.queryParameters['projectId'], 'proj-1');
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'nextCursor': null,
+                      },
+                    );
+                  },
             },
       );
       final tradingImConsumerLayer = TradingImConsumerLayer(
@@ -4596,6 +4707,8 @@ void main() {
           transport: exhibitionTransport,
           messagesTransport: messagesTransport,
           tradingImConsumerLayer: tradingImConsumerLayer,
+          counterpartConversationConsumerLayer:
+              _counterpartConsumerWithNoopRealtime(messagesTransport),
           shellContextConsumer: buildShellContextConsumer(
             organizationId: 'org-1',
             roleKeys: const <String>['supplier_admin'],
@@ -4645,19 +4758,19 @@ void main() {
       await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入项目沟通'));
       expect(find.text('展览项目 1'), findsOneWidget);
 
-      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入竞标沟通'));
-      expect(find.text('沟通与投标'), findsWidgets);
+      await _scrollAndTap(
+        tester,
+        find.widgetWithText(FilledButton, '进入此项目竞标沟通'),
+      );
+      expect(find.text('竞标沟通'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('点击查看'),
+        find.text('聊天'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('点击查看'), findsOneWidget);
-
-      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '点击查看'));
-      expect(find.text('竞标摘要'), findsOneWidget);
-      expect(find.textContaining('报价金额：¥1200'), findsOneWidget);
+      expect(find.text('聊天'), findsOneWidget);
+      expect(find.text('想跟TA说点什么...'), findsOneWidget);
     },
   );
 

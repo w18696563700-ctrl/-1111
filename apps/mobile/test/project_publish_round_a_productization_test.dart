@@ -223,13 +223,8 @@ void main() {
       final startDateY = tester.getTopLeft(_projectCreateField('计划开始日期')).dy;
       final endDateY = tester.getTopLeft(_projectCreateField('计划结束日期')).dy;
       expect((startDateY - endDateY).abs(), lessThan(1));
-      await tester.scrollUntilVisible(
-        find.text('补充说明与附件'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('补充说明与附件', skipOffstage: false), findsOneWidget);
+      expect(find.text('补充说明与附件', skipOffstage: false), findsNothing);
+      expect(find.text('资料补充', skipOffstage: false), findsNothing);
 
       await tester.binding.setSurfaceSize(const Size(420, 1000));
       await tester.pumpAndSettle();
@@ -318,6 +313,8 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
+      expect(find.textContaining('无法保存：请输入展会'), findsOneWidget);
+
       await tester.drag(find.byType(Scrollable).first, const Offset(0, 1200));
       await tester.pumpAndSettle();
 
@@ -327,6 +324,53 @@ void main() {
       expect(tester.getTopLeft(_projectCreateField('项目名称')).dy, lessThan(220));
     },
   );
+
+  testWidgets('Round A validation keeps scope summary optional', (
+    WidgetTester tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(390, 1000));
+
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        transport: transport,
+        sessionStore: _buildAuthenticatedSessionStore(
+          deviceId: 'scope-validation',
+        ),
+        shellContextConsumer: _buildShellContextConsumer(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.enterText(_projectCreateField('项目名称'), '教育装备展');
+    await tester.enterText(_projectCreateField('品牌'), '新东方');
+    await _selectProjectType(tester);
+    await tester.enterText(_projectCreateField('预算金额'), '200000');
+    await _scrollAndTap(tester, _projectCreateField('详细地址'));
+    await tester.enterText(_projectCreateField('详细地址'), '西博城');
+    await tester.pumpAndSettle();
+
+    final submitButton = find.widgetWithText(FilledButton, '保存项目基本信息并跳转至我的项目');
+    await tester.scrollUntilVisible(
+      submitButton,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    final submitAction = tester.widget<FilledButton>(submitButton);
+    expect(submitAction.onPressed, isNotNull);
+    submitAction.onPressed!();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('无法保存'), findsWidgets);
+    expect(find.textContaining('请选择省 / 市'), findsWidgets);
+    expect(find.textContaining('请补充范围说明'), findsNothing);
+  });
 
   testWidgets(
     'Round A selector still submits canonical buildingType exhibition',

@@ -20,7 +20,7 @@ layer: L1 Domain
 ## High-level Matrix
 | Action | buyer_admin | buyer_member | supplier_admin | supplier_member | platform roles |
 |---|---|---|---|---|---|
-| Create project | allow | scoped | deny | deny | observe/review |
+| Create project | allow | scoped | deny for supplier-only; allowed under approved `both` subject | deny for supplier-only; allowed under approved `both` subject | observe/review |
 | View invited project | allow | scoped | allow | scoped | allow |
 | Submit bid | eligible by org-type + dual-cert | scoped eligible by org-type + dual-cert | eligible by org-type + dual-cert | scoped eligible by org-type + dual-cert | observe |
 | Award order | allow | scoped | deny | deny | observe |
@@ -56,6 +56,18 @@ layer: L1 Domain
 - 解释边界：
   - `buyer_admin` / `buyer_member(scoped)` 在 `organizationType=both` 下不再因为角色名本身被前置硬拦截。
   - 该变化只影响 `Submit bid` 准入主门槛，不改写其他动作的既有 role-gated truth。
+
+## Project Create Gate
+- 旧规则：
+  - `Create project` 以前置 `buyer_* roleKey` 作为硬门槛。
+  - 因此 `organizationType=both` 且企业认证已通过的主体，如果当前成员角色显示为 `supplier_admin / supplier_member(scoped)`，仍会被误挡在创建命令前。
+- 新规则：
+  - `organizationType=demand/buyer` 仍要求 `buyer_admin / buyer_member(scoped)`。
+  - `organizationType=both` 且企业认证 `approved` 时，可进入创建项目主链，不再因为当前显示角色是供应商侧角色被前置硬拦截。
+  - `organizationType=supplier/platform` 仍不可创建项目。
+- 解释边界：
+  - `both` 主体的“可发布 / 可参与竞标”是主体能力，不应被当前展示角色误解释为只能承接不能发布。
+  - 该变化只修正 `both` 主体创建项目准入，不开放纯供应商主体发布项目。
 
 ## Internal-only Controlled Actions
 - `InspectionDecisionApplicationService.applyInspectionDecision`

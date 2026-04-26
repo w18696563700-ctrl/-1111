@@ -55,6 +55,15 @@ Widget _buildPage(
           settings: settings,
         );
       }
+      if (uri?.path == ExhibitionRoutes.projectAlbum) {
+        final routeUri = uri!;
+        return MaterialPageRoute<void>(
+          builder: (_) => ProjectAlbumPage(
+            projectId: routeUri.queryParameters['projectId'],
+          ),
+          settings: settings,
+        );
+      }
       return MaterialPageRoute<void>(
         builder: (_) => const Scaffold(body: Text('route opened')),
         settings: settings,
@@ -95,6 +104,13 @@ Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _enterFirstProjectCommunication(WidgetTester tester) async {
+  final entry = find.widgetWithText(FilledButton, '进入此项目竞标沟通').first;
+  await _ensureVisible(tester, entry);
+  await tester.tap(entry);
+  await tester.pumpAndSettle();
+}
+
 final class _NoopProjectCommunicationRealtimeClient
     implements ProjectCommunicationRealtimeClient {
   const _NoopProjectCommunicationRealtimeClient();
@@ -109,8 +125,10 @@ final class _NoopProjectCommunicationRealtimeClient
         StreamController<ProjectCommunicationMessageCreatedEvent>.broadcast();
     return ProjectCommunicationRealtimeSubscription(
       events: controller.stream,
-      done: Completer<void>().future,
-      close: () async {},
+      done: controller.done,
+      close: () async {
+        await controller.close();
+      },
     );
   }
 }
@@ -308,10 +326,123 @@ Map<String, Object?> _detailPayload({
   };
 }
 
-Map<String, Object?> _threadPayload() {
-  return const <String, Object?>{
-    'threadId': 'project-thread-1',
-    'projectId': 'project-1',
+Map<String, Object?> _twoProjectDetailPayload() {
+  final nameAccessDefinition =
+      messagesRegisteredEntryByActionKey['project_name_access_thread.open']!;
+  final bidThreadDefinition =
+      messagesRegisteredEntryByActionKey['bid_thread.open']!;
+
+  Map<String, Object?> groupPayload({
+    required String projectId,
+    required String title,
+    required String requestId,
+    required String bidId,
+    required String latestActivityAt,
+  }) {
+    return <String, Object?>{
+      'projectId': projectId,
+      'projectDisplayTitle': title,
+      'titleVisibility': 'visible',
+      'projectState': 'published',
+      'latestActivityAt': latestActivityAt,
+      'orderSummary': null,
+      'ratingEntry': null,
+      'cards': <Object?>[
+        <String, Object?>{
+          'cardId': '$projectId-name-access-card',
+          'cardType': 'project_name_access_request',
+          'title': '项目名称查看申请',
+          'summary': '当前申请组织 申请查看当前项目名称。',
+          'status': 'pending',
+          'updatedAt': latestActivityAt,
+          'truthAnchor': <String, Object?>{
+            'truthType': 'project_name_access_request',
+            'projectId': projectId,
+            'requestId': requestId,
+            'threadId': 'thread-name-access-$projectId',
+          },
+          'detailRouteTarget': <String, Object?>{
+            'objectType': nameAccessDefinition.objectType,
+            'actionKey': nameAccessDefinition.actionKey,
+            'canonicalPath': nameAccessDefinition.canonicalPath,
+            'params': <String, Object?>{
+              'threadId': 'thread-name-access-$projectId',
+              'projectId': projectId,
+              'requestId': requestId,
+            },
+          },
+          'decisionAvailability': const <String, Object?>{
+            'canApprove': true,
+            'canReject': true,
+          },
+        },
+        <String, Object?>{
+          'cardId': '$projectId-bid-card',
+          'cardType': 'bid_thread',
+          'title': '新的竞标已提交',
+          'summary': '重庆展宏展览展示有限公司 已提交竞标。',
+          'status': 'submitted',
+          'updatedAt': latestActivityAt,
+          'truthAnchor': <String, Object?>{
+            'truthType': 'bid_thread',
+            'projectId': projectId,
+            'bidId': bidId,
+          },
+          'detailRouteTarget': <String, Object?>{
+            'objectType': bidThreadDefinition.objectType,
+            'actionKey': bidThreadDefinition.actionKey,
+            'canonicalPath': bidThreadDefinition.canonicalPath,
+            'params': <String, Object?>{'projectId': projectId, 'bidId': bidId},
+          },
+          'decisionAvailability': null,
+        },
+      ],
+    };
+  }
+
+  return <String, Object?>{
+    'conversationId': 'conversation-1',
+    'counterpart': const <String, Object?>{
+      'organizationId': 'org-counterpart',
+      'displayName': '重庆涪川展览工厂',
+      'avatarUrl': null,
+      'role': 'counterpart',
+    },
+    'summary': const <String, Object?>{
+      'focusProjectId': 'project-luzhou',
+      'title': '项目沟通',
+      'text': '当前对方主体有多个项目沟通入口。',
+      'projectCount': 2,
+      'latestCardType': 'project_name_access_request',
+    },
+    'focusProjectId': 'project-luzhou',
+    'latestActivityAt': '2026-05-04T10:00:00Z',
+    'projectGroups': <Object?>[
+      groupPayload(
+        projectId: 'project-luzhou',
+        title: '西洽会 - 泸州',
+        requestId: 'request-luzhou',
+        bidId: 'bid-luzhou',
+        latestActivityAt: '2026-05-04T10:00:00Z',
+      ),
+      groupPayload(
+        projectId: 'project-chengdu',
+        title: '西洽会 - 成都',
+        requestId: 'request-chengdu',
+        bidId: 'bid-chengdu',
+        latestActivityAt: '2026-05-03T10:00:00Z',
+      ),
+    ],
+  };
+}
+
+Map<String, Object?> _threadPayload({
+  String threadId = 'project-thread-1',
+  String projectId = 'project-1',
+}) {
+  return <String, Object?>{
+    'threadId': threadId,
+    'projectId': projectId,
     'ownerOrganizationId': 'org-owner',
     'counterpartOrganizationId': 'org-counterpart',
     'threadState': 'open',
@@ -326,11 +457,13 @@ Map<String, Object?> _messagePayload({
   required String messageId,
   required String body,
   String? clientMessageId,
+  String threadId = 'project-thread-1',
+  String projectId = 'project-1',
 }) {
   return <String, Object?>{
     'messageId': messageId,
-    'threadId': 'project-thread-1',
-    'projectId': 'project-1',
+    'threadId': threadId,
+    'projectId': projectId,
     'senderUserId': 'user-1',
     'senderActorId': 'actor-1',
     'senderOrganizationId': 'org-owner',
@@ -591,9 +724,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _ensureVisible(tester, find.text('订单状态卡'));
-      await _ensureVisible(tester, find.text('当前账号仅可查看'));
-      expect(find.text('当前账号仅可查看'), findsOneWidget);
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('想跟TA说点什么...'), findsNothing);
+
+      await _enterFirstProjectCommunication(tester);
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '订单状态'));
+      expect(find.widgetWithText(FilledButton, '订单状态'), findsOneWidget);
+      expect(find.text('当前账号仅可查看'), findsNothing);
       expect(find.text('申请完工'), findsNothing);
       expect(find.text('确认完成'), findsNothing);
     },
@@ -710,7 +847,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _ensureVisible(tester, find.text('订单状态卡'));
+      await _enterFirstProjectCommunication(tester);
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '订单状态'));
+      await tester.tap(find.widgetWithText(FilledButton, '订单状态'));
+      await tester.pumpAndSettle();
+
       await _ensureVisible(tester, find.text('申请完工'));
       expect(find.text('申请完工'), findsOneWidget);
       expect(find.text('确认完成'), findsNothing);
@@ -834,7 +975,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _ensureVisible(tester, find.text('订单状态卡'));
+      await _enterFirstProjectCommunication(tester);
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '订单状态'));
+      await tester.tap(find.widgetWithText(FilledButton, '订单状态'));
+      await tester.pumpAndSettle();
+
       await _ensureVisible(tester, find.text('确认完成'));
       expect(find.text('确认完成'), findsOneWidget);
       await _ensureVisible(tester, find.text('拒绝完工'));
@@ -900,8 +1045,16 @@ void main() {
       expect(find.text('昵称'), findsOneWidget);
       expect(find.text('对方主体'), findsNothing);
       expect(find.text('1 个项目'), findsNothing);
-      expect(find.text('查看申请'), findsOneWidget);
-      expect(find.text('进入竞标沟通'), findsOneWidget);
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('进入此项目竞标沟通'), findsOneWidget);
+      expect(find.text('查看申请'), findsNothing);
+      expect(find.text('想跟TA说点什么...'), findsNothing);
+
+      await _enterFirstProjectCommunication(tester);
+      expect(find.text('竞标沟通'), findsOneWidget);
+      expect(find.text('项目名称查看申请 / 审核'), findsOneWidget);
+      expect(find.text('订单状态'), findsOneWidget);
+      expect(find.text('项目相册'), findsOneWidget);
       expect(find.text('想跟TA说点什么...'), findsOneWidget);
 
       await tester.tap(find.byType(CircleAvatar).first);
@@ -910,6 +1063,166 @@ void main() {
       expect(find.text('对方主体'), findsOneWidget);
       expect(find.text('评价对方'), findsOneWidget);
       expect(find.text('当前项目尚未结束，评价入口不会开放。'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'counterpart total frame switches between two projects without mixing messages',
+    (WidgetTester tester) async {
+      final messagesByProject = <String, String>{
+        'project-luzhou': '泸州项目消息',
+        'project-chengdu': '成都项目消息',
+      };
+      final threadByProject = <String, String>{
+        'project-luzhou': 'thread-luzhou',
+        'project-chengdu': 'thread-chengdu',
+      };
+      final seenThreadProjectIds = <String>[];
+      final seenMessageAnchors = <Map<String, String>>[];
+      final seenReadCursorBodies = <Map<String, Object?>>[];
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _twoProjectDetailPayload(),
+                    );
+                  },
+              'GET /api/app/message/project-communication/thread':
+                  (AppApiRequest request) async {
+                    final projectId = request.uri.queryParameters['projectId']!;
+                    seenThreadProjectIds.add(projectId);
+                    expect(
+                      request.uri.queryParameters['counterpartOrganizationId'],
+                      'org-counterpart',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _threadPayload(
+                        threadId: threadByProject[projectId]!,
+                        projectId: projectId,
+                      ),
+                    );
+                  },
+              'GET /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    final projectId = request.uri.queryParameters['projectId']!;
+                    final threadId = request.uri.queryParameters['threadId']!;
+                    expect(threadId, threadByProject[projectId]);
+                    seenMessageAnchors.add(<String, String>{
+                      'projectId': projectId,
+                      'threadId': threadId,
+                    });
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          _messagePayload(
+                            messageId: 'message-$projectId',
+                            body: messagesByProject[projectId]!,
+                            threadId: threadId,
+                            projectId: projectId,
+                          ),
+                        ],
+                        'nextCursor': null,
+                      },
+                    );
+                  },
+              'POST /api/app/message/project-communication/read-cursor':
+                  (AppApiRequest request) async {
+                    final body = request.body as Map<String, Object?>;
+                    seenReadCursorBodies.add(Map<String, Object?>.of(body));
+                    return AppApiResponse(
+                      statusCode: 202,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'threadId': body['threadId'],
+                        'projectId': body['projectId'],
+                        'organizationId': 'org-owner',
+                        'lastReadMessageId': body['lastReadMessageId'],
+                        'lastReadAt': '2026-05-04T10:02:01Z',
+                        'updatedAt': '2026-05-04T10:02:01Z',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('西洽会 - 泸州'), findsOneWidget);
+      expect(find.text('西洽会 - 成都'), findsOneWidget);
+      expect(find.text('想跟TA说点什么...'), findsNothing);
+      expect(
+        transport.requests.where(
+          (request) =>
+              request.canonicalPath ==
+                  '/api/app/message/project-communication/thread' ||
+              request.canonicalPath ==
+                  '/api/app/message/project-communication/messages',
+        ),
+        isEmpty,
+      );
+
+      await _enterFirstProjectCommunication(tester);
+
+      expect(find.text('西洽会 - 泸州'), findsOneWidget);
+      expect(find.text('泸州项目消息'), findsOneWidget);
+      expect(find.text('成都项目消息'), findsNothing);
+      expect(seenThreadProjectIds, <String>['project-luzhou']);
+      expect(seenMessageAnchors, <Map<String, String>>[
+        <String, String>{
+          'projectId': 'project-luzhou',
+          'threadId': 'thread-luzhou',
+        },
+      ]);
+      expect(seenReadCursorBodies.single, <String, Object?>{
+        'threadId': 'thread-luzhou',
+        'projectId': 'project-luzhou',
+        'lastReadMessageId': 'message-project-luzhou',
+      });
+
+      final backToProjectList = find.byIcon(Icons.arrow_back_rounded);
+      await _ensureVisible(tester, backToProjectList);
+      await tester.tap(backToProjectList);
+      await tester.pump();
+      await tester.pumpAndSettle();
+      await tester.drag(find.byType(Scrollable).first, const Offset(0, 600));
+      await tester.pumpAndSettle();
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('想跟TA说点什么...'), findsNothing);
+
+      final secondProjectEntry = find
+          .widgetWithText(FilledButton, '进入此项目竞标沟通')
+          .at(1);
+      await _ensureVisible(tester, secondProjectEntry);
+      await tester.tap(secondProjectEntry);
+      await tester.pumpAndSettle();
+
+      expect(find.text('西洽会 - 成都'), findsOneWidget);
+      expect(find.text('成都项目消息'), findsOneWidget);
+      expect(find.text('泸州项目消息'), findsNothing);
+      expect(seenThreadProjectIds, <String>[
+        'project-luzhou',
+        'project-chengdu',
+      ]);
+      expect(seenMessageAnchors.last, <String, String>{
+        'projectId': 'project-chengdu',
+        'threadId': 'thread-chengdu',
+      });
+      expect(seenReadCursorBodies.last, <String, Object?>{
+        'threadId': 'thread-chengdu',
+        'projectId': 'project-chengdu',
+        'lastReadMessageId': 'message-project-chengdu',
+      });
     },
   );
 
@@ -963,10 +1276,13 @@ void main() {
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
 
-      expect(find.text('订单状态'), findsWidgets);
-      expect(find.text('查看订单'), findsOneWidget);
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('订单状态'), findsNothing);
 
-      final openOrderButton = find.text('查看订单');
+      await _enterFirstProjectCommunication(tester);
+      expect(find.text('订单状态'), findsOneWidget);
+
+      final openOrderButton = find.widgetWithText(FilledButton, '订单状态');
       await _ensureVisible(tester, openOrderButton);
       await tester.tap(openOrderButton);
       await tester.pumpAndSettle();
@@ -1205,6 +1521,12 @@ void main() {
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
 
+      await _enterFirstProjectCommunication(tester);
+      final albumButton = find.widgetWithText(FilledButton, '项目相册');
+      await _ensureVisible(tester, albumButton);
+      await tester.tap(albumButton);
+      await tester.pumpAndSettle();
+
       await tester.scrollUntilVisible(
         find.text('项目相册'),
         280,
@@ -1331,6 +1653,7 @@ void main() {
 
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
       await tester.ensureVisible(find.byType(TextField));
       await tester.tap(find.byType(TextField));
       await tester.enterText(find.byType(TextField), '在吗');
@@ -1456,6 +1779,7 @@ void main() {
 
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
       await tester.ensureVisible(find.byType(TextField));
       await tester.tap(find.byType(TextField));
       await tester.enterText(find.byType(TextField), '重试后的消息');
@@ -1541,6 +1865,7 @@ void main() {
         _buildPage(transport, realtimeClient: realtimeClient),
       );
       await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
 
       expect(realtimeClient.subscriptions, hasLength(1));
       expect(realtimeClient.subscriptions.single, <String, String>{
@@ -1641,6 +1966,7 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
       await tester.pumpAndSettle();
 
@@ -1690,6 +2016,7 @@ void main() {
         _buildPage(transport, realtimeClient: realtimeClient),
       );
       await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
       expect(realtimeClient.subscriptions, hasLength(1));
 
       await tester.pumpWidget(const SizedBox.shrink());
@@ -1701,6 +2028,7 @@ void main() {
         _buildPage(transport, realtimeClient: realtimeClient),
       );
       await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
       await tester.idle();
       expect(realtimeClient.subscriptions, hasLength(2));
     },

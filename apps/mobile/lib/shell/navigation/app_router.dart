@@ -406,6 +406,9 @@ class AppRouter {
       ExhibitionRoutes.projectClarification => ProjectClarificationPage(
         projectId: routeUri.queryParameters['projectId'],
       ),
+      ExhibitionRoutes.projectAlbum => ProjectAlbumPage(
+        projectId: routeUri.queryParameters['projectId'],
+      ),
       ExhibitionRoutes.projectNameAccessThread => ProjectNameAccessThreadPage(
         threadId: routeUri.queryParameters['threadId'],
         projectId: routeUri.queryParameters['projectId'],
@@ -469,6 +472,7 @@ class AppRouter {
       ExhibitionRoutes.projectDetail => '项目详情',
       ExhibitionRoutes.myProjectDetail => '我的项目详情',
       ExhibitionRoutes.projectClarification => '项目澄清',
+      ExhibitionRoutes.projectAlbum => '项目相册',
       ExhibitionRoutes.projectNameAccessThread => '名称查看申请',
       ExhibitionRoutes.counterpartConversation => '项目沟通',
       ExhibitionRoutes.bidThread => '沟通与投标',

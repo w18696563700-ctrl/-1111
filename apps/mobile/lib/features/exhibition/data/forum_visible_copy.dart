@@ -460,6 +460,9 @@ String _readFailureFallback(String path, {String? errorCode}) {
 }
 
 String _readNotFoundFallback(String path) {
+  if (path.contains('/forum/interaction/')) {
+    return '互动通知暂不可用';
+  }
   if (path.contains('/forum/post/detail')) {
     return '没有找到这条帖子，可能已删除或暂不公开';
   }

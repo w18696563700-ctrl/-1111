@@ -8,6 +8,7 @@ import { ForumDraftCommandErrorMessageService } from './forum-draft-command-erro
 import { ForumDraftOpenService } from './forum-draft-open.service';
 import { ForumController } from './forum.controller';
 import { ForumInteractionService } from './forum-interaction.service';
+import { ForumInteractionInboxService } from './forum-interaction-inbox.service';
 import { ForumInteractionCommandErrorMessageService } from './forum-interaction-command-error-message.service';
 import { ForumOwnPostCommandErrorMessageService } from './forum-own-post-command-error-message.service';
 import { ForumOwnPostContinuityService } from './forum-own-post-continuity.service';
@@ -26,6 +27,7 @@ import { ForumService } from './forum.service';
     ForumCommandErrorService,
     ForumDraftCommandErrorMessageService,
     ForumDraftOpenService,
+    ForumInteractionInboxService,
     ForumInteractionService,
     ForumInteractionCommandErrorMessageService,
     ForumOwnPostCommandErrorMessageService,

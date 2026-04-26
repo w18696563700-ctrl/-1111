@@ -93,21 +93,21 @@ const List<_ProjectAttachmentKindOption> _projectAttachmentKindOptions =
     <_ProjectAttachmentKindOption>[
       _ProjectAttachmentKindOption(
         value: _projectAttachmentKindEffectImage,
-        label: '效果图',
-        summary: '用于补充效果图或展示图，只接受图片文件。',
+        label: '效果图（必传）',
+        summary: '用于补充效果图或展示图；这是预发布详情里的必传附件，只接受图片文件。',
         supportedTypes: 'PNG / JPEG / WEBP',
       ),
       _ProjectAttachmentKindOption(
-        value: _projectAttachmentKindConstructionDoc,
-        label: '施工图',
-        summary: '用于补充施工图或施工文档，只接受文档文件。',
-        supportedTypes: 'PDF / DOC / DOCX',
+        value: _projectAttachmentKindOtherMaterial,
+        label: '材质图（选传）',
+        summary: '用于补充材质、工艺或现场参考资料，接受图片或文档。',
+        supportedTypes: 'PNG / JPEG / WEBP / PDF / DOC / DOCX',
       ),
       _ProjectAttachmentKindOption(
-        value: _projectAttachmentKindOtherMaterial,
-        label: '其他资料',
-        summary: '用于补充展馆和展位图、展商手册及其他 owner-private 资料，接受图片或文档。',
-        supportedTypes: 'PNG / JPEG / WEBP / PDF / DOC / DOCX',
+        value: _projectAttachmentKindConstructionDoc,
+        label: '尺寸图（选传）',
+        summary: '用于补充尺寸、施工尺寸或平立面尺寸文档，只接受文档文件。',
+        supportedTypes: 'PDF / DOC / DOCX',
       ),
     ];
 
@@ -201,15 +201,17 @@ String _projectAttachmentMimeTypeLabel(String mimeType) {
 String _projectAttachmentKindLabel(String attachmentKind) {
   return switch (attachmentKind) {
     _projectAttachmentKindEffectImage => '效果图',
-    _projectAttachmentKindConstructionDoc => '施工图',
-    _projectAttachmentKindOtherMaterial => '其他资料',
+    _projectAttachmentKindConstructionDoc => '尺寸图',
+    _projectAttachmentKindOtherMaterial => '材质图',
     _ => attachmentKind,
   };
 }
 
 String _projectAttachmentChooseActionLabel(String attachmentKind) {
   return switch (attachmentKind) {
-    _projectAttachmentKindEffectImage => '选择项目图片',
+    _projectAttachmentKindEffectImage => '选择效果图',
+    _projectAttachmentKindConstructionDoc => '选择尺寸图',
+    _projectAttachmentKindOtherMaterial => '选择材质图',
     _ => '选择项目附件',
   };
 }
@@ -257,8 +259,8 @@ _projectAttachmentFileAccessFromPayload(Object? payload) {
 String _projectAttachmentUnsupportedTypeMessage(String attachmentKind) {
   return switch (attachmentKind) {
     _projectAttachmentKindEffectImage => '效果图只支持 PNG、JPEG、WEBP 图片。',
-    _projectAttachmentKindConstructionDoc => '施工图只支持 PDF、DOC、DOCX 文件。',
-    _projectAttachmentKindOtherMaterial => '其他资料只支持图片、PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindConstructionDoc => '尺寸图只支持 PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindOtherMaterial => '材质图只支持图片、PDF、DOC、DOCX 文件。',
     _ => '当前文件类型暂不支持。',
   };
 }
@@ -336,7 +338,8 @@ String _projectAttachmentTimestampLabel(String raw) {
 }
 
 String _projectAttachmentListFailureMessage(ExhibitionLoadResult result) {
-  if (_projectAttachmentRouteMissingMessage(result.message) case final String message) {
+  if (_projectAttachmentRouteMissingMessage(result.message)
+      case final String message) {
     return message;
   }
 
@@ -357,7 +360,8 @@ String _projectAttachmentBindFailureMessage(
   required String fileName,
 }) {
   final rawMessage = result.message;
-  if (_projectAttachmentRouteMissingMessage(rawMessage) case final String message) {
+  if (_projectAttachmentRouteMissingMessage(rawMessage)
+      case final String message) {
     return message;
   }
   // Keep the backend-provided Chinese business reason when available so bind

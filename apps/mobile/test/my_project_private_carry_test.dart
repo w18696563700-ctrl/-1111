@@ -633,13 +633,25 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
         };
     handlers['GET /api/app/my/projects/$projectId/attachments'] =
         (AppApiRequest request) async {
+          final attachments = projectId == 'project-publish-flow'
+              ? <Map<String, Object?>>[
+                  <String, Object?>{
+                    'attachmentId': 'attachment-effect-1',
+                    'projectId': projectId,
+                    'fileAssetId': 'file-effect-1',
+                    'fileName': '必传效果图.png',
+                    'attachmentKind': 'effect_image',
+                    'mimeType': 'image/png',
+                    'visibility': 'owner_private',
+                    'sortOrder': 0,
+                    'createdAt': '2026-04-13T16:19:00Z',
+                  },
+                ]
+              : const <Map<String, Object?>>[];
           return AppApiResponse(
             statusCode: 200,
             uri: request.uri,
-            body: _attachmentListResponse(
-              projectId,
-              const <Map<String, Object?>>[],
-            ),
+            body: _attachmentListResponse(projectId, attachments),
           );
         };
     handlers['DELETE /api/app/my/projects/$projectId'] =
@@ -855,7 +867,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '作废归档'), findsOneWidget);
     expect(find.text('发布前确认'), findsOneWidget);
     expect(find.textContaining('预发布阶段已开放项目详情文书区'), findsOneWidget);
-    expect(find.textContaining('补充效果图、施工图和其他资料'), findsOneWidget);
+    expect(find.textContaining('补充必传效果图'), findsOneWidget);
     expect(find.text('删除此项目'), findsNothing);
   });
 
@@ -876,11 +888,11 @@ void main() {
 
     expect(find.text('当前阶段动作'), findsNothing);
     expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
-    expect(find.text('项目详情文书：预发布阶段已开放效果图、施工图和其他资料。'), findsOneWidget);
+    expect(find.text('项目详情文书：效果图为必传，材质图和尺寸图为选传。'), findsOneWidget);
     expect(find.text('下架关闭'), findsNothing);
     await _scrollTo(tester, find.text('项目详情文书区'));
     expect(find.text('项目详情文书区'), findsOneWidget);
-    expect(find.textContaining('预发布阶段已开放效果图、施工图和其他资料'), findsWidgets);
+    expect(find.textContaining('效果图为必传，材质图和尺寸图为选传'), findsWidgets);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
     await _scrollTo(tester, find.text('公共资源下载区'));
@@ -999,6 +1011,31 @@ void main() {
     expect(find.text('已正式发布'), findsOneWidget);
     expect(projectStates['project-publish-flow'], 'published');
     expect(find.textContaining('竞标中', skipOffstage: false), findsWidgets);
+  });
+
+  testWidgets('预发布详情缺少必传效果图时拦截正式发布', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-missing-effect': 'submitted',
+    };
+    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-missing-effect',
+      actionLabel: '补资料后确认发布',
+    );
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('请先上传必传效果图，再进行正式发布确认。'), findsOneWidget);
+    expect(find.textContaining('项目将从预发布列表进入公域项目详情'), findsNothing);
+    expect(projectStates['project-missing-effect'], 'submitted');
   });
 
   testWidgets('已发布详情不再提供阶段动作和下架关闭入口', (WidgetTester tester) async {

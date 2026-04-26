@@ -159,12 +159,12 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 key: ValueKey<String>('my-project-attachment-$projectId'),
                 projectId: projectId,
                 title: '项目详情文书区',
-                summary: '预发布阶段已开放效果图、施工图和其他资料。补齐后再检查无误并正式发布。',
+                summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
                 // Keep the detail surface compact: no duplicated technical
                 // upload-chain explanation above the attachment controls.
                 showIntroCopy: false,
                 compactKindHints: true,
-                emptyMessage: '当前还没有补充效果图、施工图或其他资料。',
+                emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
               ),
             ),
             const SizedBox(height: 16),
@@ -241,7 +241,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         if (showContinueAttachmentAction) ...<Widget>[
           const _DetailLine(
             label: '项目详情文书',
-            value: '预发布阶段已开放效果图、施工图和其他资料。',
+            value: '效果图为必传，材质图和尺寸图为选传。',
             highlight: true,
           ),
           const SizedBox(height: 8),
@@ -282,7 +282,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         const SizedBox(height: 12),
         const _StateMessage(
           title: '发布前确认',
-          body: '预发布阶段已开放项目详情文书区，请先补充效果图、施工图和其他资料；确认无误后再点击“检查无误，确定发布”。',
+          body: '预发布阶段已开放项目详情文书区，请先补充必传效果图；材质图、尺寸图可按需补充。确认无误后再点击“检查无误，确定发布”。',
         ),
       ],
       const SizedBox(height: 12),
@@ -413,6 +413,10 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       _showPageMessage('当前项目不可用。');
       return;
     }
+    if (kind == _MyProjectLifecycleActionKind.publish &&
+        !await _ensureRequiredEffectImageBeforePublish(projectId)) {
+      return;
+    }
 
     final action = _myProjectLifecycleActionOption(kind);
     final confirmed = await _confirmDangerAction(
@@ -454,6 +458,32 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return;
     }
     _showPageMessage(action.successMessage);
+  }
+
+  Future<bool> _ensureRequiredEffectImageBeforePublish(String projectId) async {
+    final result = await ExhibitionConsumerLayer.instance
+        .loadProjectAttachments(projectId: projectId, forceRefresh: true);
+    if (!mounted) {
+      return false;
+    }
+    if (result.state != AppPageState.content &&
+        result.state != AppPageState.empty) {
+      _showPageMessage('当前附件列表暂不可用，请刷新后再试。');
+      return false;
+    }
+    final attachments =
+        _projectAttachmentListFromPayload(result.payload)?.attachments ??
+        const <ProjectAttachmentReadModel>[];
+    final hasEffectImage = attachments.any(
+      (ProjectAttachmentReadModel item) =>
+          item.attachmentKind == _projectAttachmentKindEffectImage,
+    );
+    if (!hasEffectImage) {
+      _showPageMessage('请先上传必传效果图，再进行正式发布确认。');
+      await _scrollToAttachments();
+      return false;
+    }
+    return true;
   }
 
   Future<void> _openProjectEdit(String projectId) async {

@@ -74,6 +74,11 @@ function createEligibilityService(overrides = {}) {
       };
     },
   };
+  const personalCertificationRepository = {
+    async findOne() {
+      return null;
+    },
+  };
 
   if (overrides.userRepository) {
     Object.assign(userRepository, overrides.userRepository);
@@ -90,16 +95,20 @@ function createEligibilityService(overrides = {}) {
       overrides.organizationCertificationRepository,
     );
   }
+  if (overrides.personalCertificationRepository) {
+    Object.assign(personalCertificationRepository, overrides.personalCertificationRepository);
+  }
 
   return new CurrentActorEligibilityService(
     userRepository,
     organizationRepository,
     organizationMemberRepository,
     organizationCertificationRepository,
+    personalCertificationRepository,
   );
 }
 
-test('Server P0-1 eligibility truth requires buyer-side allowed role plus approved certification', async () => {
+test('Server P0-1 eligibility truth allows approved both subject without buyer-role hard block', async () => {
   const approvedBuyerService = createEligibilityService();
   const approvedScope = await approvedBuyerService.requireProjectPublishEligibility({
     sessionId: 'session-1',
@@ -181,6 +190,71 @@ test('Server P0-1 eligibility truth requires buyer-side allowed role plus approv
     (error) => {
       assert.equal(error?.response?.code, 'AUTH_PERMISSION_INSUFFICIENT');
       assert.equal(error?.response?.details?.reason, 'buyer_role_not_allowed');
+      return true;
+    },
+  );
+
+  const bothSupplierRoleService = createEligibilityService({
+    organizationRepository: {
+      async findOneBy() {
+        return { id: 'buyer-org', organizationType: 'both', lifecycleStatus: 'active' };
+      },
+    },
+    organizationMemberRepository: {
+      async findOneBy() {
+        return {
+          organizationId: 'buyer-org',
+          userId: 'user-1',
+          memberStatus: 'active',
+          roleKey: 'supplier_admin',
+        };
+      },
+    },
+  });
+  const bothScope = await bothSupplierRoleService.requireProjectPublishEligibility({
+    sessionId: 'session-3b',
+    actorId: 'user-1',
+    userId: 'user-1',
+    organizationId: 'buyer-org',
+    requestId: 'eligibility-both-supplier-role',
+    traceId: 'trace-eligibility-both-supplier-role',
+  });
+  assert.equal(bothScope.organization.organizationType, 'both');
+  assert.equal(bothScope.membership.roleKey, 'supplier_admin');
+
+  const supplierOnlyService = createEligibilityService({
+    organizationRepository: {
+      async findOneBy() {
+        return { id: 'buyer-org', organizationType: 'supplier', lifecycleStatus: 'active' };
+      },
+    },
+    organizationMemberRepository: {
+      async findOneBy() {
+        return {
+          organizationId: 'buyer-org',
+          userId: 'user-1',
+          memberStatus: 'active',
+          roleKey: 'supplier_admin',
+        };
+      },
+    },
+  });
+  await assert.rejects(
+    () =>
+      supplierOnlyService.requireProjectPublishEligibility({
+        sessionId: 'session-3c',
+        actorId: 'user-1',
+        userId: 'user-1',
+        organizationId: 'buyer-org',
+        requestId: 'eligibility-supplier-only',
+        traceId: 'trace-eligibility-supplier-only',
+      }),
+    (error) => {
+      assert.equal(error?.response?.code, 'AUTH_PERMISSION_INSUFFICIENT');
+      assert.equal(
+        error?.response?.details?.reason,
+        'organization_type_not_allowed',
+      );
       return true;
     },
   );
@@ -403,7 +477,7 @@ test('Server P0-1b shell projectCreateEligibility stays aligned with the same pu
   const { ShellQueryService } = require('../dist/modules/shell/shell-query.service.js');
   const eligibilityService = createEligibilityService();
   const scopePending = {
-    organization: { id: 'buyer-org' },
+    organization: { id: 'buyer-org', organizationType: 'buyer' },
     membership: { roleKey: 'buyer_admin', memberStatus: 'active' },
     certification: { certificationStatus: 'pending_review' },
     roleKeys: ['buyer_admin'],
@@ -413,7 +487,19 @@ test('Server P0-1b shell projectCreateEligibility stays aligned with the same pu
     certification: { certificationStatus: 'approved' },
   };
   const scopeSupplier = {
-    organization: { id: 'buyer-org' },
+    organization: { id: 'buyer-org', organizationType: 'buyer' },
+    membership: { roleKey: 'supplier_admin', memberStatus: 'active' },
+    certification: { certificationStatus: 'approved' },
+    roleKeys: ['supplier_admin'],
+  };
+  const scopeBothSupplier = {
+    organization: { id: 'both-org', organizationType: 'both' },
+    membership: { roleKey: 'supplier_admin', memberStatus: 'active' },
+    certification: { certificationStatus: 'approved' },
+    roleKeys: ['supplier_admin'],
+  };
+  const scopeSupplierOnly = {
+    organization: { id: 'supplier-org', organizationType: 'supplier' },
     membership: { roleKey: 'supplier_admin', memberStatus: 'active' },
     certification: { certificationStatus: 'approved' },
     roleKeys: ['supplier_admin'],
@@ -535,6 +621,16 @@ test('Server P0-1b shell projectCreateEligibility stays aligned with the same pu
     createContext('shell-supplier'),
   );
   assert.equal(supplierContext.projectCreateEligibility.canCreateProject, false);
+
+  const bothSupplierContext = await buildService(scopeBothSupplier).getContext(
+    createContext('shell-both-supplier'),
+  );
+  assert.equal(bothSupplierContext.projectCreateEligibility.canCreateProject, true);
+
+  const supplierOnlyContext = await buildService(scopeSupplierOnly).getContext(
+    createContext('shell-supplier-only'),
+  );
+  assert.equal(supplierOnlyContext.projectCreateEligibility.canCreateProject, false);
 });
 
 test('Server P0-3 milestone submit shell accepts only the current milestone anchor', async () => {

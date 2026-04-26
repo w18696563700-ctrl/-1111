@@ -362,15 +362,9 @@ void main() {
     expect(_projectCreateField('计划结束日期'), findsOneWidget);
     expect(find.byTooltip('选择计划开始日期'), findsOneWidget);
     expect(find.byTooltip('选择计划结束日期'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('补充说明与附件'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
-    expect(find.text('补充说明与附件'), findsOneWidget);
-    expect(_projectCreateField('补充说明'), findsOneWidget);
-    expect(find.text('资料补充'), findsOneWidget);
+    expect(find.text('补充说明与附件', skipOffstage: false), findsNothing);
+    expect(_projectCreateField('补充说明'), findsNothing);
+    expect(find.text('资料补充', skipOffstage: false), findsNothing);
   });
 
   test(
@@ -673,19 +667,16 @@ void main() {
         transport: transport,
         sessionStore: _buildAuthenticatedSessionStore(deviceId: 'mainline-5'),
         shellContextConsumer: _buildShellContextConsumer(
-          roleKeys: const <String>['buyer_member(scoped)'],
+          roleKeys: const <String>['supplier_admin'],
           canCreateProject: false,
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前角色不允许创建项目'), findsOneWidget);
-    expect(
-      find.text('当前组织角色暂不允许创建项目；最终是否可继续仍以当前创建资格返回结果为准，请先返回我的项目查看当前可继续入口。'),
-      findsOneWidget,
-    );
-    expect(find.widgetWithText(FilledButton, '返回我的项目'), findsOneWidget);
+    expect(find.text('当前角色不允许创建项目'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '返回我的项目'), findsNothing);
+    expect(find.text('当前组织角色暂不允许创建项目'), findsNothing);
   });
 
   testWidgets('project create failure says network reason exactly', (

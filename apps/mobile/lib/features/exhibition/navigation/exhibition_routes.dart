@@ -11,6 +11,7 @@ final class ExhibitionRoutes {
   static const String myProjectDetail = '/exhibition/my/projects/detail';
   static const String projectClarification =
       '/exhibition/projects/clarification';
+  static const String projectAlbum = '/exhibition/projects/album';
   static const String projectNameAccessThread =
       '/exhibition/projects/name-access-thread';
   static const String counterpartConversation =
@@ -99,6 +100,10 @@ final class ExhibitionRoutes {
     return _withQuery(projectClarification, <String, String>{
       'projectId': projectId,
     });
+  }
+
+  static String projectAlbumWithProjectId(String projectId) {
+    return _withQuery(projectAlbum, <String, String>{'projectId': projectId});
   }
 
   static String projectNameAccessThreadWithIds({

@@ -5,19 +5,21 @@ class _CounterpartConversationHeader extends StatelessWidget {
     required this.data,
     required this.onOpenSubjectCard,
     required this.canOpenSubjectCard,
+    this.title = '项目沟通',
   });
 
   final CounterpartConversationDetailView data;
   final VoidCallback onOpenSubjectCard;
   final bool canOpenSubjectCard;
+  final String title;
 
   @override
   Widget build(BuildContext context) {
     final avatarUrl = data.counterpart.avatarUrl?.trim();
     final nickname = data.counterpart.displayName.trim();
-    final title = nickname.isEmpty ? '未命名对方' : nickname;
+    final displayName = nickname.isEmpty ? '未命名对方' : nickname;
     return _ActionCard(
-      title: '项目沟通',
+      title: title,
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         Row(
@@ -32,7 +34,7 @@ class _CounterpartConversationHeader extends StatelessWidget {
                     ? null
                     : NetworkImage(avatarUrl),
                 child: avatarUrl == null || avatarUrl.isEmpty
-                    ? Text(title.characters.first)
+                    ? Text(displayName.characters.first)
                     : null,
               ),
             ),
@@ -42,7 +44,7 @@ class _CounterpartConversationHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    title,
+                    displayName,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
@@ -65,44 +67,48 @@ class _CounterpartConversationHeader extends StatelessWidget {
   }
 }
 
-class _CounterpartProjectGroupSection extends StatelessWidget {
-  const _CounterpartProjectGroupSection({
-    required this.group,
-    required this.onOpenCard,
+class _CounterpartProjectEntryList extends StatelessWidget {
+  const _CounterpartProjectEntryList({
+    required this.groups,
+    required this.onOpenProjectCommunication,
   });
 
-  final CounterpartConversationProjectGroupView group;
-  final ValueChanged<CounterpartConversationBusinessCardView> onOpenCard;
+  final List<CounterpartConversationProjectGroupView> groups;
+  final ValueChanged<CounterpartConversationProjectGroupView>
+  onOpenProjectCommunication;
 
   @override
   Widget build(BuildContext context) {
     return _ActionCard(
-      title: group.projectDisplayTitle,
+      title: '项目列表',
+      summary: '选择具体项目后进入此项目竞标沟通；总框不承接聊天业务。',
       children: <Widget>[
-        if (group.cards.isEmpty)
-          const _StateMessage(title: '当前项目暂无业务卡', body: '可以下拉刷新状态。')
+        if (groups.isEmpty)
+          const _EmptyNotice(
+            title: '当前没有项目入口',
+            message: '这个对方主体下暂时没有可展示的项目沟通事项。',
+          )
         else
-          ...group.cards.map(
-            (CounterpartConversationBusinessCardView card) => Padding(
-              padding: const EdgeInsets.only(top: 10),
-              child: SizedBox(
-                width: double.infinity,
-                child: _CounterpartBusinessCard(
-                  card: card,
-                  onOpen: () => onOpenCard(card),
-                ),
+          for (final group in groups)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: _CounterpartProjectEntryTile(
+                group: group,
+                onOpen: () => onOpenProjectCommunication(group),
               ),
             ),
-          ),
       ],
     );
   }
 }
 
-class _CounterpartBusinessCard extends StatelessWidget {
-  const _CounterpartBusinessCard({required this.card, required this.onOpen});
+class _CounterpartProjectEntryTile extends StatelessWidget {
+  const _CounterpartProjectEntryTile({
+    required this.group,
+    required this.onOpen,
+  });
 
-  final CounterpartConversationBusinessCardView card;
+  final CounterpartConversationProjectGroupView group;
   final VoidCallback onOpen;
 
   @override
@@ -123,34 +129,139 @@ class _CounterpartBusinessCard extends StatelessWidget {
               spacing: 8,
               runSpacing: 8,
               children: <Widget>[
-                _ConversationPill(label: _cardTypeLabel(card.cardType)),
-                if (card.status != null)
-                  _ConversationPill(label: _businessStatusLabel(card.status!)),
+                _ConversationPill(
+                  label: _projectStateLabel(group.projectState),
+                ),
+                _ConversationPill(label: '${group.cards.length} 项业务'),
               ],
             ),
             const SizedBox(height: 8),
             Text(
-              card.title,
-              style: theme.textTheme.titleSmall?.copyWith(
+              group.projectDisplayTitle,
+              style: theme.textTheme.titleMedium?.copyWith(
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 6),
             Text(
-              card.summary,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
+              '进入后才加载此项目聊天、订单入口和项目相册入口。',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
             ),
             const SizedBox(height: 10),
-            FilledButton.tonalIcon(
+            FilledButton.icon(
               onPressed: onOpen,
-              icon: Icon(_cardActionIcon(card.cardType)),
-              label: Text(_cardActionLabel(card.cardType)),
+              icon: const Icon(Icons.forum_outlined),
+              label: const Text('进入此项目竞标沟通'),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
+  const _SelectedProjectBusinessEntrypoints({
+    required this.group,
+    required this.nameAccessCard,
+    required this.orderId,
+    required this.onBackToProjectList,
+    required this.onOpenNameAccess,
+    required this.onOpenOrder,
+    required this.onOpenProjectAlbum,
+  });
+
+  final CounterpartConversationProjectGroupView group;
+  final CounterpartConversationBusinessCardView? nameAccessCard;
+  final String? orderId;
+  final VoidCallback onBackToProjectList;
+  final ValueChanged<CounterpartConversationBusinessCardView> onOpenNameAccess;
+  final VoidCallback onOpenOrder;
+  final VoidCallback onOpenProjectAlbum;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ActionCard(
+      title: group.projectDisplayTitle,
+      summary: '当前页只保留项目级业务入口；订单状态与项目相册进入受控页面查看。',
+      children: <Widget>[
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: onBackToProjectList,
+            icon: const Icon(Icons.arrow_back_rounded),
+            label: const Text('返回项目列表'),
+          ),
+        ),
+        const SizedBox(height: 8),
+        _ProjectBusinessEntryButton(
+          icon: Icons.fact_check_outlined,
+          label: '项目名称查看申请 / 审核',
+          enabled: nameAccessCard != null,
+          disabledMessage: '当前项目暂无名称查看申请或审核入口。',
+          onPressed: nameAccessCard == null
+              ? null
+              : () => onOpenNameAccess(nameAccessCard!),
+        ),
+        const SizedBox(height: 10),
+        _ProjectBusinessEntryButton(
+          icon: Icons.receipt_long_outlined,
+          label: '订单状态',
+          enabled: orderId != null,
+          disabledMessage: '当前项目暂无订单状态入口。',
+          onPressed: orderId == null ? null : onOpenOrder,
+        ),
+        const SizedBox(height: 10),
+        _ProjectBusinessEntryButton(
+          icon: Icons.photo_library_outlined,
+          label: '项目相册',
+          enabled: true,
+          disabledMessage: '',
+          onPressed: onOpenProjectAlbum,
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectBusinessEntryButton extends StatelessWidget {
+  const _ProjectBusinessEntryButton({
+    required this.icon,
+    required this.label,
+    required this.enabled,
+    required this.disabledMessage,
+    required this.onPressed,
+  });
+
+  final IconData icon;
+  final String label;
+  final bool enabled;
+  final String disabledMessage;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: <Widget>[
+        FilledButton.tonalIcon(
+          onPressed: enabled ? onPressed : null,
+          icon: Icon(icon),
+          label: Text(label),
+        ),
+        if (!enabled) ...<Widget>[
+          const SizedBox(height: 6),
+          Text(
+            disabledMessage,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
@@ -182,49 +293,14 @@ class _ConversationPill extends StatelessWidget {
   }
 }
 
-String _cardTypeLabel(String type) {
-  return switch (type) {
-    'project_name_access_request' => '项目名称申请',
-    'bid_thread' => '竞标沟通',
-    'project_clarification' => '项目澄清',
-    'project_order' => '订单状态',
-    'system_notice' => '系统通知',
-    _ => type,
-  };
-}
-
-String _cardActionLabel(String type) {
-  return switch (type) {
-    'project_name_access_request' => '查看申请',
-    'bid_thread' => '进入竞标沟通',
-    'project_clarification' => '查看澄清',
-    'project_order' => '查看订单',
-    _ => '查看详情',
-  };
-}
-
-IconData _cardActionIcon(String type) {
-  return switch (type) {
-    'project_name_access_request' => Icons.fact_check_outlined,
-    'bid_thread' => Icons.chat_bubble_outline_rounded,
-    'project_clarification' => Icons.help_outline_rounded,
-    'project_order' => Icons.receipt_long_outlined,
-    _ => Icons.open_in_new_rounded,
-  };
-}
-
-String _businessStatusLabel(String value) {
+String _projectStateLabel(String? value) {
   return switch (value) {
-    'pending' => '待审批',
-    'approved' => '已通过',
-    'rejected' => '已拒绝',
-    'open' => '进行中',
-    'submitted' => '已提交',
-    'active' => '履约中',
+    'published' => '已发布',
+    'bidding' => '竞标中',
+    'converted_to_order' => '已转订单',
     'completed' => '已完成',
-    'requested' => '待确认完工',
-    'confirmed' => '已确认',
-    'none' => '未申请',
+    'closed' => '已关闭',
+    null => '项目',
     _ => value,
   };
 }

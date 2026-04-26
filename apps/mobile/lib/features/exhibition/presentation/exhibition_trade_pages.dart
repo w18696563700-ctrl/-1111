@@ -40,6 +40,7 @@ part 'pages/counterpart_conversation_page.dart';
 part 'pages/counterpart_conversation_widgets.dart';
 part 'pages/counterpart_conversation_chat_widgets.dart';
 part 'pages/project_album_section.dart';
+part 'pages/project_album_page.dart';
 part 'pages/counterpart_conversation_subject_sheet.dart';
 part 'pages/minimal_visual_spec_page.dart';
 part 'pages/my_project_detail_page.dart';

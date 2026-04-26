@@ -16,6 +16,7 @@ class _InputField extends StatelessWidget {
     this.required = false,
     this.readOnly = false,
     this.enabled = true,
+    this.contentPadding,
     this.onTap,
     this.onChanged,
   });
@@ -34,6 +35,7 @@ class _InputField extends StatelessWidget {
   final bool required;
   final bool readOnly;
   final bool enabled;
+  final EdgeInsetsGeometry? contentPadding;
   final VoidCallback? onTap;
   final ValueChanged<String>? onChanged;
 
@@ -67,6 +69,7 @@ class _InputField extends StatelessWidget {
           suffixText: suffixText,
           suffixIcon: suffixIcon,
           border: const OutlineInputBorder(),
+          contentPadding: contentPadding,
           alignLabelWithHint: maxLines > 1,
         ),
       ),

@@ -625,6 +625,8 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
+    expect(find.text('互动通知暂不可用'), findsOneWidget);
     expect(find.text('当前“回复我的”入口暂不可用，请稍后再试。'), findsOneWidget);
+    expect(find.text('没有找到对应的论坛内容'), findsNothing);
   });
 }

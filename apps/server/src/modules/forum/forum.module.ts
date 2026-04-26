@@ -11,6 +11,8 @@ import { ForumController } from './forum.controller';
 import { ForumAuthorProjectionService } from './forum-author-projection.service';
 import { ForumAuthorQueryService } from './forum-author.query.service';
 import { ForumCommentService } from './forum-comment.service';
+import { ForumInteractionInboxPresenter } from './forum-interaction-inbox.presenter';
+import { ForumInteractionInboxQueryService } from './forum-interaction-inbox.query.service';
 import { ForumAuthorFollowEntity } from './entities/forum-author-follow.entity';
 import { ForumCommentEntity } from './entities/forum-comment.entity';
 import { ForumDraftEntity } from './entities/forum-draft.entity';
@@ -50,6 +52,8 @@ import { ForumWriteService } from './forum.write.service';
     ForumAuthorProjectionService,
     ForumAuthorQueryService,
     ForumCommentService,
+    ForumInteractionInboxPresenter,
+    ForumInteractionInboxQueryService,
     ForumReportPresenter,
     ForumReportQueryService,
     ForumReportService,

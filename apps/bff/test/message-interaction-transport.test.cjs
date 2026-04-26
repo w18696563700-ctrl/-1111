@@ -559,8 +559,8 @@ test("counterpart conversation detail service forwards frozen server path and hi
           projectGroups: [
             {
               projectId: "project-1",
-              projectDisplayTitle: "项目名称需申请查看",
-              titleVisibility: "masked",
+              projectDisplayTitle: "西洽会 - 泸州",
+              titleVisibility: "visible",
               projectState: "published",
               latestActivityAt: "2026-04-29T10:00:00.000Z",
               orderSummary: {
@@ -658,6 +658,8 @@ test("counterpart conversation detail service forwards frozen server path and hi
     result.projectGroups[0].cards[0].truthAnchor.projectId,
     "project-1",
   );
+  assert.equal(result.projectGroups[0].projectDisplayTitle, "西洽会 - 泸州");
+  assert.equal(result.projectGroups[0].titleVisibility, "visible");
   assert.deepEqual(result.projectGroups[0].orderSummary, {
     orderId: "order-1",
     projectId: "project-1",

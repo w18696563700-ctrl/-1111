@@ -128,6 +128,26 @@ class _ProjectAttachmentKindPicker extends StatelessWidget {
   }
 }
 
+class _ProjectAttachmentRequirementPanel extends StatelessWidget {
+  const _ProjectAttachmentRequirementPanel({required this.attachments});
+
+  final List<ProjectAttachmentReadModel> attachments;
+
+  @override
+  Widget build(BuildContext context) {
+    final hasEffectImage = attachments.any(
+      (ProjectAttachmentReadModel item) =>
+          item.attachmentKind == _projectAttachmentKindEffectImage,
+    );
+    return _StateMessage(
+      title: '附件要求',
+      body: hasEffectImage
+          ? '效果图已补充；材质图和尺寸图为选传，可按项目需要继续补充。'
+          : '效果图为必传附件；材质图、尺寸图为选传附件。请先上传效果图后再进行正式发布确认。',
+    );
+  }
+}
+
 class _ProjectAttachmentKindHint extends StatelessWidget {
   const _ProjectAttachmentKindHint({
     required this.option,
@@ -354,15 +374,24 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
     }
 
     if (attachments.isEmpty) {
-      return _EmptyNotice(
-        title: '当前还没有项目文书',
-        message: '$emptyMessage 只有 bind 成功后，文书才会出现在这里。',
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _ProjectAttachmentRequirementPanel(attachments: attachments),
+          const SizedBox(height: 12),
+          _EmptyNotice(
+            title: '当前还没有项目文书',
+            message: '$emptyMessage 只有 bind 成功后，文书才会出现在这里。',
+          ),
+        ],
       );
     }
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        _ProjectAttachmentRequirementPanel(attachments: attachments),
+        const SizedBox(height: 12),
         Text(
           '项目文书列表',
           style: Theme.of(

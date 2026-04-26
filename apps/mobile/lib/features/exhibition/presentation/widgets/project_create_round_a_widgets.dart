@@ -7,7 +7,8 @@ List<Widget> _buildProjectCreateRoundABody({
   required String? formErrorMessage,
   required String? selectedProjectTypeLabel,
   required String? selectedStandardizedLocationLabel,
-  required String? quoteIntention,
+  required String selectedP0PayTaskType,
+  required bool showSupplementalSection,
   required bool hasStandardizedLocationSelection,
   required bool districtSelectionEnabled,
   required TextEditingController exhibitionNameController,
@@ -32,7 +33,7 @@ List<Widget> _buildProjectCreateRoundABody({
   required Future<void> Function() onStandardizedLocationPressed,
   required Future<void> Function() onDistrictPressed,
   required Future<void> Function() onScopeSummaryPressed,
-  required ValueChanged<String?> onQuoteIntentionChanged,
+  required ValueChanged<String?> onP0PayTaskTypeChanged,
   required VoidCallback onPlannedStartDatePressed,
   required VoidCallback onPlannedEndDatePressed,
   required VoidCallback onPlannedStartDateCleared,
@@ -60,6 +61,11 @@ List<Widget> _buildProjectCreateRoundABody({
       : districtSelectionEnabled
       ? '如需补充区/县，可继续选择更准确的位置。'
       : '当前所选城市暂无区/县选项，可直接填写详细地址。';
+  final isInquiryQuote = selectedP0PayTaskType == _projectQuoteIntentionInquiry;
+  final tallProjectInputPadding = const EdgeInsets.symmetric(
+    horizontal: 12,
+    vertical: 24,
+  );
 
   return <Widget>[
     if (guardLoading)
@@ -145,6 +151,7 @@ List<Widget> _buildProjectCreateRoundABody({
               required: true,
               readOnly: true,
               errorText: fieldErrors[_ProjectCreateFieldId.buildingType],
+              contentPadding: tallProjectInputPadding,
               onTap: onProjectTypePressed,
               suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
             ),
@@ -162,15 +169,17 @@ List<Widget> _buildProjectCreateRoundABody({
                     decimal: true,
                   ),
                   hintText: '例如：180000',
-                  helperText: '填写本次项目的预计预算金额，便于后续快速判断承接范围。',
-                  required: true,
+                  helperText: isInquiryQuote
+                      ? '询价意向下可先不填，发布前再确认预算。'
+                      : '填写本次项目的预计预算金额，便于后续快速判断承接范围。',
+                  required: !isInquiryQuote,
                   errorText: fieldErrors[_ProjectCreateFieldId.budgetAmount],
                   onChanged: (_) =>
                       onFieldInteracted(_ProjectCreateFieldId.budgetAmount),
                 ),
                 _ProjectQuoteIntentionSelector(
-                  selectedValue: quoteIntention,
-                  onChanged: onQuoteIntentionChanged,
+                  selectedValue: selectedP0PayTaskType,
+                  onChanged: onP0PayTaskTypeChanged,
                 ),
               ],
             ),
@@ -186,6 +195,7 @@ List<Widget> _buildProjectCreateRoundABody({
               helperText: '当前为选填，只填写数值真值，单位固定为㎡。',
               suffixText: '㎡',
               errorText: fieldErrors[_ProjectCreateFieldId.areaSqm],
+              contentPadding: tallProjectInputPadding,
               onChanged: (_) =>
                   onFieldInteracted(_ProjectCreateFieldId.areaSqm),
             ),
@@ -210,7 +220,7 @@ List<Widget> _buildProjectCreateRoundABody({
     const SizedBox(height: 16),
     _ActionCard(
       title: '项目地点与范围',
-      summary: '先确认项目所在地区，再补充详细地址；范围说明需要先补齐后才能保存项目。',
+      summary: '先确认项目所在地区，再补充详细地址；范围说明可按需要补充。',
       children: <Widget>[
         const _StateMessage(
           title: '地区选择说明',
@@ -354,35 +364,36 @@ List<Widget> _buildProjectCreateRoundABody({
         ),
       ],
     ),
-    const SizedBox(height: 16),
-    _ActionCard(
-      title: '补充说明与附件',
-      summary: '先补充项目背景说明；保存基本信息后会跳转到我的项目，进入预发布列表后即可补充效果图、施工图和其他资料。',
-      children: <Widget>[
-        _InputField(
-          controller: descriptionController,
-          fieldKey: fieldKeys[_ProjectCreateFieldId.description],
-          inputKey: const ValueKey<String>('project-create-description'),
-          label: '补充说明',
-          hintText: '例如：本期先完成基础施工与设备进场，重点关注医疗器械展区和灯光联动。',
-          helperText: '可补充项目背景、协作提醒或现场重点，当前为选填。',
-          maxLines: 4,
-          onChanged: (_) =>
-              onFieldInteracted(_ProjectCreateFieldId.description),
-        ),
-        const SizedBox(height: 4),
-        const _StateMessage(
-          title: '资料补充',
-          body:
-              '保存基本信息后，会先跳转到我的项目；你可以从草稿或预发布列表继续确认回显。效果图、施工图和其他资料会在预发布阶段开放为正式附件。',
-        ),
-      ],
-    ),
+    if (showSupplementalSection) ...<Widget>[
+      const SizedBox(height: 16),
+      _ActionCard(
+        title: '补充说明与附件',
+        summary: '草稿和预发布详情承接项目背景说明与正式附件；效果图为必传，材质图和尺寸图为选传。',
+        children: <Widget>[
+          _InputField(
+            controller: descriptionController,
+            fieldKey: fieldKeys[_ProjectCreateFieldId.description],
+            inputKey: const ValueKey<String>('project-create-description'),
+            label: '补充说明',
+            hintText: '例如：本期先完成基础施工与设备进场，重点关注医疗器械展区和灯光联动。',
+            helperText: '可补充项目背景、协作提醒或现场重点，当前为选填。',
+            maxLines: 4,
+            onChanged: (_) =>
+                onFieldInteracted(_ProjectCreateFieldId.description),
+          ),
+          const SizedBox(height: 4),
+          const _StateMessage(
+            title: '资料补充',
+            body: '效果图为必传；材质图、尺寸图为选传。附件上传会在项目详情文书区走正式 FileAsset 绑定链路。',
+          ),
+        ],
+      ),
+    ],
   ];
 }
 
-const String _projectQuoteIntentionFixedPrice = 'fixed_price';
-const String _projectQuoteIntentionInquiry = 'inquiry';
+const String _projectQuoteIntentionFixedPrice = 'fixed_price_bid';
+const String _projectQuoteIntentionInquiry = 'inquiry_quote';
 
 class _ProjectQuoteIntentionSelector extends StatelessWidget {
   const _ProjectQuoteIntentionSelector({
@@ -395,82 +406,108 @@ class _ProjectQuoteIntentionSelector extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final selectedDescription = switch (selectedValue) {
-      _projectQuoteIntentionFixedPrice =>
-        '已有明确预算，希望工厂按预算范围正式报价。当前只记录沟通意向，正式竞标仍需进入预发布详情检查无误后再发布。',
-      _projectQuoteIntentionInquiry =>
-        '预算仍需参考工厂报价，当前只记录沟通意向，不会创建询价报价单，也不会拉起 200 元发单诚意金。',
-      _ => null,
-    };
-
-    return Container(
+    return Padding(
       key: const ValueKey<String>('project-create-quote-intention'),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.45),
-        border: Border.all(color: colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            '报价方式意向',
-            style: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
+      padding: const EdgeInsets.only(top: 6),
+      child: Align(
+        alignment: Alignment.center,
+        child: FittedBox(
+          fit: BoxFit.scaleDown,
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              ChoiceChip(
+              _ProjectQuoteIntentionChip(
                 key: const ValueKey<String>(
                   'project-create-quote-intention-fixed-price',
                 ),
-                label: const Text('明价意向'),
+                label: '明价',
                 selected: selectedValue == _projectQuoteIntentionFixedPrice,
-                onSelected: (_) => onChanged(
-                  selectedValue == _projectQuoteIntentionFixedPrice
-                      ? null
-                      : _projectQuoteIntentionFixedPrice,
-                ),
+                onPressed: () => onChanged(_projectQuoteIntentionFixedPrice),
               ),
-              ChoiceChip(
+              const SizedBox(width: 6),
+              _ProjectQuoteIntentionChip(
                 key: const ValueKey<String>(
                   'project-create-quote-intention-inquiry',
                 ),
-                label: const Text('询价意向'),
+                label: '询价',
                 selected: selectedValue == _projectQuoteIntentionInquiry,
-                onSelected: (_) => onChanged(
-                  selectedValue == _projectQuoteIntentionInquiry
-                      ? null
-                      : _projectQuoteIntentionInquiry,
-                ),
+                onPressed: () => onChanged(_projectQuoteIntentionInquiry),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Text(
-            '仅用于说明本次预算沟通方式，不创建交易任务，不拉起支付或预授权；预算金额仍是当前唯一预算真值。',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectQuoteIntentionChip extends StatelessWidget {
+  const _ProjectQuoteIntentionChip({
+    super.key,
+    required this.label,
+    required this.selected,
+    required this.onPressed,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final foregroundColor = selected
+        ? colorScheme.onSecondaryContainer
+        : colorScheme.onSurface;
+
+    return Semantics(
+      button: true,
+      selected: selected,
+      child: SizedBox(
+        width: 58,
+        height: 30,
+        child: Material(
+          color: selected
+              ? colorScheme.secondaryContainer
+              : colorScheme.surface,
+          shape: StadiumBorder(
+            side: BorderSide(
+              color: selected
+                  ? colorScheme.secondary
+                  : colorScheme.outlineVariant,
             ),
           ),
-          if (selectedDescription != null) ...<Widget>[
-            const SizedBox(height: 8),
-            Text(
-              selectedDescription,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.primary,
-                fontWeight: FontWeight.w600,
-              ),
+          child: InkWell(
+            customBorder: const StadiumBorder(),
+            onTap: onPressed,
+            child: Stack(
+              alignment: Alignment.center,
+              children: <Widget>[
+                if (selected)
+                  Positioned(
+                    left: 7,
+                    child: Icon(
+                      Icons.check_rounded,
+                      size: 14,
+                      color: foregroundColor,
+                    ),
+                  ),
+                Center(
+                  child: Text(
+                    label,
+                    maxLines: 1,
+                    overflow: TextOverflow.clip,
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: foregroundColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ],
+          ),
+        ),
       ),
     );
   }
@@ -529,7 +566,7 @@ class _ProjectScopeSummaryButton extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            hasValue ? value.trim() : '一句话概括本次发布范围，当前为必填。',
+            hasValue ? value.trim() : '一句话概括本次发布范围，当前为选填。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: errorText == null
                   ? colorScheme.onSurfaceVariant

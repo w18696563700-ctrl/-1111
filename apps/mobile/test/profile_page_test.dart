@@ -22,6 +22,7 @@ import 'package:mobile/features/profile/data/profile_payment_billing_consumer_la
 import 'package:mobile/features/profile/data/profile_personal_edit_upload_models.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_routes.dart';
+import 'package:mobile/features/profile/presentation/profile_organization_capability_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_avatar_picker.dart';
 import 'package:mobile/features/profile/presentation/profile_member_management_sheet.dart';
 import 'package:mobile/shell/shell_app.dart';
@@ -585,6 +586,26 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
 
 void main() {
   HttpOverrides? previousHttpOverrides;
+
+  test(
+    'organization capability copy separates subject ability from current role',
+    () {
+      expect(
+        profileDisplayOrganizationCapabilitySummary(
+          'both',
+          roleKeys: const <String>['supplier_admin'],
+        ),
+        '主体支持发布项目 / 参与竞标；当前角色偏供应商，发布项目需切到买方侧',
+      );
+      expect(
+        profileDisplayOrganizationCapabilitySummary(
+          'both',
+          roleKeys: const <String>['buyer_admin'],
+        ),
+        '当前角色可发布项目；主体也可参与竞标',
+      );
+    },
+  );
 
   setUp(() {
     previousHttpOverrides = HttpOverrides.current;
@@ -2896,7 +2917,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text(freshOrganizationName), findsWidgets);
-      expect(find.text('当前主体可发布项目 / 可参与竞标'), findsWidgets);
+      expect(find.text('当前角色可发布项目；主体也可参与竞标'), findsWidgets);
       expect(find.text('需求方 / 供应商'), findsNothing);
       expect(find.text('编辑当前组织'), findsNothing);
       expect(find.text('再创建一个组织'), findsNothing);

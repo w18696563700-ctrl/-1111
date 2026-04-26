@@ -413,13 +413,13 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
-    expect(find.text('项目详情文书：预发布阶段已开放效果图、施工图和其他资料。'), findsOneWidget);
+    expect(find.text('项目详情文书：效果图为必传，材质图和尺寸图为选传。'), findsOneWidget);
     await _scrollTo(tester, find.text('项目详情文书区'));
     expect(find.text('项目详情文书区'), findsOneWidget);
-    expect(find.textContaining('预发布阶段已开放效果图、施工图和其他资料'), findsWidgets);
-    expect(find.widgetWithText(ChoiceChip, '效果图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '施工图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '其他资料'), findsOneWidget);
-    expect(find.textContaining('当前还没有补充效果图、施工图或其他资料'), findsOneWidget);
+    expect(find.textContaining('效果图为必传，材质图和尺寸图为选传'), findsWidgets);
+    expect(find.widgetWithText(ChoiceChip, '效果图（必传）'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '材质图（选传）'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '尺寸图（选传）'), findsOneWidget);
+    expect(find.textContaining('当前还没有补充效果图、材质图或尺寸图'), findsOneWidget);
   });
 }

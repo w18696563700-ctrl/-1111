@@ -900,6 +900,9 @@ export class ProjectService {
     if (structuredReason === 'organization_scope_missing') {
       return '当前组织身份不可用，请先进入可发布项目的组织后再试。';
     }
+    if (structuredReason === 'organization_type_not_allowed') {
+      return '当前主体不是发布方类型，请切换到可发布项目的组织后再试。';
+    }
     if (structuredReason === 'buyer_role_not_allowed') {
       return '当前组织角色不具备项目发布资格，请切换到买方侧可发布角色后再试。';
     }
@@ -959,6 +962,9 @@ export class ProjectService {
 
     if (structuredReason === 'organization_scope_missing') {
       return `当前组织身份不可用，请先进入可发布项目的组织后再${suffix}。`;
+    }
+    if (structuredReason === 'organization_type_not_allowed') {
+      return `当前主体不是发布方类型，请切换到可发布项目的组织后再${suffix}。`;
     }
     if (structuredReason === 'buyer_role_not_allowed') {
       return `当前组织角色不具备项目发布资格，请切换到买方侧可发布角色后再${suffix}。`;

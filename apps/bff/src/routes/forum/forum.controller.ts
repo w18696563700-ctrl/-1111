@@ -2,6 +2,7 @@ import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Quer
 import type { IncomingHttpHeaders } from 'http';
 import { ForumAuthorProfileService } from './forum-author-profile.service';
 import { ForumDraftOpenService } from './forum-draft-open.service';
+import { ForumInteractionInboxService } from './forum-interaction-inbox.service';
 import { ForumInteractionService } from './forum-interaction.service';
 import { ForumOwnPostContinuityService } from './forum-own-post-continuity.service';
 import { ForumReportMineService } from './forum-report-mine.service';
@@ -13,6 +14,7 @@ export class ForumController {
     private readonly forumService: ForumService,
     private readonly forumAuthorProfileService: ForumAuthorProfileService,
     private readonly forumInteractionService: ForumInteractionService,
+    private readonly forumInteractionInboxService: ForumInteractionInboxService,
     private readonly forumDraftOpenService: ForumDraftOpenService,
     private readonly forumOwnPostContinuityService: ForumOwnPostContinuityService,
     private readonly forumReportMineService: ForumReportMineService,
@@ -148,6 +150,16 @@ export class ForumController {
     @Query('pageSize') pageSize?: string,
   ) {
     return this.forumService.getMyFollows(headers, cursor, pageSize);
+  }
+
+  @Get('interaction/inbox')
+  getInteractionInbox(
+    @Headers() headers: IncomingHttpHeaders,
+    @Query('tab') tab?: string,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.forumInteractionInboxService.getInbox(headers, tab, cursor, pageSize);
   }
 
   @Get('me/index')

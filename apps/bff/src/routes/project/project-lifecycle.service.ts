@@ -158,6 +158,9 @@ export class ProjectLifecycleService {
     if (reason === 'organization_scope_missing') {
       return `当前组织身份不可用，请先进入可发布项目的组织后再${suffix}。`;
     }
+    if (reason === 'organization_type_not_allowed') {
+      return `当前主体不是发布方类型，请切换到可发布项目的组织后再${suffix}。`;
+    }
     if (reason === 'buyer_role_not_allowed') {
       return `当前组织角色不具备项目发布资格，请切换到买方侧可发布角色后再${suffix}。`;
     }

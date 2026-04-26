@@ -215,6 +215,7 @@ class _OrganizationHandoffPageState extends State<OrganizationHandoffPage> {
       title: profileDisplayOrganizationName(current.name),
       subtitle: profileDisplayOrganizationCapabilitySummary(
         current.organizationType,
+        roleKeys: current.roleKeys,
       ),
       statusText: '',
       statusBadges: profileBuildOrganizationCapabilityStatusBadges(

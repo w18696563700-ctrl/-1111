@@ -3,6 +3,7 @@ import type { HeaderBag } from '../../shared/request-context';
 import { resolveRequestContext } from '../../shared/request-context';
 import { ForumAuthorQueryService } from './forum-author.query.service';
 import { ForumCommentService } from './forum-comment.service';
+import { ForumInteractionInboxQueryService } from './forum-interaction-inbox.query.service';
 import { ForumReportQueryService } from './forum-report.query.service';
 import { ForumReportService } from './forum-report.service';
 import { ForumQueryService } from './forum.query.service';
@@ -15,6 +16,7 @@ export class ForumController {
     private readonly writeService: ForumWriteService,
     private readonly authorQueryService: ForumAuthorQueryService,
     private readonly commentService: ForumCommentService,
+    private readonly interactionInboxQueryService: ForumInteractionInboxQueryService,
     private readonly reportService: ForumReportService,
     private readonly reportQueryService: ForumReportQueryService
   ) {}
@@ -114,6 +116,21 @@ export class ForumController {
   @Get('me/follows')
   getMyFollows(@Headers() headers: HeaderBag) {
     return this.queryService.getMyFollows(resolveRequestContext(headers));
+  }
+
+  @Get('interaction/inbox')
+  getInteractionInbox(
+    @Headers() headers: HeaderBag,
+    @Query('tab') tab?: string,
+    @Query('cursor') cursor?: string,
+    @Query('pageSize') pageSize?: string
+  ) {
+    return this.interactionInboxQueryService.getInteractionInbox(
+      tab,
+      cursor,
+      pageSize,
+      resolveRequestContext(headers)
+    );
   }
 
   @Post('draft/save')

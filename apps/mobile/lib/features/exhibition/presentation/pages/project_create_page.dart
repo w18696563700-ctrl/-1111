@@ -54,16 +54,30 @@ String? _projectCreateValidationSummary(
     return null;
   }
 
-  final labels = errors.keys
-      .map(_projectCreateFieldLabel)
+  final messages = errors.entries
+      .map(
+        (MapEntry<_ProjectCreateFieldId, String> entry) =>
+            _projectCreateValidationErrorText(entry.key, entry.value),
+      )
       .where((String value) => value.trim().isNotEmpty)
       .toSet()
-      .toList();
-  if (labels.isEmpty) {
+      .toList(growable: false);
+  if (messages.isEmpty) {
     return '还有项目基本信息没有填完，请先补齐必填项后再保存。';
   }
 
-  return '这些项目基本信息还没有填完或需要修正：${labels.join('、')}。';
+  return '无法保存：${messages.join('；')}。';
+}
+
+String _projectCreateValidationErrorText(
+  _ProjectCreateFieldId fieldId,
+  String error,
+) {
+  final normalizedError = error.trim();
+  if (normalizedError.isNotEmpty) {
+    return normalizedError.replaceAll(RegExp(r'[。；;]+$'), '');
+  }
+  return '请补充${_projectCreateFieldLabel(fieldId)}';
 }
 
 class _ProjectCreateValidationResult {
@@ -195,7 +209,6 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   ChinaRegionCatalog? _regionCatalog;
   _ProjectStandardizedLocationOption? _selectedStandardizedLocation;
   String? _selectedDistrictCode;
-  String? _quoteIntention;
 
   bool _guardLoading = true;
   _ProjectCreateAccessGuard _accessGuard =
@@ -206,7 +219,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   int _guardRetryCount = 0;
   bool _submitting = false;
   bool _p0PaySubmitting = false;
-  String _p0PayTaskType = 'fixed_price_bid';
+  String _p0PayTaskType = _projectQuoteIntentionFixedPrice;
   bool _p0PayDemandExistsConfirmed = false;
   bool _p0PayAuthorizationConfirmed = false;
   bool _p0PayNoQuoteHarvestingConfirmed = false;
@@ -359,12 +372,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     setState(() {
       _p0PayTaskResult = taskResult;
       _p0PaySubmitting =
-          _p0PayTaskType == 'inquiry_quote' && taskResult.isSuccess;
+          _p0PayTaskType == _projectQuoteIntentionInquiry &&
+          taskResult.isSuccess;
     });
 
     final taskId = _taskIdFromPayload(taskResult.payload);
     if (!taskResult.isSuccess ||
-        _p0PayTaskType != 'inquiry_quote' ||
+        _p0PayTaskType != _projectQuoteIntentionInquiry ||
         taskId == null) {
       if (mounted) {
         setState(() {
@@ -914,7 +928,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               selectedProjectTypeLabel: _selectedProjectTypeLabel,
               selectedStandardizedLocationLabel:
                   _selectedStandardizedLocationLabel,
-              quoteIntention: _quoteIntention,
+              selectedP0PayTaskType: _p0PayTaskType,
+              showSupplementalSection: false,
               hasStandardizedLocationSelection:
                   _selectedStandardizedLocation != null,
               districtSelectionEnabled:
@@ -941,8 +956,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               onStandardizedLocationPressed: _pickStandardizedLocation,
               onDistrictPressed: _pickDistrict,
               onScopeSummaryPressed: _editScopeSummary,
-              onQuoteIntentionChanged: (String? value) =>
-                  setState(() => _quoteIntention = value),
+              onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
               onPlannedStartDatePressed: () => _pickDate(
                 controller: _plannedStartAtController,
                 fieldId: _ProjectCreateFieldId.plannedStartAt,
@@ -963,6 +977,21 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     );
   }
 
+  void _setP0PayTaskTypeFromCreateChoice(String? value) {
+    if (value != _projectQuoteIntentionFixedPrice &&
+        value != _projectQuoteIntentionInquiry) {
+      return;
+    }
+    setState(() {
+      _p0PayTaskType = value!;
+      _p0PayTaskResult = null;
+      _p0PayDepositOrderResult = null;
+      _p0PayDepositInitResult = null;
+      _p0PayDepositStatusResult = null;
+      _p0PayDepositPollResult = null;
+    });
+  }
+
   // ignore: unused_element
   Widget _buildP0PayTradeTaskSection() {
     final declarationsCompleted = _p0PayDeclarationsCompleted;
@@ -972,7 +1001,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         declarationsCompleted &&
         materials.isNotEmpty &&
         _p0PayTradeTaskBlockerMessage() == null;
-    final isInquiry = _p0PayTaskType == 'inquiry_quote';
+    final isInquiry = _p0PayTaskType == _projectQuoteIntentionInquiry;
 
     return _ActionCard(
       title: 'P0-Pay 交易任务',
@@ -996,26 +1025,19 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
             SegmentedButton<String>(
               segments: const <ButtonSegment<String>>[
                 ButtonSegment<String>(
-                  value: 'fixed_price_bid',
+                  value: _projectQuoteIntentionFixedPrice,
                   label: Text('明价竞标单'),
                   icon: Icon(Icons.gavel_outlined),
                 ),
                 ButtonSegment<String>(
-                  value: 'inquiry_quote',
+                  value: _projectQuoteIntentionInquiry,
                   label: Text('询价报价单'),
                   icon: Icon(Icons.request_quote_outlined),
                 ),
               ],
               selected: <String>{_p0PayTaskType},
               onSelectionChanged: (Set<String> value) {
-                setState(() {
-                  _p0PayTaskType = value.first;
-                  _p0PayTaskResult = null;
-                  _p0PayDepositOrderResult = null;
-                  _p0PayDepositInitResult = null;
-                  _p0PayDepositStatusResult = null;
-                  _p0PayDepositPollResult = null;
-                });
+                _setP0PayTaskTypeFromCreateChoice(value.first);
               },
             ),
             const SizedBox(height: 12),
@@ -1343,14 +1365,14 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           _DetailLine(
             label: '下一步',
             value: canOpenPublicDetail
-                ? '先进入我的项目详情确认刚保存的基本信息；预发布阶段已开放效果图、施工图和其他资料。'
-                : '点击下方“下一步：进入我的项目详情”，先确认刚保存的基本信息；保存到预发布列表后项目详情文书会开放。',
+                ? '先进入我的项目详情确认刚保存的基本信息；预发布阶段已开放效果图、材质图和尺寸图。'
+                : '点击下方“下一步：进入我的项目详情”，先确认刚保存的基本信息；保存到草稿或预发布列表后项目详情文书会开放。',
           ),
           if (!canOpenPublicDetail) ...<Widget>[
             const SizedBox(height: 12),
             const _ActionCard(
               title: '项目详情文书',
-              summary: '效果图、施工图和其他资料会在进入预发布列表后开放为 owner-private 正式附件区。',
+              summary: '效果图为必传，材质图和尺寸图为选传；保存到草稿或预发布列表后开放为 owner-private 正式附件区。',
               children: <Widget>[
                 _DetailLine(
                   label: '当前说明',
@@ -1367,8 +1389,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               key: ValueKey<String>('project-create-attachment-$projectId'),
               projectId: projectId,
               title: '继续补充资料',
-              summary: '预发布阶段已开放效果图、施工图和其他资料，可继续在这里补齐。',
-              emptyMessage: '当前还没有补充效果图、施工图或其他资料。',
+              summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
+              emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
               autoloadFormalList: false,
             ),
           ],
@@ -1497,7 +1519,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         formErrorMessage: _formErrorMessage,
         selectedProjectTypeLabel: _selectedProjectTypeLabel,
         selectedStandardizedLocationLabel: _selectedStandardizedLocationLabel,
-        quoteIntention: _quoteIntention,
+        selectedP0PayTaskType: _p0PayTaskType,
+        showSupplementalSection: true,
         hasStandardizedLocationSelection: _selectedStandardizedLocation != null,
         districtSelectionEnabled:
             _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
@@ -1523,8 +1546,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         onStandardizedLocationPressed: _pickStandardizedLocation,
         onDistrictPressed: _pickDistrict,
         onScopeSummaryPressed: _editScopeSummary,
-        onQuoteIntentionChanged: (String? value) =>
-            setState(() => _quoteIntention = value),
+        onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
         onPlannedStartDatePressed: () => _pickDate(
           controller: _plannedStartAtController,
           fieldId: _ProjectCreateFieldId.plannedStartAt,
@@ -1548,13 +1570,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           key: ValueKey<String>('project-edit-attachment-$projectId'),
           projectId: projectId,
           title: '项目详情文书区',
-          summary: '预发布阶段已开放效果图、施工图和其他资料。补齐后再检查无误并正式发布。',
-          emptyMessage: '当前还没有补充效果图、施工图或其他资料。',
+          summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
+          emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
         )
       else
         const _ActionCard(
           title: '项目详情文书区',
-          summary: '保存到预发布列表后，效果图、施工图和其他资料会在这里开放补充。',
+          summary: '保存到草稿或预发布列表后，效果图、材质图和尺寸图会在这里开放补充。',
           children: <Widget>[
             _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
           ],
@@ -1951,7 +1973,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  '一句话概括本次发布范围，方便快速理解需求。当前云端发布链路要求先补齐这个字段。',
+                  '一句话概括本次发布范围，方便快速理解需求；当前为选填，可稍后再补。',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: theme.colorScheme.onSurfaceVariant,
                   ),
@@ -2271,30 +2293,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         return;
       }
 
-      final roleAllowed = _isProjectCreateRoleExplicitlyAllowed(
-        snapshot.shellContext.roleKeys,
-      );
-      if (roleAllowed == false) {
-        setState(() {
-          _guardLoading = false;
-          _accessGuard = const _ProjectCreateAccessGuard.blocked(
-            title: '当前角色不允许创建项目',
-            message: '当前组织角色暂不允许创建项目；最终是否可继续仍以当前创建资格返回结果为准，请先返回我的项目查看当前可继续入口。',
-            actionLabel: '返回我的项目',
-            actionRouteName: ExhibitionRoutes.myProjectList,
-          );
-        });
-        return;
-      }
-
       setState(() {
         _guardLoading = false;
-        _accessGuard = const _ProjectCreateAccessGuard.blocked(
-          title: '当前创建资格未通过',
-          message: '当前创建资格未通过，请先返回我的项目查看当前可继续入口，或先补齐认证与组织状态。',
-          actionLabel: '返回我的项目',
-          actionRouteName: ExhibitionRoutes.myProjectList,
-        );
+        _accessGuard = const _ProjectCreateAccessGuard.allowed();
       });
       return;
     }
@@ -2317,24 +2318,6 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   static bool _isProjectCreateCertificationApproved(String? status) {
     final normalized = status?.trim().toLowerCase();
     return normalized == 'verified' || normalized == 'approved';
-  }
-
-  static bool? _isProjectCreateRoleExplicitlyAllowed(List<String> roleKeys) {
-    final normalizedRoles = roleKeys
-        .map((String role) => role.trim().toLowerCase())
-        .where((String role) => role.isNotEmpty)
-        .toList(growable: false);
-    if (normalizedRoles.isEmpty) {
-      return null;
-    }
-
-    for (final role in normalizedRoles) {
-      if (role.contains('admin')) {
-        return true;
-      }
-    }
-
-    return false;
   }
 
   static bool _canEnterProjectAttachmentCorridor(String? state) {
@@ -2408,9 +2391,6 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     }
     if (detailAddress.isEmpty) {
       errors[_ProjectCreateFieldId.detailAddress] = '请输入详细地址';
-    }
-    if (_normalizeOptionalText(scopeSummary) == null) {
-      errors[_ProjectCreateFieldId.scopeSummary] = '请补充范围说明';
     }
     if (plannedStartAt.isNotEmpty && normalizedStartAt == null) {
       errors[_ProjectCreateFieldId.plannedStartAt] = '请选择有效的计划开始日期';

@@ -474,10 +474,10 @@ void main() {
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.textContaining('当前只对 owner 私域可见'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
-    expect(find.widgetWithText(ChoiceChip, '效果图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '施工图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '其他资料'), findsOneWidget);
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '其他资料'));
+    expect(find.widgetWithText(ChoiceChip, '效果图（必传）'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '材质图（选传）'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '尺寸图（选传）'), findsOneWidget);
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图（选传）'));
     expect(find.textContaining('展馆和展位图'), findsNothing);
     expect(find.textContaining('展商手册'), findsNothing);
     expect(find.text('现场效果图.png'), findsOneWidget);
@@ -485,8 +485,8 @@ void main() {
     expect(find.text('图片预览'), findsOneWidget);
     await _tapVisible(tester, find.text('关闭'));
 
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '施工图'));
-    await _tapVisible(tester, find.text('选择项目附件', skipOffstage: false));
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '尺寸图（选传）'));
+    await _tapVisible(tester, find.text('选择尺寸图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
     await _scrollTo(tester, find.text('construction-plan.docx'));
@@ -582,7 +582,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('项目详情文书区'));
-    await _tapVisible(tester, find.text('选择项目图片', skipOffstage: false));
+    await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('效果图样张.png'), findsOneWidget);
 
     await _tapVisible(tester, find.text('预览当前图片'));
@@ -721,7 +721,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('项目详情文书区'));
-    await _tapVisible(tester, find.text('选择项目图片', skipOffstage: false));
+    await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('待上传附件（1）'), findsOneWidget);
     expect(find.text('效果图_A.png'), findsOneWidget);
 
@@ -838,7 +838,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('项目详情文书区'));
-      await _tapVisible(tester, find.text('选择项目图片', skipOffstage: false));
+      await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
       await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
       expect(find.text('正式附件绑定未完成'), findsOneWidget);
@@ -949,7 +949,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('项目详情文书区'));
-      await _tapVisible(tester, find.text('选择项目图片', skipOffstage: false));
+      await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
       await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
       expect(find.text('正式附件绑定未完成'), findsOneWidget);
@@ -1066,7 +1066,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('项目详情文书区'));
-    await _tapVisible(tester, find.text('选择项目图片', skipOffstage: false));
+    await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
     expect(find.text('效果图云端现状.jpg'), findsWidgets);
@@ -1184,8 +1184,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('项目详情文书区'));
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '其他资料'));
-    await _tapVisible(tester, find.text('选择项目附件', skipOffstage: false));
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图（选传）'));
+    await _tapVisible(tester, find.text('选择材质图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
     await _scrollTo(tester, find.text('brand-board.webp'));

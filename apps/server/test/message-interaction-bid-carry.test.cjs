@@ -641,6 +641,100 @@ test('counterpart conversation detail keeps every business card anchored to proj
   });
 });
 
+test('counterpart conversation project title uses concrete project title when visible', async () => {
+  const {
+    CounterpartConversationProjectionService,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
+  const now = '2026-04-24T08:05:00.000Z';
+  const project = {
+    id: 'project-luzhou',
+    organizationId: 'org-owner',
+    creatorUserId: 'user-owner',
+    title: '西洽会 - 泸州',
+    exhibitionName: '西洽会',
+    brandName: '泸州',
+    state: 'published',
+  };
+  const card = {
+    cardId: 'bid-thread:bid-luzhou',
+    cardType: 'bid_thread',
+    title: '新的竞标已提交',
+    summary: '重庆展宏展览展示有限公司 已对当前项目提交竞标。',
+    status: 'submitted',
+    updatedAt: now,
+    truthAnchor: {
+      truthType: 'bid_thread',
+      projectId: 'project-luzhou',
+      bidId: 'bid-luzhou',
+    },
+    detailRouteTarget: null,
+    decisionAvailability: null,
+  };
+  const sourceWithSeed = {
+    async buildSeeds() {
+      return [
+        {
+          counterpartOrganizationId: 'org-counterpart',
+          counterpartDisplayName: '重庆展宏展览展示有限公司',
+          counterpartAvatarUrl: null,
+          projectId: 'project-luzhou',
+          updatedAt: now,
+          card,
+        },
+      ];
+    },
+  };
+  const emptySource = {
+    async buildSeeds() {
+      return [];
+    },
+  };
+  const service = new CounterpartConversationProjectionService(
+    {
+      async findBy() {
+        return [project];
+      },
+      async query() {
+        return [];
+      },
+    },
+    {
+      async buildPublicProjectionMap(input) {
+        assert.equal(input.viewerOrganizationId, 'org-owner');
+        return new Map([
+          [
+            'project-luzhou',
+            {
+              displayTitle: '西洽会',
+              title: '西洽会 - 泸州',
+              exhibitionName: '西洽会',
+              brandName: '泸州',
+              nameAccess: {
+                status: 'visible',
+                canRequest: false,
+                requestId: null,
+              },
+            },
+          ],
+        ]);
+      },
+    },
+    sourceWithSeed,
+    emptySource,
+    emptySource,
+  );
+
+  const result = await service.getConversationDetail({
+    viewerOrganizationId: 'org-owner',
+    conversationId: 'org-counterpart',
+    focusProjectId: 'project-luzhou',
+  });
+
+  assert.equal(result.projectGroups.length, 1);
+  assert.equal(result.projectGroups[0].titleVisibility, 'visible');
+  assert.equal(result.projectGroups[0].projectDisplayTitle, '西洽会 - 泸州');
+});
+
 test('bid submission snapshot returns canonical attachment list instead of hardcoded zero', async () => {
   const { MyBidQueryService } = require('../dist/modules/my_bid/my-bid.query.service.js');
   const submittedAt = new Date('2026-04-24T08:00:00.000Z');

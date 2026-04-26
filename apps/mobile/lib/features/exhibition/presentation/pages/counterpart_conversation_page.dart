@@ -37,6 +37,7 @@ class _CounterpartConversationPageState
   Timer? _pollTimer;
   final List<_DraftProjectCommunicationMessage> _drafts =
       <_DraftProjectCommunicationMessage>[];
+  String? _selectedProjectId;
   int _reconnectAttempt = 0;
   bool _loading = true;
   bool _loadingThread = false;
@@ -95,17 +96,26 @@ class _CounterpartConversationPageState
       _loading = false;
       _threadResult = null;
       _messageResult = null;
+      if (_selectedProjectId != null &&
+          (result.data == null ||
+              !_hasProjectGroup(result.data!, _selectedProjectId!))) {
+        _selectedProjectId = null;
+        _drafts.clear();
+      }
     });
     await _stopRealtime();
-    if (result.state == AppPageState.content && result.data != null) {
-      await _loadThreadAndMessages(result.data!);
+    final selectedProjectId = _selectedProjectId;
+    if (result.state == AppPageState.content &&
+        result.data != null &&
+        selectedProjectId != null) {
+      await _loadThreadAndMessages(result.data!, projectId: selectedProjectId);
     }
   }
 
   Future<void> _loadThreadAndMessages(
-    CounterpartConversationDetailView data,
-  ) async {
-    final projectId = _communicationProjectId(data);
+    CounterpartConversationDetailView data, {
+    required String projectId,
+  }) async {
     setState(() {
       _loadingThread = true;
       _loadingMessages = true;
@@ -211,13 +221,21 @@ class _CounterpartConversationPageState
     _reconnectTimer = null;
     _pollTimer?.cancel();
     _pollTimer = null;
+    final eventSubscription = _realtimeEventSubscription;
+    _realtimeEventSubscription = null;
+    final cancelFuture = eventSubscription?.cancel();
+    if (cancelFuture != null) {
+      unawaited(cancelFuture.catchError((_) {}));
+    }
     final subscription = _realtimeSubscription;
     _realtimeSubscription = null;
     final closeFuture = subscription?.close();
-    final eventSubscription = _realtimeEventSubscription;
-    _realtimeEventSubscription = null;
-    await eventSubscription?.cancel();
-    await closeFuture;
+    if (closeFuture != null) {
+      await closeFuture.timeout(
+        const Duration(milliseconds: 500),
+        onTimeout: () {},
+      );
+    }
   }
 
   void _handleRealtimeDisconnected(
@@ -439,8 +457,44 @@ class _CounterpartConversationPageState
     });
   }
 
-  String _communicationProjectId(CounterpartConversationDetailView data) {
-    return _normalizeId(widget.projectId) ?? data.focusProjectId;
+  Future<void> _openProjectCommunication(
+    CounterpartConversationProjectGroupView group,
+  ) async {
+    await _stopRealtime();
+    if (!mounted) {
+      return;
+    }
+    _messageController.clear();
+    setState(() {
+      _selectedProjectId = group.projectId;
+      _threadResult = null;
+      _messageResult = null;
+      _drafts.clear();
+      _loadingThread = true;
+      _loadingMessages = true;
+    });
+    _scheduleScrollToTop();
+    final data = _result?.data;
+    if (data != null) {
+      await _loadThreadAndMessages(data, projectId: group.projectId);
+    }
+  }
+
+  Future<void> _backToProjectList() async {
+    await _stopRealtime();
+    if (!mounted) {
+      return;
+    }
+    _messageController.clear();
+    setState(() {
+      _selectedProjectId = null;
+      _threadResult = null;
+      _messageResult = null;
+      _drafts.clear();
+      _loadingThread = false;
+      _loadingMessages = false;
+    });
+    _scheduleScrollToTop();
   }
 
   @override
@@ -472,12 +526,13 @@ class _CounterpartConversationPageState
             ),
           ),
           if (data != null && result?.state == AppPageState.content)
-            _ProjectCommunicationComposer(
-              controller: _messageController,
-              enabled: thread != null && !_loadingThread,
-              sending: _sending,
-              onSend: _sendCurrentMessage,
-            ),
+            if (_selectedProjectId != null && thread != null)
+              _ProjectCommunicationComposer(
+                controller: _messageController,
+                enabled: !_loadingThread,
+                sending: _sending,
+                onSend: _sendCurrentMessage,
+              ),
         ],
       ),
     );
@@ -488,52 +543,56 @@ class _CounterpartConversationPageState
     ProjectCommunicationThreadView? thread,
   ) {
     final groups = _sortedProjectGroups(data);
+    final selectedGroup = _selectedProjectGroup(data);
+    if (_selectedProjectId == null || selectedGroup == null) {
+      return <Widget>[
+        _CounterpartConversationHeader(
+          data: data,
+          onOpenSubjectCard: () => _openSubjectCard(data),
+          canOpenSubjectCard: _canOpenSubjectCard(data),
+          title: '项目沟通',
+        ),
+        const SizedBox(height: 16),
+        _CounterpartProjectEntryList(
+          groups: groups,
+          onOpenProjectCommunication: _openProjectCommunication,
+        ),
+      ];
+    }
     return <Widget>[
       _CounterpartConversationHeader(
         data: data,
         onOpenSubjectCard: () => _openSubjectCard(data),
         canOpenSubjectCard: _canOpenSubjectCard(data),
+        title: '竞标沟通',
       ),
       const SizedBox(height: 16),
-      if (groups.isEmpty)
-        const _EmptyNotice(title: '当前没有项目分组', message: '这个对方主体下暂时没有可展示的项目沟通事项。')
-      else
-        ...groups.map(
-          (CounterpartConversationProjectGroupView group) => Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                _CounterpartProjectGroupSection(
-                  group: group,
-                  onOpenCard: _openBusinessCard,
-                ),
-                if (_orderIdFromConversationGroup(group) != null) ...<Widget>[
-                  const SizedBox(height: 12),
-                  _OrderStatusCard(
-                    orderId: _orderIdFromConversationGroup(group)!,
-                    projectId: group.projectId,
-                    placement: _OrderStatusPlacement.conversation,
-                    onChanged: _load,
-                  ),
-                ],
-              ],
-            ),
-          ),
+      _SelectedProjectBusinessEntrypoints(
+        group: selectedGroup,
+        nameAccessCard: _firstBusinessCard(
+          selectedGroup,
+          'project_name_access_request',
         ),
+        orderId: _orderIdFromConversationGroup(selectedGroup),
+        onBackToProjectList: _backToProjectList,
+        onOpenNameAccess: _openBusinessCard,
+        onOpenOrder: () => _openOrderDetail(selectedGroup),
+        onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
+      ),
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
-        child: _ProjectAlbumSection(projectId: _communicationProjectId(data)),
-      ),
-      _ProjectCommunicationTimeline(
-        loadingThread: _loadingThread,
-        loadingMessages: _loadingMessages,
-        threadResult: _threadResult,
-        messageResult: _messageResult,
-        drafts: _drafts,
-        currentOrganizationId: _currentOrganizationId(context),
-        onRetryDraft: _retryDraft,
-        onRefreshMessages: thread == null ? null : () => _loadMessages(thread),
+        child: _ProjectCommunicationTimeline(
+          loadingThread: _loadingThread,
+          loadingMessages: _loadingMessages,
+          threadResult: _threadResult,
+          messageResult: _messageResult,
+          drafts: _drafts,
+          currentOrganizationId: _currentOrganizationId(context),
+          onRetryDraft: _retryDraft,
+          onRefreshMessages: thread == null
+              ? null
+              : () => _loadMessages(thread),
+        ),
       ),
     ];
   }
@@ -561,6 +620,23 @@ class _CounterpartConversationPageState
       return;
     }
     Navigator.of(context).pushNamed(target.routeLocation);
+  }
+
+  void _openOrderDetail(CounterpartConversationProjectGroupView group) {
+    final orderCard = _firstBusinessCard(group, 'project_order');
+    final orderTarget =
+        orderCard?.detailRouteTarget ?? _fallbackOrderTarget(group);
+    if (orderTarget == null) {
+      _showSnack('当前项目暂时没有可打开的订单状态。');
+      return;
+    }
+    Navigator.of(context).pushNamed(orderTarget.routeLocation);
+  }
+
+  void _openProjectAlbum(CounterpartConversationProjectGroupView group) {
+    Navigator.of(
+      context,
+    ).pushNamed(ExhibitionRoutes.projectAlbumWithProjectId(group.projectId));
   }
 
   void _openSubjectCard(CounterpartConversationDetailView data) {
@@ -646,12 +722,57 @@ class _CounterpartConversationPageState
   CounterpartConversationProjectGroupView? _subjectProjectGroup(
     CounterpartConversationDetailView data,
   ) {
+    final selectedProjectId = _selectedProjectId;
+    if (selectedProjectId != null) {
+      for (final group in data.projectGroups) {
+        if (group.projectId == selectedProjectId) {
+          return group;
+        }
+      }
+    }
     for (final group in data.projectGroups) {
       if (group.projectId == data.focusProjectId) {
         return group;
       }
     }
     return data.projectGroups.isEmpty ? null : data.projectGroups.first;
+  }
+
+  CounterpartConversationProjectGroupView? _selectedProjectGroup(
+    CounterpartConversationDetailView data,
+  ) {
+    final selectedProjectId = _selectedProjectId;
+    if (selectedProjectId == null) {
+      return null;
+    }
+    for (final group in _sortedProjectGroups(data)) {
+      if (group.projectId == selectedProjectId) {
+        return group;
+      }
+    }
+    return null;
+  }
+
+  bool _hasProjectGroup(
+    CounterpartConversationDetailView data,
+    String projectId,
+  ) {
+    return data.projectGroups.any(
+      (CounterpartConversationProjectGroupView group) =>
+          group.projectId == projectId,
+    );
+  }
+
+  CounterpartConversationBusinessCardView? _firstBusinessCard(
+    CounterpartConversationProjectGroupView group,
+    String cardType,
+  ) {
+    for (final card in group.cards) {
+      if (card.cardType == cardType) {
+        return card;
+      }
+    }
+    return null;
   }
 
   String? _firstBidId(CounterpartConversationProjectGroupView? group) {
@@ -728,6 +849,24 @@ class _CounterpartConversationPageState
     }
   }
 
+  MessageInteractionRouteTarget? _fallbackOrderTarget(
+    CounterpartConversationProjectGroupView group,
+  ) {
+    final orderId = _orderIdFromConversationGroup(group);
+    if (orderId == null) {
+      return null;
+    }
+    return _routeTarget(
+      objectType: 'order',
+      actionKey: 'order_detail.open',
+      canonicalPath: '/api/app/order/detail',
+      params: <String, String>{
+        'projectId': group.projectId,
+        'orderId': orderId,
+      },
+    );
+  }
+
   MessageInteractionRouteTarget? _routeTarget({
     required String objectType,
     required String actionKey,
@@ -762,7 +901,21 @@ class _CounterpartConversationPageState
   String? _orderIdFromConversationGroup(
     CounterpartConversationProjectGroupView group,
   ) {
-    return group.orderSummary?.orderId ?? group.ratingEntry?.orderId;
+    final summaryOrderId =
+        group.orderSummary?.orderId ?? group.ratingEntry?.orderId;
+    if (summaryOrderId != null && summaryOrderId.trim().isNotEmpty) {
+      return summaryOrderId;
+    }
+    for (final card in group.cards) {
+      final orderId = card.truthAnchor.orderId;
+      if ((card.cardType == 'project_order' ||
+              card.truthAnchor.truthType == 'project_order') &&
+          orderId != null &&
+          orderId.trim().isNotEmpty) {
+        return orderId;
+      }
+    }
+    return null;
   }
 
   String _newClientMessageId() {
@@ -777,6 +930,19 @@ class _CounterpartConversationPageState
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
         duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  void _scheduleScrollToTop() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) {
+        return;
+      }
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
       );
     });
