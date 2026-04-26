@@ -1183,7 +1183,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('正式附件'));
+    await _scrollTo(tester, find.text('项目详情文书区'));
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '其他资料'));
     await _tapVisible(tester, find.text('选择项目附件', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));

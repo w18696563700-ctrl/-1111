@@ -159,11 +159,12 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 key: ValueKey<String>('my-project-attachment-$projectId'),
                 projectId: projectId,
                 title: '项目详情文书区',
-                // Keep the published detail surface compact: no duplicated
-                // explanatory copy above the attachment controls.
+                summary: '预发布阶段已开放效果图、施工图和其他资料。补齐后再检查无误并正式发布。',
+                // Keep the detail surface compact: no duplicated technical
+                // upload-chain explanation above the attachment controls.
                 showIntroCopy: false,
                 compactKindHints: true,
-                emptyMessage: '当前项目还没有项目详情文书。',
+                emptyMessage: '当前还没有补充效果图、施工图或其他资料。',
               ),
             ),
             const SizedBox(height: 16),
@@ -238,12 +239,17 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
           ),
         ),
         if (showContinueAttachmentAction) ...<Widget>[
+          const _DetailLine(
+            label: '项目详情文书',
+            value: '预发布阶段已开放效果图、施工图和其他资料。',
+            highlight: true,
+          ),
           const SizedBox(height: 8),
           Align(
             alignment: Alignment.centerRight,
             child: FilledButton(
               onPressed: onContinueAttachmentAction,
-              child: const Text('继续补充资料'),
+              child: const Text('补充项目详情文书'),
             ),
           ),
         ],
@@ -272,6 +278,13 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
 
     final children = <Widget>[
       _StateMessage(title: '当前下一步', body: stage.detailNextStep),
+      if (stage.value == _MyProjectStageBucket.submitted) ...<Widget>[
+        const SizedBox(height: 12),
+        const _StateMessage(
+          title: '发布前确认',
+          body: '预发布阶段已开放项目详情文书区，请先补充效果图、施工图和其他资料；确认无误后再点击“检查无误，确定发布”。',
+        ),
+      ],
       const SizedBox(height: 12),
     ];
 
@@ -344,7 +357,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         children.add(
           FilledButton(
             onPressed: canManageAttachments ? _scrollToAttachments : null,
-            child: Text(canManageAttachments ? '补充资料' : '补充资料（当前待开放）'),
+            child: Text(canManageAttachments ? '补充项目详情文书' : '补充资料（当前待开放）'),
           ),
         );
         children.add(const SizedBox(height: 12));
@@ -375,7 +388,9 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
 
     return _ActionCard(
       title: '当前阶段动作',
-      summary: '动作区严格跟随当前阶段，不再混放跨阶段入口。',
+      summary: stage.value == _MyProjectStageBucket.submitted
+          ? '先补资料后确认发布；返回草稿和作废归档继续使用现有动作。'
+          : '动作区严格跟随当前阶段，不再混放跨阶段入口。',
       children: children,
     );
   }

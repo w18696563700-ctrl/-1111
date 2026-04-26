@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -8,6 +9,7 @@ import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
@@ -180,6 +182,50 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await pumpFrames();
   await tester.tap(finder, warnIfMissed: false);
   await pumpFrames(12);
+}
+
+Future<void> _expandBidSubmitFlowIfNeeded(WidgetTester tester) async {
+  final continueFinder = find.byWidgetPredicate(
+    (Widget widget) =>
+        widget is FilledButton &&
+        widget.child is Text &&
+        (widget.child as Text).data == '继续竞标',
+    description: 'FilledButton("继续竞标")',
+  );
+  if (continueFinder.evaluate().isEmpty) {
+    return;
+  }
+
+  await tester.scrollUntilVisible(
+    continueFinder,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  tester.widget<FilledButton>(continueFinder).onPressed!.call();
+  await tester.pump();
+  await tester.pumpAndSettle();
+}
+
+Future<void> _enterVisibleBidTextField(
+  WidgetTester tester, {
+  required String label,
+  required String value,
+}) async {
+  await _expandBidSubmitFlowIfNeeded(tester);
+  final fieldFinder = find.widgetWithText(TextField, label);
+  await tester.scrollUntilVisible(
+    fieldFinder,
+    200,
+    scrollable: find.byType(Scrollable).first,
+  );
+  await tester.pumpAndSettle();
+  await tester.enterText(fieldFinder, value);
+}
+
+Future<void> _uploadBidAttachment(WidgetTester tester, String label) async {
+  await _expandBidSubmitFlowIfNeeded(tester);
+  await _tapVisible(tester, find.widgetWithText(FilledButton, '上传$label'));
 }
 
 Finder _projectCreateField(String label) {
@@ -721,13 +767,13 @@ void main() {
     expect(find.text('不限金额'), findsWidgets);
     expect(find.text('刷新当前结果'), findsNothing);
     expect(find.text('高密度展示项目'), findsOneWidget);
-    expect(find.textContaining('金额：', skipOffstage: false), findsWidgets);
+    expect(find.textContaining('预算：', skipOffstage: false), findsWidgets);
     expect(find.textContaining('面积：', skipOffstage: false), findsWidgets);
-    expect(find.textContaining('地点：', skipOffstage: false), findsWidgets);
+    expect(find.textContaining('搭建地：', skipOffstage: false), findsWidgets);
     expect(find.text('讲解建议'), findsNothing);
-    expect(find.text('项目编号：PROJ-LIST-1'), findsNothing);
+    expect(find.text('项目编号：PROJ-LIST-1'), findsOneWidget);
     expect(find.text('下一步动作'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '查看详情'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '查看详情'), findsOneWidget);
   });
 
   testWidgets(
@@ -877,7 +923,24 @@ void main() {
   testWidgets(
     'shell mainline continues from project list to minimum bid submit result',
     (WidgetTester tester) async {
+      final uploadedKinds = <String>[];
+      BidSubmitAttachmentDebugOverrides.installPicker(() async {
+        final nextFile = switch (uploadedKinds.length) {
+          0 => 'project-understanding.png',
+          1 => 'quote-sheet.xlsx',
+          _ => 'schedule-plan.docx',
+        };
+        return BidSubmitAttachmentDraft(
+          fileName: nextFile,
+          bytes: utf8.encode('mock-$nextFile'),
+        );
+      });
+      addTearDown(BidSubmitAttachmentDebugOverrides.reset);
+
       final transport = FakeAppApiTransport(
+        uploadHandler: (AppApiUploadRequest request) async {
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
               'GET /api/app/project/list': (AppApiRequest request) async {
@@ -909,11 +972,71 @@ void main() {
                   ),
                 );
               },
+              'GET /api/app/project/bid-materials':
+                  (AppApiRequest request) async {
+                    expect(
+                      request.uri.queryParameters['projectId'],
+                      'project-1',
+                    );
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'projectId': 'project-1',
+                        'attachments': <Object?>[],
+                      },
+                    );
+                  },
+              'GET /api/app/project/public-resources':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{'resources': <Object?>[]},
+                    );
+                  },
+              'POST /api/app/file/upload/init': (AppApiRequest request) async {
+                final body = request.body as Map<String, Object?>;
+                final fileKind = '${body['fileKind']}';
+                uploadedKinds.add(fileKind);
+                expect(body['businessType'], 'project');
+                expect(body['businessId'], 'project-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'uploadSessionId': 'session-$fileKind',
+                    'directUpload': <String, Object?>{
+                      'url': 'https://upload.test/$fileKind',
+                      'method': 'PUT',
+                      'headers': <String, Object?>{},
+                    },
+                    'confirm': <String, Object?>{
+                      'endpoint': '/api/app/file/upload/confirm',
+                    },
+                  },
+                );
+              },
+              'POST /api/app/file/upload/confirm':
+                  (AppApiRequest request) async {
+                    final body = request.body as Map<String, Object?>;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'fileAssetId': 'fa-${body['uploadSessionId']}',
+                      },
+                    );
+                  },
               'POST /api/app/bid/submit': (AppApiRequest request) async {
                 expect(request.body, <String, Object?>{
                   'projectId': 'project-1',
                   'quoteAmount': 1200.0,
                   'proposalSummary': '首发主链投标',
+                  'projectUnderstandingFileAssetId':
+                      'fa-session-bid_project_understanding',
+                  'quoteSheetFileAssetId': 'fa-session-bid_quote_sheet',
+                  'schedulePlanFileAssetId': 'fa-session-bid_schedule_plan',
                 });
                 return AppApiResponse(
                   statusCode: 202,
@@ -933,18 +1056,21 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('天气与定位'), findsOneWidget);
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '进入模块'));
+      expect(find.text('推荐频道'), findsOneWidget);
+      await _tapVisible(tester, find.widgetWithText(FilledButton, '进入项目列表'));
 
       expect(find.text('项目展示'), findsWidgets);
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '查看详情'));
+      await _tapVisible(tester, find.widgetWithText(OutlinedButton, '查看详情'));
 
       expect(find.text('项目详情'), findsWidgets);
       await _tapVisible(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
 
       expect(find.text('竞标提交'), findsWidgets);
-      await tester.enterText(find.widgetWithText(TextField, '竞标报价'), '1200');
-      await tester.enterText(find.widgetWithText(TextField, '方案说明'), '首发主链投标');
+      await _enterVisibleBidTextField(tester, label: '竞标报价', value: '1200');
+      await _enterVisibleBidTextField(tester, label: '方案说明', value: '首发主链投标');
+      await _uploadBidAttachment(tester, '项目理解');
+      await _uploadBidAttachment(tester, '报价表');
+      await _uploadBidAttachment(tester, '进度安排');
       await _tapVisible(tester, find.widgetWithText(FilledButton, '提交竞标'));
 
       expect(find.text('竞标已提交'), findsOneWidget);

@@ -252,6 +252,10 @@ void main() {
       expect(dualField.toJson()['title'], '春季医疗器械展 - 迈德瑞');
       expect(dualField.toJson()['exhibitionName'], '春季医疗器械展');
       expect(dualField.toJson()['brandName'], '迈德瑞');
+      expect(dualField.toJson().containsKey('taskType'), isFalse);
+      expect(dualField.toJson().containsKey('quoteMode'), isFalse);
+      expect(dualField.toJson().containsKey('isInquiry'), isFalse);
+      expect(dualField.toJson().containsKey('prepublish'), isFalse);
       expect(legacyOnly.toJson()['title'], '旧标题项目');
       expect(legacyOnly.toJson().containsKey('exhibitionName'), isFalse);
       expect(legacyOnly.toJson().containsKey('brandName'), isFalse);
@@ -306,6 +310,10 @@ void main() {
       expect(body['title'], '春季医疗器械展 - 迈德瑞');
       expect(body['exhibitionName'], '春季医疗器械展');
       expect(body['brandName'], '迈德瑞');
+      expect(body.containsKey('taskType'), isFalse);
+      expect(body.containsKey('quoteMode'), isFalse);
+      expect(body.containsKey('isInquiry'), isFalse);
+      expect(body.containsKey('prepublish'), isFalse);
     },
   );
 
@@ -473,9 +481,9 @@ void main() {
       expect(find.text('恢复默认筛选'), findsNothing);
       expect(find.textContaining('春季医疗器械展', skipOffstage: false), findsWidgets);
       expect(find.textContaining('迈德瑞', skipOffstage: false), findsWidgets);
-      expect(find.textContaining('金额：', skipOffstage: false), findsWidgets);
+      expect(find.textContaining('预算：', skipOffstage: false), findsWidgets);
       expect(find.textContaining('面积：', skipOffstage: false), findsWidgets);
-      expect(find.textContaining('地点：', skipOffstage: false), findsWidgets);
+      expect(find.textContaining('搭建地：', skipOffstage: false), findsWidgets);
       expect(find.textContaining('时间：', skipOffstage: false), findsWidgets);
     },
   );
@@ -636,8 +644,21 @@ void main() {
     expect(find.text('展会'), findsOneWidget);
     expect(find.text('品牌'), findsOneWidget);
     expect(find.text('项目名称'), findsNothing);
+    expect(find.text('报价方式意向'), findsOneWidget);
+    expect(find.text('明价意向'), findsOneWidget);
+    expect(find.text('询价意向'), findsOneWidget);
+    expect(find.text('P0-Pay 交易任务'), findsNothing);
+    expect(find.text('创建明价竞标单'), findsNothing);
+    expect(find.text('创建询价报价单并拉起发单诚意金'), findsNothing);
     expect(_projectCreateField('project-create-title'), findsOneWidget);
     expect(_projectCreateField('project-create-brand-name'), findsOneWidget);
+
+    await tester.tap(find.text('明价意向'));
+    await tester.pumpAndSettle();
+    expect(
+      find.textContaining('当前只记录沟通意向，正式竞标仍需进入预发布详情检查无误后再发布'),
+      findsOneWidget,
+    );
   });
 
   testWidgets(
@@ -682,7 +703,7 @@ void main() {
       expect(find.text('当前生命周期'), findsOneWidget);
       expect(find.text('当前状态：草稿'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '保存到预发布列表'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '仅保存草稿'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '仅保存草稿'), findsOneWidget);
     },
   );
 
@@ -799,7 +820,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('当前状态：草稿'), findsOneWidget);
-      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '仅保存草稿'));
+      await _scrollAndTap(tester, find.widgetWithText(OutlinedButton, '仅保存草稿'));
       await tester.pumpAndSettle();
       expect(
         requests.any(
@@ -817,7 +838,7 @@ void main() {
       expect(find.text('当前状态：预发布列表'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '发布项目'), findsNothing);
       expect(find.widgetWithText(FilledButton, '返回预发布列表详情'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '继续核对当前内容'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '继续核对当前内容'), findsOneWidget);
       expect(
         find.textContaining('最终发布请回到“我的项目 -> 预发布列表 -> 单项目详情”'),
         findsOneWidget,

@@ -195,6 +195,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   ChinaRegionCatalog? _regionCatalog;
   _ProjectStandardizedLocationOption? _selectedStandardizedLocation;
   String? _selectedDistrictCode;
+  String? _quoteIntention;
 
   bool _guardLoading = true;
   _ProjectCreateAccessGuard _accessGuard =
@@ -899,87 +900,70 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       hideResultPanelOnSuccess: true,
       resultSectionsBuilder: (ExhibitionActionResult result) =>
           _buildResultSections(result),
-      body:
-          isEditMode
-                ? _buildProjectEditBody(
-                    editContentReady: editContentReady,
-                    editResult: editResult,
-                    currentState: editState,
-                  )
-                : _buildProjectCreateRoundABody(
-                    context: context,
-                    guardLoading: _guardLoading,
-                    accessGuard: _accessGuard,
-                    formErrorMessage: _formErrorMessage,
-                    selectedProjectTypeLabel: _selectedProjectTypeLabel,
-                    selectedStandardizedLocationLabel:
-                        _selectedStandardizedLocationLabel,
-                    hasStandardizedLocationSelection:
-                        _selectedStandardizedLocation != null,
-                    districtSelectionEnabled:
-                        _selectedStandardizedLocation?.districts.isNotEmpty ??
-                        false,
-                    exhibitionNameController: _titleController,
-                    brandNameController: _brandNameController,
-                    buildingTypeController: _buildingTypeController,
-                    buildingTypeRemarkController: _buildingTypeRemarkController,
-                    budgetAmountController: _budgetAmountController,
-                    areaSqmController: _areaSqmController,
-                    provinceNameController: _provinceNameController,
-                    cityNameController: _cityNameController,
-                    districtNameController: _districtNameController,
-                    detailAddressController: _detailAddressController,
-                    scopeSummaryController: _scopeSummaryController,
-                    plannedStartAtController: _plannedStartAtController,
-                    plannedEndAtController: _plannedEndAtController,
-                    scheduleDetailController: _scheduleDetailController,
-                    descriptionController: _descriptionController,
-                    fieldKeys: _fieldKeys,
-                    fieldErrors: _fieldErrors,
-                    onFieldInteracted: _handleFieldInteracted,
-                    onProjectTypePressed: _pickProjectType,
-                    onStandardizedLocationPressed: _pickStandardizedLocation,
-                    onDistrictPressed: _pickDistrict,
-                    onScopeSummaryPressed: _editScopeSummary,
-                    onPlannedStartDatePressed: () => _pickDate(
-                      controller: _plannedStartAtController,
-                      fieldId: _ProjectCreateFieldId.plannedStartAt,
-                    ),
-                    onPlannedEndDatePressed: () => _pickDate(
-                      controller: _plannedEndAtController,
-                      fieldId: _ProjectCreateFieldId.plannedEndAt,
-                    ),
-                    onPlannedStartDateCleared: () => _clearDate(
-                      controller: _plannedStartAtController,
-                      fieldId: _ProjectCreateFieldId.plannedStartAt,
-                    ),
-                    onPlannedEndDateCleared: () => _clearDate(
-                      controller: _plannedEndAtController,
-                      fieldId: _ProjectCreateFieldId.plannedEndAt,
-                    ),
-                  )
-            ..addAll(<Widget>[
-              if (_shouldShowP0PayTradeTaskSection) ...<Widget>[
-                const SizedBox(height: 16),
-                _buildP0PayTradeTaskSection(),
-              ],
-            ]),
+      body: isEditMode
+          ? _buildProjectEditBody(
+              editContentReady: editContentReady,
+              editResult: editResult,
+              currentState: editState,
+            )
+          : _buildProjectCreateRoundABody(
+              context: context,
+              guardLoading: _guardLoading,
+              accessGuard: _accessGuard,
+              formErrorMessage: _formErrorMessage,
+              selectedProjectTypeLabel: _selectedProjectTypeLabel,
+              selectedStandardizedLocationLabel:
+                  _selectedStandardizedLocationLabel,
+              quoteIntention: _quoteIntention,
+              hasStandardizedLocationSelection:
+                  _selectedStandardizedLocation != null,
+              districtSelectionEnabled:
+                  _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
+              exhibitionNameController: _titleController,
+              brandNameController: _brandNameController,
+              buildingTypeController: _buildingTypeController,
+              buildingTypeRemarkController: _buildingTypeRemarkController,
+              budgetAmountController: _budgetAmountController,
+              areaSqmController: _areaSqmController,
+              provinceNameController: _provinceNameController,
+              cityNameController: _cityNameController,
+              districtNameController: _districtNameController,
+              detailAddressController: _detailAddressController,
+              scopeSummaryController: _scopeSummaryController,
+              plannedStartAtController: _plannedStartAtController,
+              plannedEndAtController: _plannedEndAtController,
+              scheduleDetailController: _scheduleDetailController,
+              descriptionController: _descriptionController,
+              fieldKeys: _fieldKeys,
+              fieldErrors: _fieldErrors,
+              onFieldInteracted: _handleFieldInteracted,
+              onProjectTypePressed: _pickProjectType,
+              onStandardizedLocationPressed: _pickStandardizedLocation,
+              onDistrictPressed: _pickDistrict,
+              onScopeSummaryPressed: _editScopeSummary,
+              onQuoteIntentionChanged: (String? value) =>
+                  setState(() => _quoteIntention = value),
+              onPlannedStartDatePressed: () => _pickDate(
+                controller: _plannedStartAtController,
+                fieldId: _ProjectCreateFieldId.plannedStartAt,
+              ),
+              onPlannedEndDatePressed: () => _pickDate(
+                controller: _plannedEndAtController,
+                fieldId: _ProjectCreateFieldId.plannedEndAt,
+              ),
+              onPlannedStartDateCleared: () => _clearDate(
+                controller: _plannedStartAtController,
+                fieldId: _ProjectCreateFieldId.plannedStartAt,
+              ),
+              onPlannedEndDateCleared: () => _clearDate(
+                controller: _plannedEndAtController,
+                fieldId: _ProjectCreateFieldId.plannedEndAt,
+              ),
+            ),
     );
   }
 
-  bool get _shouldShowP0PayTradeTaskSection {
-    return _titleController.text.trim().isNotEmpty ||
-        _brandNameController.text.trim().isNotEmpty ||
-        _budgetAmountController.text.trim().isNotEmpty ||
-        _areaSqmController.text.trim().isNotEmpty ||
-        _selectedStandardizedLocation != null ||
-        _p0PayTaskResult != null ||
-        _p0PayDepositOrderResult != null ||
-        _p0PayDepositInitResult != null ||
-        _p0PayDepositStatusResult != null ||
-        _p0PayDepositPollResult != null;
-  }
-
+  // ignore: unused_element
   Widget _buildP0PayTradeTaskSection() {
     final declarationsCompleted = _p0PayDeclarationsCompleted;
     final materials = _p0PayMaterialFileAssetIds();
@@ -1330,7 +1314,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       _ActionCard(
         title: '项目已创建，基本信息已保存',
         summary: canOpenPublicDetail
-            ? '当前项目已创建并进入竞标中链路，可进入项目详情继续确认基本信息、补充文书或查看公域回显。'
+            ? '当前项目已进入预发布或后续链路，可进入项目详情继续确认基本信息、补充文书或查看回显。'
             : '当前项目已创建为草稿，下一步先进入我的项目详情确认刚保存的基本信息。',
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
@@ -1359,14 +1343,14 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           _DetailLine(
             label: '下一步',
             value: canOpenPublicDetail
-                ? '先进入我的项目详情确认刚保存的基本信息；项目详情文书已开放，可继续补充效果图、施工图和其他资料。'
+                ? '先进入我的项目详情确认刚保存的基本信息；预发布阶段已开放效果图、施工图和其他资料。'
                 : '点击下方“下一步：进入我的项目详情”，先确认刚保存的基本信息；保存到预发布列表后项目详情文书会开放。',
           ),
           if (!canOpenPublicDetail) ...<Widget>[
             const SizedBox(height: 12),
             const _ActionCard(
               title: '项目详情文书',
-              summary: '效果图、施工图以及其他资料会在进入预发布列表后开放为 owner-private 正式附件区。',
+              summary: '效果图、施工图和其他资料会在进入预发布列表后开放为 owner-private 正式附件区。',
               children: <Widget>[
                 _DetailLine(
                   label: '当前说明',
@@ -1383,8 +1367,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               key: ValueKey<String>('project-create-attachment-$projectId'),
               projectId: projectId,
               title: '继续补充资料',
-              summary: '如需补充效果图、施工图或其他资料，可继续在这里完成。',
-              emptyMessage: '当前还没有补充项目附件。',
+              summary: '预发布阶段已开放效果图、施工图和其他资料，可继续在这里补齐。',
+              emptyMessage: '当前还没有补充效果图、施工图或其他资料。',
               autoloadFormalList: false,
             ),
           ],
@@ -1513,6 +1497,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         formErrorMessage: _formErrorMessage,
         selectedProjectTypeLabel: _selectedProjectTypeLabel,
         selectedStandardizedLocationLabel: _selectedStandardizedLocationLabel,
+        quoteIntention: _quoteIntention,
         hasStandardizedLocationSelection: _selectedStandardizedLocation != null,
         districtSelectionEnabled:
             _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
@@ -1538,6 +1523,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         onStandardizedLocationPressed: _pickStandardizedLocation,
         onDistrictPressed: _pickDistrict,
         onScopeSummaryPressed: _editScopeSummary,
+        onQuoteIntentionChanged: (String? value) =>
+            setState(() => _quoteIntention = value),
         onPlannedStartDatePressed: () => _pickDate(
           controller: _plannedStartAtController,
           fieldId: _ProjectCreateFieldId.plannedStartAt,
@@ -1561,13 +1548,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           key: ValueKey<String>('project-edit-attachment-$projectId'),
           projectId: projectId,
           title: '项目详情文书区',
-          summary: '进入预发布列表后，可继续在这里补充效果图、施工图和其他资料。',
-          emptyMessage: '当前还没有项目文书。',
+          summary: '预发布阶段已开放效果图、施工图和其他资料。补齐后再检查无误并正式发布。',
+          emptyMessage: '当前还没有补充效果图、施工图或其他资料。',
         )
       else
         const _ActionCard(
           title: '项目详情文书区',
-          summary: '保存到预发布列表后，这里会开放 owner-private 正式附件补充区。',
+          summary: '保存到预发布列表后，效果图、施工图和其他资料会在这里开放补充。',
           children: <Widget>[
             _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
           ],

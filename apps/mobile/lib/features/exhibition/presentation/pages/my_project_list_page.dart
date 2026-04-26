@@ -26,7 +26,6 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
   bool _myBidLoading = false;
   late _MyProjectWorkspaceBucket _selectedWorkspace;
   _MyProjectStageBucket _selectedStage = _MyProjectStageBucket.draft;
-  String? _publishingProjectId;
 
   @override
   void initState() {
@@ -63,86 +62,6 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
     if (_selectedWorkspace == _MyProjectWorkspaceBucket.bids) {
       await _loadMyBidList(forceRefresh: true);
     }
-  }
-
-  Future<bool?> _confirmLifecycleAction({
-    required String title,
-    required String content,
-    required String confirmLabel,
-  }) {
-    return showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) {
-        return AlertDialog(
-          title: Text(title),
-          content: Text(content),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.of(dialogContext).pop(true),
-              child: Text(confirmLabel),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
-  Future<void> _publishSubmittedProject({
-    required String projectId,
-    required String? state,
-  }) async {
-    if (_publishingProjectId != null) {
-      return;
-    }
-    if (!_myProjectCanPublish(state)) {
-      _showPageMessage('当前项目尚未进入预发布列表，暂不支持正式发布。');
-      return;
-    }
-
-    final action = _myProjectLifecycleActionOption(
-      _MyProjectLifecycleActionKind.publish,
-    );
-    final confirmed = await _confirmLifecycleAction(
-      title: action.confirmTitle,
-      content: action.confirmMessage,
-      confirmLabel: action.confirmLabel,
-    );
-    if (!mounted || confirmed != true) {
-      return;
-    }
-
-    setState(() => _publishingProjectId = projectId);
-    final result = await ExhibitionConsumerLayer.instance.publishProject(
-      ProjectLifecycleActionCommand(projectId: projectId),
-    );
-    if (!mounted) {
-      return;
-    }
-
-    setState(() => _publishingProjectId = null);
-    if (!result.isSuccess) {
-      _showPageMessage(_userFacingActionFailureMessage(result));
-      return;
-    }
-
-    ExhibitionConsumerLayer.instance.invalidateMyProjectList();
-    await _load(forceRefresh: true);
-    if (!mounted) {
-      return;
-    }
-
-    setState(() => _selectedStage = _MyProjectStageBucket.published);
-    _showPageMessage(action.successMessage);
-  }
-
-  void _showPageMessage(String message) {
-    final messenger = ScaffoldMessenger.maybeOf(context);
-    messenger?.hideCurrentSnackBar();
-    messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -295,21 +214,12 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
 
             final actionLabel = switch (stage.value) {
               _MyProjectStageBucket.draft => '继续编辑',
-              _MyProjectStageBucket.submitted =>
-                _publishingProjectId == projectId
-                    ? _myProjectLifecycleActionOption(
-                        _MyProjectLifecycleActionKind.publish,
-                      ).loadingLabel
-                    : _myProjectLifecycleActionOption(
-                        _MyProjectLifecycleActionKind.publish,
-                      ).buttonLabel,
+              _MyProjectStageBucket.submitted => '补资料后确认发布',
               _ => '查看详情',
             };
             final routeName = stage.value == _MyProjectStageBucket.draft
                 ? ExhibitionRoutes.projectEditWithProjectId(projectId)
                 : ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
-            final secondaryActionLabel =
-                stage.value == _MyProjectStageBucket.submitted ? '查看详情' : null;
 
             return Padding(
               padding: const EdgeInsets.only(top: 12),
@@ -352,20 +262,7 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
                 ],
                 actionLabel: actionLabel,
                 actionSummary: stage.cardNextStep,
-                onPressed: () {
-                  if (stage.value == _MyProjectStageBucket.submitted) {
-                    _publishSubmittedProject(
-                      projectId: projectId,
-                      state: state,
-                    );
-                    return;
-                  }
-                  _openRoute(routeName);
-                },
-                secondaryActionLabel: secondaryActionLabel,
-                onSecondaryPressed: secondaryActionLabel == null
-                    ? null
-                    : () => _openRoute(routeName),
+                onPressed: () => _openRoute(routeName),
               ),
             );
           }),

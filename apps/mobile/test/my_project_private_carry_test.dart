@@ -791,13 +791,10 @@ void main() {
     await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     expect(find.text('当前阶段：预发布列表'), findsOneWidget);
     expect(
-      find.text(
-        '当前下一步：查看详情 / 补充资料 / 检查无误，确定发布 / 返回草稿继续编辑 / 作废归档',
-      ),
+      find.text('当前下一步：查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废归档'),
       findsOneWidget,
     );
-    expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '查看详情'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '补资料后确认发布'), findsOneWidget);
 
     await _tapChoiceChipLabel(tester, '竞标中 · 1');
     expect(find.text('当前阶段：竞标中'), findsOneWidget);
@@ -856,6 +853,9 @@ void main() {
     expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '作废归档'), findsOneWidget);
+    expect(find.text('发布前确认'), findsOneWidget);
+    expect(find.textContaining('预发布阶段已开放项目详情文书区'), findsOneWidget);
+    expect(find.textContaining('补充效果图、施工图和其他资料'), findsOneWidget);
     expect(find.text('删除此项目'), findsNothing);
   });
 
@@ -875,10 +875,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('当前阶段动作'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '继续补充资料'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
+    expect(find.text('项目详情文书：预发布阶段已开放效果图、施工图和其他资料。'), findsOneWidget);
     expect(find.text('下架关闭'), findsNothing);
     await _scrollTo(tester, find.text('项目详情文书区'));
     expect(find.text('项目详情文书区'), findsOneWidget);
+    expect(find.textContaining('预发布阶段已开放效果图、施工图和其他资料'), findsWidgets);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
     await _scrollTo(tester, find.text('公共资源下载区'));
@@ -925,13 +927,13 @@ void main() {
     await _tapEntityCardAction(
       tester,
       title: '项目 project-withdraw-flow',
-      actionLabel: '查看详情',
+      actionLabel: '补资料后确认发布',
     );
     await _scrollTo(tester, find.widgetWithText(OutlinedButton, '返回草稿继续编辑'));
     await tester.tap(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'));
     await tester.pumpAndSettle();
 
-    expect(find.text('撤回后项目会回到草稿，可继续编辑。'), findsOneWidget);
+    expect(find.textContaining('撤回后，项目会回到草稿，暂不进入公域展示'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '确认撤回'));
     await tester.pumpAndSettle();
 
@@ -955,13 +957,13 @@ void main() {
     await _tapEntityCardAction(
       tester,
       title: '项目 project-archive-flow',
-      actionLabel: '查看详情',
+      actionLabel: '补资料后确认发布',
     );
     await _scrollTo(tester, find.widgetWithText(OutlinedButton, '作废归档'));
     await tester.tap(find.widgetWithText(OutlinedButton, '作废归档'));
     await tester.pumpAndSettle();
 
-    expect(find.text('归档后项目会退出当前活跃流转。'), findsOneWidget);
+    expect(find.textContaining('归档后，项目会退出当前活跃流转，不会进入公域展示'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '确认归档'));
     await tester.pumpAndSettle();
 
@@ -970,7 +972,7 @@ void main() {
     expect(find.text('删除此项目'), findsNothing);
   });
 
-  testWidgets('预发布列表卡片主动作可直接正式发布并进入已发布承接', (WidgetTester tester) async {
+  testWidgets('预发布列表卡片主动作进入详情后正式发布并进入已发布承接', (WidgetTester tester) async {
     final projectStates = <String, String>{
       'project-draft-1': 'draft',
       'project-publish-flow': 'submitted',
@@ -984,17 +986,19 @@ void main() {
     await _tapEntityCardAction(
       tester,
       title: '项目 project-publish-flow',
-      actionLabel: '检查无误，确定发布',
+      actionLabel: '补资料后确认发布',
     );
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
     await tester.pumpAndSettle();
 
-    expect(find.text('确认无误后，项目将正式进入公域展示。'), findsOneWidget);
+    expect(find.textContaining('项目将从预发布列表进入公域项目详情'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
     await tester.pumpAndSettle();
 
     expect(find.text('已正式发布'), findsOneWidget);
     expect(projectStates['project-publish-flow'], 'published');
-    expect(find.textContaining('竞标中'), findsWidgets);
+    expect(find.textContaining('竞标中', skipOffstage: false), findsWidgets);
   });
 
   testWidgets('已发布详情不再提供阶段动作和下架关闭入口', (WidgetTester tester) async {
@@ -1014,7 +1018,7 @@ void main() {
       actionLabel: '查看详情',
     );
     expect(find.text('当前阶段动作'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '继续补充资料'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
     expect(find.text('下架关闭'), findsNothing);
     expect(projectStates['project-close-flow'], 'published');
   });
