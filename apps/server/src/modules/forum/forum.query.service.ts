@@ -45,7 +45,19 @@ export class ForumQueryService {
 
   async getFeed(scope?: string, topicId?: string, context?: RequestContext) {
     const normalizedScope = this.normalizeOptional(scope);
-    if (normalizedScope && normalizedScope !== 'all' && normalizedScope !== 'square') {
+    if (
+      normalizedScope &&
+      normalizedScope !== 'all' &&
+      normalizedScope !== 'square' &&
+      normalizedScope !== 'local' &&
+      normalizedScope !== 'following'
+    ) {
+      return this.presenter.toFeedResponse([]);
+    }
+
+    const followedAuthorIds =
+      normalizedScope === 'following' ? await this.resolveFollowedAuthorIds(context) : null;
+    if (followedAuthorIds !== null && !followedAuthorIds.length) {
       return this.presenter.toFeedResponse([]);
     }
 
@@ -53,6 +65,7 @@ export class ForumQueryService {
     const posts = await this.postRepository.find({
       where: {
         ...(normalizedTopicId ? { topicId: normalizedTopicId } : {}),
+        ...(followedAuthorIds !== null ? { authorUserId: In(followedAuthorIds) } : {}),
         state: 'published'
       },
       order: { publishedAt: 'DESC', createdAt: 'DESC' }
@@ -94,6 +107,21 @@ export class ForumQueryService {
         })
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
     );
+  }
+
+  private async resolveFollowedAuthorIds(context?: RequestContext) {
+    if (!context) {
+      return [] satisfies string[];
+    }
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    const follows = await this.authorFollowRepository.find({
+      where: { followerUserId: currentSession.userId },
+      order: { createdAt: 'DESC' }
+    });
+    return [...new Set(follows.map((follow) => follow.targetAuthorUserId).filter(Boolean))];
   }
 
   async getTopicMetadata() {
