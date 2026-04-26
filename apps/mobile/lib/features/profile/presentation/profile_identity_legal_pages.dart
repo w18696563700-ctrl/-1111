@@ -39,28 +39,40 @@ class LoginLegalEntryStrip extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Checkbox(
-                  value: agreed,
-                  onChanged: (bool? value) => onChanged(value ?? false),
+                Padding(
+                  padding: const EdgeInsets.only(top: 2),
+                  child: SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: Checkbox(
+                      value: agreed,
+                      onChanged: (bool? value) => onChanged(value ?? false),
+                      visualDensity: VisualDensity.compact,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
                 ),
-                const SizedBox(width: 4),
+                const SizedBox(width: 10),
                 Expanded(
-                  child: Wrap(
-                    crossAxisAlignment: WrapCrossAlignment.center,
-                    spacing: 4,
-                    runSpacing: 4,
-                    children: <Widget>[
-                      Text('我已阅读并同意', style: textTheme.bodyMedium),
-                      _LegalLinkButton(
-                        label: '《用户协议》',
-                        routeName: ProfileIdentityRoutes.userAgreement,
-                      ),
-                      Text('和', style: textTheme.bodyMedium),
-                      _LegalLinkButton(
-                        label: '《隐私政策》',
-                        routeName: ProfileIdentityRoutes.privacyPolicy,
-                      ),
-                    ],
+                  child: Padding(
+                    padding: const EdgeInsets.only(top: 1),
+                    child: Wrap(
+                      crossAxisAlignment: WrapCrossAlignment.center,
+                      spacing: 4,
+                      runSpacing: 4,
+                      children: <Widget>[
+                        Text('我已阅读并同意', style: textTheme.bodyMedium),
+                        _LegalLinkText(
+                          label: '《用户协议》',
+                          routeName: ProfileIdentityRoutes.userAgreement,
+                        ),
+                        Text('和', style: textTheme.bodyMedium),
+                        _LegalLinkText(
+                          label: '《隐私政策》',
+                          routeName: ProfileIdentityRoutes.privacyPolicy,
+                        ),
+                      ],
+                    ),
                   ),
                 ),
               ],
@@ -112,22 +124,27 @@ class PrivacyPolicyPage extends StatelessWidget {
   }
 }
 
-class _LegalLinkButton extends StatelessWidget {
-  const _LegalLinkButton({required this.label, required this.routeName});
+class _LegalLinkText extends StatelessWidget {
+  const _LegalLinkText({required this.label, required this.routeName});
 
   final String label;
   final String routeName;
 
   @override
   Widget build(BuildContext context) {
-    return TextButton(
-      onPressed: () => Navigator.of(context).pushNamed(routeName),
-      style: TextButton.styleFrom(
-        padding: EdgeInsets.zero,
-        minimumSize: Size.zero,
-        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: () => Navigator.of(context).pushNamed(routeName),
+      borderRadius: BorderRadius.circular(4),
+      child: Text(
+        label,
+        style: textTheme.bodyMedium?.copyWith(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-      child: Text(label),
     );
   }
 }

@@ -6,7 +6,7 @@ purpose: >
   treat them as intentional current behavior rather than accidental drift and
   do not silently revert them.
 layer: L0 SSOT
-updated_at_local: 2026-04-14
+updated_at_local: 2026-04-27
 ---
 
 # 最新用户确认变更台账
@@ -956,3 +956,20 @@ updated_at_local: 2026-04-14
   - 最终验收仍为 conditional，不是 production pass。
 - 当前新增正式文书：
   - `docs/00_ssot/project_communication_album_rating_progress_catchup_checkpoint_20260426_addendum.md`
+
+### 3.10 登录入口法律确认条对齐规则
+
+- `2026-04-27` 用户确认：
+  - 登录入口中“我已阅读并同意《用户协议》和《隐私政策》”这一行：
+    - 左侧勾选框
+    - 右侧确认文案
+    - 必须保持同一视觉基线和同一内容区对齐
+  - 不得继续使用会导致勾选框下坠、文案上浮的松散布局
+  - 法律链接应保持轻量文本态，不要再回退成影响对齐的默认大按钮样式
+- 当前实现口径：
+  - 使用紧凑 checkbox 尺寸
+  - 使用轻量文本链接承接 `用户协议 / 隐私政策`
+  - 仅修正对齐与点击承接，不改变登录门禁规则
+- 相关文件：
+  - `apps/mobile/lib/features/profile/presentation/profile_identity_legal_pages.dart`
+  - `apps/mobile/test/shell_app_test.dart`

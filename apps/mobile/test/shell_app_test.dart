@@ -1048,8 +1048,8 @@ void main() {
       expect(find.text('发送验证码'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '验证码登录'), findsOneWidget);
       expect(find.byType(Checkbox), findsOneWidget);
-      expect(find.widgetWithText(TextButton, '《用户协议》'), findsOneWidget);
-      expect(find.widgetWithText(TextButton, '《隐私政策》'), findsOneWidget);
+      expect(find.text('《用户协议》'), findsOneWidget);
+      expect(find.text('《隐私政策》'), findsOneWidget);
       expect(find.text('请输入可接收验证码的手机号'), findsOneWidget);
       expect(find.text('Apple'), findsNothing);
       expect(find.text('微信'), findsNothing);
