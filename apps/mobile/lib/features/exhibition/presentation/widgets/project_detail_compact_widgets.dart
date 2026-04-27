@@ -14,6 +14,59 @@ class _ProjectDetailCompactMetaItemData {
   final bool fullWidth;
 }
 
+class _ProjectDetailOverviewCard extends StatelessWidget {
+  const _ProjectDetailOverviewCard({
+    required this.title,
+    required this.children,
+    this.statusLabel,
+  });
+
+  final String title;
+  final String? statusLabel;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                if (statusLabel != null) ...<Widget>[
+                  const SizedBox(width: 12),
+                  _StatusPill(label: statusLabel!, tone: _ActionCardTone.muted),
+                ],
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ProjectDetailCompactMetaGrid extends StatelessWidget {
   const _ProjectDetailCompactMetaGrid({required this.items});
 

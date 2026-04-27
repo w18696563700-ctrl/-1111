@@ -346,12 +346,16 @@ export class MyProjectAttachmentService {
     result: Record<string, unknown>,
     projectId: string,
   ): MyProjectAttachmentListResponse {
-    if (!Array.isArray(result.items)) {
-      throw new Error('Project attachment list response is missing `items`.');
+    const rawAttachments = Array.isArray(result.attachments)
+      ? result.attachments
+      : result.items;
+    if (!Array.isArray(rawAttachments)) {
+      throw new Error('Project attachment list response is missing `attachments`.');
     }
 
     return {
-      items: result.items.map((item) =>
+      projectId: this.asString(result.projectId) || projectId,
+      attachments: rawAttachments.map((item) =>
         this.toReadModel(
           this.requireRecord(item, 'Project attachment item must be an object.'),
           projectId,

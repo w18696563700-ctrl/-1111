@@ -17,7 +17,9 @@ class ProjectAttachmentReadModel {
   factory ProjectAttachmentReadModel.fromPayload(Object? payload) {
     final raw = _asMap(payload);
     if (raw == null) {
-      throw const FormatException('project attachment payload must be an object');
+      throw const FormatException(
+        'project attachment payload must be an object',
+      );
     }
 
     return ProjectAttachmentReadModel(
@@ -60,18 +62,23 @@ class ProjectAttachmentListReadModel {
       );
     }
 
-    final rawAttachments = raw['attachments'];
+    final rawAttachments = raw['attachments'] ?? raw['items'];
     if (rawAttachments is! List) {
       throw const FormatException(
         'project attachment list payload must contain attachments',
       );
     }
 
+    final attachments = rawAttachments
+        .map<ProjectAttachmentReadModel>(ProjectAttachmentReadModel.fromPayload)
+        .toList(growable: false);
+    final projectId =
+        (raw['projectId'] is String ? '${raw['projectId']}' : null) ??
+        (attachments.isNotEmpty ? attachments.first.projectId : '');
+
     return ProjectAttachmentListReadModel(
-      projectId: '${raw['projectId']!}',
-      attachments: rawAttachments
-          .map<ProjectAttachmentReadModel>(ProjectAttachmentReadModel.fromPayload)
-          .toList(growable: false),
+      projectId: projectId,
+      attachments: attachments,
     );
   }
 

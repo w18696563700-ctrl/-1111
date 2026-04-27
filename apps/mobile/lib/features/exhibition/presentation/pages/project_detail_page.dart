@@ -256,146 +256,25 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
 
         return <Widget>[
           const SizedBox(height: 16),
-          _ActionCard(
-            title: '核心信息',
-            tone: _ActionCardTone.emphasis,
-            children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        _ProjectDetailHeadline(
-                          headline: headline,
-                          accessControlled:
-                              _projectShouldShowNameAccessControls(
-                                projectMap,
-                              ) &&
-                              !_isOwnerSurface(viewerProjectRelation),
-                          onTap: () => _showProjectNameAccessSheet(
-                            projectId: projectId,
-                            projectMap: projectMap,
-                          ),
-                        ),
-                        if (secondaryHeadline != null) ...<Widget>[
-                          const SizedBox(height: 6),
-                          Text(
-                            secondaryHeadline,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  color: Theme.of(
-                                    context,
-                                  ).colorScheme.onSurfaceVariant,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ),
-                  if (state != null)
-                    _StatusPill(
-                      label: _frontStageStateLabel(state),
-                      tone: _ActionCardTone.muted,
-                    ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              _ProjectDetailCompactMetaGrid(
-                items: <_ProjectDetailCompactMetaItemData>[
-                  _ProjectDetailCompactMetaItemData(
-                    label: '项目编号',
-                    value: projectNo ?? '未提供',
-                    fullWidth: true,
-                  ),
-                  _ProjectDetailCompactMetaItemData(
-                    label: '项目类型',
-                    value: _buildingTypeLabel(buildingType),
-                  ),
-                  _ProjectDetailCompactMetaItemData(
-                    label: '预算金额',
-                    value: _currencyText(budgetAmount),
-                    highlight: true,
-                  ),
-                  _ProjectDetailCompactMetaItemData(
-                    label: '项目面积',
-                    value: _projectAreaText(areaSqm),
-                  ),
-                ],
-              ),
-              if (buildingTypeRemark != null) ...<Widget>[
-                const SizedBox(height: 12),
-                _DetailLine(label: '类型备注', value: buildingTypeRemark),
-              ],
-              if (summaryHeading != null) ...<Widget>[
-                const SizedBox(height: 4),
-                _DetailLine(label: '项目摘要', value: summaryHeading),
-              ],
-            ],
-          ),
-          const SizedBox(height: 16),
-          _ActionCard(
-            title: '地点与安排',
-            children: <Widget>[
-              if (arrangementMissing)
-                const _EmptyNotice(
-                  title: '当前暂无地点与安排信息',
-                  message: '当前项目暂未提供地点、范围、说明或时间安排。',
-                ),
-              if (locationSummary != null)
-                _DetailLine(label: '项目地点', value: locationSummary),
-              if (scopeSummary != null)
-                _DetailLine(label: '范围说明', value: scopeSummary),
-              if (scheduleRange != null)
-                _DetailLine(label: '计划时间', value: scheduleRange),
-              if (scheduleDetail != null)
-                _DetailLine(label: '时间说明', value: scheduleDetail),
-              if (description != null)
-                _DetailLine(label: '补充说明', value: description),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _ActionCard(
-            title: _isOwnerSurface(viewerProjectRelation)
-                ? '继续处理'
-                : _canContinueBidFromState(state)
-                ? '参与竞标'
-                : _canReadBidResultFromState(state)
-                ? '竞标结果'
-                : '当前状态',
-            children: <Widget>[
-              _StateMessage(
-                title: '当前说明',
-                body: _isOwnerSurface(viewerProjectRelation)
-                    ? _ownerContinuationBody(state)
-                    : _detailContinuationBody(state),
-              ),
-              if (_isOwnerSurface(viewerProjectRelation)) ...<Widget>[
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () {
-                    Navigator.of(context).pushNamed(
-                      ExhibitionRoutes.myProjectDetailWithProjectId(projectId),
-                    );
-                  },
-                  child: const Text('进入我的项目'),
-                ),
-              ] else if (_canContinueBidFromState(state)) ...<Widget>[
-                const SizedBox(height: 12),
-                FilledButton(
-                  onPressed: () => _continueBidWithGuard(projectId),
-                  child: const Text('立即参与竞标'),
-                ),
-              ] else if (_canReadBidResultFromState(state)) ...<Widget>[
-                const SizedBox(height: 12),
-                OutlinedButton(
-                  onPressed: () => _openBidResultWithGuard(projectId),
-                  child: const Text('查看竞标结果'),
-                ),
-              ],
-            ],
+          _buildProjectOverviewCard(
+            projectId: projectId,
+            projectNo: projectNo,
+            headline: headline,
+            secondaryHeadline: secondaryHeadline,
+            projectMap: projectMap,
+            buildingType: buildingType,
+            budgetAmount: budgetAmount,
+            areaSqm: areaSqm,
+            buildingTypeRemark: buildingTypeRemark,
+            summaryHeading: summaryHeading,
+            arrangementMissing: arrangementMissing,
+            locationSummary: locationSummary,
+            scopeSummary: scopeSummary,
+            scheduleRange: scheduleRange,
+            scheduleDetail: scheduleDetail,
+            description: description,
+            state: state,
+            viewerProjectRelation: viewerProjectRelation,
           ),
           const SizedBox(height: 16),
           if (_isOwnerSurface(viewerProjectRelation)) ...<Widget>[
@@ -429,13 +308,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             ),
             const SizedBox(height: 16),
           ],
-          _buildTradingImEntryCard(
-            projectId: projectId,
-            bidId: _normalizeId(payload?['bidId'] as String?),
-            canStartBid:
-                !_isOwnerSurface(viewerProjectRelation) &&
-                _canContinueBidFromState(state),
-          ),
         ];
       },
     );

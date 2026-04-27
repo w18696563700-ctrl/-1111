@@ -78,14 +78,8 @@ void main() {
 
       expect(find.text('当前展示：演示内容'), findsOneWidget);
       expect(find.text('当前真实内容暂未返回'), findsOneWidget);
-      expect(find.text('核心信息'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('地点与安排'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('地点与安排'), findsOneWidget);
+      expect(find.text('项目概要'), findsOneWidget);
+      expect(find.text('地点与安排'), findsNothing);
     },
   );
 

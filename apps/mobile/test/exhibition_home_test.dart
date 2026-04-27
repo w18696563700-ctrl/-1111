@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
+import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:mobile/core/location/device_location_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
@@ -402,15 +403,36 @@ ExhibitionConsumerLayer _projectListConsumer({
   );
 }
 
+void _installMinimalRegionCatalog() {
+  ChinaRegionCatalogLoader.installLoadOverrideForTest(() async {
+    return ChinaRegionCatalog(
+      provinces: const <ChinaProvinceOption>[
+        ChinaProvinceOption(
+          provinceCode: '500000',
+          provinceName: '重庆市',
+          cities: <ChinaCityOption>[],
+        ),
+        ChinaProvinceOption(
+          provinceCode: '510000',
+          provinceName: '四川省',
+          cities: <ChinaCityOption>[],
+        ),
+      ],
+    );
+  });
+}
+
 void main() {
   setUp(() {
     SharedPreferences.setMockInitialValues(const <String, Object>{});
+    ChinaRegionCatalogLoader.reset();
     ExhibitionHomeLocationContextStore.reset();
     _installEnterpriseHubConsumer();
   });
 
   tearDown(() {
     EnterpriseHubConsumerLayer.reset();
+    ChinaRegionCatalogLoader.reset();
     ExhibitionHomeLocationContextStore.reset();
   });
 
@@ -642,7 +664,13 @@ void main() {
     'exhibition home keeps controlled province notice when factory channel has no province scope',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
-        onLoad: (locationContext) => contentHomeResult(),
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: '当前地区',
+          provinceName: '当前地区',
+          provinceCode: null,
+          latitude: null,
+          longitude: null,
+        ),
       );
       final locationService = FakeDeviceLocationService(
         resolver: () => const DeviceLocationSnapshot(
@@ -670,6 +698,218 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('当前还没拿到本省定位'), findsOneWidget);
       expect(find.text('重庆坤特工厂样本'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'exhibition home backfills province code from home location name for province project filter',
+    (WidgetTester tester) async {
+      _installMinimalRegionCatalog();
+      final provinceRequests = <String?>[];
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(
+          displayName: '重庆渝中',
+          provinceName: '重庆',
+          provinceCode: null,
+          cityName: '重庆',
+          latitude: 29.563,
+          longitude: 106.5516,
+        ),
+      );
+      final locationService = FakeDeviceLocationService(
+        resolver: () => const DeviceLocationSnapshot(
+          permissionState: DeviceLocationPermissionState.granted,
+          latitude: 29.563,
+          longitude: 106.5516,
+        ),
+      );
+      final consumer = ExhibitionConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/project/list': (AppApiRequest request) async {
+                    final provinceCode =
+                        request.uri.queryParameters['provinceCode'];
+                    provinceRequests.add(provinceCode);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'projectId': provinceCode == '500000'
+                                ? 'project-province'
+                                : 'project-all',
+                            'title': provinceCode == '500000'
+                                ? '重庆本省项目'
+                                : '综合项目',
+                            'buildingType': 'exhibition',
+                            'budgetAmount': 180000,
+                            'areaSqm': 220,
+                            'provinceCode': provinceCode,
+                            'cityName': '重庆市',
+                            'plannedStartAt': '2026-05-18',
+                            'state': 'published',
+                            'summary': const <String, Object?>{},
+                          },
+                        ],
+                      },
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: consumer,
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+          deviceLocationService: locationService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find
+            .byWidgetPredicate(
+              (Widget widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
+        const Offset(0, -180),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('本省').last);
+      await tester.pumpAndSettle();
+
+      expect(provinceRequests, contains('500000'));
+      expect(find.text('当前还没拿到本省定位'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'exhibition home province empty relocate button retries device location',
+    (WidgetTester tester) async {
+      _installMinimalRegionCatalog();
+      var resolveCount = 0;
+      final provinceRequests = <String?>[];
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (locationContext) => contentHomeResult(
+          displayName: locationContext?.provinceName ?? '当前地区',
+          provinceName: locationContext?.provinceName ?? '当前地区',
+          provinceCode: locationContext?.provinceCode,
+          latitude: locationContext?.latitude,
+          longitude: locationContext?.longitude,
+        ),
+        onRefresh: (locationContext) => contentHomeResult(
+          displayName: locationContext?.provinceName ?? '当前地区',
+          provinceName: locationContext?.provinceName ?? '当前地区',
+          provinceCode: locationContext?.provinceCode,
+          latitude: locationContext?.latitude,
+          longitude: locationContext?.longitude,
+        ),
+      );
+      final locationService = FakeDeviceLocationService(
+        resolver: () {
+          resolveCount += 1;
+          if (resolveCount == 1) {
+            return const DeviceLocationSnapshot(
+              permissionState: DeviceLocationPermissionState.unavailable,
+            );
+          }
+          return const DeviceLocationSnapshot(
+            permissionState: DeviceLocationPermissionState.granted,
+            latitude: 29.563,
+            longitude: 106.5516,
+            provinceCode: '500000',
+            provinceName: '重庆市',
+          );
+        },
+      );
+      final consumer = ExhibitionConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/project/list': (AppApiRequest request) async {
+                    final provinceCode =
+                        request.uri.queryParameters['provinceCode'];
+                    provinceRequests.add(provinceCode);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          if (provinceCode == '500000')
+                            <String, Object?>{
+                              'projectId': 'project-province',
+                              'title': '重庆本省项目',
+                              'buildingType': 'exhibition',
+                              'budgetAmount': 180000,
+                              'areaSqm': 220,
+                              'provinceCode': '500000',
+                              'cityName': '重庆市',
+                              'plannedStartAt': '2026-05-18',
+                              'state': 'published',
+                              'summary': const <String, Object?>{},
+                            },
+                        ],
+                      },
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: consumer,
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+          deviceLocationService: locationService,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.drag(
+        find
+            .byWidgetPredicate(
+              (Widget widget) =>
+                  widget is Scrollable &&
+                  widget.axisDirection == AxisDirection.down,
+            )
+            .first,
+        const Offset(0, -180),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('本省').last);
+      await tester.pumpAndSettle();
+      expect(find.text('当前还没拿到本省定位'), findsOneWidget);
+
+      final relocateButton = find.widgetWithText(OutlinedButton, '重新定位并刷新');
+      await tester.ensureVisible(relocateButton);
+      await tester.pumpAndSettle();
+      tester.widget<OutlinedButton>(relocateButton).onPressed!();
+      await tester.pumpAndSettle();
+
+      expect(resolveCount, 2);
+      expect(homeClient.refreshCount, 1);
+      expect(provinceRequests, contains('500000'));
     },
   );
 

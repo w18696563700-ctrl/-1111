@@ -813,14 +813,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('当前展示：已接通内容'), findsNothing);
-      expect(find.text('核心信息'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('地点与安排'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('地点与安排'), findsOneWidget);
+      expect(find.text('项目概要'), findsOneWidget);
+      expect(find.text('地点与安排'), findsNothing);
       expect(find.text('公开项目说明'), findsNothing);
       expect(find.text('公开资料边界'), findsNothing);
       expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
@@ -891,7 +885,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('核心信息'), findsOneWidget);
+      expect(find.text('项目概要'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.widgetWithText(FilledButton, '进入我的项目'),
         200,

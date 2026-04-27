@@ -232,6 +232,11 @@ layer: L0 SSOT
 - [project_attachment_prepublish_and_bid_materials_bff_surface_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/project_attachment_prepublish_and_bid_materials_bff_surface_addendum.md) is the formal `L4` BFF surface freeze for the same correction, freezing transport, shaping, and error normalization for the prepublish owner-attachment corridor and the new bid-material read projection only.
 - [project_attachment_prepublish_and_bid_materials_frontend_surface_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/project_attachment_prepublish_and_bid_materials_frontend_surface_addendum.md) is the formal `L5` frontend freeze for the same correction, freezing prepublish attachment entry on owner surfaces, bid-submit staged reveal, and the read-only effect/construction material display on bid-submit.
 
+### 2026-04-27 Bid Submit Project Review Collapse
+
+- [bid_submit_project_review_collapse_truth_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/bid_submit_project_review_collapse_truth_addendum.md) is the formal `L0` truth addendum for the narrow bid-submit UX refinement that keeps full project review on the first screen, collapses it to a reviewed summary after `继续竞标`, and preserves explicit re-open without changing BFF or Server truth.
+- [bid_submit_project_review_collapse_frontend_surface_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/bid_submit_project_review_collapse_frontend_surface_addendum.md) is the formal `L5` frontend surface addendum for the same refinement, freezing the `_bidFlowExpanded` rendering rule, `重新展开核对`, and `收起核对信息`.
+
 ### 2026-04-14 Project Detail Document Zone And Public Resource Download Boundary
 
 - [project_detail_document_zone_and_public_resource_download_stage_gate_checklist_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/project_detail_document_zone_and_public_resource_download_stage_gate_checklist_addendum.md) is the formal `L0` stage gate checklist for the current same-object `项目详情文书区与公共资源下载区` sub-round, freezing that the next allowed move is docs-only freeze authoring only and that the sub-round may not overclaim an app-facing public-resource center, a public attachment surface, or an Admin-to-App template proxy.

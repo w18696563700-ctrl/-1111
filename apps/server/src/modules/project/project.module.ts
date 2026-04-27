@@ -1,10 +1,14 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { CoreModule } from '../../core/core.module';
 import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module';
 import { AuthModule } from '../auth/auth.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectNameAccessModule } from '../project_name_access/project-name-access.module';
+import { UploadModule } from '../upload/upload.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
+import { ProjectAttachmentFileAccessController } from './project-attachment-file-access.controller';
+import { ProjectAttachmentFileAccessService } from './project-attachment-file-access.service';
 import { ProjectAttachmentController } from './project-attachment.controller';
 import { ProjectAttachmentPresenter } from './project-attachment.presenter';
 import { ProjectAttachmentService } from './project-attachment.service';
@@ -25,6 +29,7 @@ import { ProjectWriteService } from './project-write.service';
 
 @Module({
   imports: [
+    CoreModule,
     TypeOrmModule.forFeature([
       ProjectEntity,
       ProjectAttachmentEntity,
@@ -34,10 +39,12 @@ import { ProjectWriteService } from './project-write.service';
     ProjectPublishAuditModule,
     AuthModule,
     OrganizationModule,
-    ProjectNameAccessModule
+    ProjectNameAccessModule,
+    UploadModule
   ],
   controllers: [
     ProjectPublicResourceController,
+    ProjectAttachmentFileAccessController,
     ProjectController,
     ProjectAttachmentController,
     ProjectBidMaterialController
@@ -51,6 +58,7 @@ import { ProjectWriteService } from './project-write.service';
     ProjectLifecycleService,
     ProjectWriteService,
     ProjectAttachmentService,
+    ProjectAttachmentFileAccessService,
     ProjectBidMaterialService,
     ProjectPublicResourceService
   ],

@@ -10,15 +10,20 @@ _SuccessContractValidation _validateProjectAttachmentListPayload(
     return _invalidSuccessPayload(canonicalPath, 'response must be an object');
   }
 
+  final rawAttachments = raw['attachments'] ?? raw['items'];
   final message = _firstValidationError(<String?>[
-    _requireStringField(raw, 'projectId', canonicalPath),
-    _requireListField(raw, 'attachments', canonicalPath),
+    raw.containsKey('projectId')
+        ? _requireStringField(raw, 'projectId', canonicalPath)
+        : null,
+    rawAttachments is List
+        ? null
+        : 'contract drift at $canonicalPath: response.attachments must be a list',
   ]);
   if (message != null) {
     return _invalidSuccessPayload(canonicalPath, message, payload: sanitized);
   }
 
-  final attachments = raw['attachments']! as List;
+  final attachments = rawAttachments as List;
   for (var index = 0; index < attachments.length; index += 1) {
     final item = attachments[index];
     if (item is! Map) {

@@ -107,6 +107,12 @@ Map<String, Object?> _attachmentListResponse(
   return <String, Object?>{'projectId': projectId, 'attachments': attachments};
 }
 
+Map<String, Object?> _attachmentListResponseFromBffItems(
+  List<Map<String, Object?>> attachments,
+) {
+  return <String, Object?>{'items': attachments};
+}
+
 Map<String, Object?> _publicResourceItem({
   required String resourceId,
   required String resourceCategory,
@@ -587,6 +593,90 @@ void main() {
 
     await _tapVisible(tester, find.text('预览当前图片'));
     expect(find.text('图片预览'), findsOneWidget);
+  });
+
+  testWidgets('file access failed code stays Chinese on project attachment preview', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/my/projects/project-owner-access-failed':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _myProjectDetailPayload(
+                      projectId: 'project-owner-access-failed',
+                      viewerProjectRelation: 'owner',
+                      state: 'published',
+                    ),
+                  );
+                },
+            'GET /api/app/my/projects/project-owner-access-failed/attachments':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _attachmentListResponse(
+                      'project-owner-access-failed',
+                      <Map<String, Object?>>[
+                        _attachmentItem(
+                          attachmentId: 'attachment-access-failed-1',
+                          projectId: 'project-owner-access-failed',
+                          fileAssetId: 'file-asset-access-failed-1',
+                          fileName: '访问失败效果图.png',
+                          attachmentKind: 'effect_image',
+                          mimeType: 'image/png',
+                          sortOrder: 0,
+                        ),
+                      ],
+                    ),
+                  );
+                },
+            'GET /api/app/project/public-resources':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _publicResourceListResponse(
+                      const <Map<String, Object?>>[],
+                    ),
+                  );
+                },
+            'GET /api/app/file/access': (AppApiRequest request) async {
+              expect(
+                request.uri.queryParameters['fileAssetId'],
+                'file-asset-access-failed-1',
+              );
+              expect(request.uri.queryParameters['mode'], 'preview');
+              return AppApiResponse(
+                statusCode: 502,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'code': 'FILE_ACCESS_FAILED',
+                  'message': 'FILE_ACCESS_FAILED from upstream',
+                  'source': 'bff',
+                },
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionTransport: transport,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-owner-access-failed',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.text('项目详情文书区'));
+    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
+    expect(find.text('当前文书预览服务暂不可用，请稍后再试。'), findsOneWidget);
+    expect(find.textContaining('unrecognized error code'), findsNothing);
   });
 
   testWidgets('selected attachments can continue add and batch upload', (
@@ -1200,6 +1290,66 @@ void main() {
     expect(find.text('brand-board.webp'), findsNothing);
     expect(find.text('当前还没有项目文书'), findsOneWidget);
   });
+
+  testWidgets(
+    'project edit accepts current BFF attachment list shape and keeps document zone compact',
+    (WidgetTester tester) async {
+      final attachments = <Map<String, Object?>>[
+        _attachmentItem(
+          attachmentId: 'attachment-effect-edit-1',
+          projectId: 'project-edit-items-1',
+          fileAssetId: 'file-asset-effect-edit-1',
+          fileName: 'edit-effect-preview.png',
+          attachmentKind: 'effect_image',
+          mimeType: 'image/png',
+          sortOrder: 0,
+        ),
+      ];
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/project/edit/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _projectPayload(
+                        projectId: 'project-edit-items-1',
+                        viewerProjectRelation: 'owner',
+                        state: 'published',
+                      ),
+                    );
+                  },
+              'GET /api/app/my/projects/project-edit-items-1/attachments':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _attachmentListResponseFromBffItems(attachments),
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          exhibitionTransport: transport,
+          initialRoute: ExhibitionRoutes.projectEditWithProjectId(
+            'project-edit-items-1',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.text('项目详情文书区'));
+      expect(find.text('当前说明'), findsNothing);
+      expect(find.textContaining('upload confirm 只确认 FileAsset'), findsNothing);
+      expect(find.textContaining('用于补充效果图或展示图'), findsNothing);
+      expect(find.text('edit-effect-preview.png'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
+    },
+  );
 
   testWidgets('my project detail public resource zone handles empty state', (
     WidgetTester tester,

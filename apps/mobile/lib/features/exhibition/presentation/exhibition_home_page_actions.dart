@@ -32,7 +32,10 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
       return;
     }
 
-    _storeRecoveredHomeLocationContext(results[0]);
+    await _storeRecoveredHomeLocationContext(results[0]);
+    if (!mounted) {
+      return;
+    }
     _applyRefreshResults(results);
   }
 
@@ -100,8 +103,10 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
     );
   }
 
-  void _storeRecoveredHomeLocationContext(ExhibitionLoadResult homeResult) {
-    final locationContext = _homeLocationContextFromResult(homeResult);
+  Future<void> _storeRecoveredHomeLocationContext(
+    ExhibitionLoadResult homeResult,
+  ) async {
+    final locationContext = await _canonicalizedHomeLocationContext(homeResult);
     if (locationContext == null) {
       return;
     }
@@ -112,6 +117,55 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
     ExhibitionHomeLocationContextStore.instance.storeResolvedLocationContext(
       locationContext,
       permissionState: permissionState,
+    );
+    _mergeRecoveredLocationIntoSnapshot(locationContext, permissionState);
+  }
+
+  Future<ExhibitionHomeLocationContextRequest?>
+  _canonicalizedHomeLocationContext(ExhibitionLoadResult homeResult) async {
+    final locationContext = _homeLocationContextFromResult(homeResult);
+    final provinceName = _homeString(locationContext?.provinceName);
+    if (locationContext == null ||
+        _homeString(locationContext.provinceCode) != null ||
+        provinceName == null) {
+      return locationContext;
+    }
+
+    try {
+      final catalog = await ChinaRegionCatalogLoader.load();
+      if (!mounted) {
+        return null;
+      }
+      final province = catalog.provinceByName(provinceName);
+      if (province == null) {
+        return locationContext;
+      }
+      return ExhibitionHomeLocationContextRequest(
+        latitude: locationContext.latitude,
+        longitude: locationContext.longitude,
+        provinceCode: province.provinceCode,
+        provinceName: province.provinceName,
+        cityName: locationContext.cityName,
+        districtName: locationContext.districtName,
+        locationPermissionState: locationContext.locationPermissionState,
+      );
+    } on Object {
+      return locationContext;
+    }
+  }
+
+  void _mergeRecoveredLocationIntoSnapshot(
+    ExhibitionHomeLocationContextRequest locationContext,
+    DeviceLocationPermissionState permissionState,
+  ) {
+    final current = _locationSnapshot;
+    _locationSnapshot = DeviceLocationSnapshot(
+      permissionState: current?.permissionState ?? permissionState,
+      latitude: locationContext.latitude ?? current?.latitude,
+      longitude: locationContext.longitude ?? current?.longitude,
+      provinceCode: locationContext.provinceCode ?? current?.provinceCode,
+      provinceName: locationContext.provinceName ?? current?.provinceName,
+      errorMessage: current?.errorMessage,
     );
   }
 
@@ -231,7 +285,10 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
       return;
     }
 
-    _storeRecoveredHomeLocationContext(selectionResult);
+    await _storeRecoveredHomeLocationContext(selectionResult);
+    if (!mounted) {
+      return;
+    }
     _applyManualLocationSelection(selected);
     _applyRefreshResults(<ExhibitionLoadResult>[
       selectionResult,

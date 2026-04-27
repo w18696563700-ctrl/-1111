@@ -1572,6 +1572,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           title: '项目详情文书区',
           summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
           emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
+          showIntroCopy: false,
+          compactKindHints: true,
         )
       else
         const _ActionCard(

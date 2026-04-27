@@ -3,22 +3,29 @@ owner: Codex 总控
 status: active
 purpose: >
   Record the latest Flutter-side owner-private project attachment corridor
-  behavior and active cloud runtime observations, so later threads do not treat
-  preview support, queue intake, compact detail surface, or runtime partition
-  checks as accidental drift and revert them silently.
+  behavior, edit-page re-entry surface, and active cloud runtime observations,
+  so later threads do not treat preview support, queue intake, compact detail
+  surface, list-shape compatibility, or runtime partition checks as accidental
+  drift and revert them silently.
 layer: L5 Frontend
-decision_date_local: 2026-04-14
+decision_date_local: 2026-04-27
 inputs_canonical:
   - AGENTS.md
   - docs/00_ssot/latest_user_confirmed_change_ledger.md
   - docs/04_frontend/project_publish_workbench_post_publish_materials_corridor_v1_frontend_consumption_freeze_addendum.md
   - docs/04_frontend/project_detail_document_zone_and_public_resource_download_frontend_consumption_addendum.md
   - docs/04_frontend/my_project_detail_compact_materials_surface_frontend_addendum.md
+  - docs/00_ssot/project_edit_supplement_and_document_zone_convergence_freeze_addendum.md
+  - apps/mobile/lib/features/exhibition/presentation/pages/project_create_page.dart
+  - apps/mobile/lib/features/exhibition/presentation/widgets/project_create_round_a_widgets.dart
   - apps/mobile/lib/features/exhibition/presentation/pages/my_project_detail_page.dart
   - apps/mobile/lib/features/exhibition/presentation/widgets/project_attachment_widgets.dart
   - apps/mobile/lib/features/exhibition/presentation/widgets/project_attachment_panels.dart
   - apps/mobile/lib/features/exhibition/presentation/presentation_support/project_attachment_support.dart
   - apps/mobile/lib/features/exhibition/data/services/project_attachment_action_service.dart
+  - apps/mobile/lib/features/exhibition/data/services/project_attachment_contract_mapper.dart
+  - apps/mobile/lib/features/exhibition/data/services/project_attachment_contract_validation.dart
+  - apps/mobile/lib/features/exhibition/data/models/project_attachment_read_models.dart
   - apps/mobile/test/my_project_private_carry_test.dart
   - apps/mobile/test/project_attachment_corridor_test.dart
 ---
@@ -27,11 +34,14 @@ inputs_canonical:
 
 ## 1. Scope
 
-- 本说明只覆盖当前 `我的项目详情 -> 项目详情文书区` 的现行前端口径：
+- 本说明只覆盖当前以下前端口径：
+  - `我的项目详情 -> 项目详情文书区`
+  - `项目编辑页 -> 项目详情文书区` re-entry
   - owner-private 文书补充
   - 已发布态补资料 handoff
   - 效果图 / 施工图预览
   - 连续添加与批量形成正式附件
+  - `items / attachments` 双返回形状兼容
 - 本说明不改写：
   - backend truth ownership
   - contract 冻结文本
@@ -52,13 +62,28 @@ inputs_canonical:
     - `继续添加`
     - 一次 `上传并形成正式附件`
   - 附件待上传区允许保留多份草稿，再顺序完成 upload / confirm / bind
+  - 附件列表当前兼容：
+    - `attachments`
+    - `items`
+  - `2026-04-27` Day4 云上最小修复后，active BFF 已将项目文书列表收回
+    `projectId + attachments[]` contract；Flutter 继续保留 `items` 兼容，
+    用于覆盖旧 release / 回滚窗口。
 - 当前格式边界固定为：
   - `效果图` = `PNG / JPEG / WEBP`
   - `施工图` = `PDF / DOC / DOCX`
   - `其他资料` 继续走既有文书附件能力
 
-## 3. 已发布详情页紧凑口径
+## 3. 清爽文书区口径
 
+- `项目编辑` 页当前已收口为：
+  - `补充说明` 独立
+  - 不再显示 `补充说明与附件`
+  - 隐藏补充说明下方解释 copy
+  - 隐藏 `资料补充` 提示段
+  - `项目详情文书区` 使用紧凑态：
+    - 隐藏顶部总说明
+    - 隐藏 `当前说明`
+    - 隐藏资料类型提示卡中的解释性段落
 - `已发布` 详情页不再展示单独的 `当前阶段动作` 卡片。
 - `补充资料` 入口已迁移到：
   - `已保存的项目基础信息摘要` 卡片
@@ -109,12 +134,16 @@ inputs_canonical:
 ## 5. Anti-revert Rule
 
 - 后续线程当前不得把以下行为当成“误改”直接回退：
+  - 把编辑页 `补充说明` 改回 `补充说明与附件`
+  - 恢复编辑页补充说明下方解释 copy
+  - 恢复编辑页 `资料补充` 提示段
   - 删除效果图本地预览
   - 删除施工图正式预览
   - 把 bind 失败提示退化回泛化 fallback
   - 把附件区改回单文件单次选择
   - 恢复 `当前阶段动作` 卡片
   - 恢复文书区顶部解释文案
+  - 删除 `items / attachments` 双口径兼容
 - 这些都是当前用户明确确认过的现行方案，不是临时视觉漂移。
 
 ## 6. 回写要求
@@ -130,5 +159,7 @@ inputs_canonical:
   - `preview-first`
   - `queue-based continue add`
   - `precise bind failure messaging`
+  - `compact edit re-entry surface`
   - `compact published detail surface`
+  - `attachments contract shape with retained items compatibility`
   - `cloud runtime observations override local assumptions when they conflict`

@@ -20,7 +20,7 @@ Map<String, Object?> _projectDetailPayload({
   String? bidId,
   String? tradeTaskId,
 }) {
-  return <String, Object?>{
+  final payload = <String, Object?>{
     'projectId': projectId,
     'projectNo': 'PROJ-1',
     'title': '展览项目 1',
@@ -29,9 +29,14 @@ Map<String, Object?> _projectDetailPayload({
     'state': state,
     'viewerProjectRelation': 'public_viewer',
     'summary': const <String, Object?>{'heading': '当前项目说明'},
-    if (bidId != null) 'bidId': bidId,
-    if (tradeTaskId != null) 'tradeTaskId': tradeTaskId,
   };
+  if (bidId != null) {
+    payload['bidId'] = bidId;
+  }
+  if (tradeTaskId != null) {
+    payload['tradeTaskId'] = tradeTaskId;
+  }
+  return payload;
 }
 
 void main() {
@@ -332,17 +337,12 @@ void main() {
       const MaterialApp(home: ProjectDetailPage(projectId: 'project-1')),
     );
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      find.text('项目沟通'),
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    await tester.pumpAndSettle();
 
     expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
     expect(find.text('先参与竞标'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '项目澄清'), findsOneWidget);
-    expect(find.textContaining('当前请使用上方主入口继续参与竞标'), findsOneWidget);
+    expect(find.text('项目沟通'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '项目澄清'), findsNothing);
+    expect(find.textContaining('当前请使用上方主入口继续参与竞标'), findsNothing);
   });
 
   testWidgets('project detail renders P0-Pay read-only status from summary', (
@@ -429,7 +429,6 @@ void main() {
   testWidgets(
     'bid thread renders a bounded system seed card and opens bid submission snapshot',
     (WidgetTester tester) async {
-      final fileAccessCalls = <Map<String, String>>[];
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{

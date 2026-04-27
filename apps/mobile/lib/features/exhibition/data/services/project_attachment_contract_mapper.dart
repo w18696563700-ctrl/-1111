@@ -30,13 +30,26 @@ Map<String, Object?>? _sanitizeProjectAttachmentListPayload(Object? payload) {
     (Object? key, Object? value) => MapEntry('$key', value),
   );
   final attachments = _sanitizeEntityList(
-    map['attachments'],
+    map['attachments'] ?? map['items'],
     _sanitizeProjectAttachmentMap,
   );
+  final derivedProjectId =
+      _normalize(map['projectId'] as String?) ??
+      _projectAttachmentProjectIdFromItems(attachments);
   return <String, Object?>{
-    'projectId': _normalize(map['projectId'] as String?),
+    'projectId': derivedProjectId,
     'attachments': attachments,
   };
+}
+
+String? _projectAttachmentProjectIdFromItems(
+  List<Map<String, Object?>>? attachments,
+) {
+  if (attachments == null || attachments.isEmpty) {
+    return null;
+  }
+  final first = attachments.first['projectId'];
+  return first is String ? _normalize(first) : null;
 }
 
 Map<String, Object?>? _sanitizeProjectAttachmentPayload(Object? payload) {
@@ -62,14 +75,13 @@ Map<String, Object?>? _sanitizeProjectAttachmentDeleteAcceptedPayload(
   return _compactMap(<String, Object?>{
     'attachmentId': _normalize(map['attachmentId'] as String?),
     'projectId': _normalize(map['projectId'] as String?),
-    'state': _sanitizeState(
-      map['state'],
-      _stableProjectAttachmentDeleteStates,
-    ),
+    'state': _sanitizeState(map['state'], _stableProjectAttachmentDeleteStates),
   });
 }
 
-Map<String, Object?> _sanitizeProjectAttachmentMap(Map<String, Object?> payload) {
+Map<String, Object?> _sanitizeProjectAttachmentMap(
+  Map<String, Object?> payload,
+) {
   final mimeType = _sanitizeProjectAttachmentMimeType(payload['mimeType']);
   return _compactMap(<String, Object?>{
     'attachmentId': _normalize(payload['attachmentId'] as String?),

@@ -424,6 +424,7 @@ String _projectAttachmentFileAccessFailureMessage(
   return switch (result.errorCode) {
     'AUTH_SESSION_INVALID' => '当前登录状态已失效，请重新登录后再试。',
     'FILE_ACCESS_INVALID' => '当前文书预览参数不可用，请稍后再试。',
+    'FILE_ACCESS_FAILED' => '当前文书预览服务暂不可用，请稍后再试。',
     'FILE_ACCESS_NOT_FOUND' => '当前文书不存在或暂不可预览。',
     'FILE_ACCESS_PERMISSION_DENIED' => '当前账号暂不可预览这份文书。',
     'FILE_ACCESS_UNAVAILABLE' => '当前文书预览服务暂不可用，请稍后再试。',

@@ -367,8 +367,7 @@ List<Widget> _buildProjectCreateRoundABody({
     if (showSupplementalSection) ...<Widget>[
       const SizedBox(height: 16),
       _ActionCard(
-        title: '补充说明与附件',
-        summary: '草稿和预发布详情承接项目背景说明与正式附件；效果图为必传，材质图和尺寸图为选传。',
+        title: '补充说明',
         children: <Widget>[
           _InputField(
             controller: descriptionController,
@@ -380,11 +379,6 @@ List<Widget> _buildProjectCreateRoundABody({
             maxLines: 4,
             onChanged: (_) =>
                 onFieldInteracted(_ProjectCreateFieldId.description),
-          ),
-          const SizedBox(height: 4),
-          const _StateMessage(
-            title: '资料补充',
-            body: '效果图为必传；材质图、尺寸图为选传。附件上传会在项目详情文书区走正式 FileAsset 绑定链路。',
           ),
         ],
       ),

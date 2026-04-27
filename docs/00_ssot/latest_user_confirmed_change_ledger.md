@@ -166,6 +166,18 @@ updated_at_local: 2026-04-27
     - 详情摘要：
       - `优先补充资料；当前详情页不再单独展示阶段动作。`
   - `项目详情文书区` 保持清爽型：隐藏顶部说明、`当前说明` 和资料解释段落，只保留操作与必要格式信息
+  - `项目编辑` 页已收口为：
+    - `补充说明` 独立
+    - 不再使用 `补充说明与附件`
+    - 隐藏补充说明下方解释 copy 与 `资料补充` 提示段
+    - `项目详情文书区` 使用清爽型：隐藏顶部说明、`当前说明` 和资料解释段落
+  - Flutter 当前兼容项目文书列表两种 live payload：
+    - `attachments`
+    - `items`
+  - `2026-04-27` Day4 云上 BFF 最小修复后，当前 active list payload 已收回：
+    - `projectId`
+    - `attachments`
+  - Flutter 继续保留 `items` 兼容，只服务旧 release / 回滚窗口
 - 当前云端核查记录已确认：
   - `project_attachments` 与 `file_assets` 在云端为独立业务表
   - OSS 中存在 `project_attachment/` 等业务前缀分区

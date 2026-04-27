@@ -3251,7 +3251,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('项目详情'), findsWidgets);
-      expect(find.text('核心信息'), findsOneWidget);
+      expect(find.text('项目概要'), findsOneWidget);
       expect(find.text('展览项目 1'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('项目编号：PROJ-1'),
@@ -5071,8 +5071,14 @@ void main() {
       expect(find.text('竞标提交'), findsWidgets);
       expect(find.text('第一步 核对项目'), findsOneWidget);
       await _expandBidSubmitFlowIfNeeded(tester);
+      expect(find.textContaining('项目核对已完成'), findsOneWidget);
+      final reopenProjectReview = find.widgetWithText(OutlinedButton, '重新展开核对');
+      expect(reopenProjectReview, findsOneWidget);
+      tester.widget<OutlinedButton>(reopenProjectReview).onPressed!.call();
+      await tester.pumpAndSettle();
       await _expectVisibleText(tester, '核心信息');
       await _expectVisibleText(tester, '地点与安排');
+      expect(find.widgetWithText(OutlinedButton, '收起核对信息'), findsOneWidget);
       await _expectVisibleText(tester, '第二步 填写报价与方案说明');
       await _expectVisibleText(tester, '第三步 上传必选文档');
       await _expectVisibleText(tester, '模板下载区');

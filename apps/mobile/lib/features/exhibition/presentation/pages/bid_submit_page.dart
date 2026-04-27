@@ -51,6 +51,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   ExhibitionLoadResult? _bidMaterialResult;
   bool _resultLoading = false;
   bool _bidFlowExpanded = false;
+  bool _projectReviewExpanded = false;
   final Set<String> _openingBidMaterialIds = <String>{};
   bool _p0PaySubmitting = false;
   bool _p0PayTaxIncluded = true;
@@ -344,9 +345,11 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
             guardLoading: _guardLoading,
             accessGuard: _accessGuard,
             flowExpanded: _bidFlowExpanded,
+            projectReviewExpanded: _projectReviewExpanded,
             showContinueBidFlowAction: showContinueBidFlowAction,
             canContinueBidFlow: canContinueBidFlow,
             onContinueBidFlow: _continueBidFlow,
+            onToggleProjectReview: _toggleProjectReview,
             projectDetailResult: _projectDetailResult,
             bidMaterialResult: _bidMaterialResult,
             quoteAmountController: _quoteAmountController,
@@ -703,6 +706,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     setState(() {
       _bidFlowExpanded = true;
+      _projectReviewExpanded = false;
       _bidMaterialResult = ExhibitionLoadResult(
         state: AppPageState.loading,
         method: 'GET',
@@ -711,6 +715,16 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     });
 
     await _loadBidMaterials();
+  }
+
+  void _toggleProjectReview() {
+    if (!_bidFlowExpanded) {
+      return;
+    }
+
+    setState(() {
+      _projectReviewExpanded = !_projectReviewExpanded;
+    });
   }
 
   Future<void> _loadBidMaterials({bool forceRefresh = false}) async {

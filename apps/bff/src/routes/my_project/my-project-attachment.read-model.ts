@@ -12,7 +12,8 @@ export type MyProjectAttachmentReadModel = {
 };
 
 export type MyProjectAttachmentListResponse = {
-  items: MyProjectAttachmentReadModel[];
+  projectId: string;
+  attachments: MyProjectAttachmentReadModel[];
 };
 
 export type MyProjectAttachmentDeleteResponse = {

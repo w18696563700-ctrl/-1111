@@ -95,6 +95,7 @@ function createAttachment(overrides = {}) {
 function createAttachmentHarness(overrides = {}) {
   const state = {
     project: createProject(overrides.project),
+    projectMissing: overrides.projectMissing ?? false,
     fileAssets: structuredClone(overrides.fileAssets ?? [createFileAsset()]),
     attachments: structuredClone(overrides.attachments ?? []),
     auditLogs: structuredClone(overrides.auditLogs ?? []),
@@ -104,13 +105,16 @@ function createAttachmentHarness(overrides = {}) {
     if (entity?.name === 'ProjectEntity') {
       return {
         async findOneBy(where) {
-          if (!draft.project) {
+          if (!draft.project || draft.projectMissing) {
             return null;
           }
           if (where?.id && draft.project.id !== where.id) {
             return null;
           }
           return draft.project;
+        },
+        async query() {
+          return [];
         },
       };
     }
@@ -238,6 +242,22 @@ function createAttachmentHarness(overrides = {}) {
 
 function createEligibilityService(overrides = {}) {
   return {
+    async requireAuthenticatedActor() {
+      return { id: overrides.userId ?? 'buyer-user', status: 'active' };
+    },
+    async requireCurrentOrganizationScope(currentSession, organizationId) {
+      if ((currentSession.organizationId ?? '') !== organizationId) {
+        const error = new Error('organization scope mismatch');
+        error.response = { code: 'AUTH_PERMISSION_INSUFFICIENT' };
+        throw error;
+      }
+      return {
+        organization: { id: organizationId },
+        membership: { roleKey: overrides.roleKey ?? 'buyer_admin' },
+        certification: { certificationStatus: 'approved' },
+        roleKeys: [overrides.roleKey ?? 'buyer_admin'],
+      };
+    },
     async requireProjectPublishEligibilityFromContext() {
       return {
         currentSession: {
@@ -265,6 +285,44 @@ function createEligibilityService(overrides = {}) {
       };
     },
   };
+}
+
+function createFileAccessService(harness, overrides = {}) {
+  const {
+    ProjectAttachmentFileAccessService,
+  } = require('../dist/modules/project/project-attachment-file-access.service.js');
+  return new ProjectAttachmentFileAccessService(
+    harness.repositories.fileAssetRepository,
+    harness.repositories.attachmentRepository,
+    harness.repositories.projectRepository,
+    {
+      async verifyCurrentSessionContext() {
+        return {
+          outcome: 'verified',
+          currentSession: {
+            sessionId: 'session-1',
+            actorId: overrides.actorId ?? 'buyer-user',
+            userId: overrides.userId ?? 'buyer-user',
+            organizationId: overrides.sessionOrganizationId ?? 'buyer-org',
+            requestId: 'file-access-request',
+            traceId: 'trace-file-access-request',
+          },
+        };
+      },
+    },
+    createEligibilityService({
+      organizationId: overrides.sessionOrganizationId ?? 'buyer-org',
+      roleKey: overrides.roleKey ?? 'buyer_admin',
+    }),
+    overrides.publicUrlService ?? {
+      async buildObjectAccessUrl(objectKey) {
+        return `https://signed.example.test/${encodeURIComponent(objectKey)}`;
+      },
+    },
+    {
+      uploadSignedUrlExpiresSeconds: overrides.expiresSeconds ?? 900,
+    },
+  );
 }
 
 test('owner + published project bind success', async () => {
@@ -585,6 +643,200 @@ test('list readback success', async () => {
   assert.equal(result.items[0].mimeType, 'application/pdf');
 });
 
+test('file/access returns owner-private signed access without exposing objectKey', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/project-attachment';
+      },
+    },
+  });
+
+  const result = await service.getAccess(
+    { fileAssetId: 'asset-1', mode: 'preview' },
+    createContext('file-access-owner-preview'),
+  );
+
+  assert.equal(result.fileAssetId, 'asset-1');
+  assert.equal(result.mode, 'preview');
+  assert.equal(result.accessUrl, 'https://signed.example.test/project-attachment');
+  assert.equal(result.fileName, '效果图.png');
+  assert.equal(result.mimeType, 'image/png');
+  assert.equal(result.contentLengthBytes, 2048);
+  assert.deepEqual(publicUrlCalls, ['object-1']);
+  assert.ok(Date.parse(result.expiresAt) > Date.now());
+  assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
+test('file/access rejects non-owner before signing URL', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness, {
+    sessionOrganizationId: 'supplier-org',
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/project-attachment';
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'download' },
+        createContext('file-access-non-owner'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_PERMISSION_DENIED',
+  );
+  assert.deepEqual(publicUrlCalls, []);
+});
+
+test('file/access rejects unbound FileAsset', async () => {
+  const harness = createAttachmentHarness({
+    attachments: [],
+  });
+  const service = createFileAccessService(harness);
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'download' },
+        createContext('file-access-unbound'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_NOT_FOUND',
+  );
+});
+
+test('file/access rejects unsupported mode', async () => {
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness);
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'inline' },
+        createContext('file-access-invalid-mode'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_INVALID',
+  );
+});
+
+test('file/access rejects missing fileAssetId', async () => {
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness);
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { mode: 'download' },
+        createContext('file-access-missing-file-asset-id'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_INVALID',
+  );
+});
+
+test('file/access rejects non owner-private attachment visibility', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment({ visibility: 'public' })],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/project-attachment';
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'download' },
+        createContext('file-access-public-visibility'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_NOT_FOUND',
+  );
+  assert.deepEqual(publicUrlCalls, []);
+});
+
+test('file/access rejects attachment when project truth is missing', async () => {
+  const harness = createAttachmentHarness({
+    projectMissing: true,
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness);
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'download' },
+        createContext('file-access-project-missing'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_NOT_FOUND',
+  );
+});
+
+test('file/access rejects FileAsset project binding drift before signing URL', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    fileAssets: [createFileAsset({ businessId: 'other-project' })],
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/project-attachment';
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'download' },
+        createContext('file-access-file-asset-drift'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_UNAVAILABLE',
+  );
+  assert.deepEqual(publicUrlCalls, []);
+});
+
+test('file/access fails closed when signed URL cannot be built', async () => {
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl() {
+        return null;
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'asset-1', mode: 'download' },
+        createContext('file-access-url-unavailable'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_UNAVAILABLE',
+  );
+});
+
 test('delete binding success keeps FileAsset truth untouched', async () => {
   const { ProjectAttachmentService } = require('../dist/modules/project/project-attachment.service.js');
   const { ProjectAttachmentPresenter } = require('../dist/modules/project/project-attachment.presenter.js');
@@ -653,6 +905,9 @@ test('public project detail is not expanded by attachment corridor', async () =>
     {
       async findOneBy(where) {
         return where?.id === 'project-1' ? project : null;
+      },
+      async query() {
+        return [];
       },
     },
     {

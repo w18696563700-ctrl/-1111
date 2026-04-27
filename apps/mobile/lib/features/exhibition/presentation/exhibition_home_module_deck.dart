@@ -31,6 +31,7 @@ class _HomeModuleDeck extends StatelessWidget {
     required this.projectResult,
     required this.projectItems,
     required this.onRefreshHome,
+    required this.onRelocateHome,
     required this.onOpenProjectList,
     required this.onOpenProjectCreate,
     required this.onOpenProjectDetail,
@@ -51,6 +52,7 @@ class _HomeModuleDeck extends StatelessWidget {
   final ExhibitionLoadResult? projectResult;
   final List<Map<String, Object?>> projectItems;
   final Future<void> Function() onRefreshHome;
+  final Future<void> Function() onRelocateHome;
   final VoidCallback onOpenProjectList;
   final VoidCallback onOpenProjectCreate;
   final ValueChanged<String> onOpenProjectDetail;
@@ -105,6 +107,7 @@ class _HomeModuleDeck extends StatelessWidget {
         provinceCode: locationSnapshot?.provinceCode,
         provinceName: locationSnapshot?.provinceName,
         onRefreshHome: onRefreshHome,
+        onRelocateHome: onRelocateHome,
         onOpenProjectList: onOpenProjectList,
         onOpenProjectCreate: onOpenProjectCreate,
         onOpenProjectDetail: onOpenProjectDetail,
@@ -119,6 +122,7 @@ class _HomeModuleDeck extends StatelessWidget {
         openBoardLabel: '进入公司列表',
         provinceCode: locationSnapshot?.provinceCode,
         provinceName: locationSnapshot?.provinceName,
+        onRelocateHome: onRelocateHome,
         onOpenEnterpriseItem: onOpenEnterpriseItem,
         onOpenBoard: onOpenCompanyBoard,
       ),
@@ -127,12 +131,14 @@ class _HomeModuleDeck extends StatelessWidget {
         openBoardLabel: '进入工厂列表',
         provinceCode: locationSnapshot?.provinceCode,
         provinceName: locationSnapshot?.provinceName,
+        onRelocateHome: onRelocateHome,
         onOpenEnterpriseItem: onOpenEnterpriseItem,
         onOpenBoard: onOpenFactoryBoard,
       ),
       _HomeModuleTab.supplier => _HomeSupplierModulePanel(
         provinceCode: locationSnapshot?.provinceCode,
         provinceName: locationSnapshot?.provinceName,
+        onRelocateHome: onRelocateHome,
         onOpenSupplierBoard: onOpenSupplierBoard,
         onOpenEnterpriseItem: onOpenEnterpriseItem,
       ),

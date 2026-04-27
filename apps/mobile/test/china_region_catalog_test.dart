@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -77,5 +78,16 @@ void main() {
       ),
       isTrue,
     );
+  });
+
+  test('china region loader can fallback to local asset file', () async {
+    final raw = await ChinaRegionCatalogLoader.readFromLocalFileForTest(
+      'assets/location/china_province_city.json',
+    );
+
+    expect(raw, isNotNull);
+    expect(raw!.trim(), isNotEmpty);
+    final payload = jsonDecode(raw) as Map<String, Object?>;
+    expect(payload['provinces'], isA<List<Object?>>());
   });
 }

@@ -8,6 +8,7 @@ class _HomeProjectModulePanel extends StatefulWidget {
     required this.provinceCode,
     required this.provinceName,
     required this.onRefreshHome,
+    required this.onRelocateHome,
     required this.onOpenProjectList,
     required this.onOpenProjectCreate,
     required this.onOpenProjectDetail,
@@ -19,6 +20,7 @@ class _HomeProjectModulePanel extends StatefulWidget {
   final String? provinceCode;
   final String? provinceName;
   final Future<void> Function() onRefreshHome;
+  final Future<void> Function() onRelocateHome;
   final VoidCallback onOpenProjectList;
   final VoidCallback onOpenProjectCreate;
   final ValueChanged<String> onOpenProjectDetail;
@@ -65,6 +67,10 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
 
   Future<void> _refreshActiveFilter() async {
     if (_selectedFilter == _HomeProjectFilter.province) {
+      if (widget.provinceCode == null || widget.provinceCode!.trim().isEmpty) {
+        await widget.onRelocateHome();
+        return;
+      }
       await _ensureProvinceLoaded(forceRefresh: true);
       return;
     }
@@ -167,7 +173,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
           message: '先刷新定位，再看本省项目；当前不会把综合项目伪装成“本省”。',
           actions: <Widget>[
             OutlinedButton(
-              onPressed: _refreshActiveFilter,
+              onPressed: () => unawaited(widget.onRelocateHome()),
               child: const Text('重新定位并刷新'),
             ),
             OutlinedButton(

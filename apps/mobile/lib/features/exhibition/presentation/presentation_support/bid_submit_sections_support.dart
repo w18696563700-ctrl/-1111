@@ -46,9 +46,11 @@ List<Widget> _buildBidSubmitBody({
   required bool guardLoading,
   required _BidAccessGuard? accessGuard,
   required bool flowExpanded,
+  required bool projectReviewExpanded,
   required bool showContinueBidFlowAction,
   required bool canContinueBidFlow,
   required Future<void> Function() onContinueBidFlow,
+  required VoidCallback onToggleProjectReview,
   required ExhibitionLoadResult? projectDetailResult,
   required ExhibitionLoadResult? bidMaterialResult,
   required TextEditingController quoteAmountController,
@@ -72,9 +74,11 @@ List<Widget> _buildBidSubmitBody({
       routeProjectId: routeProjectId,
       projectDetailResult: projectDetailResult,
       flowExpanded: flowExpanded,
+      projectReviewExpanded: projectReviewExpanded,
       showContinueBidFlowAction: showContinueBidFlowAction,
       canContinueBidFlow: canContinueBidFlow,
       onContinueBidFlow: onContinueBidFlow,
+      onToggleProjectReview: onToggleProjectReview,
     ),
   ];
 
@@ -177,9 +181,11 @@ Widget _buildBidSubmitProjectOverviewSection({
   required String? routeProjectId,
   required ExhibitionLoadResult? projectDetailResult,
   required bool flowExpanded,
+  required bool projectReviewExpanded,
   required bool showContinueBidFlowAction,
   required bool canContinueBidFlow,
   required Future<void> Function() onContinueBidFlow,
+  required VoidCallback onToggleProjectReview,
 }) {
   final result = projectDetailResult;
   if (routeProjectId == null) {
@@ -271,6 +277,35 @@ Widget _buildBidSubmitProjectOverviewSection({
         scheduleDetail: scheduleDetail,
       ) &&
       description == null;
+
+  if (flowExpanded && !projectReviewExpanded) {
+    return _ActionCard(
+      title: '第一步 核对项目',
+      summary: '项目核对已完成，下面继续查看附件、填写报价和上传文档；需要复核时可重新展开。',
+      tone: _ActionCardTone.emphasis,
+      children: <Widget>[
+        const _DetailLine(label: '核对状态', value: '已确认当前项目无误', highlight: true),
+        _DetailLine(label: '项目名称', value: headline),
+        if (projectNo != null) _DetailLine(label: '项目编号', value: projectNo),
+        if (state != null)
+          _DetailLine(
+            label: '当前状态',
+            value: _frontStageStateLabel(state),
+            highlight: true,
+          ),
+        if (locationSummary != null)
+          _DetailLine(label: '项目地点', value: locationSummary),
+        if (scheduleRange != null)
+          _DetailLine(label: '计划时间', value: scheduleRange),
+        const SizedBox(height: 8),
+        OutlinedButton.icon(
+          onPressed: onToggleProjectReview,
+          icon: const Icon(Icons.unfold_more),
+          label: const Text('重新展开核对'),
+        ),
+      ],
+    );
+  }
 
   return _ActionCard(
     title: '第一步 核对项目',
@@ -380,6 +415,14 @@ Widget _buildBidSubmitProjectOverviewSection({
           const SizedBox(height: 8),
           const Text('项目核对完成后，当前按钮才会开放。'),
         ],
+      ],
+      if (flowExpanded && projectReviewExpanded) ...<Widget>[
+        const SizedBox(height: 16),
+        OutlinedButton.icon(
+          onPressed: onToggleProjectReview,
+          icon: const Icon(Icons.unfold_less),
+          label: const Text('收起核对信息'),
+        ),
       ],
     ],
   );

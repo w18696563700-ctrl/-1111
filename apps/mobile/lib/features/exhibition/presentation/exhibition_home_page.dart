@@ -224,6 +224,10 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
                 projectResult: _projectResult,
                 projectItems: projectItems,
                 onRefreshHome: () => _refreshWholePage(useRefreshPath: true),
+                onRelocateHome: () => _refreshWholePage(
+                  useRefreshPath: true,
+                  forceDeviceRelocation: true,
+                ),
                 onOpenProjectList: _openShowcase,
                 onOpenProjectCreate: _openProjectCreate,
                 onOpenProjectDetail: _openProjectDetail,

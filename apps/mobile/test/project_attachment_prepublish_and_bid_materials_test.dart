@@ -277,6 +277,8 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
+    expect(find.textContaining('项目核对已完成'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '重新展开核对'), findsOneWidget);
     expect(find.text('项目附件'), findsOneWidget);
     expect(find.text('效果图.png'), findsOneWidget);
     expect(find.text('施工图.pdf'), findsOneWidget);
@@ -284,6 +286,15 @@ void main() {
     expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
     expect(find.text('上传并形成正式附件', skipOffstage: false), findsNothing);
     expect(find.text('删除当前文书', skipOffstage: false), findsNothing);
+
+    final reopenReview = find.widgetWithText(OutlinedButton, '重新展开核对');
+    tester.widget<OutlinedButton>(reopenReview).onPressed!.call();
+    await tester.pumpAndSettle();
+
+    expect(find.text('核心信息'), findsOneWidget);
+    expect(find.text('地点与安排'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '收起核对信息'), findsOneWidget);
+
     await _scrollTo(tester, find.text('第二步 填写报价与方案说明'));
     expect(find.text('第二步 填写报价与方案说明'), findsOneWidget);
     await _scrollTo(tester, find.text('第三步 上传必选文档'));

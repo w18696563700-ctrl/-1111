@@ -1,5 +1,7 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart' show rootBundle;
 
 class ChinaCityOption {
@@ -82,6 +84,21 @@ class ChinaRegionCatalog {
     }
     for (final province in provinces) {
       if (province.provinceCode == normalized) {
+        return province;
+      }
+    }
+    return null;
+  }
+
+  ChinaProvinceOption? provinceByName(String? provinceName) {
+    final normalized = _normalizedName(provinceName);
+    if (normalized == null) {
+      return null;
+    }
+    final comparable = _normalizedComparableName(normalized);
+    for (final province in provinces) {
+      if (_normalizedComparableName(province.provinceName) == comparable ||
+          _normalizedComparableName(province.shortProvinceName) == comparable) {
         return province;
       }
     }
@@ -211,6 +228,10 @@ class ChinaRegionCatalog {
     final normalized = value.toString().trim();
     return normalized.isEmpty ? null : normalized;
   }
+
+  static String _normalizedComparableName(String value) {
+    return chinaRegionShortName(value).replaceAll(' ', '');
+  }
 }
 
 class ChinaRegionCatalogLoader {
@@ -248,20 +269,91 @@ class ChinaRegionCatalogLoader {
 
   static Future<ChinaRegionCatalog> _read() async {
     try {
-      final raw = await rootBundle.loadString(
-        'assets/location/china_province_city.json',
-      );
-      final decoded = jsonDecode(raw);
-      final payload = decoded is Map<String, Object?>
-          ? decoded
-          : <String, Object?>{};
-      final catalog = ChinaRegionCatalog.fromJsonMap(payload);
-      _cached = catalog;
-      return catalog;
-    } catch (_) {
+      final raw = await _readRawCatalogJson();
+      return _cacheCatalogFromRaw(raw);
+    } finally {
       _loading = null;
+    }
+  }
+
+  static Future<String> _readRawCatalogJson() async {
+    const assetPath = 'assets/location/china_province_city.json';
+    try {
+      return await rootBundle.loadString(assetPath);
+    } catch (error) {
+      final fallback = await _readFromLocalFile(assetPath);
+      if (fallback != null) {
+        debugPrint(
+          'ChinaRegionCatalogLoader: fallback to local file for $assetPath ($error)',
+        );
+        return fallback;
+      }
       rethrow;
     }
+  }
+
+  static ChinaRegionCatalog _cacheCatalogFromRaw(String raw) {
+    final decoded = jsonDecode(raw);
+    final payload = decoded is Map<String, Object?>
+        ? decoded
+        : <String, Object?>{};
+    final catalog = ChinaRegionCatalog.fromJsonMap(payload);
+    _cached = catalog;
+    return catalog;
+  }
+
+  static Future<String?> _readFromLocalFile(String relativePath) async {
+    final visited = <String>{};
+    for (final candidate in _assetSearchRoots()) {
+      if (!visited.add(candidate.path)) {
+        continue;
+      }
+      final file = File(_joinPath(candidate.path, relativePath));
+      if (!await file.exists()) {
+        continue;
+      }
+      final raw = await file.readAsString();
+      if (raw.trim().isNotEmpty) {
+        return raw;
+      }
+    }
+    return null;
+  }
+
+  @visibleForTesting
+  static Future<String?> readFromLocalFileForTest(String relativePath) {
+    return _readFromLocalFile(relativePath);
+  }
+
+  static Iterable<Directory> _assetSearchRoots() sync* {
+    Directory? current = Directory.current.absolute;
+    while (current != null) {
+      yield current;
+      final parent = current.parent;
+      if (parent.path == current.path) {
+        break;
+      }
+      current = parent;
+    }
+
+    final executable = File(Platform.resolvedExecutable).absolute;
+    Directory? executableDir = executable.parent;
+    while (executableDir != null) {
+      yield executableDir;
+      final parent = executableDir.parent;
+      if (parent.path == executableDir.path) {
+        break;
+      }
+      executableDir = parent;
+    }
+  }
+
+  static String _joinPath(String basePath, String relativePath) {
+    final separator = Platform.pathSeparator;
+    final normalizedBase = basePath.endsWith(separator)
+        ? basePath.substring(0, basePath.length - 1)
+        : basePath;
+    return '$normalizedBase$separator$relativePath';
   }
 }
 

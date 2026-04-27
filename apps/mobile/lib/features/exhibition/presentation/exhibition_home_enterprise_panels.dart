@@ -6,6 +6,7 @@ class _HomeEnterpriseModulePanel extends StatefulWidget {
     required this.openBoardLabel,
     required this.provinceCode,
     required this.provinceName,
+    required this.onRelocateHome,
     required this.onOpenBoard,
     required this.onOpenEnterpriseItem,
   });
@@ -14,6 +15,7 @@ class _HomeEnterpriseModulePanel extends StatefulWidget {
   final String openBoardLabel;
   final String? provinceCode;
   final String? provinceName;
+  final Future<void> Function() onRelocateHome;
   final VoidCallback onOpenBoard;
   final ValueChanged<EnterpriseHubListItem> onOpenEnterpriseItem;
 
@@ -107,6 +109,11 @@ class _HomeEnterpriseModulePanelState
   }
 
   Future<void> _refreshSelected() async {
+    if (_selectedFilter == _HomeEnterpriseFilter.province &&
+        (widget.provinceCode == null || widget.provinceCode!.trim().isEmpty)) {
+      await widget.onRelocateHome();
+      return;
+    }
     await _ensureFilterLoaded(_selectedFilter, forceRefresh: true);
     if (_usesConditionalFeaturedFilter &&
         _selectedFilter != _HomeEnterpriseFilter.featured) {
@@ -232,8 +239,8 @@ class _HomeEnterpriseModulePanelState
           message: '先刷新定位，再看本省$channelLabel；当前不会把综合列表伪装成本省结果。',
           actions: <Widget>[
             OutlinedButton(
-              onPressed: _refreshSelected,
-              child: const Text('刷新当前频道'),
+              onPressed: () => unawaited(widget.onRelocateHome()),
+              child: const Text('重新定位并刷新'),
             ),
             OutlinedButton(
               onPressed: widget.onOpenBoard,
@@ -315,12 +322,14 @@ class _HomeSupplierModulePanel extends StatelessWidget {
   const _HomeSupplierModulePanel({
     required this.provinceCode,
     required this.provinceName,
+    required this.onRelocateHome,
     required this.onOpenSupplierBoard,
     required this.onOpenEnterpriseItem,
   });
 
   final String? provinceCode;
   final String? provinceName;
+  final Future<void> Function() onRelocateHome;
   final VoidCallback onOpenSupplierBoard;
   final ValueChanged<EnterpriseHubListItem> onOpenEnterpriseItem;
 
@@ -331,6 +340,7 @@ class _HomeSupplierModulePanel extends StatelessWidget {
       openBoardLabel: '进入供应商列表',
       provinceCode: provinceCode,
       provinceName: provinceName,
+      onRelocateHome: onRelocateHome,
       onOpenBoard: onOpenSupplierBoard,
       onOpenEnterpriseItem: onOpenEnterpriseItem,
     );
