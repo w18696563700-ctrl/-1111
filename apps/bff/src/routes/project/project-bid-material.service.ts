@@ -11,7 +11,10 @@ import type {
 
 const PROJECT_BID_MATERIAL_KINDS = new Set<ProjectBidMaterialKind>([
   'effect_image',
-  'construction_doc'
+  'construction_doc',
+  'material_sample',
+  'equipment_material_list',
+  'service_list'
 ]);
 
 @Injectable()
@@ -41,7 +44,7 @@ export class ProjectBidMaterialService {
     const normalized = this.errors.toHttpException(
       error,
       'AUTH_RESOURCE_UNAVAILABLE',
-      '当前项目附件暂不可用，请稍后再试。',
+      '当前项目材料清单暂不可读，请稍后再试。',
       {
         401: 'AUTH_SESSION_INVALID',
         403: 'AUTH_PERMISSION_INSUFFICIENT',
@@ -71,7 +74,7 @@ export class ProjectBidMaterialService {
           ...payload,
           statusCode,
           source: payload.source === 'server' ? 'server' : 'bff',
-          message: '当前账号暂不可读取竞标材料。'
+          message: '当前项目材料清单暂不可读，请稍后再试。'
         },
         statusCode
       );
@@ -84,7 +87,7 @@ export class ProjectBidMaterialService {
           statusCode,
           code: 'AUTH_RESOURCE_UNAVAILABLE',
           source: payload.source === 'server' ? 'server' : 'bff',
-          message: '当前项目附件暂不可用，请稍后再试。'
+          message: '当前项目材料清单暂不可读，请稍后再试。'
         },
         statusCode
       );

@@ -84,6 +84,8 @@ extension _ProjectAttachmentActionService on _ExhibitionActionService {
   Future<ExhibitionActionResult> requestProjectAttachmentAccess({
     required String? fileAssetId,
     required String mode,
+    String? projectId,
+    String? accessScope,
   }) async {
     final normalizedFileAssetId = _normalize(fileAssetId);
     final normalizedMode = _normalize(mode);
@@ -106,6 +108,10 @@ extension _ProjectAttachmentActionService on _ExhibitionActionService {
           queryParameters: <String, String>{
             'fileAssetId': normalizedFileAssetId,
             'mode': normalizedMode,
+            if (_normalize(projectId) case final String normalizedProjectId)
+              'projectId': normalizedProjectId,
+            if (_normalize(accessScope) case final String normalizedAccessScope)
+              'accessScope': normalizedAccessScope,
           },
         ),
       );

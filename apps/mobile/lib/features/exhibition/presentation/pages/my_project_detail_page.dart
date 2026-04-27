@@ -27,6 +27,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   ExhibitionStageLoadSnapshot? _snapshot;
   bool _loading = true;
   bool _deletingProject = false;
+  bool _summaryExpanded = false;
   _MyProjectLifecycleActionKind? _submittingLifecycleAction;
 
   @override
@@ -147,10 +148,6 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
               canManageAttachments: canManageAttachments,
             ),
           ],
-          if (projectId != null) ...<Widget>[
-            const SizedBox(height: 16),
-            _buildOwnerTradingImEntryCard(projectId),
-          ],
           if (canManageAttachments && projectId != null) ...<Widget>[
             const SizedBox(height: 16),
             KeyedSubtree(
@@ -158,45 +155,25 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
               child: _ProjectAttachmentSection(
                 key: ValueKey<String>('my-project-attachment-$projectId'),
                 projectId: projectId,
-                title: '项目详情文书区',
-                summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
+                title: '报价依据资料',
+                summary: '请补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单、服务清单，作为接单方报价依据。',
                 // Keep the detail surface compact: no duplicated technical
                 // upload-chain explanation above the attachment controls.
                 showIntroCopy: false,
                 compactKindHints: true,
-                emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
+                emptyMessage: '当前还没有补充报价依据资料。',
               ),
             ),
             const SizedBox(height: 16),
             _ProjectPublicResourceSection(
               key: ValueKey<String>('my-project-public-resource-$projectId'),
               title: '公共资源下载区',
-              summary: '这里提供平台共享参考资料，用于帮助项目发布与续接过程理解规则和流程，不替代私域项目文书区。',
+              summary: '可下载平台共享模板与公共资料。',
               onMessage: _showPageMessage,
             ),
           ],
         ];
       },
-    );
-  }
-
-  Widget _buildOwnerTradingImEntryCard(String projectId) {
-    return _ActionCard(
-      title: '项目沟通',
-      children: <Widget>[
-        const _StateMessage(
-          title: '当前对象',
-          body: '项目澄清绑定当前项目；具体投标沟通从 bidId 承接入口进入。',
-        ),
-        const SizedBox(height: 12),
-        FilledButton.tonalIcon(
-          onPressed: () => Navigator.of(context).pushNamed(
-            ExhibitionRoutes.projectClarificationWithProjectId(projectId),
-          ),
-          icon: const Icon(Icons.forum_rounded),
-          label: const Text('项目澄清'),
-        ),
-      ],
     );
   }
 
@@ -212,12 +189,11 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     required bool showContinueAttachmentAction,
     required VoidCallback? onContinueAttachmentAction,
   }) {
-    return _ActionCard(
-      title: '已保存的项目基础信息摘要',
-      tone: _ActionCardTone.emphasis,
-      children: <Widget>[
-        _DetailLine(label: '项目名称', value: title ?? '未提供'),
-        _DetailLine(label: '项目编号', value: projectNo ?? '未提供'),
+    final children = <Widget>[
+      _DetailLine(label: '项目名称', value: title ?? '未提供'),
+      _DetailLine(label: '项目编号', value: projectNo ?? '未提供'),
+      _DetailLine(label: '当前阶段', value: stage.label, highlight: true),
+      if (_summaryExpanded) ...<Widget>[
         _DetailLine(label: '项目类型', value: _buildingTypeLabel(buildingType)),
         _DetailLine(
           label: '预算金额',
@@ -225,7 +201,6 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
           highlight: true,
         ),
         _DetailLine(label: '项目面积', value: _areaOrUnavailable(areaSqm)),
-        _DetailLine(label: '当前阶段', value: stage.label, highlight: true),
         _DetailLine(
           label: '当前下一步',
           value: stage.detailNextStep,
@@ -238,22 +213,47 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             privateMap['formalCompletionStatus'] as String?,
           ),
         ),
-        if (showContinueAttachmentAction) ...<Widget>[
-          const _DetailLine(
-            label: '项目详情文书',
-            value: '效果图为必传，材质图和尺寸图为选传。',
-            highlight: true,
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: FilledButton(
-              onPressed: onContinueAttachmentAction,
-              child: const Text('补充项目详情文书'),
-            ),
-          ),
-        ],
       ],
+      if (showContinueAttachmentAction) ...<Widget>[
+        const _DetailLine(
+          label: '报价依据资料',
+          value: '请补充五类报价依据资料，接单方会在竞标提交第二步查看。',
+          highlight: true,
+        ),
+      ],
+      const SizedBox(height: 8),
+      Align(
+        alignment: Alignment.centerRight,
+        child: Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          alignment: WrapAlignment.end,
+          children: <Widget>[
+            OutlinedButton.icon(
+              onPressed: () {
+                setState(() => _summaryExpanded = !_summaryExpanded);
+              },
+              icon: Icon(
+                _summaryExpanded
+                    ? Icons.expand_less_rounded
+                    : Icons.expand_more_rounded,
+              ),
+              label: Text(_summaryExpanded ? '收起项目基础信息' : '展开项目基础信息'),
+            ),
+            if (showContinueAttachmentAction)
+              FilledButton(
+                onPressed: onContinueAttachmentAction,
+                child: const Text('补充报价依据资料'),
+              ),
+          ],
+        ),
+      ),
+    ];
+
+    return _ActionCard(
+      title: '已保存的项目基础信息摘要',
+      tone: _ActionCardTone.emphasis,
+      children: children,
     );
   }
 
@@ -282,7 +282,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         const SizedBox(height: 12),
         const _StateMessage(
           title: '发布前确认',
-          body: '预发布阶段已开放项目详情文书区，请先补充必传效果图；材质图、尺寸图可按需补充。确认无误后再点击“检查无误，确定发布”。',
+          body:
+              '预发布阶段已开放报价依据资料，请先补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单。确认无误后再点击“检查无误，确定发布”。',
         ),
       ],
       const SizedBox(height: 12),
@@ -357,7 +358,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         children.add(
           FilledButton(
             onPressed: canManageAttachments ? _scrollToAttachments : null,
-            child: Text(canManageAttachments ? '补充项目详情文书' : '补充资料（当前待开放）'),
+            child: Text(canManageAttachments ? '补充报价依据资料' : '补充资料（当前待开放）'),
           ),
         );
         children.add(const SizedBox(height: 12));
@@ -498,7 +499,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   Future<void> _scrollToAttachments() async {
     final attachmentContext = _attachmentSectionKey.currentContext;
     if (attachmentContext == null) {
-      _showPageMessage('当前还没有可补充的项目详情文书区。');
+      _showPageMessage('当前还没有可补充的报价依据资料。');
       return;
     }
 

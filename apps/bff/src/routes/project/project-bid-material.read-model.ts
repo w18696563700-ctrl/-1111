@@ -1,4 +1,9 @@
-export type ProjectBidMaterialKind = 'effect_image' | 'construction_doc';
+export type ProjectBidMaterialKind =
+  | 'effect_image'
+  | 'construction_doc'
+  | 'material_sample'
+  | 'equipment_material_list'
+  | 'service_list';
 
 export type ProjectBidMaterialReadModel = {
   attachmentId: string;

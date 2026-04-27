@@ -9,6 +9,7 @@ purpose: >
 layer: L0 SSOT
 freeze_date_local: 2026-04-27
 inputs_canonical:
+  - docs/00_ssot/project_attachment_day5_1_flutter_image_preview_rendering_patch_freeze_addendum.md
   - docs/00_ssot/project_edit_supplement_and_document_zone_convergence_freeze_addendum.md
   - docs/00_ssot/project_attachment_cloud_chain_day3_day4_evidence_release_receipt_addendum.md
   - docs/01_contracts/project_publish_workbench_post_publish_materials_corridor_v1_contract_freeze_addendum.md
@@ -16,13 +17,80 @@ inputs_canonical:
   - docs/04_frontend/project_attachment_corridor_runtime_alignment_frontend_truth_note.md
   - apps/mobile/scripts/run_macos_formal.sh
   - apps/mobile/lib/features/exhibition/presentation/pages/my_project_detail_page.dart
+  - apps/mobile/lib/features/exhibition/presentation/presentation_support/project_attachment_support.dart
   - apps/mobile/lib/features/exhibition/presentation/widgets/project_attachment_widgets.dart
+  - apps/mobile/lib/features/exhibition/presentation/widgets/project_attachment_preview_widgets.dart
   - apps/mobile/lib/features/exhibition/presentation/widgets/project_attachment_panels.dart
   - apps/bff/src/routes/file/app-file-upload.controller.ts
   - apps/bff/src/routes/file/file.service.ts
 ---
 
 # 《附件回显验收表》
+
+## 0B. 2026-04-27 Day5.1 Flutter Image Preview Patch
+
+Day5.1 复验结论更新为：`图片预览像素渲染已通过，Day5 附件回显闭环可放行`。
+
+本轮只改 Flutter 图片预览承载：
+
+1. 仍通过 `GET /api/app/file/access` 获取 Server 签名后的 `accessUrl`。
+2. Flutter 不拼 OSS URL，不读取或外露 `objectKey`。
+3. 正式效果图预览由 `Image.network(accessUrl)` 改为：
+   `accessUrl bytes fetch -> Image.memory(bytes)`。
+4. 下载 bytes 失败时显示中文错误，并保留系统外部打开兜底。
+5. 上传、confirm、bind、list、BFF 转发、Server 签名和 owner 校验均未改。
+
+本地验证：
+
+```text
+apps/mobile/test/project_attachment_corridor_test.dart = 14/14 passed
+```
+
+云上复验项目：
+
+```text
+project=4d5fcbe3-5720-406a-b041-d8819611b75b
+server_current=/srv/releases/server/20260427055505-file-access-owner-private-read
+bff_current=/srv/releases/bff/20260427034316-project-attachment-list-contract-shape/apps/bff
+```
+
+云上链路证据：
+
+```text
+list_shape=projectId+attachments
+file=codex-image-preview-20260427061316-effect-32.png
+file_asset_id=425363fc-34aa-4897-bbf3-27e916ce0e42
+attachment_id=918e4f4c-67dd-4e25-9d77-06efabbe3081
+file_access_preview=200
+signed_oss=200|image/png|99 bytes
+signed_sha256=c3d2aadfc27ff1d8bc99c488de7b37cfe289f352235fcc59d7b8b45449395f62
+```
+
+macOS UI 复验证据：
+
+```text
+route=/exhibition/projects/edit?projectId=4d5fcbe3-5720-406a-b041-d8819611b75b
+formal_list_filename=codex-image-preview-20260427061316-effect-32.png
+preview_dialog=图片预览
+render_carrier=Image.memory
+accessibility=image element present
+visual_pixels=red 32x32 PNG rendered
+error_copy_absent=当前图片暂时无法预览
+```
+
+Gate judgment：
+
+```text
+upload_to_list=PASS
+ui_file_name_readback=PASS
+document_view=PASS
+file_access_api=PASS
+db_truth=PASS
+oss_object=PASS
+image_preview_dialog=PASS
+image_pixels_rendered=PASS
+overall=PASS
+```
 
 ## 0A. 2026-04-27 Rerun Addendum
 

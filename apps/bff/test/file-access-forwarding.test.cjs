@@ -132,6 +132,42 @@ test('file/access download mode still delegates signing to Server', async () => 
   assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
 });
 
+test('file/access forwards bid material scope and project id to Server', async () => {
+  let captured = null;
+  const { service, calls } = createService({
+    async onGet(path, options) {
+      captured = { path, options };
+      return {
+        fileAssetId: 'file-asset-bid-1',
+        mode: 'download',
+        accessUrl: 'https://signed.example.test/project/project_attachment/material.xlsx',
+        fileName: '设备物料清单.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        expiresAt: '2026-04-27T10:30:00.000Z',
+      };
+    },
+  });
+
+  const result = await service.getAccess(
+    { authorization: 'Bearer app' },
+    'file-asset-bid-1',
+    'download',
+    'project-1',
+    'bid_material',
+  );
+
+  assert.equal(calls.commandHeaders, 1);
+  assert.equal(captured.path, '/server/file/access');
+  assert.deepEqual(captured.options.params, {
+    fileAssetId: 'file-asset-bid-1',
+    mode: 'download',
+    projectId: 'project-1',
+    accessScope: 'bid_material',
+  });
+  assert.equal(result.fileAssetId, 'file-asset-bid-1');
+  assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
 test('my project attachment list keeps projectId + attachments[] contract shape', async () => {
   let captured = null;
   const service = new MyProjectAttachmentService(

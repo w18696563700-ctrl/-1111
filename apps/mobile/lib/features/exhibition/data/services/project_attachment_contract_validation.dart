@@ -138,6 +138,12 @@ bool _projectAttachmentKindAllowsMimeType(String kind, String mimeType) {
   return switch (kind) {
     'effect_image' => _isProjectAttachmentImageMimeType(mimeType),
     'construction_doc' => _isProjectAttachmentDocumentMimeType(mimeType),
+    'material_sample' =>
+      _isProjectAttachmentImageMimeType(mimeType) ||
+          _isProjectAttachmentDocumentMimeType(mimeType),
+    'equipment_material_list' || 'service_list' =>
+      _isProjectAttachmentDocumentMimeType(mimeType) ||
+          _isProjectAttachmentSpreadsheetMimeType(mimeType),
     'other_material' =>
       _isProjectAttachmentImageMimeType(mimeType) ||
           _isProjectAttachmentDocumentMimeType(mimeType),

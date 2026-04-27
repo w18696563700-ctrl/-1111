@@ -6,6 +6,7 @@ import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
@@ -190,59 +191,112 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
 }
 
 void main() {
+  setUp(() {
+    ProjectAttachmentDebugOverrides.reset();
+  });
+
+  tearDown(() {
+    ProjectAttachmentDebugOverrides.reset();
+  });
+
   testWidgets('bid submit keeps step one only until continue bid', (
     WidgetTester tester,
   ) async {
+    Uri? openedBidMaterialUri;
+    ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader((
+      Uri uri,
+    ) async {
+      return null;
+    });
+    ProjectAttachmentDebugOverrides.installExternalUrlOpener((Uri uri) async {
+      openedBidMaterialUri = uri;
+      return true;
+    });
     final transport = FakeAppApiTransport(
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/project/detail': (AppApiRequest request) async =>
-                AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: _projectDetailPayload(
-                    projectId: 'project-1',
-                    state: 'published',
-                    viewerProjectRelation: 'non_owner',
-                  ),
+      handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+        'GET /api/app/project/detail': (AppApiRequest request) async =>
+            AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: _projectDetailPayload(
+                projectId: 'project-1',
+                state: 'published',
+                viewerProjectRelation: 'non_owner',
+              ),
+            ),
+        'GET /api/app/project/bid-materials': (AppApiRequest request) async =>
+            AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: _attachmentListResponse('project-1', <Map<String, Object?>>[
+                _bidMaterial(
+                  attachmentId: 'attachment-1',
+                  projectId: 'project-1',
+                  fileAssetId: 'asset-1',
+                  fileName: '效果图.png',
+                  attachmentKind: 'effect_image',
+                  mimeType: 'image/png',
+                  sortOrder: 0,
                 ),
-            'GET /api/app/project/bid-materials':
-                (AppApiRequest request) async => AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: _attachmentListResponse(
-                    'project-1',
-                    <Map<String, Object?>>[
-                      _bidMaterial(
-                        attachmentId: 'attachment-1',
-                        projectId: 'project-1',
-                        fileAssetId: 'asset-1',
-                        fileName: '效果图.png',
-                        attachmentKind: 'effect_image',
-                        mimeType: 'image/png',
-                        sortOrder: 0,
-                      ),
-                      _bidMaterial(
-                        attachmentId: 'attachment-2',
-                        projectId: 'project-1',
-                        fileAssetId: 'asset-2',
-                        fileName: '施工图.pdf',
-                        attachmentKind: 'construction_doc',
-                        mimeType: 'application/pdf',
-                        sortOrder: 1,
-                      ),
-                    ],
-                  ),
+                _bidMaterial(
+                  attachmentId: 'attachment-2',
+                  projectId: 'project-1',
+                  fileAssetId: 'asset-2',
+                  fileName: '施工图.pdf',
+                  attachmentKind: 'construction_doc',
+                  mimeType: 'application/pdf',
+                  sortOrder: 1,
                 ),
-            'GET /api/app/project/public-resources':
-                (AppApiRequest request) async => AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: _publicResourceListResponse(
-                    const <Map<String, Object?>>[],
-                  ),
+                _bidMaterial(
+                  attachmentId: 'attachment-3',
+                  projectId: 'project-1',
+                  fileAssetId: 'asset-3',
+                  fileName: '材质图.pdf',
+                  attachmentKind: 'material_sample',
+                  mimeType: 'application/pdf',
+                  sortOrder: 2,
                 ),
-          },
+                _bidMaterial(
+                  attachmentId: 'attachment-4',
+                  projectId: 'project-1',
+                  fileAssetId: 'asset-4',
+                  fileName: '设备物料清单.xlsx',
+                  attachmentKind: 'equipment_material_list',
+                  mimeType:
+                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                  sortOrder: 3,
+                ),
+                _bidMaterial(
+                  attachmentId: 'attachment-5',
+                  projectId: 'project-1',
+                  fileAssetId: 'asset-5',
+                  fileName: '服务清单.csv',
+                  attachmentKind: 'service_list',
+                  mimeType: 'text/csv',
+                  sortOrder: 4,
+                ),
+              ]),
+            ),
+        'GET /api/app/project/public-resources':
+            (AppApiRequest request) async => AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: _publicResourceListResponse(const <Map<String, Object?>>[]),
+            ),
+        'GET /api/app/file/access': (AppApiRequest request) async =>
+            AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: <String, Object?>{
+                'fileAssetId': request.uri.queryParameters['fileAssetId'],
+                'mode': request.uri.queryParameters['mode'],
+                'accessUrl': 'https://signed.example.test/bid-material',
+                'fileName': '效果图.png',
+                'mimeType': 'image/png',
+                'expiresAt': '2026-04-27T10:00:00.000Z',
+              },
+            ),
+      },
     );
 
     await tester.pumpWidget(
@@ -265,8 +319,9 @@ void main() {
     expect(find.text('第一步 核对项目'), findsOneWidget);
     expect(continueButton, findsOneWidget);
     expect(find.text('项目附件'), findsNothing);
-    expect(find.text('第二步 填写报价与方案说明'), findsNothing);
-    expect(find.text('第三步 上传必选文档'), findsNothing);
+    expect(find.text('第二步 查看报价依据资料'), findsNothing);
+    expect(find.text('第三步 填写竞标价格与服务费确认'), findsNothing);
+    expect(find.text('第四步 上传文档和方案说明'), findsNothing);
 
     final continueAction = tester
         .widget<FilledButton>(continueButton)
@@ -279,15 +334,59 @@ void main() {
 
     expect(find.textContaining('项目核对已完成'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '重新展开核对'), findsOneWidget);
-    expect(find.text('项目附件'), findsOneWidget);
+    expect(find.text('第二步 查看报价依据资料'), findsOneWidget);
+    expect(find.text('项目附件'), findsNothing);
     expect(find.text('效果图.png'), findsOneWidget);
     expect(find.text('施工图.pdf'), findsOneWidget);
+    expect(find.text('材质图.pdf'), findsOneWidget);
+    expect(find.text('设备物料清单.xlsx'), findsOneWidget);
+    expect(find.text('服务清单.csv'), findsOneWidget);
+    expect(find.textContaining('建议先将资料下载到手机'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '刷新报价依据资料'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '查看 / 下载'), findsWidgets);
+    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '预览文书'), findsNothing);
     expect(find.text('其他资料'), findsNothing);
+    expect(find.text('打开', skipOffstage: false), findsNothing);
+    expect(find.text('下载原文件', skipOffstage: false), findsNothing);
     expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
     expect(find.text('上传并形成正式附件', skipOffstage: false), findsNothing);
     expect(find.text('删除当前文书', skipOffstage: false), findsNothing);
-
-    final reopenReview = find.widgetWithText(OutlinedButton, '重新展开核对');
+    expect(find.text('绑定', skipOffstage: false), findsNothing);
+    expect(
+      transport.requests.where(
+        (AppApiRequest request) =>
+            request.canonicalPath == '/api/app/file/access',
+      ),
+      isEmpty,
+    );
+    expect(
+      transport.requests
+          .where(
+            (AppApiRequest request) =>
+                request.canonicalPath == '/api/app/project/bid-materials',
+          )
+          .length,
+      1,
+    );
+    final refreshMaterials = find.widgetWithText(OutlinedButton, '刷新报价依据资料');
+    await _scrollTo(tester, refreshMaterials);
+    await tester.tap(refreshMaterials, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    expect(
+      transport.requests
+          .where(
+            (AppApiRequest request) =>
+                request.canonicalPath == '/api/app/project/bid-materials',
+          )
+          .length,
+      2,
+    );
+    final reopenReview = find.widgetWithText(
+      OutlinedButton,
+      '重新展开核对',
+      skipOffstage: false,
+    );
     tester.widget<OutlinedButton>(reopenReview).onPressed!.call();
     await tester.pumpAndSettle();
 
@@ -295,10 +394,29 @@ void main() {
     expect(find.text('地点与安排'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '收起核对信息'), findsOneWidget);
 
-    await _scrollTo(tester, find.text('第二步 填写报价与方案说明'));
-    expect(find.text('第二步 填写报价与方案说明'), findsOneWidget);
-    await _scrollTo(tester, find.text('第三步 上传必选文档'));
-    expect(find.text('第三步 上传必选文档'), findsOneWidget);
+    final openButtons = find.widgetWithText(OutlinedButton, '查看 / 下载');
+    await _scrollTo(tester, openButtons.first);
+    await tester.tap(openButtons.first, warnIfMissed: false);
+    await tester.pumpAndSettle();
+    final accessRequests = transport.requests
+        .where(
+          (AppApiRequest request) =>
+              request.canonicalPath == '/api/app/file/access',
+        )
+        .toList(growable: false);
+    expect(accessRequests, hasLength(1));
+    expect(accessRequests.single.uri.queryParameters['fileAssetId'], 'asset-1');
+    expect(accessRequests.single.uri.queryParameters['projectId'], 'project-1');
+    expect(
+      accessRequests.single.uri.queryParameters['accessScope'],
+      'bid_material',
+    );
+    expect(openedBidMaterialUri, isNotNull);
+
+    await _scrollTo(tester, find.text('第三步 填写竞标价格与服务费确认'));
+    expect(find.text('第三步 填写竞标价格与服务费确认'), findsOneWidget);
+    await _scrollTo(tester, find.text('第四步 上传文档和方案说明'));
+    expect(find.text('第四步 上传文档和方案说明'), findsOneWidget);
   });
 
   testWidgets('bid submit rejects other-material drift before rendering', (
@@ -368,13 +486,79 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('项目附件'), findsOneWidget);
-    expect(find.text('项目附件暂不可读'), findsOneWidget);
+    expect(find.text('第二步 查看报价依据资料'), findsOneWidget);
+    expect(find.text('报价依据资料暂不可读'), findsOneWidget);
     expect(find.text('其他资料.zip'), findsNothing);
     expect(find.text('其他资料'), findsNothing);
     expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
     expect(find.text('上传并形成正式附件', skipOffstage: false), findsNothing);
     expect(find.text('删除当前文书', skipOffstage: false), findsNothing);
+  });
+
+  testWidgets('bid submit material read failure stays list-level copy', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/project/detail': (AppApiRequest request) async =>
+                AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectDetailPayload(
+                    projectId: 'project-1',
+                    state: 'published',
+                    viewerProjectRelation: 'non_owner',
+                  ),
+                ),
+            'GET /api/app/project/bid-materials':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 403,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'code': 'AUTH_PERMISSION_INSUFFICIENT',
+                    'message': 'current account has no file access',
+                  },
+                ),
+            'GET /api/app/project/public-resources':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _publicResourceListResponse(
+                    const <Map<String, Object?>>[],
+                  ),
+                ),
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=project-1',
+        transport: transport,
+        roleKeys: const <String>['supplier_admin'],
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final continueButton = find.byWidgetPredicate(
+      (Widget widget) =>
+          widget is FilledButton &&
+          widget.child is Text &&
+          (widget.child as Text).data == '继续竞标',
+      description: 'FilledButton("继续竞标")',
+    );
+    await _scrollTo(tester, continueButton);
+    tester.widget<FilledButton>(continueButton).onPressed!.call();
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('报价依据资料暂不可读'), findsOneWidget);
+    expect(find.text('当前项目材料清单暂不可读，请稍后再试。'), findsOneWidget);
+    expect(find.textContaining('账号'), findsNothing);
+    expect(find.textContaining('权限'), findsNothing);
+    expect(find.textContaining('file access'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '预览文书'), findsNothing);
   });
 
   testWidgets('submitted my-project detail opens attachment corridor', (
@@ -423,14 +607,15 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
-    expect(find.text('项目详情文书：效果图为必传，材质图和尺寸图为选传。'), findsOneWidget);
-    await _scrollTo(tester, find.text('项目详情文书区'));
-    expect(find.text('项目详情文书区'), findsOneWidget);
-    expect(find.textContaining('效果图为必传，材质图和尺寸图为选传'), findsWidgets);
-    expect(find.widgetWithText(ChoiceChip, '效果图（必传）'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '材质图（选传）'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '尺寸图（选传）'), findsOneWidget);
-    expect(find.textContaining('当前还没有补充效果图、材质图或尺寸图'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
+    await _scrollTo(tester, find.text('报价依据资料'));
+    expect(find.text('报价依据资料'), findsWidgets);
+    expect(find.textContaining('效果图、尺寸图 / 施工图、材质图 / 材料样板'), findsWidgets);
+    expect(find.widgetWithText(ChoiceChip, '效果图'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '材质图 / 材料样板'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '设备物料清单'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '服务清单'), findsOneWidget);
+    expect(find.textContaining('当前还没有补充报价依据资料'), findsOneWidget);
   });
 }

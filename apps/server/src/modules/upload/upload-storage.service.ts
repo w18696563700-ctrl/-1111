@@ -183,6 +183,7 @@ export class UploadStorageService {
     if (mimeType === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet') {
       return 'xlsx';
     }
+    if (mimeType === 'text/csv' || mimeType === 'application/csv') return 'csv';
     return 'bin';
   }
 

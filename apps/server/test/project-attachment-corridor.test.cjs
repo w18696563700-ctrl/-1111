@@ -258,6 +258,42 @@ function createEligibilityService(overrides = {}) {
         roleKeys: [overrides.roleKey ?? 'buyer_admin'],
       };
     },
+    async requireBidSubmitEligibilityFromContext(_context, _resolver, project) {
+      const currentSession = {
+        sessionId: 'session-1',
+        actorId: overrides.actorId ?? 'supplier-user',
+        userId: overrides.userId ?? 'supplier-user',
+        organizationId: overrides.organizationId ?? 'supplier-org',
+        requestId: 'bid-material-request',
+        traceId: 'trace-bid-material-request',
+      };
+      const scope = await this.requireBidSubmitEligibility(currentSession, project);
+      return { currentSession, scope, project };
+    },
+    async requireBidSubmitEligibility(currentSession, project) {
+      if (!project || project.state !== 'published' || project.publishedAt === null) {
+        const error = new Error('project not published');
+        error.response = { code: 'AUTH_PERMISSION_INSUFFICIENT' };
+        throw error;
+      }
+      const organizationId = currentSession.organizationId ?? overrides.organizationId ?? 'supplier-org';
+      if (organizationId === project.organizationId) {
+        const error = new Error('owner cannot bid');
+        error.response = { code: 'AUTH_PERMISSION_INSUFFICIENT' };
+        throw error;
+      }
+      return {
+        organization: { id: organizationId, organizationType: 'supplier' },
+        membership: { roleKey: overrides.roleKey ?? 'supplier_admin' },
+        certification: { certificationStatus: 'approved' },
+        personalCertification: {
+          certificationStatus: 'approved',
+          qualifiedForCurrentActor: true,
+          lockedToOtherActor: false,
+        },
+        roleKeys: [overrides.roleKey ?? 'supplier_admin'],
+      };
+    },
     async requireProjectPublishEligibilityFromContext() {
       return {
         currentSession: {
@@ -324,6 +360,29 @@ function createFileAccessService(harness, overrides = {}) {
     },
   );
 }
+
+test('project attachment migration keeps five V1 kinds plus legacy other_material constraint', () => {
+  const {
+    projectAttachmentCorridorP1Migrations,
+  } = require('../dist/core/migrations/migrations.js');
+
+  const migration = projectAttachmentCorridorP1Migrations.find(
+    (item) => item.key === '20260427_quote_basis_material_package_v1_attachment_kind_constraint',
+  );
+  assert.ok(migration);
+  const statements = migration.statements.join('\n');
+  assert.match(statements, /DROP CONSTRAINT IF EXISTS chk_project_attachments_attachment_kind/);
+  for (const kind of [
+    'effect_image',
+    'construction_doc',
+    'material_sample',
+    'equipment_material_list',
+    'service_list',
+    'other_material',
+  ]) {
+    assert.match(statements, new RegExp(`'${kind}'`));
+  }
+});
 
 test('owner + published project bind success', async () => {
   const { ProjectAttachmentService } = require('../dist/modules/project/project-attachment.service.js');
@@ -568,12 +627,12 @@ test('construction_doc mime validation rejects image truth', async () => {
   );
 });
 
-test('other_material mime validation rejects unsupported truth', async () => {
+test('bind rejects legacy other_material for V1 writes', async () => {
   const { ProjectAttachmentService } = require('../dist/modules/project/project-attachment.service.js');
   const { ProjectAttachmentPresenter } = require('../dist/modules/project/project-attachment.presenter.js');
 
   const harness = createAttachmentHarness({
-    fileAssets: [createFileAsset({ mimeType: 'application/zip' })],
+    fileAssets: [createFileAsset({ mimeType: 'application/pdf' })],
   });
   const service = new ProjectAttachmentService(
     harness.repositories.projectRepository,
@@ -592,12 +651,14 @@ test('other_material mime validation rejects unsupported truth', async () => {
         'project-1',
         {
           fileAssetId: 'asset-1',
-          fileName: '其他材料.zip',
+          fileName: '其他材料.pdf',
           attachmentKind: 'other_material',
         },
-        createContext('attachment-bind-other-material-mime'),
+        createContext('attachment-bind-other-material-legacy'),
       ),
-    (error) => error?.response?.code === 'PROJECT_ATTACHMENT_INVALID',
+    (error) =>
+      error?.response?.code === 'PROJECT_ATTACHMENT_INVALID' &&
+      error?.response?.message === 'Current attachmentKind is not supported.',
   );
 });
 
@@ -693,6 +754,124 @@ test('file/access rejects non-owner before signing URL', async () => {
       service.getAccess(
         { fileAssetId: 'asset-1', mode: 'download' },
         createContext('file-access-non-owner'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_PERMISSION_DENIED',
+  );
+  assert.deepEqual(publicUrlCalls, []);
+});
+
+test('file/access returns bid-material signed access for qualified supplier scope', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [
+      createAttachment({
+        id: 'attachment-equipment-list',
+        fileAssetId: 'asset-1',
+        fileName: '设备物料清单.xlsx',
+        attachmentKind: 'equipment_material_list',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    ],
+    fileAssets: [
+      createFileAsset({
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    ],
+  });
+  const service = createFileAccessService(harness, {
+    sessionOrganizationId: 'supplier-org',
+    roleKey: 'supplier_admin',
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/bid-material';
+      },
+    },
+  });
+
+  const result = await service.getAccess(
+    {
+      fileAssetId: 'asset-1',
+      mode: 'download',
+      projectId: 'project-1',
+      accessScope: 'bid_material',
+    },
+    createContext('file-access-bid-material-supplier'),
+  );
+
+  assert.equal(result.fileAssetId, 'asset-1');
+  assert.equal(result.mode, 'download');
+  assert.equal(result.fileName, '设备物料清单.xlsx');
+  assert.equal(result.accessUrl, 'https://signed.example.test/bid-material');
+  assert.deepEqual(publicUrlCalls, ['object-1']);
+});
+
+test('file/access rejects owner organization for bid-material scope before signing URL', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/bid-material';
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        {
+          fileAssetId: 'asset-1',
+          mode: 'download',
+          projectId: 'project-1',
+          accessScope: 'bid_material',
+        },
+        createContext('file-access-bid-material-owner-denied'),
+      ),
+    (error) => error?.response?.code === 'AUTH_PERMISSION_INSUFFICIENT',
+  );
+  assert.deepEqual(publicUrlCalls, []);
+});
+
+test('file/access rejects legacy other_material for bid-material scope', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [
+      createAttachment({
+        attachmentKind: 'other_material',
+        mimeType: 'application/pdf',
+      }),
+    ],
+    fileAssets: [
+      createFileAsset({
+        mimeType: 'application/pdf',
+      }),
+    ],
+  });
+  const service = createFileAccessService(harness, {
+    sessionOrganizationId: 'supplier-org',
+    roleKey: 'supplier_admin',
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/bid-material';
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        {
+          fileAssetId: 'asset-1',
+          mode: 'download',
+          projectId: 'project-1',
+          accessScope: 'bid_material',
+        },
+        createContext('file-access-bid-material-legacy-other-material'),
       ),
     (error) => error?.response?.code === 'FILE_ACCESS_PERMISSION_DENIED',
   );
@@ -936,11 +1115,9 @@ test('public project detail is not expanded by attachment corridor', async () =>
   assert.ok(!Object.prototype.hasOwnProperty.call(detail, 'attachments'));
 });
 
-test('bid-material projection filters to effect_image and construction_doc only', async () => {
+test('bid-material projection filters to quote-basis V1 kinds only', async () => {
   const { ProjectBidMaterialPresenter } = require('../dist/modules/project/project-bid-material.presenter.js');
   const { ProjectBidMaterialService } = require('../dist/modules/project/project-bid-material.service.js');
-  const { ProjectQueryService } = require('../dist/modules/project/project-query.service.js');
-  const { ProjectPresenter } = require('../dist/modules/project/project.presenter.js');
 
   const harness = createAttachmentHarness({
     attachments: [
@@ -952,6 +1129,33 @@ test('bid-material projection filters to effect_image and construction_doc only'
         mimeType: 'application/pdf',
         sortOrder: 2,
         createdAt: new Date('2026-04-13T09:02:00.000Z'),
+      }),
+      createAttachment({
+        id: 'attachment-3',
+        fileAssetId: 'asset-3',
+        fileName: '材质图.pdf',
+        attachmentKind: 'material_sample',
+        mimeType: 'application/pdf',
+        sortOrder: 3,
+        createdAt: new Date('2026-04-13T09:03:00.000Z'),
+      }),
+      createAttachment({
+        id: 'attachment-4',
+        fileAssetId: 'asset-4',
+        fileName: '设备物料清单.xlsx',
+        attachmentKind: 'equipment_material_list',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        sortOrder: 4,
+        createdAt: new Date('2026-04-13T09:04:00.000Z'),
+      }),
+      createAttachment({
+        id: 'attachment-5',
+        fileAssetId: 'asset-5',
+        fileName: '服务清单.csv',
+        attachmentKind: 'service_list',
+        mimeType: 'text/csv',
+        sortOrder: 5,
+        createdAt: new Date('2026-04-13T09:05:00.000Z'),
       }),
       createAttachment({
         id: 'attachment-0',
@@ -973,30 +1177,30 @@ test('bid-material projection filters to effect_image and construction_doc only'
       }),
     ],
   });
-  const queryService = new ProjectQueryService(
-    harness.repositories.projectRepository,
-    {
-      async verifyCurrentSessionContext() {
-        return {
-          outcome: 'verified',
-          currentSession: {
-            sessionId: 'session-1',
-            actorId: 'buyer-user',
-            userId: 'buyer-user',
-            organizationId: 'buyer-org',
-            requestId: 'bid-material-request',
-            traceId: 'trace-bid-material-request',
-          },
-        };
-      },
+  const verificationService = {
+    async verifyCurrentSessionContext() {
+      return {
+        outcome: 'verified',
+        currentSession: {
+          sessionId: 'session-1',
+          actorId: 'supplier-user',
+          userId: 'supplier-user',
+          organizationId: 'supplier-org',
+          requestId: 'bid-material-request',
+          traceId: 'trace-bid-material-request',
+        },
+      };
     },
-    createEligibilityService(),
-    createProjectNameAccessProjectionService(),
-    new ProjectPresenter(),
-  );
+  };
+  const eligibilityService = createEligibilityService({
+    organizationId: 'supplier-org',
+    roleKey: 'supplier_admin',
+  });
   const service = new ProjectBidMaterialService(
     harness.repositories.attachmentRepository,
-    queryService,
+    harness.repositories.projectRepository,
+    verificationService,
+    eligibilityService,
     new ProjectBidMaterialPresenter(),
   );
 
@@ -1005,7 +1209,7 @@ test('bid-material projection filters to effect_image and construction_doc only'
   assert.equal(result.projectId, 'project-1');
   assert.deepEqual(
     result.attachments.map((item) => item.attachmentId),
-    ['attachment-1', 'attachment-2'],
+    ['attachment-1', 'attachment-2', 'attachment-3', 'attachment-4', 'attachment-5'],
   );
   assert.ok(result.attachments.every((item) => item.attachmentKind !== 'other_material'));
 });

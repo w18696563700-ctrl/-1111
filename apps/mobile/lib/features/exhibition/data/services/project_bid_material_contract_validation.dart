@@ -3,6 +3,9 @@ part of '../exhibition_consumer_layer.dart';
 const Set<String> _stableProjectBidMaterialKinds = <String>{
   'effect_image',
   'construction_doc',
+  'material_sample',
+  'equipment_material_list',
+  'service_list',
 };
 
 _SuccessContractValidation _validateProjectBidMaterialListPayload(

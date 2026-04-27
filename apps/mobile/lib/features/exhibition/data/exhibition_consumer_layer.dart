@@ -523,10 +523,14 @@ class ExhibitionConsumerLayer {
   Future<ExhibitionActionResult> requestProjectAttachmentAccess({
     required String? fileAssetId,
     required String mode,
+    String? projectId,
+    String? accessScope,
   }) {
     return _actionService.requestProjectAttachmentAccess(
       fileAssetId: fileAssetId,
       mode: mode,
+      projectId: projectId,
+      accessScope: accessScope,
     );
   }
 

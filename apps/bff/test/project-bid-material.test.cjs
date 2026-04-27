@@ -97,6 +97,36 @@ test('project bid-material service forwards canonical read-only projection', asy
               sortOrder: 1,
               createdAt: '2026-04-16T09:31:00.000Z',
             },
+            {
+              attachmentId: 'attachment-3',
+              projectId: 'project-1',
+              fileAssetId: 'file-asset-3',
+              fileName: '材质图.pdf',
+              attachmentKind: 'material_sample',
+              mimeType: 'application/pdf',
+              sortOrder: 2,
+              createdAt: '2026-04-16T09:32:00.000Z',
+            },
+            {
+              attachmentId: 'attachment-4',
+              projectId: 'project-1',
+              fileAssetId: 'file-asset-4',
+              fileName: '设备物料清单.xlsx',
+              attachmentKind: 'equipment_material_list',
+              mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+              sortOrder: 3,
+              createdAt: '2026-04-16T09:33:00.000Z',
+            },
+            {
+              attachmentId: 'attachment-5',
+              projectId: 'project-1',
+              fileAssetId: 'file-asset-5',
+              fileName: '服务清单.csv',
+              attachmentKind: 'service_list',
+              mimeType: 'text/csv',
+              sortOrder: 4,
+              createdAt: '2026-04-16T09:34:00.000Z',
+            },
           ],
         };
       },
@@ -109,7 +139,13 @@ test('project bid-material service forwards canonical read-only projection', asy
   assert.equal(result.projectId, 'project-1');
   assert.deepEqual(
     result.attachments.map((item) => item.attachmentKind),
-    ['effect_image', 'construction_doc'],
+    [
+      'effect_image',
+      'construction_doc',
+      'material_sample',
+      'equipment_material_list',
+      'service_list',
+    ],
   );
 });
 
@@ -131,7 +167,7 @@ test('project bid-material service rewrites 404 into stable Chinese message', as
     (error) => {
       assert.equal(error.getStatus(), 404);
       assert.equal(error.getResponse().code, 'AUTH_RESOURCE_UNAVAILABLE');
-      assert.equal(error.getResponse().message, '当前项目附件暂不可用，请稍后再试。');
+      assert.equal(error.getResponse().message, '当前项目材料清单暂不可读，请稍后再试。');
       return true;
     },
   );

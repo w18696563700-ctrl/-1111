@@ -94,9 +94,9 @@ const List<_MyProjectStageOption> _myProjectPrimaryStageOptions =
       _MyProjectStageOption(
         value: _MyProjectStageBucket.submitted,
         label: '预发布列表',
-        description: '项目已经进入发布前核对阶段，当前应先补充项目详情文书，再检查无误并正式发布。',
+        description: '项目已经进入发布前核对阶段，当前应先补充报价依据资料，再检查无误并正式发布。',
         cardNextStep: '查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废归档',
-        detailNextStep: '当前应先补充项目详情文书，再检查无误并正式发布。',
+        detailNextStep: '当前应先补充报价依据资料，再检查无误并正式发布。',
         emptyTitle: '当前没有预发布项目',
         emptyMessage: '还没有进入预发布列表的项目。',
       ),

@@ -105,19 +105,13 @@ class _ProjectPublicResourceSectionState
       title: widget.title,
       summary: widget.summary,
       children: <Widget>[
-        const _StateMessage(
-          title: '当前说明',
-          body: '这里用于集中下载平台共享参考资料，帮助理解项目发布与续接规则和流程；当前不提供上传、删除或编辑，也不替代项目详情文书区。',
-        ),
-        const SizedBox(height: 12),
         _ProjectPublicResourceCategoryPicker(
           selectedValue: _selectedCategory,
           onChanged: (String value) {
             setState(() => _selectedCategory = value);
           },
         ),
-        const SizedBox(height: 12),
-        _ProjectPublicResourceCategoryHint(option: selectedOption),
+        _ProjectPublicResourceCategoryMarker(option: selectedOption),
         const SizedBox(height: 16),
         _ProjectPublicResourceListPanel(
           loading: _loadingList,
@@ -172,33 +166,19 @@ class _ProjectPublicResourceCategoryPicker extends StatelessWidget {
   }
 }
 
-class _ProjectPublicResourceCategoryHint extends StatelessWidget {
-  const _ProjectPublicResourceCategoryHint({required this.option});
+class _ProjectPublicResourceCategoryMarker extends StatelessWidget {
+  const _ProjectPublicResourceCategoryMarker({required this.option});
 
   final _ProjectPublicResourceCategoryOption option;
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              option.label,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 6),
-            Text(option.summary),
-          ],
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Text(
+        '当前分类：${option.label}',
+        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );
@@ -227,28 +207,19 @@ class _ProjectPublicResourceListPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (loading) {
-      return const _EmptyNotice(
-        title: '正在读取公共资源目录',
-        message: '当前正在同步平台共享参考资料；这不影响项目详情文书区。',
-      );
+      return const _EmptyNotice(title: '正在读取公共资源目录', message: '正在同步平台共享资料。');
     }
 
     final loadResult = result;
     if (loadResult == null) {
-      return const _EmptyNotice(
-        title: '当前正在准备公共资源目录',
-        message: '稍后会在这里展示平台共享参考资料。',
-      );
+      return const _EmptyNotice(title: '当前正在准备公共资源目录', message: '稍后会展示可下载资料。');
     }
 
     if (loadResult.state == AppPageState.empty) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          const _EmptyNotice(
-            title: '当前暂无可下载的公共资源',
-            message: '这表示共享资料目录当前未承接内容，不代表项目详情文书区为空。',
-          ),
+          const _EmptyNotice(title: '当前暂无可下载的公共资源', message: '暂无可下载公共资源。'),
           const SizedBox(height: 12),
           OutlinedButton(onPressed: onRetry, child: const Text('重新读取')),
         ],
@@ -270,10 +241,7 @@ class _ProjectPublicResourceListPanel extends StatelessWidget {
     }
 
     if (!hasAnyResource) {
-      return const _EmptyNotice(
-        title: '当前暂无可下载的公共资源',
-        message: '这表示共享资料目录当前未承接内容，不代表项目详情文书区为空。',
-      );
+      return const _EmptyNotice(title: '当前暂无可下载的公共资源', message: '暂无可下载公共资源。');
     }
 
     if (resources.isEmpty) {
@@ -291,11 +259,6 @@ class _ProjectPublicResourceListPanel extends StatelessWidget {
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '这里和项目详情文书区分开承接，只展示平台共享的可下载资料。',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
         ),
         const SizedBox(height: 12),
         ...resources.asMap().entries.map((

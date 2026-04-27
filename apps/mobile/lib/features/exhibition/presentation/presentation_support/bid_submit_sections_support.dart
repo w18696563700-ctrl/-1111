@@ -53,16 +53,20 @@ List<Widget> _buildBidSubmitBody({
   required VoidCallback onToggleProjectReview,
   required ExhibitionLoadResult? projectDetailResult,
   required ExhibitionLoadResult? bidMaterialResult,
+  required String? bidMaterialProjectId,
+  required Set<String> openingBidMaterialIds,
   required TextEditingController quoteAmountController,
   required TextEditingController proposalSummaryController,
   required bool submitting,
   required List<_BidSubmitAttachmentSlotState> attachmentSlots,
-  required Set<String> openingBidMaterialIds,
   required GlobalKey quoteAmountFieldKey,
   required GlobalKey proposalSummaryFieldKey,
-  required Future<void> Function(ProjectBidMaterialReadModel attachment)
-  onPreviewBidMaterial,
+  required List<Widget> platformServiceFeeChildren,
+  required VoidCallback onQuoteAmountChanged,
+  required VoidCallback onProposalSummaryChanged,
   required VoidCallback onRetryBidMaterials,
+  required Future<void> Function(ProjectBidMaterialReadModel attachment)
+  onOpenBidMaterial,
   required Future<void> Function(_BidSubmitAttachmentSlotState slot)
   onUploadAttachment,
   required Future<void> Function(_BidSubmitAttachmentSlotState slot)
@@ -128,14 +132,15 @@ List<Widget> _buildBidSubmitBody({
     const SizedBox(height: 16),
     _buildBidSubmitMaterialSection(
       bidMaterialResult: bidMaterialResult,
+      projectId: bidMaterialProjectId,
       openingAttachmentIds: openingBidMaterialIds,
-      onPreview: onPreviewBidMaterial,
       onRetry: onRetryBidMaterials,
+      onOpenAttachment: onOpenBidMaterial,
     ),
     const SizedBox(height: 16),
     _ActionCard(
-      title: '第二步 填写报价与方案说明',
-      summary: '补齐本次竞标的报价与方案说明，然后继续上传必选文档。',
+      title: '第三步 填写竞标价格与服务费确认',
+      summary: '先填写本次竞标报价，再核对平台成交服务费说明和确认项。',
       children: <Widget>[
         _InputField(
           controller: quoteAmountController,
@@ -144,22 +149,27 @@ List<Widget> _buildBidSubmitBody({
           keyboardType: TextInputType.number,
           hintText: '例如：1200',
           helperText: '填写当前竞标报价。',
+          onChanged: (_) => onQuoteAmountChanged(),
         ),
+        const SizedBox(height: 12),
+        ...platformServiceFeeChildren,
+      ],
+    ),
+    const SizedBox(height: 16),
+    _ActionCard(
+      title: '第四步 上传文档和方案说明',
+      summary: '方案说明是接单方给发布方的总体概述；项目理解、报价表和进度安排均为必传附件。',
+      children: <Widget>[
         _InputField(
           controller: proposalSummaryController,
           label: '方案说明',
           fieldKey: proposalSummaryFieldKey,
           maxLines: 3,
           hintText: '例如：先完成展台结构、照明和基础安装',
-          helperText: '简要说明当前竞标方案的重点。',
+          helperText: '接单方给发布方的总体方案概述。',
+          onChanged: (_) => onProposalSummaryChanged(),
         ),
-      ],
-    ),
-    const SizedBox(height: 16),
-    _ActionCard(
-      title: '第三步 上传必选文档',
-      summary: '项目理解、报价表和进度安排均为必传附件，三项都确认完成后才可提交。',
-      children: <Widget>[
+        const SizedBox(height: 16),
         const _BidSubmitTemplateDownloadSection(),
         const SizedBox(height: 16),
         _buildBidSubmitAttachmentGrid(
@@ -281,7 +291,7 @@ Widget _buildBidSubmitProjectOverviewSection({
   if (flowExpanded && !projectReviewExpanded) {
     return _ActionCard(
       title: '第一步 核对项目',
-      summary: '项目核对已完成，下面继续查看附件、填写报价和上传文档；需要复核时可重新展开。',
+      summary: '项目核对已完成，下面继续查看材料、填写报价、上传方案并提交竞标；需要复核时可重新展开。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         const _DetailLine(label: '核对状态', value: '已确认当前项目无误', highlight: true),
@@ -310,8 +320,8 @@ Widget _buildBidSubmitProjectOverviewSection({
   return _ActionCard(
     title: '第一步 核对项目',
     summary: flowExpanded
-        ? '先确认当前参与竞标的项目无误，再继续填写报价和上传文档。'
-        : '先确认当前参与竞标的项目无误；点击“继续竞标”后再查看项目附件、填写报价和上传文档。',
+        ? '先确认当前参与竞标的项目无误，再继续查看材料、填写报价和上传方案。'
+        : '先确认当前参与竞标的项目无误；点击“继续竞标”后再查看项目材料、填写报价和上传方案。',
     tone: _ActionCardTone.emphasis,
     children: <Widget>[
       _ActionCard(

@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
@@ -12,6 +13,10 @@ import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.d
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
+
+final List<int> _tinyPngBytes = base64Decode(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVQIW2P8z/D/PwAHggJ/PF2uWQAAAABJRU5ErkJggg==',
+);
 
 Map<String, Object?> _projectPayload({
   required String projectId,
@@ -301,6 +306,7 @@ void main() {
     ];
     Uri? openedUri;
     Uri? openedAttachmentUri;
+    Uri? loadedImageUri;
     ProjectPublicResourceDebugOverrides.installExternalUrlOpener((
       Uri uri,
     ) async {
@@ -310,6 +316,12 @@ void main() {
     ProjectAttachmentDebugOverrides.installExternalUrlOpener((Uri uri) async {
       openedAttachmentUri = uri;
       return true;
+    });
+    ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader((
+      Uri uri,
+    ) async {
+      loadedImageUri = uri;
+      return _tinyPngBytes;
     });
 
     final transport = FakeAppApiTransport(
@@ -475,24 +487,35 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
-    expect(find.text('项目详情文书区'), findsOneWidget);
+    await _scrollTo(tester, find.text('报价依据资料'));
+    expect(find.text('报价依据资料'), findsOneWidget);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.textContaining('当前只对 owner 私域可见'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
-    expect(find.widgetWithText(ChoiceChip, '效果图（必传）'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '材质图（选传）'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '尺寸图（选传）'), findsOneWidget);
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图（选传）'));
+    expect(find.widgetWithText(ChoiceChip, '效果图'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '材质图 / 材料样板'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '设备物料清单'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '服务清单'), findsOneWidget);
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
     expect(find.textContaining('展馆和展位图'), findsNothing);
     expect(find.textContaining('展商手册'), findsNothing);
     expect(find.text('现场效果图.png'), findsOneWidget);
+    expect(find.text('资料名称：效果图'), findsOneWidget);
+    expect(find.text('文件名：现场效果图.png'), findsOneWidget);
+    expect(find.textContaining('接单方在竞标第二步查看'), findsOneWidget);
     await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
     expect(find.text('图片预览'), findsOneWidget);
-    await _tapVisible(tester, find.text('关闭'));
+    expect(
+      loadedImageUri?.toString(),
+      'https://files.example.com/effect-image-1.png',
+    );
+    expect(find.text('当前图片暂时无法预览'), findsNothing);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
 
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '尺寸图（选传）'));
-    await _tapVisible(tester, find.text('选择尺寸图', skipOffstage: false));
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'));
+    await _tapVisible(tester, find.text('选择尺寸图 / 施工图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
     await _scrollTo(tester, find.text('construction-plan.docx'));
@@ -505,7 +528,7 @@ void main() {
 
     await _tapVisible(
       tester,
-      find.widgetWithText(OutlinedButton, '删除当前文书').first,
+      find.widgetWithText(OutlinedButton, '删除当前资料').first,
     );
     await tester.pumpAndSettle();
 
@@ -514,7 +537,7 @@ void main() {
 
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
-    expect(find.textContaining('这里提供平台共享参考资料'), findsOneWidget);
+    expect(find.text('可下载平台共享模板与公共资料。'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '合同模板'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '流程图与说明'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '公共资料'), findsOneWidget);
@@ -587,7 +610,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
+    await _scrollTo(tester, find.text('报价依据资料'));
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('效果图样张.png'), findsOneWidget);
 
@@ -595,37 +618,135 @@ void main() {
     expect(find.text('图片预览'), findsOneWidget);
   });
 
-  testWidgets('file access failed code stays Chinese on project attachment preview', (
+  testWidgets(
+    'file access failed code stays Chinese on project attachment preview',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/my/projects/project-owner-access-failed':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _myProjectDetailPayload(
+                        projectId: 'project-owner-access-failed',
+                        viewerProjectRelation: 'owner',
+                        state: 'published',
+                      ),
+                    );
+                  },
+              'GET /api/app/my/projects/project-owner-access-failed/attachments':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _attachmentListResponse(
+                        'project-owner-access-failed',
+                        <Map<String, Object?>>[
+                          _attachmentItem(
+                            attachmentId: 'attachment-access-failed-1',
+                            projectId: 'project-owner-access-failed',
+                            fileAssetId: 'file-asset-access-failed-1',
+                            fileName: '访问失败效果图.png',
+                            attachmentKind: 'effect_image',
+                            mimeType: 'image/png',
+                            sortOrder: 0,
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+              'GET /api/app/project/public-resources':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _publicResourceListResponse(
+                        const <Map<String, Object?>>[],
+                      ),
+                    );
+                  },
+              'GET /api/app/file/access': (AppApiRequest request) async {
+                expect(
+                  request.uri.queryParameters['fileAssetId'],
+                  'file-asset-access-failed-1',
+                );
+                expect(request.uri.queryParameters['mode'], 'preview');
+                return AppApiResponse(
+                  statusCode: 502,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'code': 'FILE_ACCESS_FAILED',
+                    'message': 'FILE_ACCESS_FAILED from upstream',
+                    'source': 'bff',
+                  },
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          exhibitionTransport: transport,
+          initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+            'project-owner-access-failed',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.text('报价依据资料'));
+      await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
+      expect(find.text('当前文书预览服务暂不可用，请稍后再试。'), findsOneWidget);
+      expect(find.textContaining('unrecognized error code'), findsNothing);
+    },
+  );
+
+  testWidgets('image preview bytes failure keeps external fallback Chinese', (
     WidgetTester tester,
   ) async {
+    Uri? loadedImageUri;
+    Uri? openedImageUri;
+    ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader((
+      Uri uri,
+    ) async {
+      loadedImageUri = uri;
+      return null;
+    });
+    ProjectAttachmentDebugOverrides.installExternalUrlOpener((Uri uri) async {
+      openedImageUri = uri;
+      return true;
+    });
+
     final transport = FakeAppApiTransport(
       handlers:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/my/projects/project-owner-access-failed':
+            'GET /api/app/my/projects/project-owner-image-fallback':
                 (AppApiRequest request) async {
                   return AppApiResponse(
                     statusCode: 200,
                     uri: request.uri,
                     body: _myProjectDetailPayload(
-                      projectId: 'project-owner-access-failed',
+                      projectId: 'project-owner-image-fallback',
                       viewerProjectRelation: 'owner',
                       state: 'published',
                     ),
                   );
                 },
-            'GET /api/app/my/projects/project-owner-access-failed/attachments':
+            'GET /api/app/my/projects/project-owner-image-fallback/attachments':
                 (AppApiRequest request) async {
                   return AppApiResponse(
                     statusCode: 200,
                     uri: request.uri,
                     body: _attachmentListResponse(
-                      'project-owner-access-failed',
+                      'project-owner-image-fallback',
                       <Map<String, Object?>>[
                         _attachmentItem(
-                          attachmentId: 'attachment-access-failed-1',
-                          projectId: 'project-owner-access-failed',
-                          fileAssetId: 'file-asset-access-failed-1',
-                          fileName: '访问失败效果图.png',
+                          attachmentId: 'attachment-image-fallback-1',
+                          projectId: 'project-owner-image-fallback',
+                          fileAssetId: 'file-asset-image-fallback-1',
+                          fileName: 'fallback-effect.png',
                           attachmentKind: 'effect_image',
                           mimeType: 'image/png',
                           sortOrder: 0,
@@ -647,16 +768,19 @@ void main() {
             'GET /api/app/file/access': (AppApiRequest request) async {
               expect(
                 request.uri.queryParameters['fileAssetId'],
-                'file-asset-access-failed-1',
+                'file-asset-image-fallback-1',
               );
               expect(request.uri.queryParameters['mode'], 'preview');
               return AppApiResponse(
-                statusCode: 502,
+                statusCode: 200,
                 uri: request.uri,
                 body: const <String, Object?>{
-                  'code': 'FILE_ACCESS_FAILED',
-                  'message': 'FILE_ACCESS_FAILED from upstream',
-                  'source': 'bff',
+                  'fileAssetId': 'file-asset-image-fallback-1',
+                  'mode': 'preview',
+                  'accessUrl': 'https://files.example.com/fallback-effect.png',
+                  'fileName': 'fallback-effect.png',
+                  'mimeType': 'image/png',
+                  'expiresAt': '2026-04-14T10:00:00Z',
                 },
               );
             },
@@ -667,16 +791,25 @@ void main() {
       _buildApp(
         exhibitionTransport: transport,
         initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
-          'project-owner-access-failed',
+          'project-owner-image-fallback',
         ),
       ),
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
+    await _scrollTo(tester, find.text('报价依据资料'));
     await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
-    expect(find.text('当前文书预览服务暂不可用，请稍后再试。'), findsOneWidget);
-    expect(find.textContaining('unrecognized error code'), findsNothing);
+
+    expect(
+      loadedImageUri?.toString(),
+      'https://files.example.com/fallback-effect.png',
+    );
+    expect(
+      openedImageUri?.toString(),
+      'https://files.example.com/fallback-effect.png',
+    );
+    expect(find.text('图片预览链接已打开；当前应用内图片暂时无法渲染。'), findsOneWidget);
+    expect(find.textContaining('FILE_ACCESS_FAILED'), findsNothing);
   });
 
   testWidgets('selected attachments can continue add and batch upload', (
@@ -810,7 +943,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
+    await _scrollTo(tester, find.text('报价依据资料'));
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('待上传附件（1）'), findsOneWidget);
     expect(find.text('效果图_A.png'), findsOneWidget);
@@ -927,13 +1060,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('项目详情文书区'));
+      await _scrollTo(tester, find.text('报价依据资料'));
       await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
       await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
       expect(find.text('正式附件绑定未完成'), findsOneWidget);
       expect(find.text('当前资料文件与项目绑定不一致，请重新上传后再试。'), findsOneWidget);
-      expect(find.textContaining('尚未形成项目详情文书'), findsNothing);
+      expect(find.textContaining('尚未形成报价依据资料'), findsNothing);
       expect(find.text('再次绑定正式附件'), findsOneWidget);
     },
   );
@@ -1038,13 +1171,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('项目详情文书区'));
+      await _scrollTo(tester, find.text('报价依据资料'));
       await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
       await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
       expect(find.text('正式附件绑定未完成'), findsOneWidget);
       expect(find.text('当前云端 BFF 尚未部署项目附件写入路由，请先同步云端后再试。'), findsOneWidget);
-      expect(find.textContaining('尚未形成项目详情文书'), findsNothing);
+      expect(find.textContaining('尚未形成报价依据资料'), findsNothing);
       expect(find.text('再次绑定正式附件'), findsOneWidget);
     },
   );
@@ -1155,7 +1288,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
+    await _scrollTo(tester, find.text('报价依据资料'));
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
@@ -1225,13 +1358,13 @@ void main() {
         'POST /api/app/my/projects/project-edit-1/attachments':
             (AppApiRequest request) async {
               final body = request.body! as Map<String, Object?>;
-              expect(body['attachmentKind'], 'other_material');
+              expect(body['attachmentKind'], 'material_sample');
               final item = _attachmentItem(
                 attachmentId: 'attachment-webp-1',
                 projectId: 'project-edit-1',
                 fileAssetId: 'file-asset-webp-1',
                 fileName: 'brand-board.webp',
-                attachmentKind: 'other_material',
+                attachmentKind: 'material_sample',
                 mimeType: 'image/webp',
                 sortOrder: 0,
               );
@@ -1273,9 +1406,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图（选传）'));
-    await _tapVisible(tester, find.text('选择材质图', skipOffstage: false));
+    await _scrollTo(tester, find.text('报价依据资料'));
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
+    await _tapVisible(tester, find.text('选择材质图 / 材料样板', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
     await _scrollTo(tester, find.text('brand-board.webp'));
@@ -1283,12 +1416,12 @@ void main() {
 
     await _tapVisible(
       tester,
-      find.widgetWithText(OutlinedButton, '删除当前文书').first,
+      find.widgetWithText(OutlinedButton, '删除当前资料').first,
     );
     await tester.pumpAndSettle();
 
     expect(find.text('brand-board.webp'), findsNothing);
-    expect(find.text('当前还没有项目文书'), findsOneWidget);
+    expect(find.text('当前还没有报价依据资料'), findsOneWidget);
   });
 
   testWidgets(
@@ -1342,7 +1475,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('项目详情文书区'));
+      await _scrollTo(tester, find.text('报价依据资料'));
       expect(find.text('当前说明'), findsNothing);
       expect(find.textContaining('upload confirm 只确认 FileAsset'), findsNothing);
       expect(find.textContaining('用于补充效果图或展示图'), findsNothing);
@@ -1403,12 +1536,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('项目详情文书区'));
-    expect(find.text('项目详情文书区'), findsOneWidget);
+    await _scrollTo(tester, find.text('报价依据资料'));
+    expect(find.text('报价依据资料'), findsOneWidget);
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
     expect(find.text('当前暂无可下载的公共资源'), findsOneWidget);
-    expect(find.textContaining('不代表项目详情文书区为空'), findsOneWidget);
+    expect(find.text('暂无可下载公共资源。'), findsOneWidget);
   });
 
   testWidgets(
@@ -1557,11 +1690,11 @@ void main() {
 
       await _scrollTo(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
       expect(find.text('公开资料边界'), findsNothing);
-      expect(find.text('项目详情文书区'), findsNothing);
+      expect(find.text('报价依据资料'), findsNothing);
       expect(find.text('公共资源下载区'), findsNothing);
       expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
       expect(find.text('上传并形成正式附件', skipOffstage: false), findsNothing);
-      expect(find.text('项目文书列表'), findsNothing);
+      expect(find.text('报价依据资料列表'), findsNothing);
     },
   );
 }

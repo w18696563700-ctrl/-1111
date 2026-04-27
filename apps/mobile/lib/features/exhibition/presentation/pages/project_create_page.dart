@@ -1365,14 +1365,15 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           _DetailLine(
             label: '下一步',
             value: canOpenPublicDetail
-                ? '先进入我的项目详情确认刚保存的基本信息；预发布阶段已开放效果图、材质图和尺寸图。'
-                : '点击下方“下一步：进入我的项目详情”，先确认刚保存的基本信息；保存到草稿或预发布列表后项目详情文书会开放。',
+                ? '先进入我的项目详情确认刚保存的基本信息；预发布阶段已开放报价依据资料。'
+                : '点击下方“下一步：进入我的项目详情”，先确认刚保存的基本信息；保存到草稿或预发布列表后报价依据资料会开放。',
           ),
           if (!canOpenPublicDetail) ...<Widget>[
             const SizedBox(height: 12),
             const _ActionCard(
-              title: '项目详情文书',
-              summary: '效果图为必传，材质图和尺寸图为选传；保存到草稿或预发布列表后开放为 owner-private 正式附件区。',
+              title: '报价依据资料',
+              summary:
+                  '效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单；保存到预发布列表后开放为 owner-private 正式附件区。',
               children: <Widget>[
                 _DetailLine(
                   label: '当前说明',
@@ -1388,9 +1389,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
             _ProjectAttachmentSection(
               key: ValueKey<String>('project-create-attachment-$projectId'),
               projectId: projectId,
-              title: '继续补充资料',
-              summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
-              emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
+              title: '继续补充报价依据资料',
+              summary: '请补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单。',
+              emptyMessage: '当前还没有补充报价依据资料。',
               autoloadFormalList: false,
             ),
           ],
@@ -1569,16 +1570,16 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         _ProjectAttachmentSection(
           key: ValueKey<String>('project-edit-attachment-$projectId'),
           projectId: projectId,
-          title: '项目详情文书区',
-          summary: '效果图为必传，材质图和尺寸图为选传。补齐后再检查无误并正式发布。',
-          emptyMessage: '当前还没有补充效果图、材质图或尺寸图。',
+          title: '报价依据资料',
+          summary: '请补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单。',
+          emptyMessage: '当前还没有补充报价依据资料。',
           showIntroCopy: false,
           compactKindHints: true,
         )
       else
         const _ActionCard(
-          title: '项目详情文书区',
-          summary: '保存到草稿或预发布列表后，效果图、材质图和尺寸图会在这里开放补充。',
+          title: '报价依据资料',
+          summary: '保存到草稿或预发布列表后，五类报价依据资料会在这里开放补充。',
           children: <Widget>[
             _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
           ],
@@ -2142,7 +2143,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   String _projectLifecycleSummary(String? state) {
     return switch (state) {
       'draft' => '当前项目还在草稿态，主动作是保存到预发布列表。',
-      'submitted' => '当前项目已进入预发布列表，当前可先补充项目详情文书，再回到我的项目详情完成正式发布确认。',
+      'submitted' => '当前项目已进入预发布列表，当前可先补充报价依据资料，再回到我的项目详情完成正式发布确认。',
       'published' => '当前项目已进入竞标中，页面继续保留编辑与回显入口。',
       final String value => '当前项目处于 ${_frontStageStateLabel(value)}。',
       _ => '当前项目生命周期正在读取。',
@@ -2153,7 +2154,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     return switch (state) {
       'draft' => '点击“保存到预发布列表”后，项目会先进入发布前核对阶段，不会立即进入公域展示；如只想暂存，请使用“仅保存草稿”。',
       'submitted' =>
-        '当前页只继续核对预发布内容并补充项目详情文书；最终发布请回到“我的项目 -> 预发布列表 -> 单项目详情”点击“检查无误，确定发布”。',
+        '当前页只继续核对预发布内容并补充报价依据资料；最终发布请回到“我的项目 -> 预发布列表 -> 单项目详情”点击“检查无误，确定发布”。',
       'published' => '当前项目已进入竞标中；公域详情与我的项目详情会继续按真实状态回显。',
       final String value =>
         '当前项目处于 ${_frontStageStateLabel(value)}，页面只按真实状态承接。',

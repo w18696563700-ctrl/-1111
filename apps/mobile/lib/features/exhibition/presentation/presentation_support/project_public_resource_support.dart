@@ -27,12 +27,10 @@ class _ProjectPublicResourceCategoryOption {
   const _ProjectPublicResourceCategoryOption({
     required this.value,
     required this.label,
-    required this.summary,
   });
 
   final String value;
   final String label;
-  final String summary;
 }
 
 const List<_ProjectPublicResourceCategoryOption>
@@ -40,17 +38,14 @@ _projectPublicResourceCategoryOptions = <_ProjectPublicResourceCategoryOption>[
   _ProjectPublicResourceCategoryOption(
     value: _projectPublicResourceCategoryContractTemplate,
     label: '合同模板',
-    summary: '用于承接平台共享合同模板资料，只提供下载，不提供上传或删除。',
   ),
   _ProjectPublicResourceCategoryOption(
     value: _projectPublicResourceCategoryProcessGuide,
     label: '流程图与说明',
-    summary: '用于承接流程图与说明资料，帮助理解项目发布与续接过程。',
   ),
   _ProjectPublicResourceCategoryOption(
     value: _projectPublicResourceCategoryOtherResource,
     label: '公共资料',
-    summary: '用于承接平台共享公共资料，不替代项目详情文书区。',
   ),
 ];
 
@@ -107,7 +102,7 @@ String _projectPublicResourceLoadFailureTitle(ExhibitionLoadResult result) {
 
 String _projectPublicResourceLoadFailureMessage(ExhibitionLoadResult result) {
   if (_projectPublicResourceIsTimeoutResult(result)) {
-    return '这次公共资源目录读取超时了。你可以稍后重新读取；这不代表项目详情文书区不可用。';
+    return '这次公共资源目录读取超时了。你可以稍后重新读取；这不代表报价依据资料不可用。';
   }
 
   final rawMessage = result.message;

@@ -118,6 +118,8 @@ export class FileService {
     headers: IncomingHttpHeaders,
     fileAssetId?: string,
     mode?: string,
+    projectId?: string,
+    accessScope?: string,
   ) {
     try {
       const forwardHeaders =
@@ -129,6 +131,12 @@ export class FileService {
           params: {
             fileAssetId: this.asOptionalString(fileAssetId),
             mode: this.asOptionalString(mode),
+            ...(this.asOptionalString(projectId) === undefined
+              ? {}
+              : { projectId: this.asOptionalString(projectId) }),
+            ...(this.asOptionalString(accessScope) === undefined
+              ? {}
+              : { accessScope: this.asOptionalString(accessScope) }),
           },
         },
       );
@@ -493,12 +501,22 @@ export class FileService {
       if (message.includes("mode must be preview or download")) {
         return "当前附件读取方式无效，请检查后再试。";
       }
+      if (message.includes("accessScope must be owner_private or bid_material")) {
+        return "当前附件读取范围无效，请检查后再试。";
+      }
       return "当前附件读取参数无效，请检查后再试。";
     }
     if (code === "FILE_ACCESS_NOT_FOUND") {
       return "当前附件不存在或暂不可用。";
     }
     if (code === "FILE_ACCESS_PERMISSION_DENIED") {
+      if (
+        message.includes("bid-material") ||
+        message.includes("requested project") ||
+        message.includes("submit bid")
+      ) {
+        return "当前账号暂不能下载该项目材料。";
+      }
       return "当前账号没有权限读取这个附件。";
     }
     if (code === "FILE_ACCESS_UNAVAILABLE") {

@@ -3,6 +3,9 @@ part of '../exhibition_consumer_layer.dart';
 const Set<String> _stableProjectAttachmentKinds = <String>{
   'effect_image',
   'construction_doc',
+  'material_sample',
+  'equipment_material_list',
+  'service_list',
   'other_material',
 };
 
@@ -19,6 +22,10 @@ const Set<String> _stableProjectAttachmentMimeTypes = <String>{
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'application/csv',
 };
 
 Map<String, Object?>? _sanitizeProjectAttachmentListPayload(Object? payload) {
@@ -129,4 +136,12 @@ bool _isProjectAttachmentDocumentMimeType(String mimeType) {
       mimeType == 'application/msword' ||
       mimeType ==
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+}
+
+bool _isProjectAttachmentSpreadsheetMimeType(String mimeType) {
+  return mimeType == 'application/vnd.ms-excel' ||
+      mimeType ==
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType == 'text/csv' ||
+      mimeType == 'application/csv';
 }

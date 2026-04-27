@@ -135,15 +135,20 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final hasEffectImage = attachments.any(
-      (ProjectAttachmentReadModel item) =>
-          item.attachmentKind == _projectAttachmentKindEffectImage,
-    );
+    final uploadedKinds = attachments
+        .map((ProjectAttachmentReadModel item) => item.attachmentKind)
+        .toSet();
+    final uploadedCount = _projectAttachmentKindOptions
+        .where(
+          (_ProjectAttachmentKindOption item) =>
+              uploadedKinds.contains(item.value),
+        )
+        .length;
     return _StateMessage(
       title: '附件要求',
-      body: hasEffectImage
-          ? '效果图已补充；材质图和尺寸图为选传，可按项目需要继续补充。'
-          : '效果图为必传附件；材质图、尺寸图为选传附件。请先上传效果图后再进行正式发布确认。',
+      body: uploadedCount >= _projectAttachmentKindOptions.length
+          ? '五类报价依据资料已补充；接单方将在竞标提交第二步查看。'
+          : '请尽量补齐效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单，方便接单方准确报价。',
     );
   }
 }
@@ -185,7 +190,7 @@ class _ProjectAttachmentKindHint extends StatelessWidget {
             if (!compactCopy)
               const _DetailLine(
                 label: '说明',
-                value: '这里会进入项目详情文书区，只对 owner 私域可见。',
+                value: '这里会进入报价依据资料，只对 owner 私域可见。',
               ),
           ],
         ),
@@ -245,7 +250,7 @@ class _ProjectAttachmentStatePanel extends StatelessWidget {
 
   String _title() {
     return switch (status) {
-      _ProjectAttachmentUploadUiStatus.idle => '等待选择附件',
+      _ProjectAttachmentUploadUiStatus.idle => '等待选择资料',
       _ProjectAttachmentUploadUiStatus.selecting => '正在选择附件',
       _ProjectAttachmentUploadUiStatus.selectedReady => '附件已选中',
       _ProjectAttachmentUploadUiStatus.initStarting => '正在申请上传',
@@ -263,8 +268,7 @@ class _ProjectAttachmentStatePanel extends StatelessWidget {
 
   String _body() {
     return switch (status) {
-      _ProjectAttachmentUploadUiStatus.idle =>
-        '当前还没有开始补充附件。选择文件后，页面会继续走 init -> direct upload -> confirm -> bind 的正式链路。',
+      _ProjectAttachmentUploadUiStatus.idle => '当前还没有开始补充报价依据资料。',
       _ProjectAttachmentUploadUiStatus.selecting => '正在打开文件选择器，请选择当前项目要补充的附件。',
       _ProjectAttachmentUploadUiStatus.selectedReady =>
         '当前附件已经选中，可以直接上传并形成正式附件。',
@@ -277,9 +281,9 @@ class _ProjectAttachmentStatePanel extends StatelessWidget {
       _ProjectAttachmentUploadUiStatus.directUploading => '页面正在把当前附件发送到签名直传地址。',
       _ProjectAttachmentUploadUiStatus.confirming => '直传已完成，页面正在确认当前附件的上传结果。',
       _ProjectAttachmentUploadUiStatus.binding =>
-        '上传确认已完成，页面正在把已确认文件绑定成正式项目附件。',
+        '上传确认已完成，页面正在把已确认文件绑定成报价依据资料。',
       _ProjectAttachmentUploadUiStatus.bindSucceeded =>
-        '当前附件已经形成项目文书；最终展示以后端项目文书列表回读为准。',
+        '当前附件已经形成报价依据资料；最终展示以后端资料列表回读为准。',
       _ProjectAttachmentUploadUiStatus.unsupportedType =>
         '当前资料类型与文件类型不匹配，请重新选择。',
     };
@@ -348,10 +352,7 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
     }
 
     if (loading) {
-      return const _EmptyNotice(
-        title: '正在读取文书列表',
-        message: '当前正在回读 owner-private 项目文书列表。',
-      );
+      return const _EmptyNotice(title: '正在读取文书列表', message: '正在读取报价依据资料列表。');
     }
 
     final loadResult = result;
@@ -362,7 +363,7 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           _EmptyNotice(
-            title: '当前文书列表暂不可用',
+            title: '当前报价依据资料列表暂不可用',
             message: _projectAttachmentListFailureMessage(loadResult),
           ),
           if (onRetry != null) ...<Widget>[
@@ -380,8 +381,8 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
           _ProjectAttachmentRequirementPanel(attachments: attachments),
           const SizedBox(height: 12),
           _EmptyNotice(
-            title: '当前还没有项目文书',
-            message: '$emptyMessage 只有 bind 成功后，文书才会出现在这里。',
+            title: '当前还没有报价依据资料',
+            message: '$emptyMessage 只有 bind 成功后，报价依据资料才会出现在这里。',
           ),
         ],
       );
@@ -393,15 +394,10 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
         _ProjectAttachmentRequirementPanel(attachments: attachments),
         const SizedBox(height: 12),
         Text(
-          '项目文书列表',
+          '报价依据资料列表',
           style: Theme.of(
             context,
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '这里只展示当前文书区的 app-facing 正式回读结果，不展示本地 upload confirm 过程记录。',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(height: 1.45),
         ),
         if (feedbackMessage != null) ...<Widget>[
           const SizedBox(height: 12),
@@ -446,78 +442,92 @@ class _ProjectAttachmentFormalRecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              attachment.fileName,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-            ),
-            const SizedBox(height: 8),
-            _DetailLine(
-              label: '资料类型',
-              value: _projectAttachmentKindLabel(attachment.attachmentKind),
-              highlight: true,
-            ),
-            _DetailLine(
-              label: '文件类型',
-              value: _projectAttachmentMimeTypeLabel(attachment.mimeType),
-            ),
-            _DetailLine(
-              label: '可见范围',
-              value: _projectAttachmentVisibilityLabel(attachment.visibility),
-            ),
-            _DetailLine(label: '排序序号', value: '${attachment.sortOrder}'),
-            _DetailLine(
-              label: '创建时间',
-              value: _projectAttachmentTimestampLabel(attachment.createdAt),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: <Widget>[
-                OutlinedButton.icon(
-                  onPressed: openingPreview || deleting ? null : onPreview,
-                  icon: openingPreview
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.visibility_outlined),
-                  label: Text(
-                    openingPreview
-                        ? '处理中'
-                        : _projectAttachmentRecordPreviewButtonLabel(
-                            attachment.mimeType,
-                          ),
+    return SizedBox(
+      width: double.infinity,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLow,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                _projectAttachmentKindLabel(attachment.attachmentKind),
+                style: Theme.of(
+                  context,
+                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                attachment.fileName,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 8),
+              _DetailLine(
+                label: '资料名称',
+                value: _projectAttachmentKindLabel(attachment.attachmentKind),
+                highlight: true,
+              ),
+              _DetailLine(label: '文件名', value: attachment.fileName),
+              _DetailLine(
+                label: '文件类型',
+                value: _projectAttachmentMimeTypeLabel(attachment.mimeType),
+              ),
+              _DetailLine(
+                label: '可见范围',
+                value: _projectAttachmentVisibilityLabel(attachment.visibility),
+              ),
+              _DetailLine(label: '排序序号', value: '${attachment.sortOrder}'),
+              _DetailLine(
+                label: '创建时间',
+                value: _projectAttachmentTimestampLabel(attachment.createdAt),
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: <Widget>[
+                  OutlinedButton.icon(
+                    onPressed: openingPreview || deleting ? null : onPreview,
+                    icon: openingPreview
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.visibility_outlined),
+                    label: Text(
+                      openingPreview
+                          ? '处理中'
+                          : _projectAttachmentRecordPreviewButtonLabel(
+                              attachment.mimeType,
+                            ),
+                    ),
                   ),
-                ),
-                OutlinedButton.icon(
-                  onPressed: deleting || openingPreview ? null : onDelete,
-                  icon: deleting
-                      ? const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.delete_outline_rounded),
-                  label: Text(deleting ? '正在删除' : '删除当前文书'),
-                ),
-              ],
-            ),
-          ],
+                  OutlinedButton.icon(
+                    onPressed: deleting || openingPreview ? null : onDelete,
+                    icon: deleting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline_rounded),
+                    label: Text(deleting ? '正在删除' : '删除当前资料'),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

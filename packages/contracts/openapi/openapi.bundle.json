@@ -3789,7 +3789,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Read-only bid-submit project materials projection for the current published project only. This path returns only effect-image and construction-doc attachments sourced from `project_attachments`; it must not expose owner upload/delete actions, `other_material`, or become a generic public attachment center.\n",
+            "description": "Read-only bid-submit quote-basis material projection for the current published project only. This path returns only the five V1 quote-basis attachment kinds sourced from `project_attachments`: `effect_image`, `construction_doc`, `material_sample`, `equipment_material_list`, and `service_list`. It must not expose owner upload/delete actions, `other_material`, raw OSS URLs, or become a generic public attachment center.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -4864,11 +4864,29 @@
             "schema": {
               "$ref": "#/components/schemas/FileAccessMode"
             }
+          },
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            },
+            "description": "Required by `accessScope=bid_material` so Server can verify the requested material belongs to the current project. Owner-private access may omit this field.\n"
+          },
+          {
+            "in": "query",
+            "name": "accessScope",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/FileAccessScope"
+            },
+            "description": "Optional access scope. Omitted value is treated as `owner_private`; `bid_material` is the only bidder-facing scope for Quote Basis Material Package V1.\n"
           }
         ],
         "responses": {
           "200": {
-            "description": "Shared file-access response for current app-facing download reuse. This path is reused by the public resource download zone and other bounded attachment access families. It must not create a second download protocol and must not expose `objectKey` as contract truth.\n",
+            "description": "Shared file-access response for current app-facing download reuse. This path is reused by the public resource download zone, owner-private project attachments, and the bounded `bid_material` access scope. It must not create a second download protocol, must not expose `objectKey` as contract truth, and must not relax owner-private access outside the scoped Server permission branch.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -5388,7 +5406,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Internal truth read pair for `GET /api/app/project/bid-materials`. This path returns only read-only effect-image and construction-doc attachments sourced from `project_attachments` truth; it must not expose owner write controls, `other_material`, or a generic public attachment family.\n",
+            "description": "Internal truth read pair for `GET /api/app/project/bid-materials`. This path returns only read-only V1 quote-basis attachments sourced from `project_attachments` truth: `effect_image`, `construction_doc`, `material_sample`, `equipment_material_list`, and `service_list`. It must not expose owner write controls, `other_material`, raw OSS URLs, or a generic public attachment family.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -11595,6 +11613,14 @@
         ],
         "description": "Shared app-facing file access mode. The public resource download zone currently uses `download`.\n"
       },
+      "FileAccessScope": {
+        "type": "string",
+        "enum": [
+          "owner_private",
+          "bid_material"
+        ],
+        "description": "Shared app-facing file access permission scope. Omitted value is `owner_private`. `bid_material` is the dedicated Quote Basis Material Package V1 bidder-access branch and must validate bidder eligibility without opening all owner-private file assets.\n"
+      },
       "FileAccessResponse": {
         "type": "object",
         "required": [
@@ -13024,9 +13050,23 @@
         "enum": [
           "effect_image",
           "construction_doc",
+          "material_sample",
+          "equipment_material_list",
+          "service_list",
           "other_material"
         ],
-        "description": "Formal owner-private project attachment kind for the submitted-or-later materials continuation corridor only.\n"
+        "description": "Formal owner-private project attachment kind for the submitted-or-later materials continuation corridor only. Quote Basis Material Package V1 must use `effect_image`, `construction_doc`, `material_sample`, `equipment_material_list`, and `service_list`. `other_material` is retained only as a legacy-compatible owner-private value and must not become the new quote-basis main path.\n"
+      },
+      "ProjectQuoteBasisMaterialKind": {
+        "type": "string",
+        "enum": [
+          "effect_image",
+          "construction_doc",
+          "material_sample",
+          "equipment_material_list",
+          "service_list"
+        ],
+        "description": "Canonical Quote Basis Material Package V1 kind shared by publisher upload, bidder read projection, BFF shaping, and Server validation. `other_material` is intentionally excluded from this V1 main path.\n"
       },
       "ProjectAttachmentVisibility": {
         "type": "string",
@@ -13067,7 +13107,7 @@
           },
           "mimeType": {
             "type": "string",
-            "description": "Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx only. `effect_image` may use image MIME only; `construction_doc` may use pdf/doc/docx only; `other_material` may use either family.\n"
+            "description": "Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx / xls / xlsx / csv only. `effect_image` may use image MIME only; `construction_doc` may use pdf/doc/docx only; `material_sample` may use image/pdf/doc/docx; `equipment_material_list` and `service_list` may use xls/xlsx/csv/pdf/doc/docx.\n"
           },
           "visibility": {
             "$ref": "#/components/schemas/ProjectAttachmentVisibility"
@@ -13109,9 +13149,12 @@
         "type": "string",
         "enum": [
           "effect_image",
-          "construction_doc"
+          "construction_doc",
+          "material_sample",
+          "equipment_material_list",
+          "service_list"
         ],
-        "description": "Read-only bid-submit project material kind. This projection is sourced from `project_attachments` truth and does not authorize owner write operations.\n"
+        "description": "Read-only bid-submit quote-basis material kind. This projection is sourced from `project_attachments` truth and does not authorize owner write operations. `other_material` is intentionally excluded.\n"
       },
       "ProjectBidMaterialReadModel": {
         "type": "object",
@@ -13125,7 +13168,7 @@
           "sortOrder",
           "createdAt"
         ],
-        "description": "Read-only bid-submit project material projection. This model is limited to effect-image and construction-doc attachments and must not become a second attachment truth family.\n",
+        "description": "Read-only bid-submit project material projection. This model is limited to Quote Basis Material Package V1 attachments and must not become a second attachment truth family.\n",
         "properties": {
           "attachmentId": {
             "type": "string"
@@ -13144,7 +13187,7 @@
           },
           "mimeType": {
             "type": "string",
-            "description": "Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx only. `effect_image` may use image MIME only; `construction_doc` may use pdf/doc/docx only.\n"
+            "description": "Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx / xls / xlsx / csv only. `effect_image` may use image MIME only; `construction_doc` may use pdf/doc/docx only; `material_sample` may use image/pdf/doc/docx; `equipment_material_list` and `service_list` may use xls/xlsx/csv/pdf/doc/docx.\n"
           },
           "sortOrder": {
             "type": "integer",
@@ -13184,7 +13227,7 @@
           "mimeType",
           "sortOrder"
         ],
-        "description": "Owner-private project attachment create request only. This request binds a confirmed `FileAsset` into project-owned `project_attachments` truth and must not be replaced by upload confirm alone.\n",
+        "description": "Owner-private project attachment create request only. This request binds a confirmed `FileAsset` into project-owned `project_attachments` truth and must not be replaced by upload confirm alone. New Quote Basis Material Package V1 writes must use the five V1 attachment kinds; `other_material` is legacy-compatible only.\n",
         "properties": {
           "fileAssetId": {
             "type": "string"

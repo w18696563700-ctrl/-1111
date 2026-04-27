@@ -10,6 +10,7 @@ layer: L0 SSOT
 freeze_date_local: 2026-04-27
 inputs_canonical:
   - docs/00_ssot/project_attachment_day5_e2e_acceptance_table_addendum.md
+  - docs/00_ssot/project_attachment_day5_1_flutter_image_preview_rendering_patch_freeze_addendum.md
   - docs/00_ssot/project_attachment_cloud_chain_day3_day4_evidence_release_receipt_addendum.md
   - docs/01_contracts/openapi.yaml
   - apps/bff/src/routes/file/app-file-upload.controller.ts
@@ -18,6 +19,55 @@ inputs_canonical:
 ---
 
 # 《上线观察与收口单》
+
+## 0B. 2026-04-27 Day5.1 Patch Closure
+
+Day6 收口结论更新为：`不回滚，Day5.1 图片预览补丁已通过，测试数据已清理`。
+
+当前云上锚点保持不变：
+
+```text
+Server current=/srv/releases/server/20260427055505-file-access-owner-private-read
+BFF current=/srv/releases/bff/20260427034316-project-attachment-list-contract-shape/apps/bff
+exhibition-server=active
+exhibition-bff=active
+nginx /health/server/live=200
+nginx /health/bff/live=200
+```
+
+Day5.1 复验对象：
+
+```text
+project=4d5fcbe3-5720-406a-b041-d8819611b75b
+attachment_1=b1ecd92a-07f3-4a4e-a372-bd9d3dcc863e
+attachment_2=918e4f4c-67dd-4e25-9d77-06efabbe3081
+file_asset_1=6fc8b317-cbeb-43bc-8587-e169399bf425
+file_asset_2=425363fc-34aa-4897-bbf3-27e916ce0e42
+upload_session_1=fac4f200-938d-4cbd-aa04-85c91e219aaf
+upload_session_2=0d77e42e-d376-4c4b-86eb-c2f6fc23a1d6
+object_1=project/project_attachment/2026/04/43ff810e09074627a35ded7fa1ab9100.png
+object_2=project/project_attachment/2026/04/68c44538909d49c089b21514feaa3f98.png
+```
+
+清理结果：
+
+```text
+object_1 before=200 after=404
+object_2 before=200 after=404
+db_project=0
+db_project_attachments=0
+db_file_asset=0
+db_upload_session=0
+db_codex_sessions=0
+db_audit=0
+```
+
+Rollback judgment：
+
+```text
+rollback=NOT_EXECUTED
+reason=Day5.1 only changed Flutter image preview carrier; Server/BFF/API/DB/OSS were already healthy and remained unchanged.
+```
 
 ## 0A. 2026-04-27 Rerun Addendum
 

@@ -2,11 +2,17 @@ part of '../exhibition_trade_pages.dart';
 
 typedef ProjectAttachmentPicker = Future<ProjectAttachmentDraft?> Function();
 typedef ProjectAttachmentExternalUrlOpener = Future<bool> Function(Uri uri);
+typedef ProjectAttachmentRemoteImageBytesLoader =
+    Future<List<int>?> Function(Uri uri);
 
 const String _projectAttachmentBusinessType = 'project';
 const String _projectAttachmentFileKind = 'project_attachment';
 const String _projectAttachmentKindEffectImage = 'effect_image';
 const String _projectAttachmentKindConstructionDoc = 'construction_doc';
+const String _projectAttachmentKindMaterialSample = 'material_sample';
+const String _projectAttachmentKindEquipmentMaterialList =
+    'equipment_material_list';
+const String _projectAttachmentKindServiceList = 'service_list';
 const String _projectAttachmentKindOtherMaterial = 'other_material';
 
 class ProjectAttachmentDraft {
@@ -21,6 +27,7 @@ final class ProjectAttachmentDebugOverrides {
 
   static ProjectAttachmentPicker? _pickerOverride;
   static ProjectAttachmentExternalUrlOpener? _externalUrlOpener;
+  static ProjectAttachmentRemoteImageBytesLoader? _remoteImageBytesLoader;
 
   static void installPicker(ProjectAttachmentPicker? picker) {
     _pickerOverride = picker;
@@ -32,11 +39,18 @@ final class ProjectAttachmentDebugOverrides {
     _externalUrlOpener = opener;
   }
 
+  static void installRemoteImageBytesLoader(
+    ProjectAttachmentRemoteImageBytesLoader? loader,
+  ) {
+    _remoteImageBytesLoader = loader;
+  }
+
   static void clearSession() {}
 
   static void reset() {
     _pickerOverride = null;
     _externalUrlOpener = null;
+    _remoteImageBytesLoader = null;
     clearSession();
   }
 }
@@ -93,21 +107,33 @@ const List<_ProjectAttachmentKindOption> _projectAttachmentKindOptions =
     <_ProjectAttachmentKindOption>[
       _ProjectAttachmentKindOption(
         value: _projectAttachmentKindEffectImage,
-        label: '效果图（必传）',
-        summary: '用于补充效果图或展示图；这是预发布详情里的必传附件，只接受图片文件。',
+        label: '效果图',
+        summary: '用于补充效果图或展示图，帮助接单方判断视觉复杂度、造型和灯光氛围。',
         supportedTypes: 'PNG / JPEG / WEBP',
       ),
       _ProjectAttachmentKindOption(
-        value: _projectAttachmentKindOtherMaterial,
-        label: '材质图（选传）',
-        summary: '用于补充材质、工艺或现场参考资料，接受图片或文档。',
+        value: _projectAttachmentKindConstructionDoc,
+        label: '尺寸图 / 施工图',
+        summary: '用于补充尺寸、施工尺寸或平立面尺寸文档，帮助接单方判断面积、结构、用料和人工。',
+        supportedTypes: 'PDF / DOC / DOCX',
+      ),
+      _ProjectAttachmentKindOption(
+        value: _projectAttachmentKindMaterialSample,
+        label: '材质图 / 材料样板',
+        summary: '用于补充材质、工艺或现场参考资料，帮助接单方判断板材、饰面、五金和工艺成本。',
         supportedTypes: 'PNG / JPEG / WEBP / PDF / DOC / DOCX',
       ),
       _ProjectAttachmentKindOption(
-        value: _projectAttachmentKindConstructionDoc,
-        label: '尺寸图（选传）',
-        summary: '用于补充尺寸、施工尺寸或平立面尺寸文档，只接受文档文件。',
-        supportedTypes: 'PDF / DOC / DOCX',
+        value: _projectAttachmentKindEquipmentMaterialList,
+        label: '设备物料清单',
+        summary: '用于补充 LED、电视、触摸机、桌椅、绿植、饮水机等非装修但必需物料。',
+        supportedTypes: 'XLS / XLSX / CSV / PDF / DOC / DOCX',
+      ),
+      _ProjectAttachmentKindOption(
+        value: _projectAttachmentKindServiceList,
+        label: '服务清单',
+        summary: '用于补充保洁、摄影摄像、礼仪、模特、演绎、安保等服务需求。',
+        supportedTypes: 'XLS / XLSX / CSV / PDF / DOC / DOCX',
       ),
     ];
 
@@ -155,7 +181,16 @@ String? _projectAttachmentExtension(String fileName) {
 
   final extension = normalized.substring(dotIndex + 1);
   return switch (extension) {
-    'png' || 'jpg' || 'jpeg' || 'webp' || 'pdf' || 'doc' || 'docx' => extension,
+    'png' ||
+    'jpg' ||
+    'jpeg' ||
+    'webp' ||
+    'pdf' ||
+    'doc' ||
+    'docx' ||
+    'xls' ||
+    'xlsx' ||
+    'csv' => extension,
     _ => null,
   };
 }
@@ -169,6 +204,10 @@ String? _projectAttachmentMimeType(String? extension) {
     'doc' => 'application/msword',
     'docx' =>
       'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'xls' => 'application/vnd.ms-excel',
+    'xlsx' =>
+      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'csv' => 'text/csv',
     _ => null,
   };
 }
@@ -181,6 +220,9 @@ String _projectAttachmentFileTypeLabel(String extension) {
     'pdf' => 'PDF 文档',
     'doc' => 'DOC 文档',
     'docx' => 'DOCX 文档',
+    'xls' => 'XLS 表格',
+    'xlsx' => 'XLSX 表格',
+    'csv' => 'CSV 表格',
     _ => extension.toUpperCase(),
   };
 }
@@ -194,6 +236,10 @@ String _projectAttachmentMimeTypeLabel(String mimeType) {
     'application/msword' => 'DOC 文档',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document' =>
       'DOCX 文档',
+    'application/vnd.ms-excel' => 'XLS 表格',
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' =>
+      'XLSX 表格',
+    'text/csv' || 'application/csv' => 'CSV 表格',
     _ => mimeType,
   };
 }
@@ -201,8 +247,11 @@ String _projectAttachmentMimeTypeLabel(String mimeType) {
 String _projectAttachmentKindLabel(String attachmentKind) {
   return switch (attachmentKind) {
     _projectAttachmentKindEffectImage => '效果图',
-    _projectAttachmentKindConstructionDoc => '尺寸图',
-    _projectAttachmentKindOtherMaterial => '材质图',
+    _projectAttachmentKindConstructionDoc => '尺寸图 / 施工图',
+    _projectAttachmentKindMaterialSample => '材质图 / 材料样板',
+    _projectAttachmentKindEquipmentMaterialList => '设备物料清单',
+    _projectAttachmentKindServiceList => '服务清单',
+    _projectAttachmentKindOtherMaterial => '其他资料（历史）',
     _ => attachmentKind,
   };
 }
@@ -210,15 +259,18 @@ String _projectAttachmentKindLabel(String attachmentKind) {
 String _projectAttachmentChooseActionLabel(String attachmentKind) {
   return switch (attachmentKind) {
     _projectAttachmentKindEffectImage => '选择效果图',
-    _projectAttachmentKindConstructionDoc => '选择尺寸图',
-    _projectAttachmentKindOtherMaterial => '选择材质图',
+    _projectAttachmentKindConstructionDoc => '选择尺寸图 / 施工图',
+    _projectAttachmentKindMaterialSample => '选择材质图 / 材料样板',
+    _projectAttachmentKindEquipmentMaterialList => '选择设备物料清单',
+    _projectAttachmentKindServiceList => '选择服务清单',
+    _projectAttachmentKindOtherMaterial => '选择其他资料',
     _ => '选择项目附件',
   };
 }
 
 String _projectAttachmentVisibilityLabel(String visibility) {
   return switch (visibility) {
-    'owner_private' => '仅 owner 私域可见',
+    'owner_private' => '仅 owner 私域可见；接单方在竞标第二步查看',
     _ => visibility,
   };
 }
@@ -242,7 +294,7 @@ String _projectAttachmentUploadErrorMessage(
     _ProjectAttachmentUploadUiStatus.directUploadFailed =>
       '当前附件直传未完成，请重新上传当前附件。',
     _ProjectAttachmentUploadUiStatus.confirmFailed => '当前附件确认结果未完成，请再次确认或重新上传。',
-    _ProjectAttachmentUploadUiStatus.bindFailed => '当前附件还没有形成正式项目附件，请重新绑定。',
+    _ProjectAttachmentUploadUiStatus.bindFailed => '当前文件还没有形成报价依据资料，请重新绑定。',
     _ => '',
   };
 }
@@ -259,8 +311,13 @@ _projectAttachmentFileAccessFromPayload(Object? payload) {
 String _projectAttachmentUnsupportedTypeMessage(String attachmentKind) {
   return switch (attachmentKind) {
     _projectAttachmentKindEffectImage => '效果图只支持 PNG、JPEG、WEBP 图片。',
-    _projectAttachmentKindConstructionDoc => '尺寸图只支持 PDF、DOC、DOCX 文件。',
-    _projectAttachmentKindOtherMaterial => '材质图只支持图片、PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindConstructionDoc => '尺寸图 / 施工图只支持 PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindMaterialSample => '材质图 / 材料样板只支持图片、PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindEquipmentMaterialList =>
+      '设备物料清单只支持 XLS、XLSX、CSV、PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindServiceList =>
+      '服务清单只支持 XLS、XLSX、CSV、PDF、DOC、DOCX 文件。',
+    _projectAttachmentKindOtherMaterial => '其他资料只支持图片、PDF、DOC、DOCX 文件。',
     _ => '当前文件类型暂不支持。',
   };
 }
@@ -272,9 +329,18 @@ bool _projectAttachmentKindMatchesMimeType(String kind, String mimeType) {
       mimeType == 'application/msword' ||
       mimeType ==
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+  final isSpreadsheet =
+      mimeType == 'application/vnd.ms-excel' ||
+      mimeType ==
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType == 'text/csv' ||
+      mimeType == 'application/csv';
   return switch (kind) {
     _projectAttachmentKindEffectImage => isImage,
     _projectAttachmentKindConstructionDoc => isDocument,
+    _projectAttachmentKindMaterialSample => isImage || isDocument,
+    _projectAttachmentKindEquipmentMaterialList ||
+    _projectAttachmentKindServiceList => isDocument || isSpreadsheet,
     _projectAttachmentKindOtherMaterial => isImage || isDocument,
     _ => false,
   };
@@ -303,6 +369,8 @@ String _projectAttachmentDraftPreviewButtonLabel(String mimeType) {
 String _projectAttachmentRecordPreviewButtonLabel(String mimeType) {
   return _projectAttachmentIsImageMimeType(mimeType) ? '预览图片' : '预览文书';
 }
+
+const int _projectAttachmentRemoteImagePreviewMaxBytes = 12 * 1024 * 1024;
 
 int _projectAttachmentNextSortOrder(List<ProjectAttachmentReadModel> items) {
   if (items.isEmpty) {
@@ -346,12 +414,12 @@ String _projectAttachmentListFailureMessage(ExhibitionLoadResult result) {
   return switch (result.state) {
     AppPageState.unauthorized => '当前登录状态不可继续补资料，请重新登录后再试。',
     AppPageState.forbidden => '当前主体暂不可继续补资料。',
-    AppPageState.notFound => '当前项目详情文书区暂未返回可读内容。',
+    AppPageState.notFound => '当前报价依据资料暂未返回可读内容。',
     _ =>
       result.message ==
               'current fake transport did not provide this canonical path'
-          ? '当前项目详情文书区暂未接通读侧。'
-          : '当前项目详情文书列表读取失败，请稍后重试。',
+          ? '当前报价依据资料暂未接通读侧。'
+          : '当前报价依据资料列表读取失败，请稍后重试。',
   };
 }
 
@@ -377,8 +445,8 @@ String _projectAttachmentBindFailureMessage(
     'PROJECT_ATTACHMENT_UNAVAILABLE' => '当前项目资料补充入口暂不可用，请稍后再试。',
     _ =>
       rawMessage == 'current fake transport did not provide this canonical path'
-          ? '当前项目详情文书区暂未接通写入。'
-          : '$fileName 尚未形成项目详情文书，请稍后重试。',
+          ? '当前报价依据资料暂未接通写入。'
+          : '$fileName 尚未形成报价依据资料，请稍后重试。',
   };
 }
 
@@ -426,7 +494,7 @@ String _projectAttachmentFileAccessFailureMessage(
     'FILE_ACCESS_INVALID' => '当前文书预览参数不可用，请稍后再试。',
     'FILE_ACCESS_FAILED' => '当前文书预览服务暂不可用，请稍后再试。',
     'FILE_ACCESS_NOT_FOUND' => '当前文书不存在或暂不可预览。',
-    'FILE_ACCESS_PERMISSION_DENIED' => '当前账号暂不可预览这份文书。',
+    'FILE_ACCESS_PERMISSION_DENIED' => '当前账号暂不可读取这份资料。',
     'FILE_ACCESS_UNAVAILABLE' => '当前文书预览服务暂不可用，请稍后再试。',
     _ => '当前文书预览服务暂不可用，请稍后再试。',
   };
@@ -466,6 +534,54 @@ Future<bool> _openProjectAttachmentUrl(String accessUrl) async {
   }
 
   return false;
+}
+
+Future<List<int>?> _loadProjectAttachmentRemoteImageBytes(
+  String accessUrl,
+) async {
+  final uri = Uri.tryParse(accessUrl);
+  if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
+    return null;
+  }
+
+  final override = ProjectAttachmentDebugOverrides._remoteImageBytesLoader;
+  if (override != null) {
+    return override(uri);
+  }
+
+  final client = HttpClient();
+  try {
+    final request = await client.getUrl(uri);
+    request.followRedirects = true;
+    final response = await request.close();
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return null;
+    }
+    if (response.contentLength > _projectAttachmentRemoteImagePreviewMaxBytes) {
+      return null;
+    }
+
+    var totalBytes = 0;
+    final buffer = BytesBuilder(copy: false);
+    await for (final chunk in response) {
+      totalBytes += chunk.length;
+      if (totalBytes > _projectAttachmentRemoteImagePreviewMaxBytes) {
+        return null;
+      }
+      buffer.add(chunk);
+    }
+
+    if (totalBytes == 0) {
+      return null;
+    }
+    return buffer.takeBytes();
+  } on IOException {
+    return null;
+  } on FormatException {
+    return null;
+  } finally {
+    client.close(force: true);
+  }
 }
 
 Future<File> _writeProjectAttachmentPreviewTempFile({
@@ -516,7 +632,7 @@ String _projectAttachmentDeleteFailureMessage(ExhibitionActionResult result) {
     _ =>
       result.message ==
               'current fake transport did not provide this canonical path'
-          ? '当前项目详情文书区暂未接通删除。'
+          ? '当前报价依据资料暂未接通删除。'
           : '当前文书删除未完成，请稍后重试。',
   };
 }

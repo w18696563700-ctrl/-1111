@@ -3,7 +3,7 @@ part of '../exhibition_trade_pages.dart';
 const double _bidSubmitAttachmentWideLayoutBreakpoint = 720;
 const double _bidSubmitAttachmentGridSpacing = 12;
 const double _bidSubmitAttachmentCardHeight = 312;
-const double _bidSubmitTemplateCardHeight = 156;
+const double _bidSubmitTemplateCardHeight = 128;
 
 List<List<T>> _chunkBidSubmitRows<T>(List<T> items, int columns) {
   final rows = <List<T>>[];

@@ -21,11 +21,20 @@ import { projectInvalidState, projectUnavailable } from './project.errors';
 type AttachmentBindCommand = {
   fileAssetId: string;
   fileName: string;
-  attachmentKind: ProjectAttachmentKind;
+  attachmentKind: ProjectQuoteBasisMaterialKind;
   sortOrder: number | null;
 };
 
-type ProjectAttachmentKind = 'effect_image' | 'construction_doc' | 'other_material';
+type ProjectQuoteBasisMaterialKind =
+  | 'effect_image'
+  | 'construction_doc'
+  | 'material_sample'
+  | 'equipment_material_list'
+  | 'service_list';
+
+type ProjectAttachmentKind =
+  | ProjectQuoteBasisMaterialKind
+  | 'other_material';
 
 const OWNER_PRIVATE_VISIBILITY = 'owner_private';
 const PROJECT_UPLOAD_BUSINESS_TYPE = 'project';
@@ -43,10 +52,26 @@ const DOCUMENT_MIMES = new Set([
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 ]);
+const SPREADSHEET_MIMES = new Set([
+  'application/vnd.ms-excel',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'application/csv'
+]);
 const ATTACHMENT_KIND_MIMES = new Map<ProjectAttachmentKind, Set<string>>([
   ['effect_image', IMAGE_MIMES],
   ['construction_doc', DOCUMENT_MIMES],
+  ['material_sample', new Set([...IMAGE_MIMES, ...DOCUMENT_MIMES])],
+  ['equipment_material_list', new Set([...DOCUMENT_MIMES, ...SPREADSHEET_MIMES])],
+  ['service_list', new Set([...DOCUMENT_MIMES, ...SPREADSHEET_MIMES])],
   ['other_material', new Set([...IMAGE_MIMES, ...DOCUMENT_MIMES])]
+]);
+const QUOTE_BASIS_MATERIAL_KINDS = new Set<ProjectQuoteBasisMaterialKind>([
+  'effect_image',
+  'construction_doc',
+  'material_sample',
+  'equipment_material_list',
+  'service_list'
 ]);
 
 @Injectable()
@@ -239,7 +264,7 @@ export class ProjectAttachmentService {
     }
   }
 
-  private ensureAttachmentMime(attachmentKind: ProjectAttachmentKind, mimeType: string) {
+  private ensureAttachmentMime(attachmentKind: ProjectQuoteBasisMaterialKind, mimeType: string) {
     const normalizedMimeType = this.normalizeMimeType(mimeType);
     const allowedMimes = ATTACHMENT_KIND_MIMES.get(attachmentKind);
     if (!allowedMimes?.has(normalizedMimeType)) {
@@ -292,8 +317,8 @@ export class ProjectAttachmentService {
   }
 
   private readAttachmentKind(value: unknown) {
-    const normalized = this.readRequiredString(value, 'attachmentKind') as ProjectAttachmentKind;
-    if (!ATTACHMENT_KIND_MIMES.has(normalized)) {
+    const normalized = this.readRequiredString(value, 'attachmentKind') as ProjectQuoteBasisMaterialKind;
+    if (!QUOTE_BASIS_MATERIAL_KINDS.has(normalized)) {
       throw projectAttachmentInvalid('Current attachmentKind is not supported.');
     }
     return normalized;

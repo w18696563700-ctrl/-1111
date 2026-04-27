@@ -1372,7 +1372,7 @@ export const projectAttachmentCorridorP1Migrations = [
         CONSTRAINT chk_project_attachments_visibility
           CHECK (visibility = 'owner_private'),
         CONSTRAINT chk_project_attachments_attachment_kind
-          CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'other_material'))
+          CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'material_sample', 'equipment_material_list', 'service_list', 'other_material'))
       )`,
       `ALTER TABLE public.project_attachments
        ADD COLUMN IF NOT EXISTS file_name text NOT NULL DEFAULT ''`,
@@ -1419,7 +1419,7 @@ export const projectAttachmentCorridorP1Migrations = [
          ) THEN
            ALTER TABLE public.project_attachments
              ADD CONSTRAINT chk_project_attachments_attachment_kind
-             CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'other_material'));
+             CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'material_sample', 'equipment_material_list', 'service_list', 'other_material'));
          END IF;
        END $$`,
       `CREATE INDEX IF NOT EXISTS idx_project_attachments_project_sort_created
@@ -1428,6 +1428,16 @@ export const projectAttachmentCorridorP1Migrations = [
        ON public.project_attachments (file_asset_id)`,
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_attachments_project_file_asset_unique
        ON public.project_attachments (project_id, file_asset_id)`
+    ]
+  },
+  {
+    key: '20260427_quote_basis_material_package_v1_attachment_kind_constraint',
+    statements: [
+      `ALTER TABLE public.project_attachments
+       DROP CONSTRAINT IF EXISTS chk_project_attachments_attachment_kind`,
+      `ALTER TABLE public.project_attachments
+       ADD CONSTRAINT chk_project_attachments_attachment_kind
+       CHECK (attachment_kind IN ('effect_image', 'construction_doc', 'material_sample', 'equipment_material_list', 'service_list', 'other_material'))`
     ]
   }
 ];

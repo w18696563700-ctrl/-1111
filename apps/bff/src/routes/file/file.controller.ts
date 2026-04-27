@@ -36,7 +36,9 @@ export class FileController {
     @Headers() headers: IncomingHttpHeaders,
     @Query('fileAssetId') fileAssetId?: string,
     @Query('mode') mode?: string,
+    @Query('projectId') projectId?: string,
+    @Query('accessScope') accessScope?: string,
   ) {
-    return this.fileService.getAccess(headers, fileAssetId, mode);
+    return this.fileService.getAccess(headers, fileAssetId, mode, projectId, accessScope);
   }
 }

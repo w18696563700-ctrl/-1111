@@ -137,7 +137,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
   Future<void> _selectAttachment({bool append = false}) async {
     setState(() {
       _uploadStatus = _ProjectAttachmentUploadUiStatus.selecting;
-      _uploadMessage = append ? '正在继续选择项目附件' : '正在选择项目附件';
+      _uploadMessage = append ? '正在继续选择报价依据资料' : '正在选择报价依据资料';
     });
 
     final draft = await _pickProjectAttachmentDraft();
@@ -160,7 +160,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     if (resolved == null) {
       setState(() {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.unsupportedType;
-        _uploadMessage = '当前只支持图片、PDF、DOC、DOCX 文件。';
+        _uploadMessage = '当前只支持图片、PDF、DOC、DOCX、XLS、XLSX、CSV 文件。';
       });
       return;
     }
@@ -239,8 +239,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           await _loadFormalAttachments(
             forceRefresh: true,
             feedbackMessage: successNames.length == 1
-                ? '${successNames.first} 已进入项目文书列表。'
-                : '已回读 ${successNames.length} 个新文书。',
+                ? '${successNames.first} 已进入报价依据资料列表。'
+                : '已回读 ${successNames.length} 个新资料。',
           );
         }
         return;
@@ -258,8 +258,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _retryDraft = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
       _uploadMessage = successNames.length == 1
-          ? '${successNames.first} 已形成项目文书。最终列表以后端项目文书读侧回读为准。'
-          : '已形成 ${successNames.length} 个项目文书。最终列表以后端项目文书读侧回读为准。';
+          ? '${successNames.first} 已形成报价依据资料。最终列表以后端资料读侧回读为准。'
+          : '已形成 ${successNames.length} 个报价依据资料。最终列表以后端资料读侧回读为准。';
     });
     ExhibitionConsumerLayer.instance.invalidateProjectAttachments(
       projectId: projectId,
@@ -267,8 +267,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     await _loadFormalAttachments(
       forceRefresh: true,
       feedbackMessage: successNames.length == 1
-          ? '${successNames.first} 已进入项目文书列表。'
-          : '已回读 ${successNames.length} 个新文书。',
+          ? '${successNames.first} 已进入报价依据资料列表。'
+          : '已回读 ${successNames.length} 个新资料。',
     );
   }
 
@@ -419,8 +419,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _uploadStatus = _ProjectAttachmentUploadUiStatus.binding;
       _uploadMessage =
           totalDraftCount != null && totalDraftCount > 1 && draftIndex != null
-          ? '正在绑定第 $draftIndex/$totalDraftCount 个附件：${resolvedDraft.fileName}'
-          : '正在把已确认文件绑定成正式项目附件';
+          ? '正在绑定第 $draftIndex/$totalDraftCount 个报价依据资料：${resolvedDraft.fileName}'
+          : '正在把已确认文件绑定成报价依据资料';
     });
 
     final result = await ExhibitionConsumerLayer.instance.bindProjectAttachment(
@@ -489,7 +489,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     });
     await _loadFormalAttachments(
       forceRefresh: true,
-      feedbackMessage: '${attachment.fileName} 已从项目文书列表移除。',
+      feedbackMessage: '${attachment.fileName} 已从报价依据资料列表移除。',
     );
   }
 
@@ -570,14 +570,14 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
-      _uploadMessage = '${draft.fileName} 已形成项目文书。最终列表以后端项目文书读侧回读为准。';
+      _uploadMessage = '${draft.fileName} 已形成报价依据资料。最终列表以后端资料读侧回读为准。';
     });
     ExhibitionConsumerLayer.instance.invalidateProjectAttachments(
       projectId: widget.projectId,
     );
     await _loadFormalAttachments(
       forceRefresh: true,
-      feedbackMessage: '${draft.fileName} 已进入项目文书列表。',
+      feedbackMessage: '${draft.fileName} 已进入报价依据资料列表。',
     );
   }
 
@@ -600,14 +600,14 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
-      _uploadMessage = '${draft.fileName} 已形成项目文书。最终列表以后端项目文书读侧回读为准。';
+      _uploadMessage = '${draft.fileName} 已形成报价依据资料。最终列表以后端资料读侧回读为准。';
     });
     ExhibitionConsumerLayer.instance.invalidateProjectAttachments(
       projectId: widget.projectId,
     );
     await _loadFormalAttachments(
       forceRefresh: true,
-      feedbackMessage: '${draft.fileName} 已进入项目文书列表。',
+      feedbackMessage: '${draft.fileName} 已进入报价依据资料列表。',
     );
   }
 
@@ -639,16 +639,34 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       return;
     }
 
-    setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
     if (_projectAttachmentIsImageMimeType(attachment.mimeType)) {
-      await _showProjectAttachmentRemoteImagePreviewDialog(
-        context,
-        attachment: attachment,
-        access: access,
+      final imageBytes = await _loadProjectAttachmentRemoteImageBytes(
+        access.accessUrl,
+      );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
+      if (imageBytes != null && imageBytes.isNotEmpty) {
+        await _showProjectAttachmentLocalImagePreviewDialog(
+          context,
+          fileName: attachment.fileName,
+          bytes: imageBytes,
+        );
+        return;
+      }
+
+      final opened = await _openProjectAttachmentUrl(access.accessUrl);
+      if (!mounted) {
+        return;
+      }
+      _showSectionMessage(
+        opened ? '图片预览链接已打开；当前应用内图片暂时无法渲染。' : '当前图片暂时无法预览，请稍后再试。',
       );
       return;
     }
 
+    setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
     final opened = await _openProjectAttachmentUrl(access.accessUrl);
     if (!mounted) {
       return;
@@ -678,7 +696,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           const _StateMessage(
             title: '当前说明',
             body:
-                '这是 owner-private 项目文书补充区。upload confirm 只确认 FileAsset，只有 bind 成功后才会进入项目文书列表。',
+                '这是 owner-private 报价依据资料补充区。upload confirm 只确认 FileAsset，只有 bind 成功后才会进入报价依据资料列表。',
           ),
           const SizedBox(height: 12),
         ],

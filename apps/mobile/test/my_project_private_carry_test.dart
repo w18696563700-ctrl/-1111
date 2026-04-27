@@ -866,8 +866,8 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '作废归档'), findsOneWidget);
     expect(find.text('发布前确认'), findsOneWidget);
-    expect(find.textContaining('预发布阶段已开放项目详情文书区'), findsOneWidget);
-    expect(find.textContaining('补充必传效果图'), findsOneWidget);
+    expect(find.textContaining('预发布阶段已开放报价依据资料'), findsOneWidget);
+    expect(find.textContaining('补充效果图、尺寸图 / 施工图'), findsWidgets);
     expect(find.text('删除此项目'), findsNothing);
   });
 
@@ -887,20 +887,25 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('当前阶段动作'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
-    expect(find.text('项目详情文书：效果图为必传，材质图和尺寸图为选传。'), findsOneWidget);
+    expect(find.text('项目沟通'), findsNothing);
+    expect(find.text('项目澄清'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '展开项目基础信息'), findsOneWidget);
+    expect(find.textContaining('正式完结补充'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
+    expect(find.textContaining('请补充五类报价依据资料'), findsOneWidget);
     expect(find.text('下架关闭'), findsNothing);
-    await _scrollTo(tester, find.text('项目详情文书区'));
-    expect(find.text('项目详情文书区'), findsOneWidget);
-    expect(find.textContaining('效果图为必传，材质图和尺寸图为选传'), findsWidgets);
+    await tester.tap(find.widgetWithText(OutlinedButton, '展开项目基础信息'));
+    await tester.pumpAndSettle();
+    expect(find.widgetWithText(OutlinedButton, '收起项目基础信息'), findsOneWidget);
+    expect(find.textContaining('正式完结补充'), findsOneWidget);
+    await _scrollTo(tester, find.text('报价依据资料'));
+    expect(find.text('报价依据资料'), findsOneWidget);
+    expect(find.textContaining('效果图、尺寸图 / 施工图、材质图 / 材料样板'), findsWidgets);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
-    expect(
-      find.text('这里提供平台共享参考资料，用于帮助项目发布与续接过程理解规则和流程，不替代私域项目文书区。'),
-      findsOneWidget,
-    );
+    expect(find.text('可下载平台共享模板与公共资料。'), findsOneWidget);
     expect(find.text('删除此项目'), findsNothing);
   });
 
@@ -1055,7 +1060,7 @@ void main() {
       actionLabel: '查看详情',
     );
     expect(find.text('当前阶段动作'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '补充项目详情文书'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
     expect(find.text('下架关闭'), findsNothing);
     expect(projectStates['project-close-flow'], 'published');
   });

@@ -37,17 +37,16 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
           taskId: taskId,
           command: P0PayFixedPriceBidCommand(
             quoteAmount: quoteAmount,
-            quoteValidUntil: _p0PayQuoteValidUntilController.text.trim(),
+            quoteValidUntil: _p0PayQuoteValidUntil(),
             taxIncluded: _p0PayTaxIncluded,
             transportIncluded: _p0PayTransportIncluded,
             installationIncluded: _p0PayInstallationIncluded,
             constructionPlan: _proposalSummaryController.text.trim(),
-            materialDescription: _p0PayMaterialDescriptionController.text
-                .trim(),
-            craftDescription: _p0PayCraftDescriptionController.text.trim(),
-            buildProcess: _p0PayBuildProcessController.text.trim(),
+            materialDescription: _p0PayProfessionalPlanSummary(),
+            craftDescription: _p0PayProfessionalPlanSummary(),
+            buildProcess: '详见第四步上传的进度安排附件。',
             deliveryMilestones: _p0PayDeliveryMilestones(),
-            riskNotes: _p0PayRiskNotesController.text.trim(),
+            riskNotes: '以第四步方案说明和必传文档为准。',
             attachmentFileAssetIds: _p0PayBidAttachmentFileAssetIds(),
             platformServiceFeeRuleAgreement:
                 _p0PayPlatformServiceFeeAgreement(),
@@ -250,7 +249,7 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
     final payload = _payloadMap(_projectDetailResult?.payload);
     return _normalizeDynamicText(payload?['taskId']) ??
         _normalizeDynamicText(payload?['tradeTaskId']) ??
-        _normalizeId(_projectIdController.text);
+        _normalizeDynamicText(_payloadMap(payload?['p0PaySummary'])?['taskId']);
   }
 
   bool get _p0PayAuthorizationIdsReady {
@@ -273,42 +272,20 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
       return '请先填写有效的竞标报价。';
     }
     if (_proposalSummaryController.text.trim().isEmpty) {
-      return '请先填写施工方案。';
-    }
-    if (_p0PayQuoteValidUntilController.text.trim().isEmpty) {
-      return '请先填写报价有效期。';
-    }
-    if (_p0PayMaterialDescriptionController.text.trim().isEmpty) {
-      return '请先填写材料说明。';
-    }
-    if (_p0PayCraftDescriptionController.text.trim().isEmpty) {
-      return '请先填写工艺说明。';
-    }
-    if (_p0PayBuildProcessController.text.trim().isEmpty) {
-      return '请先填写搭建流程。';
-    }
-    if (_p0PayDeliveryMilestones().isEmpty) {
-      return '请先填写至少一个交付节点。';
-    }
-    if (_p0PayRiskNotesController.text.trim().isEmpty) {
-      return '请先填写风险说明。';
+      return '请先填写方案说明。';
     }
     if (_p0PayBidAttachmentFileAssetIds().isEmpty) {
-      return '请先完成当前页竞标附件上传确认，或填写补充报价附件 FileAsset ID。';
+      return '请先完成当前页竞标附件上传确认。';
     }
     if (!_p0PayReadRuleConfirmed ||
         !_p0PayAuthorizationAwarenessConfirmed ||
         !_p0PayPublisherBreachReleaseConfirmed) {
-      return '请先勾选全部平台服务费预授权确认项。';
+      return '请先勾选全部平台服务费确认项。';
     }
     return null;
   }
 
   List<String> _p0PayBidAttachmentFileAssetIds() {
-    final explicitIds = _p0PayAttachmentFileAssetIdsController.text
-        .split(RegExp(r'[,，;\s]+'))
-        .map((String value) => value.trim())
-        .where((String value) => value.isNotEmpty);
     final uploadedIds = _attachmentSlots
         .where((_BidSubmitAttachmentSlotState slot) => slot.isConfirmed)
         .map(
@@ -316,15 +293,37 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
               _normalizeId(slot.fileAssetId),
         )
         .whereType<String>();
-    return <String>{...uploadedIds, ...explicitIds}.toList(growable: false);
+    return <String>{...uploadedIds}.toList(growable: false);
   }
 
-  List<String> _p0PayDeliveryMilestones() {
-    return _p0PayDeliveryMilestonesController.text
-        .split(RegExp(r'[,，;\n]+'))
-        .map((String value) => value.trim())
-        .where((String value) => value.isNotEmpty)
-        .toList(growable: false);
+  List<String> _p0PayDeliveryMilestones() => const <String>['详见第四步上传的进度安排附件'];
+
+  String _p0PayProfessionalPlanSummary() {
+    final proposalSummary = _proposalSummaryController.text.trim();
+    return '详见第四步方案说明和必传文档：$proposalSummary';
+  }
+
+  String _p0PayQuoteValidUntil() {
+    final expiresAt = DateTime.now().add(
+      Duration(hours: _p0PayQuoteValidHours),
+    );
+    return _p0PayIso8601WithOffset(expiresAt);
+  }
+
+  String _p0PayIso8601WithOffset(DateTime value) {
+    String twoDigits(int number) => number.toString().padLeft(2, '0');
+    final offset = value.timeZoneOffset;
+    final sign = offset.isNegative ? '-' : '+';
+    final absoluteOffset = offset.abs();
+    return '${value.year}-'
+        '${twoDigits(value.month)}-'
+        '${twoDigits(value.day)}T'
+        '${twoDigits(value.hour)}:'
+        '${twoDigits(value.minute)}:'
+        '${twoDigits(value.second)}'
+        '$sign'
+        '${twoDigits(absoluteOffset.inHours)}:'
+        '${twoDigits(absoluteOffset.inMinutes.remainder(60))}';
   }
 
   Map<String, Object?> _p0PayPlatformServiceFeeAgreement() {

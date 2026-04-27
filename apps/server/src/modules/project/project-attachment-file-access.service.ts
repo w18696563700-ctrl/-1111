@@ -18,11 +18,20 @@ import {
 } from './project-attachment-file-access.errors';
 
 type FileAccessMode = 'preview' | 'download';
+type FileAccessScope = 'owner_private' | 'bid_material';
 
 const OWNER_PRIVATE_VISIBILITY = 'owner_private';
 const PROJECT_UPLOAD_BUSINESS_TYPE = 'project';
 const PROJECT_UPLOAD_FILE_KIND = 'project_attachment';
 const FILE_ACCESS_MODES = new Set<FileAccessMode>(['preview', 'download']);
+const FILE_ACCESS_SCOPES = new Set<FileAccessScope>(['owner_private', 'bid_material']);
+const BID_MATERIAL_ATTACHMENT_KINDS = new Set([
+  'effect_image',
+  'construction_doc',
+  'material_sample',
+  'equipment_material_list',
+  'service_list'
+]);
 
 @Injectable()
 export class ProjectAttachmentFileAccessService {
@@ -42,6 +51,8 @@ export class ProjectAttachmentFileAccessService {
   async getAccess(query: Record<string, unknown>, context: RequestContext) {
     const fileAssetId = this.readRequiredString(query.fileAssetId, 'fileAssetId');
     const mode = this.readMode(query.mode);
+    const accessScope = this.readAccessScope(query.accessScope);
+    const requestedProjectId = this.readOptionalString(query.projectId);
     const currentSession = await requireVerifiedCurrentSessionContext(
       context,
       this.currentSessionVerificationService
@@ -59,14 +70,15 @@ export class ProjectAttachmentFileAccessService {
     if (!project) {
       throw fileAccessNotFound('Current project is unavailable for file access.');
     }
-    if (this.normalizeText(currentSession.organizationId) !== this.normalizeText(project.organizationId)) {
-      throw fileAccessPermissionDenied('Current actor lacks owner permission for this project attachment.');
+    if (requestedProjectId && requestedProjectId !== project.id) {
+      throw fileAccessPermissionDenied('Current file access request is not aligned with the requested project.');
     }
 
-    await this.eligibilityService.requireCurrentOrganizationScope(
-      currentSession,
-      project.organizationId
-    );
+    if (accessScope === 'bid_material') {
+      await this.requireBidMaterialAccess(currentSession, project, attachment);
+    } else {
+      await this.requireOwnerPrivateAccess(currentSession, project);
+    }
     this.ensureProjectAttachmentFileAsset(fileAsset, project);
 
     const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
@@ -96,12 +108,63 @@ export class ProjectAttachmentFileAccessService {
     }
   }
 
+  private async requireOwnerPrivateAccess(
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>,
+    project: ProjectEntity
+  ) {
+    if (this.normalizeText(currentSession.organizationId) !== this.normalizeText(project.organizationId)) {
+      throw fileAccessPermissionDenied('Current actor lacks owner permission for this project attachment.');
+    }
+
+    await this.eligibilityService.requireCurrentOrganizationScope(
+      currentSession,
+      project.organizationId
+    );
+  }
+
+  private async requireBidMaterialAccess(
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>,
+    project: ProjectEntity,
+    attachment: ProjectAttachmentEntity
+  ) {
+    if (!BID_MATERIAL_ATTACHMENT_KINDS.has(this.normalizeText(attachment.attachmentKind))) {
+      throw fileAccessPermissionDenied('Current project attachment is not available for bid-material access.');
+    }
+
+    await this.eligibilityService.requireBidSubmitEligibility(
+      currentSession,
+      project
+    );
+  }
+
   private readMode(value: unknown): FileAccessMode {
     const mode = this.readRequiredString(value, 'mode') as FileAccessMode;
     if (!FILE_ACCESS_MODES.has(mode)) {
       throw fileAccessInvalid('mode must be preview or download.');
     }
     return mode;
+  }
+
+  private readAccessScope(value: unknown): FileAccessScope {
+    if (value === undefined || value === null || value === '') {
+      return OWNER_PRIVATE_VISIBILITY;
+    }
+    const scope = this.readRequiredString(value, 'accessScope') as FileAccessScope;
+    if (!FILE_ACCESS_SCOPES.has(scope)) {
+      throw fileAccessInvalid('accessScope must be owner_private or bid_material.');
+    }
+    return scope;
+  }
+
+  private readOptionalString(value: unknown) {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    if (typeof value !== 'string') {
+      throw fileAccessInvalid('projectId must be a string when provided for file access.');
+    }
+    const normalized = value.trim();
+    return normalized ? normalized : null;
   }
 
   private readRequiredString(value: unknown, field: string) {
