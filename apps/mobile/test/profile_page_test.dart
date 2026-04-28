@@ -1635,7 +1635,7 @@ void main() {
       const <String>[AuthCanonicalPaths.logout],
     );
     expect(AppSessionStore.instance.hasAnySession, isFalse);
-    expect(find.widgetWithText(FilledButton, '发送验证码'), findsOneWidget);
+    expect(find.widgetWithText(TextButton, '发送验证码'), findsOneWidget);
   });
 
   testWidgets('logout treats unauthorized as local logout completion', (

@@ -977,8 +977,9 @@ void main() {
       expect(find.widgetWithText(FilledButton, '进入登录入口'), findsOneWidget);
 
       await tapBottomDestination(tester, '我的');
-      expect(find.text('尚未登录'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '进入登录入口'), findsOneWidget);
+      expect(find.text('登录后管理项目与企业身份'), findsOneWidget);
+      expect(find.text('认证、发布、沟通和会员能力将在登录后开放'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '立即登录'), findsOneWidget);
       expect(find.text('创建组织入口'), findsNothing);
       expect(find.text('加入组织入口'), findsNothing);
       expect(find.text('查看认证状态'), findsNothing);
@@ -1037,7 +1038,7 @@ void main() {
       await tester.tap(find.widgetWithText(TextButton, '去发布项目'));
       await tester.pumpAndSettle();
 
-      expect(find.text('登录入口'), findsWidgets);
+      expect(find.text('欢迎登录'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '验证码登录'), findsOneWidget);
       expect(find.text('发送验证码'), findsOneWidget);
     },
@@ -1069,12 +1070,12 @@ void main() {
       expect(find.byType(Checkbox), findsOneWidget);
       expect(find.text('《用户协议》'), findsOneWidget);
       expect(find.text('《隐私政策》'), findsOneWidget);
-      expect(find.text('请输入可接收验证码的手机号'), findsOneWidget);
+      expect(find.text('请输入手机号'), findsOneWidget);
       expect(find.text('Apple'), findsNothing);
       expect(find.text('微信'), findsNothing);
       expect(find.text('一键登录'), findsNothing);
       expect(find.text('password login'), findsNothing);
-      expect(find.textContaining('验证码登录在首次验证成功时会自动创建账号并直接登录'), findsWidgets);
+      expect(find.text('登录后管理项目、企业身份与沟通协作'), findsOneWidget);
       expect(AppSessionStore.instance.hasAnySession, isFalse);
       expect(
         AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app').effectiveBaseUrl,
@@ -1106,7 +1107,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('密码'), findsOneWidget);
-    expect(find.text('密码登录'), findsOneWidget);
+    expect(find.text('请输入登录密码'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '账号密码登录'), findsOneWidget);
     expect(find.widgetWithText(TextButton, '忘记密码'), findsOneWidget);
     expect(find.text('发送验证码'), findsNothing);
     expect(find.widgetWithText(FilledButton, '验证码登录'), findsNothing);
@@ -1160,8 +1162,8 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      final FilledButton sendButtonBefore = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, '发送验证码'),
+      final TextButton sendButtonBefore = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, '发送验证码'),
       );
       final FilledButton otpLoginBefore = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, '验证码登录'),
@@ -1173,7 +1175,7 @@ void main() {
       await tester.pumpAndSettle();
 
       final FilledButton passwordLoginBefore = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, '密码登录'),
+        find.widgetWithText(FilledButton, '账号密码登录'),
       );
       expect(passwordLoginBefore.onPressed, isNull);
 
@@ -1185,15 +1187,15 @@ void main() {
       final Checkbox checkbox = tester.widget<Checkbox>(checkboxFinder);
       expect(checkbox.value, isTrue);
       final FilledButton passwordLoginAfter = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, '密码登录'),
+        find.widgetWithText(FilledButton, '账号密码登录'),
       );
       expect(passwordLoginAfter.onPressed, isNotNull);
 
       await tester.tap(find.text('验证码登录'));
       await tester.pumpAndSettle();
 
-      final FilledButton sendButtonAfter = tester.widget<FilledButton>(
-        find.widgetWithText(FilledButton, '发送验证码'),
+      final TextButton sendButtonAfter = tester.widget<TextButton>(
+        find.widgetWithText(TextButton, '发送验证码'),
       );
       final FilledButton otpLoginAfter = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, '验证码登录'),
@@ -3594,7 +3596,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollAndTap(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
-      expect(find.text('登录入口'), findsWidgets);
+      expect(find.text('欢迎登录'), findsOneWidget);
       expect(find.text('验证码登录'), findsWidgets);
       expect(find.text('账号密码登录'), findsOneWidget);
     },
@@ -3615,7 +3617,7 @@ void main() {
     expect(find.widgetWithText(FilledButton, '进入登录入口'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
     await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入登录入口'));
-    expect(find.text('登录入口'), findsWidgets);
+    expect(find.text('欢迎登录'), findsOneWidget);
   });
 
   testWidgets('bid submit blocks actor without organization with handoff', (
@@ -4061,7 +4063,7 @@ void main() {
     expect(submitButton, findsNothing);
 
     await _scrollAndTap(tester, find.text('去登录', skipOffstage: false));
-    expect(find.text('登录入口'), findsWidgets);
+    expect(find.text('欢迎登录'), findsOneWidget);
     expect(find.text('验证码登录'), findsWidgets);
     expect(find.text('账号密码登录'), findsWidgets);
   });

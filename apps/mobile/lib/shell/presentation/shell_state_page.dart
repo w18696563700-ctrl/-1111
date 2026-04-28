@@ -46,6 +46,11 @@ class ShellStatePage extends StatelessWidget {
       GlobalShellState.maintenance => '平台当前处于维护中，页面先停留在受控维护态。',
     };
 
+    if (state == GlobalShellState.unauthenticated &&
+        building == AppBuilding.profile) {
+      return const _ProfileLoginPromptCard();
+    }
+
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 440),
@@ -147,6 +152,102 @@ class ShellStatePage extends StatelessWidget {
                       child: const Text('回到展览'),
                     ),
                   ],
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProfileLoginPromptCard extends StatelessWidget {
+  const _ProfileLoginPromptCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 440),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 34, 24, 24),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(30),
+              gradient: const LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: <Color>[Color(0xFFFFFFFF), Color(0xFFFFF5E7)],
+              ),
+              boxShadow: <BoxShadow>[
+                BoxShadow(
+                  color: const Color(0xFF8E5A16).withValues(alpha: 0.10),
+                  blurRadius: 30,
+                  offset: const Offset(0, 18),
+                ),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 24, 22),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  DecoratedBox(
+                    decoration: const BoxDecoration(
+                      color: Color(0xFFFFEACB),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(12),
+                      child: Icon(
+                        Icons.person_outline_rounded,
+                        color: const Color(0xFFB97418),
+                        size: 28,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    '登录后管理项目与企业身份',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      color: const Color(0xFF2A251F),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '认证、发布、沟通和会员能力将在登录后开放',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: FilledButton(
+                      onPressed: () {
+                        Navigator.of(
+                          context,
+                        ).pushNamed(ProfileIdentityRoutes.login);
+                      },
+                      style: FilledButton.styleFrom(
+                        backgroundColor: const Color(0xFFD8902E),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        textStyle: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      child: const Text('立即登录'),
+                    ),
+                  ),
                 ],
               ),
             ),

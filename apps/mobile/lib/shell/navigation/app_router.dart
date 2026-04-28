@@ -14,6 +14,7 @@ import 'package:mobile/features/profile/presentation/profile_forum_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_identity_access_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_identity_legal_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_identity_password_pages.dart';
+import 'package:mobile/features/profile/presentation/profile_login_page.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_pages.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_switch_page.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
@@ -588,7 +589,7 @@ class AppRouter {
 
     final routePath = _routeUri(routeName).path;
     final Widget? child = switch (routePath) {
-      ProfileIdentityRoutes.login => const LoginEntryPage(),
+      ProfileIdentityRoutes.login => const OnePageLoginEntryPage(),
       ProfileIdentityRoutes.organizationHandoff =>
         const OrganizationHandoffPage(),
       ProfileIdentityRoutes.organizationSwitch =>
@@ -619,7 +620,7 @@ class AppRouter {
     }
 
     final title = switch (routePath) {
-      ProfileIdentityRoutes.login => '登录入口',
+      ProfileIdentityRoutes.login => '登录',
       ProfileIdentityRoutes.organizationHandoff => '公司与组织',
       ProfileIdentityRoutes.organizationSwitch => '切换当前主体',
       ProfileIdentityRoutes.organizationCreate => '组织资料',

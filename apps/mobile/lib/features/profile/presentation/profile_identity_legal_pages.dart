@@ -20,27 +20,20 @@ class LoginLegalEntryStrip extends StatelessWidget {
 
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
+        color: const Color(0xFFFFFBF6),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: const Color(0xFFEADCC8)),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              '登录前请先查看',
-              style: textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Padding(
-                  padding: const EdgeInsets.only(top: 2),
+                  padding: const EdgeInsets.only(top: 1),
                   child: SizedBox(
                     width: 24,
                     height: 24,
@@ -77,20 +70,12 @@ class LoginLegalEntryStrip extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              '未勾选前不能发送验证码，也不能完成验证码登录或账号密码登录。',
-              style: textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.45,
-              ),
-            ),
             const SizedBox(height: 6),
             Text(
-              '当前仅承接手机号 + 验证码登录 / 账号密码登录，不扩到其他登录方式或第二条认证路径。',
+              '未勾选前不可发送验证码或登录。',
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
-                height: 1.45,
+                height: 1.35,
               ),
             ),
           ],
