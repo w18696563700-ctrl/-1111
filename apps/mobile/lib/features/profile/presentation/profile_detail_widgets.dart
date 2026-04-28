@@ -210,7 +210,7 @@ class _ProfileActionRow extends StatelessWidget {
     this.tileKey,
     required this.title,
     required this.subtitle,
-    required this.onTap,
+    this.onTap,
     this.leadingIcon,
     this.emphasized = false,
     this.trailing,
@@ -219,7 +219,7 @@ class _ProfileActionRow extends StatelessWidget {
   final Key? tileKey;
   final String title;
   final String subtitle;
-  final VoidCallback onTap;
+  final VoidCallback? onTap;
   final IconData? leadingIcon;
   final bool emphasized;
   final Widget? trailing;
@@ -227,10 +227,15 @@ class _ProfileActionRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final enabled = onTap != null;
     final highlightColor = theme.colorScheme.primary;
     final titleStyle = theme.textTheme.titleMedium?.copyWith(
       fontWeight: FontWeight.w700,
-      color: emphasized ? highlightColor : null,
+      color: !enabled
+          ? theme.colorScheme.onSurfaceVariant
+          : emphasized
+          ? highlightColor
+          : null,
     );
     final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
       color: theme.colorScheme.onSurfaceVariant,
@@ -271,6 +276,7 @@ class _ProfileActionRow extends StatelessWidget {
       title: Text(title, style: titleStyle),
       subtitle: Text(subtitle, style: subtitleStyle),
       trailing: resolvedTrailing,
+      enabled: enabled,
       onTap: onTap,
     );
   }

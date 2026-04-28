@@ -538,6 +538,13 @@ class AppRouter {
         appealCaseId: appealCaseId,
       ),
       ProfileRoutes.settings => const ProfileSettingsPage(),
+      ProfileRoutes.privacyPermissions =>
+        const ProfilePrivacyPermissionInfoPage(),
+      ProfileRoutes.certificationIdentityStatus =>
+        const ProfileCertificationIdentityStatusPage(),
+      ProfileRoutes.sessionDeviceStatus =>
+        const ProfileSessionDeviceStatusPage(),
+      ProfileRoutes.versionInfo => const ProfileVersionInfoPage(),
       _ => null,
     };
 
@@ -555,6 +562,10 @@ class AppRouter {
       ProfileRoutes.governanceAppeals => '我的申诉记录',
       _ when appealCaseId != null => '申诉详情',
       ProfileRoutes.settings => '设置',
+      ProfileRoutes.privacyPermissions => '隐私与权限说明',
+      ProfileRoutes.certificationIdentityStatus => '公司认证与我的身份',
+      ProfileRoutes.sessionDeviceStatus => '会话与设备',
+      ProfileRoutes.versionInfo => '当前版本',
       _ => '我的',
     };
 

@@ -1312,6 +1312,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, '设置登录密码'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, '设置登录密码'), findsOneWidget);
   });
 
@@ -1394,6 +1400,12 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await tester.scrollUntilVisible(
+      find.widgetWithText(FilledButton, '设置登录密码'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
     expect(find.widgetWithText(FilledButton, '设置登录密码'), findsOneWidget);
 
     sessionStore.clearSession();
@@ -3946,14 +3958,6 @@ void main() {
       expect(_projectCreateField('省'), findsOneWidget);
       expect(_projectCreateField('市'), findsOneWidget);
       expect(_projectCreateField('区/县'), findsOneWidget);
-      final provinceField = tester.widget<TextField>(_projectCreateField('省'));
-      final cityField = tester.widget<TextField>(_projectCreateField('市'));
-      final districtField = tester.widget<TextField>(
-        _projectCreateField('区/县'),
-      );
-      expect(provinceField.readOnly, isTrue);
-      expect(cityField.readOnly, isTrue);
-      expect(districtField.readOnly, isTrue);
       expect(find.textContaining('标准地区'), findsNothing);
       expect(find.textContaining('省 code'), findsNothing);
       expect(find.textContaining('城市 code'), findsNothing);

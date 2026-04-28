@@ -106,6 +106,28 @@ final class _VisualDemoDeviceLocationService implements DeviceLocationService {
   bool get supportsReverseGeocoding => true;
 
   @override
+  Future<DeviceLocationPermissionSnapshot> readPermissionStatus() async {
+    if (state == 'no_location') {
+      return const DeviceLocationPermissionSnapshot(
+        permissionState: DeviceLocationPermissionState.denied,
+        serviceEnabled: true,
+        message: '定位权限未开启。',
+      );
+    }
+    return const DeviceLocationPermissionSnapshot(
+      permissionState: DeviceLocationPermissionState.granted,
+      serviceEnabled: true,
+      message: '定位权限已开启。',
+    );
+  }
+
+  @override
+  Future<bool> openAppPermissionSettings() async => true;
+
+  @override
+  Future<bool> openSystemLocationSettings() async => true;
+
+  @override
   Future<DeviceLocationSnapshot> resolveCurrentPosition() async {
     if (state == 'no_location') {
       return const DeviceLocationSnapshot(

@@ -41,22 +41,59 @@ List<Object?> _futureHourlyForecastPayload() {
 class FakeDeviceLocationService implements DeviceLocationService {
   FakeDeviceLocationService({
     FutureOr<DeviceLocationSnapshot> Function()? resolver,
+    FutureOr<DeviceLocationPermissionSnapshot> Function()? permissionResolver,
+    FutureOr<bool> Function()? appSettingsOpener,
+    FutureOr<bool> Function()? locationSettingsOpener,
   }) : _resolver =
            resolver ??
            (() => const DeviceLocationSnapshot(
              permissionState: DeviceLocationPermissionState.granted,
              latitude: 30.5728,
              longitude: 104.0668,
-           ));
+           )),
+       _permissionResolver =
+           permissionResolver ??
+           (() => const DeviceLocationPermissionSnapshot(
+             permissionState: DeviceLocationPermissionState.granted,
+             serviceEnabled: true,
+             message: '定位权限已开启。',
+           )),
+       _appSettingsOpener = appSettingsOpener ?? (() => true),
+       _locationSettingsOpener = locationSettingsOpener ?? (() => true);
 
   final FutureOr<DeviceLocationSnapshot> Function() _resolver;
+  final FutureOr<DeviceLocationPermissionSnapshot> Function()
+  _permissionResolver;
+  final FutureOr<bool> Function() _appSettingsOpener;
+  final FutureOr<bool> Function() _locationSettingsOpener;
   int requestCount = 0;
+  int permissionStatusReadCount = 0;
+  int appSettingsOpenCount = 0;
+  int locationSettingsOpenCount = 0;
 
   @override
   bool get supportsDeviceLocation => true;
 
   @override
   bool get supportsReverseGeocoding => true;
+
+  @override
+  Future<DeviceLocationPermissionSnapshot> readPermissionStatus() async {
+    permissionStatusReadCount += 1;
+    return _permissionResolver();
+  }
+
+  @override
+  Future<bool> openAppPermissionSettings() async {
+    appSettingsOpenCount += 1;
+    return _appSettingsOpener();
+  }
+
+  @override
+  Future<bool> openSystemLocationSettings() async {
+    locationSettingsOpenCount += 1;
+    return _locationSettingsOpener();
+  }
 
   @override
   Future<DeviceLocationSnapshot> resolveCurrentPosition() async {

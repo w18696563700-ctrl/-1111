@@ -10,6 +10,9 @@ import 'package:mobile/core/auth/auth_consumer_layer.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
+import 'package:mobile/core/local_cache/local_cache_cleanup_service.dart';
+import 'package:mobile/core/location/device_location_service.dart';
+import 'package:mobile/core/runtime_info/app_runtime_info_service.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
@@ -279,9 +282,11 @@ ExhibitionMobileApp _buildProfileApp({
   AppShellContextData? shellContext,
   AppShellContextConsumer? shellContextConsumer,
   AppSessionStore? sessionStore,
+  bool establishSession = true,
+  DeviceLocationService? deviceLocationService,
 }) {
   final resolvedSessionStore = sessionStore ?? AppSessionStore();
-  if (!resolvedSessionStore.hasAnySession) {
+  if (establishSession && !resolvedSessionStore.hasAnySession) {
     resolvedSessionStore.establishSession(
       accessToken: 'profile-test-access-token',
       refreshToken: 'profile-test-refresh-token',
@@ -367,7 +372,95 @@ ExhibitionMobileApp _buildProfileApp({
           ),
         ),
     sessionStore: resolvedSessionStore,
+    deviceLocationService:
+        deviceLocationService ?? _ProfileSettingsDeviceLocationService(),
   );
+}
+
+class _ProfileSettingsDeviceLocationService implements DeviceLocationService {
+  _ProfileSettingsDeviceLocationService({
+    this.permissionSnapshot = const DeviceLocationPermissionSnapshot(
+      permissionState: DeviceLocationPermissionState.granted,
+      serviceEnabled: true,
+      message: '定位权限已开启。',
+    ),
+  });
+
+  final DeviceLocationPermissionSnapshot permissionSnapshot;
+  int permissionReadCount = 0;
+  int appSettingsOpenCount = 0;
+  int locationSettingsOpenCount = 0;
+  int resolvePositionCount = 0;
+
+  @override
+  bool get supportsDeviceLocation => true;
+
+  @override
+  bool get supportsReverseGeocoding => false;
+
+  @override
+  Future<DeviceLocationPermissionSnapshot> readPermissionStatus() async {
+    permissionReadCount += 1;
+    return permissionSnapshot;
+  }
+
+  @override
+  Future<bool> openAppPermissionSettings() async {
+    appSettingsOpenCount += 1;
+    return true;
+  }
+
+  @override
+  Future<bool> openSystemLocationSettings() async {
+    locationSettingsOpenCount += 1;
+    return true;
+  }
+
+  @override
+  Future<DeviceLocationSnapshot> resolveCurrentPosition() async {
+    resolvePositionCount += 1;
+    return DeviceLocationSnapshot(
+      permissionState: permissionSnapshot.permissionState,
+      errorMessage: permissionSnapshot.message,
+    );
+  }
+}
+
+class _FakeAppRuntimeInfoService extends AppRuntimeInfoService {
+  static const AppRuntimeInfo _info = AppRuntimeInfo(
+    appName: '展览装修之家',
+    packageName: 'mobile',
+    version: '1.2.3',
+    buildNumber: '45',
+    environmentLabel: 'SSH隧道',
+    entryModeLabel: 'ssh_tunnel',
+    apiBaseSummary: '127.0.0.1:8080/api/app',
+    debugModeLabel: 'debug',
+  );
+
+  int loadCount = 0;
+
+  @override
+  Future<AppRuntimeInfo> load() async {
+    loadCount += 1;
+    return _info;
+  }
+}
+
+class _FakeLocalCacheCleanupService extends LocalCacheCleanupService {
+  static const LocalCacheCleanupResult _result = LocalCacheCleanupResult(
+    imageCacheCleared: true,
+    deletedTemporaryFiles: 2,
+    failedTemporaryFiles: 0,
+  );
+
+  int clearCount = 0;
+
+  @override
+  Future<LocalCacheCleanupResult> clearSafeLocalCache() async {
+    clearCount += 1;
+    return _result;
+  }
 }
 
 class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
@@ -688,6 +781,8 @@ void main() {
     );
     ProfileOrganizationCreditScoringConsumerLayer.reset();
     ProfileMembershipConsumerLayer.reset();
+    AppRuntimeInfoService.install(_FakeAppRuntimeInfoService());
+    LocalCacheCleanupService.install(_FakeLocalCacheCleanupService());
   });
 
   tearDown(() {
@@ -697,6 +792,8 @@ void main() {
     ProfilePaymentBillingConsumerLayer.reset();
     ProfileOrganizationCreditScoringConsumerLayer.reset();
     ProfileMembershipConsumerLayer.reset();
+    AppRuntimeInfoService.reset();
+    LocalCacheCleanupService.reset();
   });
 
   Future<void> scrollTo(WidgetTester tester, Finder finder) async {
@@ -1231,11 +1328,260 @@ void main() {
       ),
     );
     await tester.pumpAndSettle();
+
+    expect(find.text('当前账号：138****5678'), findsOneWidget);
+
     await scrollTo(tester, find.text('账号与安全'));
 
     expect(find.text('切换账号'), findsOneWidget);
     expect(find.text('退出登录'), findsOneWidget);
     expect(find.text('登录入口'), findsNothing);
+  });
+
+  testWidgets('settings auth actions require confirmation before logout', (
+    WidgetTester tester,
+  ) async {
+    final authTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'POST /api/app/auth/logout': (AppApiRequest request) async =>
+                AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'ok': true,
+                    'traceId': 'logout-confirmation',
+                  },
+                ),
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        authConsumerLayer: AuthConsumerLayer(
+          client: AppApiClient(
+            config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+            transport: authTransport,
+          ),
+        ),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('切换账号'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, '退出并登录其他账号'), findsOneWidget);
+    expect(authTransport.requests, isEmpty);
+
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+
+    expect(authTransport.requests, isEmpty);
+
+    await tester.tap(find.text('退出登录'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, '退出登录'), findsOneWidget);
+    expect(authTransport.requests, isEmpty);
+
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+
+    expect(authTransport.requests, isEmpty);
+    expect(AppSessionStore.instance.hasAnySession, isTrue);
+  });
+
+  testWidgets('settings p1 certification identity opens status-only page', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          personalCertificationStatus: 'approved',
+          personalCertificationQualified: true,
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await scrollTo(tester, find.text('公司认证与我的身份'));
+    expect(find.text('企业已认证 · 我的认证已通过 · 已开通'), findsOneWidget);
+
+    await tester.tap(find.text('公司认证与我的身份'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前只展示状态，不在设置页展开认证办理'), findsOneWidget);
+    expect(find.text('企业认证'), findsOneWidget);
+    expect(find.text('已认证'), findsOneWidget);
+    expect(find.text('本轮边界'), findsOneWidget);
+    expect(find.textContaining('设置页不展开认证提交'), findsOneWidget);
+    expect(find.text('认证办理'), findsNothing);
+  });
+
+  testWidgets('settings p1 session page stays current-device only', (
+    WidgetTester tester,
+  ) async {
+    final profileIdentityTransport = FakeAppApiTransport(handlers: const {});
+    final sessionStore = AppSessionStore();
+    sessionStore.establishSession(
+      accessToken: 'profile-test-access-token',
+      refreshToken: 'profile-test-refresh-token',
+      expiresInSeconds: 7200,
+      deviceId: 'profile-test-device',
+      localLoginSource: AppSessionLoginSource.passwordLogin,
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        profileIdentityTransport: profileIdentityTransport,
+        sessionStore: sessionStore,
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await scrollTo(tester, find.text('会话与设备'));
+    expect(find.text('账号密码登录 · 当前设备已建立'), findsOneWidget);
+
+    await tester.tap(find.text('会话与设备'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前仅展示本机登录状态'), findsOneWidget);
+    expect(find.text('profile-test-device'), findsNothing);
+    expect(find.text('profil…vice'), findsOneWidget);
+    expect(find.text('登录凭证'), findsOneWidget);
+    expect(find.text('续期状态'), findsOneWidget);
+    await scrollTo(tester, find.text('其他设备'));
+    expect(find.text('其他设备'), findsOneWidget);
+    expect(find.text('暂不展示。'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '撤销此设备'), findsNothing);
+    expect(profileIdentityTransport.requests, isEmpty);
+  });
+
+  testWidgets('settings p1 cache cleanup requires confirmation', (
+    WidgetTester tester,
+  ) async {
+    final cleanupService = _FakeLocalCacheCleanupService();
+    LocalCacheCleanupService.install(cleanupService);
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await scrollTo(tester, find.text('清理缓存'));
+    await tester.tap(find.text('清理缓存'));
+    await tester.pumpAndSettle();
+
+    expect(find.widgetWithText(FilledButton, '确认清理'), findsOneWidget);
+    expect(cleanupService.clearCount, 0);
+
+    await tester.tap(find.widgetWithText(TextButton, '取消'));
+    await tester.pumpAndSettle();
+    expect(cleanupService.clearCount, 0);
+
+    await tester.tap(find.text('清理缓存'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '确认清理'));
+    await tester.pumpAndSettle();
+
+    expect(cleanupService.clearCount, 1);
+    expect(find.textContaining('已清理图片缓存和 2 个临时预览文件'), findsOneWidget);
+    expect(AppSessionStore.instance.hasAnySession, isTrue);
+  });
+
+  testWidgets('settings p1 version page shows runtime info', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await scrollTo(tester, find.text('当前版本'));
+    expect(find.text('1.2.3+45 · SSH隧道'), findsOneWidget);
+
+    await tester.tap(find.text('当前版本'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('查看当前应用版本与运行入口'), findsOneWidget);
+    expect(find.text('版本号'), findsOneWidget);
+    expect(find.text('1.2.3'), findsOneWidget);
+    expect(find.text('构建号'), findsOneWidget);
+    expect(find.text('45'), findsOneWidget);
+    await scrollTo(tester, find.text('API 入口'));
+    expect(find.text('API 入口'), findsOneWidget);
+    expect(find.text('127.0.0.1:8080/api/app'), findsOneWidget);
+  });
+
+  testWidgets('settings page shows logged out state from local session', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        establishSession: false,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前账号：未登录'), findsOneWidget);
+    expect(find.text('当前账号：138****5678'), findsNothing);
+    expect(find.text('登录入口'), findsOneWidget);
+    expect(find.text('退出登录'), findsNothing);
   });
 
   testWidgets('switch account logs out and routes to login page', (
@@ -1279,6 +1625,8 @@ void main() {
 
     await tester.tap(find.text('切换账号'));
     await tester.pumpAndSettle();
+    await tester.tap(find.text('退出并登录其他账号'));
+    await tester.pumpAndSettle();
 
     expect(
       authTransport.requests
@@ -1288,6 +1636,178 @@ void main() {
     );
     expect(AppSessionStore.instance.hasAnySession, isFalse);
     expect(find.widgetWithText(FilledButton, '发送验证码'), findsOneWidget);
+  });
+
+  testWidgets('logout treats unauthorized as local logout completion', (
+    WidgetTester tester,
+  ) async {
+    final authTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'POST /api/app/auth/logout': (AppApiRequest request) async =>
+                AppApiResponse(
+                  statusCode: 401,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'message': '当前登录态不可用，请重新登录或刷新后再试。',
+                    'code': 'AUTH_SESSION_INVALID',
+                  },
+                ),
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        authConsumerLayer: AuthConsumerLayer(
+          client: AppApiClient(
+            config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+            transport: authTransport,
+          ),
+        ),
+        initialRoute: ProfileRoutes.settings,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('退出登录'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '退出登录'));
+    await tester.pumpAndSettle();
+
+    expect(
+      authTransport.requests
+          .map((AppApiRequest request) => request.canonicalPath)
+          .toList(),
+      const <String>[AuthCanonicalPaths.logout],
+    );
+    expect(AppSessionStore.instance.hasAnySession, isFalse);
+    expect(find.text('当前账号：138****5678'), findsNothing);
+  });
+
+  testWidgets('settings page opens privacy permissions and legal documents', (
+    WidgetTester tester,
+  ) async {
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        deviceLocationService: _ProfileSettingsDeviceLocationService(),
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前保持受控开放'), findsNothing);
+    await scrollTo(tester, find.text('隐私与权限说明'));
+    await tester.tap(find.text('隐私与权限说明'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('隐私与权限说明'), findsWidgets);
+    expect(find.text('用户协议'), findsOneWidget);
+    expect(find.text('隐私政策'), findsOneWidget);
+    expect(find.text('当前权限范围'), findsOneWidget);
+    expect(find.textContaining('不表示已接入完整推送链路'), findsOneWidget);
+
+    await tester.tap(find.widgetWithText(ListTile, '用户协议'));
+    await tester.pumpAndSettle();
+    expect(find.text('展览装修之家用户协议'), findsOneWidget);
+  });
+
+  testWidgets(
+    'settings page reads location status without requesting position',
+    (WidgetTester tester) async {
+      final locationService = _ProfileSettingsDeviceLocationService(
+        permissionSnapshot: const DeviceLocationPermissionSnapshot(
+          permissionState: DeviceLocationPermissionState.denied,
+          serviceEnabled: true,
+          message: '定位权限未授予。',
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(handlers: const {}),
+          initialRoute: ProfileRoutes.settings,
+          deviceLocationService: locationService,
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-1',
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('定位权限'));
+      expect(find.text('定位权限未授予。'), findsOneWidget);
+      expect(locationService.permissionReadCount, 1);
+      expect(locationService.resolvePositionCount, 0);
+
+      await tester.tap(find.text('定位权限'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('刷新状态'));
+      await tester.pumpAndSettle();
+
+      expect(locationService.permissionReadCount, 2);
+      expect(locationService.resolvePositionCount, 0);
+    },
+  );
+
+  testWidgets('settings page opens app and location system settings only', (
+    WidgetTester tester,
+  ) async {
+    final locationService = _ProfileSettingsDeviceLocationService();
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(handlers: const {}),
+        initialRoute: ProfileRoutes.settings,
+        deviceLocationService: locationService,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-1',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await scrollTo(tester, find.text('系统通知'));
+    await tester.tap(find.text('系统通知'));
+    await tester.pumpAndSettle();
+    expect(locationService.appSettingsOpenCount, 1);
+    expect(locationService.resolvePositionCount, 0);
+
+    await scrollTo(tester, find.text('定位权限'));
+    await tester.tap(find.text('定位权限'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('打开系统定位设置'));
+    await tester.pumpAndSettle();
+
+    expect(locationService.locationSettingsOpenCount, 1);
+    expect(locationService.resolvePositionCount, 0);
   });
 
   testWidgets('personal page shows switch account and logout after login', (
@@ -4418,31 +4938,81 @@ void main() {
     },
   );
 
+  testWidgets('session center stays local-only and hides device management', (
+    WidgetTester tester,
+  ) async {
+    final profileIdentityTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/profile/security/devices':
+                (AppApiRequest request) async {
+                  fail('session center must not load device list in P1 mode');
+                },
+            'POST /api/app/profile/security/devices/device-2/revoke':
+                (AppApiRequest request) async {
+                  fail('session center must not revoke devices in P1 mode');
+                },
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildProfileApp(
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/profile/index': (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _profilePayload(
+                      organizationId: 'org-sec',
+                      certificationStatus: 'approved',
+                      membershipStatus: 'active',
+                    ),
+                  );
+                },
+              },
+        ),
+        initialRoute: '/profile/session',
+        profileIdentityTransport: profileIdentityTransport,
+        shellContext: AppShellContextData(
+          userId: '13812345678',
+          organizationId: 'org-sec',
+          certificationStatus: 'approved',
+          membershipStatus: 'active',
+          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('会话与设备'), findsWidgets);
+    expect(find.text('当前仅展示本机登录状态，其他设备管理暂不开放。'), findsOneWidget);
+    expect(find.text('本机信息'), findsOneWidget);
+    expect(find.text('登录凭证'), findsOneWidget);
+    expect(find.text('续期状态'), findsOneWidget);
+    expect(find.text('当前 iPhone'), findsNothing);
+    expect(find.text('备用 Android'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '撤销此设备'), findsNothing);
+    expect(profileIdentityTransport.requests, isEmpty);
+  });
+
   testWidgets(
-    'session center consumes devices list and reloads truth after revoke success',
+    'session center does not surface revoke failure path in p1 mode',
     (WidgetTester tester) async {
-      final devices = <Map<String, Object?>>[
-        <String, Object?>{
-          'deviceId': 'device-1',
-          'deviceName': '当前 iPhone',
-          'osType': 'iOS',
-          'appVersion': '1.0.0',
-          'currentDevice': true,
-          'trustStatus': 'trusted',
-          'lastSeenAt': '2026-04-05 10:00',
-          'revokedAt': null,
-        },
-        <String, Object?>{
-          'deviceId': 'device-2',
-          'deviceName': '备用 Android',
-          'osType': 'Android',
-          'appVersion': '1.0.1',
-          'currentDevice': false,
-          'trustStatus': 'trusted',
-          'lastSeenAt': '2026-04-05 09:40',
-          'revokedAt': null,
-        },
-      ];
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/security/devices':
+                  (AppApiRequest request) async {
+                    fail('session center must not load device list in P1 mode');
+                  },
+              'POST /api/app/profile/security/devices/device-3/revoke':
+                  (AppApiRequest request) async {
+                    fail('session center must not revoke devices in P1 mode');
+                  },
+            },
+      );
 
       await tester.pumpWidget(
         _buildProfileApp(
@@ -4466,38 +5036,7 @@ void main() {
                 },
           ),
           initialRoute: '/profile/session',
-          profileIdentityTransport: FakeAppApiTransport(
-            handlers:
-                <
-                  String,
-                  Future<AppApiResponse> Function(AppApiRequest request)
-                >{
-                  'GET /api/app/profile/security/devices':
-                      (AppApiRequest request) async {
-                        return AppApiResponse(
-                          statusCode: 200,
-                          uri: request.uri,
-                          body: <String, Object?>{'items': devices},
-                        );
-                      },
-                  'POST /api/app/profile/security/devices/device-2/revoke':
-                      (AppApiRequest request) async {
-                        devices[1] = <String, Object?>{
-                          ...devices[1],
-                          'trustStatus': 'revoked',
-                          'revokedAt': '2026-04-05 10:30',
-                        };
-                        return AppApiResponse(
-                          statusCode: 200,
-                          uri: request.uri,
-                          body: const <String, Object?>{
-                            'ok': true,
-                            'traceId': 'device-revoke-1',
-                          },
-                        );
-                      },
-                },
-          ),
+          profileIdentityTransport: profileIdentityTransport,
           shellContext: AppShellContextData(
             userId: '13812345678',
             organizationId: 'org-sec',
@@ -4513,105 +5052,14 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('会话与设备'), findsWidgets);
-      expect(find.textContaining('设备列表当前待开放'), findsNothing);
-      expect(find.text('当前 iPhone'), findsOneWidget);
-      expect(find.text('备用 Android'), findsOneWidget);
-      expect(find.text('当前设备正在使用中，不能在当前会话内撤销。'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '撤销此设备'), findsOneWidget);
-
-      await scrollTo(tester, find.widgetWithText(FilledButton, '撤销此设备'));
-      await tester.tap(find.widgetWithText(FilledButton, '撤销此设备'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('设备状态已刷新'), findsOneWidget);
-      expect(find.textContaining('traceId device-revoke-1'), findsOneWidget);
-      expect(find.text('撤销时间'), findsOneWidget);
-      expect(find.text('2026-04-05 10:30'), findsOneWidget);
-      expect(find.text('该设备已撤销，当前只展示最新状态。'), findsOneWidget);
+      expect(find.text('设备撤销当前未完成'), findsNothing);
+      expect(find.text('当前设备撤销目标不一致，请刷新后再试。'), findsNothing);
       expect(find.widgetWithText(FilledButton, '撤销此设备'), findsNothing);
+      await scrollTo(tester, find.text('安全操作'));
+      expect(find.text('其他设备暂不展示；退出登录请回到设置页完成二次确认。'), findsOneWidget);
+      expect(profileIdentityTransport.requests, isEmpty);
     },
   );
-
-  testWidgets('session center keeps controlled failure when revoke fails', (
-    WidgetTester tester,
-  ) async {
-    await tester.pumpWidget(
-      _buildProfileApp(
-        transport: FakeAppApiTransport(
-          handlers:
-              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/profile/index': (AppApiRequest request) async {
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: _profilePayload(
-                      organizationId: 'org-sec',
-                      certificationStatus: 'approved',
-                      membershipStatus: 'active',
-                    ),
-                  );
-                },
-              },
-        ),
-        initialRoute: '/profile/session',
-        profileIdentityTransport: FakeAppApiTransport(
-          handlers:
-              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'GET /api/app/profile/security/devices':
-                    (AppApiRequest request) async {
-                      return AppApiResponse(
-                        statusCode: 200,
-                        uri: request.uri,
-                        body: const <String, Object?>{
-                          'items': <Object?>[
-                            <String, Object?>{
-                              'deviceId': 'device-3',
-                              'deviceName': '出差平板',
-                              'osType': 'Android',
-                              'appVersion': '1.0.2',
-                              'currentDevice': false,
-                              'trustStatus': 'untrusted',
-                              'lastSeenAt': '2026-04-05 08:00',
-                              'revokedAt': null,
-                            },
-                          ],
-                        },
-                      );
-                    },
-                'POST /api/app/profile/security/devices/device-3/revoke':
-                    (AppApiRequest request) async {
-                      return AppApiResponse(
-                        statusCode: 400,
-                        uri: request.uri,
-                        body: const <String, Object?>{
-                          'code': 'SECURITY_DEVICE_REVOKE_INVALID',
-                          'message': '当前设备撤销目标不一致，请刷新后再试。',
-                        },
-                      );
-                    },
-              },
-        ),
-        shellContext: AppShellContextData(
-          userId: '13812345678',
-          organizationId: 'org-sec',
-          certificationStatus: 'approved',
-          membershipStatus: 'active',
-          visibleBuildings: const <String>['exhibition', 'messages', 'profile'],
-        ),
-      ),
-    );
-    await tester.pumpAndSettle();
-
-    await scrollTo(tester, find.widgetWithText(FilledButton, '撤销此设备'));
-    await tester.tap(find.widgetWithText(FilledButton, '撤销此设备'));
-    await tester.pumpAndSettle();
-
-    expect(find.text('设备撤销当前未完成'), findsOneWidget);
-    expect(find.text('当前设备撤销目标不一致，请刷新后再试。'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '撤销此设备'), findsOneWidget);
-    expect(find.text('该设备已撤销，当前只展示最新状态。'), findsNothing);
-  });
 
   testWidgets(
     'organization members sheet consumes list and reloads truth after role change and disable success',

@@ -1,9 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/auth_action_result_presenter.dart';
 import 'package:mobile/core/auth/auth_consumer_layer.dart';
+import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
+import 'package:mobile/core/local_cache/local_cache_cleanup_service.dart';
+import 'package:mobile/core/location/device_location_service.dart';
+import 'package:mobile/core/runtime_info/app_runtime_info_service.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_organization_credit_scoring_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_governance_appeal_consumer_layer.dart';
@@ -38,4 +44,7 @@ part 'profile_personal_safety_status_card.dart';
 part 'profile_personal_page.dart';
 part 'profile_company_page.dart';
 part 'profile_settings_page.dart';
+part 'profile_settings_support.dart';
+part 'profile_settings_p1_pages.dart';
+part 'profile_privacy_permission_info_page.dart';
 part 'profile_auth_entry_rows.dart';

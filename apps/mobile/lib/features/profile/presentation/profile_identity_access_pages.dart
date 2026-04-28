@@ -385,71 +385,8 @@ class SessionCenterPage extends StatefulWidget {
 }
 
 class _SessionCenterPageState extends State<SessionCenterPage> {
-  bool _loading = true;
-  String? _revokingDeviceId;
-  String? _lastHandledDeviceId;
-  String? _lastHandledDeviceLabel;
-  ProfileIdentityResult<SecurityDevicesView>? _devicesResult;
-  ProfileIdentityResult<ProfileActionAckView>? _revokeResult;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    setState(() {
-      _loading = true;
-    });
-
-    final result = await ProfileIdentityConsumerLayer.instance
-        .loadSecurityDevices();
-    if (!mounted) {
-      return;
-    }
-
-    setState(() {
-      _devicesResult = result;
-      _loading = false;
-    });
-  }
-
-  Future<void> _revokeDevice(SecurityDeviceItemView device) async {
-    setState(() {
-      _revokingDeviceId = device.deviceId;
-      _lastHandledDeviceId = device.deviceId;
-      _revokeResult = null;
-      _lastHandledDeviceLabel = _deviceLabel(device);
-    });
-
-    final result = await ProfileIdentityConsumerLayer.instance
-        .revokeSecurityDevice(deviceId: device.deviceId);
-    if (!mounted) {
-      return;
-    }
-
-    if (result.state == AppPageState.content) {
-      setState(() {
-        _revokingDeviceId = null;
-        _revokeResult = result;
-      });
-      await _load();
-      return;
-    }
-
-    setState(() {
-      _revokingDeviceId = null;
-      _revokeResult = result;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    final devicesResult = _devicesResult;
-    final devices =
-        devicesResult?.data?.items ?? const <SecurityDeviceItemView>[];
-
     return AnimatedBuilder(
       animation: AppSessionStore.instance,
       builder: (BuildContext context, Widget? child) {
@@ -458,26 +395,54 @@ class _SessionCenterPageState extends State<SessionCenterPage> {
         final showSetPasswordEntry = AppSessionStore.instance.isOtpLoginSession;
 
         return ListView(
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
           children: <Widget>[
             const _IdentityHeroCard(
               title: '会话与设备',
-              summary: '查看当前登录设备，并撤销不再使用的设备会话。',
+              summary: '当前仅展示本机登录状态，其他设备管理暂不开放。',
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             _IdentityStateCard(
-              title: hasSession ? '当前存在本地会话' : '当前没有可验证会话',
+              title: hasSession ? '本机存在登录态' : '当前没有本地会话',
               message:
-                  'accessToken：${snapshot.hasAccessToken ? '已存在' : '缺失'}；refreshToken：${snapshot.hasRefreshToken ? '已存在' : '缺失'}；设备标识：${snapshot.deviceId ?? '未生成'}',
+                  '${_sessionLoginSourceLabel(snapshot.localLoginSource)} · ${hasSession ? '登录状态可用于当前设备' : '请先恢复登录'}',
+            ),
+            const SizedBox(height: 12),
+            _IdentityFormCard(
+              title: '本机信息',
+              child: _IdentitySummaryList(
+                items: <_IdentitySummaryItem>[
+                  _IdentitySummaryItem(
+                    label: '设备标识',
+                    value: _sessionMaskedDeviceId(snapshot.deviceId),
+                  ),
+                  _IdentitySummaryItem(
+                    label: '登录来源',
+                    value: _sessionLoginSourceLabel(snapshot.localLoginSource),
+                  ),
+                  _IdentitySummaryItem(
+                    label: '登录凭证',
+                    value: snapshot.hasAccessToken ? '已建立' : '未建立',
+                  ),
+                  _IdentitySummaryItem(
+                    label: '续期状态',
+                    value: snapshot.hasRefreshToken ? '可续期' : '不可续期',
+                  ),
+                  _IdentitySummaryItem(
+                    label: '有效期',
+                    value: _sessionExpiryLabel(snapshot.expiresAt),
+                  ),
+                ],
+              ),
             ),
             if (showSetPasswordEntry) ...<Widget>[
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _IdentityFormCard(
-                title: '密码入口',
+                title: '登录密码',
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    const Text('当前入口只服务已登录账号补齐账号密码登录能力，不作为注册入口。'),
+                    const Text('当前已通过验证码登录，可为这个账号补齐密码登录能力。'),
                     const SizedBox(height: 14),
                     FilledButton.tonal(
                       onPressed: () => Navigator.of(
@@ -490,7 +455,7 @@ class _SessionCenterPageState extends State<SessionCenterPage> {
               ),
             ],
             if (!hasSession) ...<Widget>[
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
               _IdentityFormCard(
                 title: '返回路径',
                 child: FilledButton.tonal(
@@ -500,198 +465,55 @@ class _SessionCenterPageState extends State<SessionCenterPage> {
                   child: const Text('进入登录入口'),
                 ),
               ),
-            ] else if (_loading) ...<Widget>[
-              const SizedBox(height: 16),
-              const _IdentityStateCard(
-                title: '正在同步设备列表',
-                message: '正在读取当前设备与撤销状态。',
-              ),
-            ] else if (devicesResult == null ||
-                devicesResult.state != AppPageState.content) ...<Widget>[
-              const SizedBox(height: 16),
-              _IdentityFormCard(
-                title: '设备列表暂不可用',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Text(
-                      _identityResultMessage(
-                        devicesResult?.state,
-                        devicesResult?.message,
-                      ),
-                    ),
-                    const SizedBox(height: 14),
-                    FilledButton.tonal(
-                      onPressed: _load,
-                      child: const Text('重试'),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...<Widget>[
-              const SizedBox(height: 16),
-              _IdentityStateCard(
-                title: '设备摘要',
-                message:
-                    '当前共 ${devices.length} 台设备；当前设备 ${devices.where((SecurityDeviceItemView item) => item.currentDevice).length} 台；已撤销 ${devices.where(_isRevoked).length} 台。',
-              ),
-              const SizedBox(height: 16),
-              _IdentityFormCard(
-                title: devices.isEmpty ? '当前没有可见设备' : '当前设备列表',
-                child: devices.isEmpty
-                    ? const Text('当前没有返回可展示的设备列表。')
-                    : Column(
-                        children: devices
-                            .map(
-                              (SecurityDeviceItemView item) =>
-                                  _buildDeviceTile(item),
-                            )
-                            .toList(growable: false),
-                      ),
-              ),
-              if (_revokeResult != null) ...<Widget>[
-                const SizedBox(height: 16),
-                _IdentityStateCard(
-                  title: _revokeResult!.state == AppPageState.content
-                      ? '设备状态已刷新'
-                      : '设备撤销当前未完成',
-                  message: _revokeResultMessage(_revokeResult!),
-                ),
-              ],
             ],
+            const SizedBox(height: 12),
+            const _IdentityStateCard(
+              title: '安全操作',
+              message: '其他设备暂不展示；退出登录请回到设置页完成二次确认。',
+            ),
           ],
         );
       },
     );
   }
+}
 
-  Widget _buildDeviceTile(SecurityDeviceItemView item) {
-    final theme = Theme.of(context);
-    final revoked = _isRevoked(item);
-    final revoking = _revokingDeviceId == item.deviceId;
-    final labels = <String>{
-      if (item.currentDevice) '当前设备',
-      if (!item.currentDevice)
-        profileDisplaySecurityTrustStatus(item.trustStatus),
-      if (revoked) '已撤销',
-    }.toList(growable: false);
+String _sessionLoginSourceLabel(String? source) {
+  return switch (source?.trim()) {
+    AppSessionLoginSource.otpLogin => '验证码登录',
+    AppSessionLoginSource.passwordLogin => '账号密码登录',
+    null || '' => '登录来源待确认',
+    _ => '登录来源待确认',
+  };
+}
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: theme.colorScheme.surfaceContainerLowest,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: theme.colorScheme.outlineVariant),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                _deviceLabel(item),
-                style: theme.textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              if (labels.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 10),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: labels
-                      .map(
-                        (String label) => Chip(
-                          label: Text(label),
-                          visualDensity: VisualDensity.compact,
-                        ),
-                      )
-                      .toList(growable: false),
-                ),
-              ],
-              const SizedBox(height: 12),
-              _IdentityInlineCard(
-                title: '操作系统',
-                body: profileValueOrFallback(item.osType, '暂未提供'),
-              ),
-              _IdentityInlineCard(
-                title: '应用版本',
-                body: profileValueOrFallback(item.appVersion, '暂未提供'),
-              ),
-              _IdentityInlineCard(
-                title: '最近活跃',
-                body: profileValueOrFallback(item.lastSeenAt, '暂未提供'),
-              ),
-              _IdentityInlineCard(
-                title: '当前状态',
-                body: revoked
-                    ? '已撤销'
-                    : item.currentDevice
-                    ? '当前设备'
-                    : profileDisplaySecurityTrustStatus(item.trustStatus),
-              ),
-              if (item.revokedAt != null)
-                _IdentityInlineCard(title: '撤销时间', body: item.revokedAt!),
-              const SizedBox(height: 4),
-              if (item.currentDevice)
-                Text(
-                  '当前设备正在使用中，不能在当前会话内撤销。',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                )
-              else if (revoked)
-                Text(
-                  '该设备已撤销，当前只展示最新状态。',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                )
-              else
-                FilledButton.tonal(
-                  onPressed: revoking ? null : () => _revokeDevice(item),
-                  child: Text(revoking ? '撤销中' : '撤销此设备'),
-                ),
-              if (_revokeResult != null &&
-                  _lastHandledDeviceId == item.deviceId)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: _IdentityInlineCard(
-                    title: _revokeResult!.state == AppPageState.content
-                        ? '设备状态已刷新'
-                        : '设备撤销当前未完成',
-                    body: _revokeResultMessage(_revokeResult!),
-                  ),
-                ),
-            ],
-          ),
-        ),
-      ),
-    );
+String _sessionMaskedDeviceId(String? deviceId) {
+  final value = deviceId?.trim();
+  if (value == null || value.isEmpty) {
+    return '未生成';
   }
-
-  String _revokeResultMessage(
-    ProfileIdentityResult<ProfileActionAckView> result,
-  ) {
-    if (result.state == AppPageState.content) {
-      return '${_lastHandledDeviceLabel ?? '所选设备'}已撤销，当前列表已按最新状态刷新。traceId ${result.data!.traceId}。';
-    }
-    return _identityResultMessage(result.state, result.message);
+  if (value.length <= 10) {
+    return value;
   }
+  return '${value.substring(0, 6)}…${value.substring(value.length - 4)}';
+}
 
-  static bool _isRevoked(SecurityDeviceItemView item) {
-    return item.trustStatus == 'revoked' ||
-        (item.revokedAt?.trim().isNotEmpty ?? false);
+String _sessionExpiryLabel(DateTime? expiresAt) {
+  if (expiresAt == null) {
+    return '待确认';
   }
-
-  static String _deviceLabel(SecurityDeviceItemView item) {
-    final deviceName = item.deviceName?.trim();
-    if (deviceName != null && deviceName.isNotEmpty) {
-      return deviceName;
-    }
-    return item.currentDevice ? '当前设备' : '未命名设备';
+  final now = DateTime.now();
+  if (!expiresAt.isAfter(now)) {
+    return '已过期';
   }
+  final minutes = expiresAt.difference(now).inMinutes;
+  if (minutes <= 1) {
+    return '1 分钟内到期';
+  }
+  if (minutes < 60) {
+    return '约 $minutes 分钟后到期';
+  }
+  return '约 ${minutes ~/ 60} 小时后到期';
 }
 
 class CertificationStatusPage extends StatefulWidget {

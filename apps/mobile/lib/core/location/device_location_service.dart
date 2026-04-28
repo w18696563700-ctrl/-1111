@@ -47,6 +47,18 @@ class DeviceLocationSnapshot {
   }
 }
 
+class DeviceLocationPermissionSnapshot {
+  const DeviceLocationPermissionSnapshot({
+    required this.permissionState,
+    required this.serviceEnabled,
+    this.message,
+  });
+
+  final DeviceLocationPermissionState permissionState;
+  final bool? serviceEnabled;
+  final String? message;
+}
+
 abstract class DeviceLocationService {
   static DeviceLocationService _instance = GeolocatorDeviceLocationService();
 
@@ -64,6 +76,18 @@ abstract class DeviceLocationService {
 
   bool get supportsReverseGeocoding => false;
 
+  Future<DeviceLocationPermissionSnapshot> readPermissionStatus() async {
+    return const DeviceLocationPermissionSnapshot(
+      permissionState: DeviceLocationPermissionState.unavailable,
+      serviceEnabled: null,
+      message: '当前环境未接入定位权限状态读取。',
+    );
+  }
+
+  Future<bool> openAppPermissionSettings() async => false;
+
+  Future<bool> openSystemLocationSettings() async => false;
+
   Future<DeviceLocationSnapshot> resolveCurrentPosition();
 }
 
@@ -73,6 +97,66 @@ class GeolocatorDeviceLocationService implements DeviceLocationService {
 
   @override
   bool get supportsReverseGeocoding => _supportsReverseGeocoding();
+
+  @override
+  Future<DeviceLocationPermissionSnapshot> readPermissionStatus() async {
+    if (!supportsDeviceLocation) {
+      return const DeviceLocationPermissionSnapshot(
+        permissionState: DeviceLocationPermissionState.unavailable,
+        serviceEnabled: null,
+        message: '当前平台暂不支持设备定位。',
+      );
+    }
+
+    try {
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      final permission = await Geolocator.checkPermission();
+      return DeviceLocationPermissionSnapshot(
+        permissionState: _mapPermissionStateForStatus(permission),
+        serviceEnabled: serviceEnabled,
+        message: _permissionStatusMessage(
+          permission: permission,
+          serviceEnabled: serviceEnabled,
+        ),
+      );
+    } on MissingPluginException {
+      return const DeviceLocationPermissionSnapshot(
+        permissionState: DeviceLocationPermissionState.unavailable,
+        serviceEnabled: null,
+        message: '当前环境未注册设备定位能力。',
+      );
+    } on PlatformException catch (error) {
+      return DeviceLocationPermissionSnapshot(
+        permissionState: DeviceLocationPermissionState.unavailable,
+        serviceEnabled: null,
+        message: error.message ?? '设备定位权限状态当前不可用。',
+      );
+    } on Exception {
+      return const DeviceLocationPermissionSnapshot(
+        permissionState: DeviceLocationPermissionState.unavailable,
+        serviceEnabled: null,
+        message: '设备定位权限状态当前不可用。',
+      );
+    }
+  }
+
+  @override
+  Future<bool> openAppPermissionSettings() async {
+    try {
+      return Geolocator.openAppSettings();
+    } on Object {
+      return false;
+    }
+  }
+
+  @override
+  Future<bool> openSystemLocationSettings() async {
+    try {
+      return Geolocator.openLocationSettings();
+    } on Object {
+      return false;
+    }
+  }
 
   @override
   Future<DeviceLocationSnapshot> resolveCurrentPosition() async {
@@ -161,6 +245,34 @@ class GeolocatorDeviceLocationService implements DeviceLocationService {
         DeviceLocationPermissionState.unavailable,
       LocationPermission.unableToDetermine =>
         DeviceLocationPermissionState.unknown,
+    };
+  }
+
+  DeviceLocationPermissionState _mapPermissionStateForStatus(
+    LocationPermission permission,
+  ) {
+    return switch (permission) {
+      LocationPermission.always ||
+      LocationPermission.whileInUse => DeviceLocationPermissionState.granted,
+      LocationPermission.denied ||
+      LocationPermission.deniedForever => DeviceLocationPermissionState.denied,
+      LocationPermission.unableToDetermine =>
+        DeviceLocationPermissionState.unknown,
+    };
+  }
+
+  String _permissionStatusMessage({
+    required LocationPermission permission,
+    required bool serviceEnabled,
+  }) {
+    if (!serviceEnabled) {
+      return '设备定位服务未开启。';
+    }
+    return switch (permission) {
+      LocationPermission.always || LocationPermission.whileInUse => '定位权限已开启。',
+      LocationPermission.denied => '定位权限未授予。',
+      LocationPermission.deniedForever => '定位权限已被系统拒绝，请到应用权限设置中开启。',
+      LocationPermission.unableToDetermine => '定位权限状态暂未确定。',
     };
   }
 

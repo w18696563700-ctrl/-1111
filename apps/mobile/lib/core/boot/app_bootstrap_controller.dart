@@ -158,6 +158,7 @@ class AppBootstrapController extends ChangeNotifier {
 
   void handleLoggedOut() {
     AppSessionStore.instance.clearSession();
+    _shellContext = AppShellContextData.bootstrapDefaults(manifest: _manifest);
     _setBlockingState(GlobalShellState.unauthenticated);
     notifyListeners();
   }

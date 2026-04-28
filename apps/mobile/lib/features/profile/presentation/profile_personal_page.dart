@@ -177,10 +177,10 @@ class ProfilePersonalPage extends StatelessWidget {
                 ),
                 _ProfileActionRow(
                   title: '会话与设备',
-                  subtitle: '管理当前登录设备与安全状态',
+                  subtitle: '查看本机登录状态',
                   onTap: () => Navigator.of(
                     context,
-                  ).pushNamed(ProfileIdentityRoutes.sessionCenter),
+                  ).pushNamed(ProfileRoutes.sessionDeviceStatus),
                 ),
                 ..._buildProfileAuthEntryRows(context),
               ],

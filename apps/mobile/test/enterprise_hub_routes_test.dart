@@ -5241,6 +5241,21 @@ class _EnterpriseWorkbenchTestLocationService implements DeviceLocationService {
   bool get supportsReverseGeocoding => reverseGeocodingSupported;
 
   @override
+  Future<DeviceLocationPermissionSnapshot> readPermissionStatus() async {
+    return DeviceLocationPermissionSnapshot(
+      permissionState: snapshot.permissionState,
+      serviceEnabled: true,
+      message: snapshot.errorMessage,
+    );
+  }
+
+  @override
+  Future<bool> openAppPermissionSettings() async => true;
+
+  @override
+  Future<bool> openSystemLocationSettings() async => true;
+
+  @override
   Future<DeviceLocationSnapshot> resolveCurrentPosition() async => snapshot;
 }
 
