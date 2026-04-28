@@ -33,17 +33,21 @@ class _HomeProjectModulePanel extends StatefulWidget {
 class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
   _HomeProjectFilter _selectedFilter = _HomeProjectFilter.comprehensive;
   ExhibitionLoadResult? _provinceResult;
+  String? _resolvedProvinceCode;
   String? _loadedProvinceCode;
   bool _provinceLoading = false;
+  bool _provinceCodeResolutionFailed = false;
 
   @override
   void didUpdateWidget(covariant _HomeProjectModulePanel oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.provinceCode != widget.provinceCode) {
+    if (oldWidget.provinceCode != widget.provinceCode ||
+        oldWidget.provinceName != widget.provinceName) {
       _provinceResult = null;
+      _resolvedProvinceCode = null;
       _loadedProvinceCode = null;
-      if (_selectedFilter == _HomeProjectFilter.province &&
-          widget.provinceCode != null) {
+      _provinceCodeResolutionFailed = false;
+      if (_selectedFilter == _HomeProjectFilter.province && _hasProvinceHint) {
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             _ensureProvinceLoaded(forceRefresh: false);
@@ -67,7 +71,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
 
   Future<void> _refreshActiveFilter() async {
     if (_selectedFilter == _HomeProjectFilter.province) {
-      if (widget.provinceCode == null || widget.provinceCode!.trim().isEmpty) {
+      if (!_hasProvinceHint || _provinceCodeResolutionFailed) {
         await widget.onRelocateHome();
         return;
       }
@@ -78,22 +82,36 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
   }
 
   Future<void> _ensureProvinceLoaded({required bool forceRefresh}) async {
-    final provinceCode = widget.provinceCode;
-    if (provinceCode == null || provinceCode.trim().isEmpty) {
+    if (!_hasProvinceHint) {
       return;
     }
     if (_provinceLoading) {
       return;
     }
-    if (!forceRefresh &&
-        _provinceResult != null &&
-        _loadedProvinceCode == provinceCode) {
-      return;
-    }
 
     setState(() {
       _provinceLoading = true;
+      _provinceCodeResolutionFailed = false;
     });
+    final provinceCode = await _resolveProvinceCode();
+    if (!mounted) {
+      return;
+    }
+    if (provinceCode == null) {
+      setState(() {
+        _provinceLoading = false;
+        _provinceCodeResolutionFailed = true;
+      });
+      return;
+    }
+    if (!forceRefresh &&
+        _provinceResult != null &&
+        _loadedProvinceCode == provinceCode) {
+      setState(() {
+        _provinceLoading = false;
+      });
+      return;
+    }
     final result = await ExhibitionConsumerLayer.instance.loadProjectList(
       forceRefresh: true,
       provinceCode: provinceCode,
@@ -105,7 +123,45 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
       _provinceLoading = false;
       _provinceResult = result;
       _loadedProvinceCode = provinceCode;
+      _provinceCodeResolutionFailed = false;
     });
+  }
+
+  bool get _hasProvinceHint =>
+      _homeTrimmedString(widget.provinceCode) != null ||
+      _homeTrimmedString(_resolvedProvinceCode) != null ||
+      _homeTrimmedString(widget.provinceName) != null;
+
+  Future<String?> _resolveProvinceCode() async {
+    final direct =
+        _homeTrimmedString(widget.provinceCode) ??
+        _homeTrimmedString(_resolvedProvinceCode);
+    if (direct != null) {
+      return direct;
+    }
+
+    final provinceName = _homeTrimmedString(widget.provinceName);
+    if (provinceName == null) {
+      return null;
+    }
+
+    try {
+      final catalog = await ChinaRegionCatalogLoader.load();
+      if (!mounted) {
+        return null;
+      }
+      final province = catalog.provinceByName(provinceName);
+      if (province == null) {
+        return null;
+      }
+      setState(() {
+        _resolvedProvinceCode = province.provinceCode;
+        _provinceCodeResolutionFailed = false;
+      });
+      return province.provinceCode;
+    } on Object {
+      return null;
+    }
   }
 
   @override
@@ -166,7 +222,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
     final activeState = activeResult?.state;
 
     if (_selectedFilter == _HomeProjectFilter.province &&
-        (widget.provinceCode == null || widget.provinceCode!.trim().isEmpty)) {
+        (!_hasProvinceHint || _provinceCodeResolutionFailed)) {
       return <Widget>[
         _HomeStateNotice(
           title: '当前还没拿到本省定位',
@@ -182,6 +238,19 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
             ),
           ],
         ),
+      ];
+    }
+
+    if (_selectedFilter == _HomeProjectFilter.province &&
+        _homeTrimmedString(widget.provinceCode) == null &&
+        _homeTrimmedString(_resolvedProvinceCode) == null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _ensureProvinceLoaded(forceRefresh: false);
+        }
+      });
+      return <Widget>[
+        _HomeLoadingNotice(message: '正在同步${widget.provinceName ?? '本省'}项目'),
       ];
     }
 
