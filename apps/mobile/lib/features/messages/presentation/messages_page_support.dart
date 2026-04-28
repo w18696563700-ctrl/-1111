@@ -6,7 +6,7 @@ class _MessagesInboxTabBar extends StatelessWidget {
     required this.onSelectTab,
   });
 
-  final _MessagesInteractionTab selectedTab;
+  final _MessagesInteractionTab? selectedTab;
   final ValueChanged<_MessagesInteractionTab> onSelectTab;
 
   @override
@@ -74,14 +74,10 @@ class _MessagesInboxTabBar extends StatelessWidget {
 class _MessagesInteractionCard extends StatelessWidget {
   const _MessagesInteractionCard({
     required this.item,
-    required this.sourceActionLabel,
-    required this.showQuickReply,
     required this.onOpenSource,
   });
 
   final ForumInteractionInboxItemView item;
-  final String sourceActionLabel;
-  final bool showQuickReply;
   final VoidCallback onOpenSource;
 
   @override
@@ -96,68 +92,67 @@ class _MessagesInteractionCard extends StatelessWidget {
     );
     final preview = forumDisplayInteractionPreview(item.preview);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: item.unread
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.32)
-            : theme.colorScheme.surface,
+    return Material(
+      color: item.unread
+          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.32)
+          : theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(18),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                _MessagesMetaPill(label: actorName),
-                _MessagesMetaPill(label: _targetTypeLabel(item.targetType)),
-                if (item.unread) const _MessagesMetaPill(label: '未读'),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(24),
+        onTap: onOpenSource,
+        child: Padding(
+          padding: const EdgeInsets.all(18),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  _MessagesMetaPill(label: actorName),
+                  _MessagesMetaPill(label: _targetTypeLabel(item.targetType)),
+                  if (item.unread) const _MessagesMetaPill(label: '未读'),
+                ],
               ),
-            ),
-            if (preview != null && preview.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 10),
+              const SizedBox(height: 12),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: 22,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ],
+              ),
+              if (preview != null && preview.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 10),
+                Text(
+                  preview,
+                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+                ),
+              ],
+              const SizedBox(height: 12),
               Text(
-                preview,
-                style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+                '发生时间：$createdAt',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
               ),
             ],
-            const SizedBox(height: 12),
-            Text(
-              '发生时间：$createdAt',
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: <Widget>[
-                FilledButton.tonalIcon(
-                  onPressed: onOpenSource,
-                  icon: const Icon(Icons.open_in_new_rounded),
-                  label: Text(sourceActionLabel),
-                ),
-                if (showQuickReply)
-                  OutlinedButton.icon(
-                    onPressed: onOpenSource,
-                    icon: const Icon(Icons.reply_rounded),
-                    label: const Text('继续回复'),
-                  ),
-              ],
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -176,7 +171,7 @@ class _MessagesForumInteractionSection extends StatelessWidget {
     this.message,
   });
 
-  final _MessagesInteractionTab selectedTab;
+  final _MessagesInteractionTab? selectedTab;
   final ValueChanged<_MessagesInteractionTab> onSelectTab;
   final bool loading;
   final AppPageState? state;
@@ -188,8 +183,10 @@ class _MessagesForumInteractionSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final selectedTab = this.selectedTab;
     final showState =
-        loading || (state != null && state != AppPageState.content);
+        selectedTab != null &&
+        (loading || (state != null && state != AppPageState.content));
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLow,
@@ -199,7 +196,7 @@ class _MessagesForumInteractionSection extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(14),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             Text(
               '论坛互动',
@@ -213,7 +210,12 @@ class _MessagesForumInteractionSection extends StatelessWidget {
               onSelectTab: onSelectTab,
             ),
             const SizedBox(height: 12),
-            if (showState)
+            if (selectedTab == null)
+              const _MessagesInlinePanel(
+                title: '选择一个分类查看',
+                body: '点击“回复我的”“收到的赞”或“新关注”后，再展开对应提醒列表。',
+              )
+            else if (showState)
               _MessagesInteractionStatePanel(
                 loading: loading,
                 state: state,
@@ -232,10 +234,6 @@ class _MessagesForumInteractionSection extends StatelessWidget {
                   padding: const EdgeInsets.only(bottom: 12),
                   child: _MessagesInteractionCard(
                     item: item,
-                    sourceActionLabel: _sourceActionLabel(item.targetType),
-                    showQuickReply:
-                        item.canQuickReply == true &&
-                        item.targetType != 'forum_comment',
                     onOpenSource: () => onOpenSource(item),
                   ),
                 ),
@@ -564,10 +562,6 @@ String _notFoundHint(_MessagesInteractionTab tab) {
     _MessagesInteractionTab.likes => '当前“收到的赞”入口暂不可用，请稍后再试。',
     _MessagesInteractionTab.follows => '当前“新关注”入口暂不可用，请稍后再试。',
   };
-}
-
-String _sourceActionLabel(String targetType) {
-  return targetType == 'forum_comment' ? '查看说明' : '回到源对象';
 }
 
 String _projectCommunicationOpenLabel(MessageInteractionItemView item) {

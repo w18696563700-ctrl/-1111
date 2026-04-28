@@ -149,7 +149,9 @@ String _forumEntrySummary({
   commentsResult,
   required ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>?
   bookmarksResult,
-  required ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>?
+  required ForumReadResult<
+    ForumPagedCollectionView<ForumFollowedAuthorItemView>
+  >?
   followsResult,
   required ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>?
   draftsResult,

@@ -26,8 +26,8 @@ class AppShellScaffold extends StatelessWidget {
   Widget build(BuildContext context) {
     final controller = AppShellScope.of(context);
     final shellContext = controller.snapshot.shellContext;
-    final canPop =
-        ModalRoute.of(context)?.canPop ?? Navigator.of(context).canPop();
+    final navigator = Navigator.of(context);
+    final canPop = navigator.canPop();
     final visibleBottomBuildings = bottomNavigationBuildings
         .where(controller.snapshot.isBuildingVisible)
         .toList();
@@ -69,11 +69,8 @@ class AppShellScaffold extends StatelessWidget {
               automaticallyImplyLeading: false,
               leading: canPop
                   ? IconButton(
-                      tooltip: MaterialLocalizations.of(
-                        context,
-                      ).backButtonTooltip,
                       icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      onPressed: () => Navigator.of(context).maybePop(),
+                      onPressed: navigator.pop,
                     )
                   : null,
               title: Text(titleOverride ?? currentBuilding.label),

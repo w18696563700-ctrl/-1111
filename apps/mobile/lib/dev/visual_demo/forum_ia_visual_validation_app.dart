@@ -78,9 +78,17 @@ class _ForumIaShellPageState extends State<_ForumIaShellPage> {
       _ForumIaBuilding.messages => const _InteractionCenterPage(),
       _ForumIaBuilding.profile => const _ForumAssetEntrancePage(),
     };
+    final navigator = Navigator.of(context);
 
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: navigator.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: navigator.pop,
+              )
+            : null,
         title: Text(switch (_building) {
           _ForumIaBuilding.exhibition => '展览楼 / 论坛容器',
           _ForumIaBuilding.messages => '消息楼 / 互动中心',

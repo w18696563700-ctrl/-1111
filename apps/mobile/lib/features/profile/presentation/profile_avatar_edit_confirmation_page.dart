@@ -64,12 +64,20 @@ class _ProfileAvatarEditConfirmationPageState
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final navigator = Navigator.of(context);
 
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
+        automaticallyImplyLeading: false,
         backgroundColor: Colors.black,
         foregroundColor: Colors.white,
+        leading: navigator.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: navigator.pop,
+              )
+            : null,
         title: Text(widget.title),
         actions: <Widget>[
           TextButton(
@@ -308,8 +316,12 @@ class _ProfileAvatarEditConfirmationPageState
     final extension = _mimeTypeFor(bytes) == 'image/jpeg' ? 'jpg' : 'png';
     final baseName = widget.file.fileName.trim();
     final dotIndex = baseName.lastIndexOf('.');
-    final stem = dotIndex > 0 ? baseName.substring(0, dotIndex) : widget.defaultStem;
-    final normalizedStem = stem.trim().isEmpty ? widget.defaultStem : stem.trim();
+    final stem = dotIndex > 0
+        ? baseName.substring(0, dotIndex)
+        : widget.defaultStem;
+    final normalizedStem = stem.trim().isEmpty
+        ? widget.defaultStem
+        : stem.trim();
     return '${normalizedStem}_edited.$extension';
   }
 

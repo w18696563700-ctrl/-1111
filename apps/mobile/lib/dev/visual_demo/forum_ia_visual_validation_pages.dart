@@ -7,8 +7,16 @@ class _ForumFeedPrototypePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final navigator = Navigator.of(context);
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: false,
+        leading: navigator.canPop()
+            ? IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded),
+                onPressed: navigator.pop,
+              )
+            : null,
         title: Text('论坛 / $scopeTitle'),
         actions: <Widget>[
           IconButton(
@@ -384,7 +392,17 @@ class _SceneBar extends StatelessWidget implements PreferredSizeWidget {
 
   @override
   Widget build(BuildContext context) {
-    return AppBar(title: Text(title));
+    final navigator = Navigator.of(context);
+    return AppBar(
+      automaticallyImplyLeading: false,
+      leading: navigator.canPop()
+          ? IconButton(
+              icon: const Icon(Icons.arrow_back_ios_new_rounded),
+              onPressed: navigator.pop,
+            )
+          : null,
+      title: Text(title),
+    );
   }
 
   @override

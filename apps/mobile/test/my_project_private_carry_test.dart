@@ -688,7 +688,9 @@ void main() {
     expect(find.text('预发布列表 · 1'), findsOneWidget);
     expect(find.text('竞标中 · 1'), findsOneWidget);
     expect(find.text('进行中 · 1'), findsOneWidget);
+    expect(find.textContaining('当前只显示所选阶段'), findsOneWidget);
     await _tapChoiceChipLabel(tester, '草稿 · 1');
+    expect(find.textContaining('当前只显示草稿阶段'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
 
     await _tapChoiceChipLabel(tester, '预发布列表 · 1');

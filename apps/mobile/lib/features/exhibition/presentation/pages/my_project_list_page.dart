@@ -129,7 +129,7 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
 
     return _ActionCard(
       title: '项目阶段',
-      summary: '先按阶段分栏，再查看当前项目最推荐的下一步。',
+      summary: '当前只显示所选阶段；切换上方阶段标签可查看其他项目。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         Wrap(
@@ -151,7 +151,8 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
         const SizedBox(height: 16),
         _StateMessage(
           title: currentStage.label,
-          body: '${currentStage.description} 当前共有 $currentCount 个项目。',
+          body:
+              '${currentStage.description} 当前只显示${currentStage.label}阶段，共 $currentCount 个项目；切换上方阶段标签可查看其他阶段。',
         ),
       ],
     );

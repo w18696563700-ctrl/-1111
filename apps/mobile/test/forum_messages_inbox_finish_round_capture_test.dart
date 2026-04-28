@@ -78,52 +78,55 @@ void main() {
       boundaryKey,
       forumHandlerOverrides:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/interaction/inbox': (AppApiRequest request) async {
-              final tab = request.uri.queryParameters['tab'];
-              final items = switch (tab) {
-                'likes' => <Object?>[
-                    _inboxItem(
-                      notificationId: 'notice-like-1',
-                      tab: 'likes',
-                      targetType: 'forum_post',
-                      targetId: 'post-1',
-                      title: '赞了你在《搭建夜班排班》下的评论',
-                    ),
-                  ],
-                'follows' => <Object?>[
-                    _inboxItem(
-                      notificationId: 'notice-follow-1',
-                      tab: 'follows',
-                      targetType: 'forum_topic',
-                      targetId: 'topic-1',
-                      title: '新关注了你的话题更新',
-                    ),
-                  ],
-                _ => <Object?>[
-                    _inboxItem(
-                      notificationId: 'notice-reply-1',
-                      tab: 'replies',
-                      targetType: 'forum_post',
-                      targetId: 'post-1',
-                      title: '回复了你在《材料交接节点》里的问题',
-                      preview: '建议先锁定吊装批次。',
-                    ),
-                  ],
-              };
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'items': items,
-                  'page': const <String, Object?>{
-                    'nextCursor': null,
-                    'hasMore': false,
-                  },
+            'GET /api/app/forum/interaction/inbox':
+                (AppApiRequest request) async {
+                  final tab = request.uri.queryParameters['tab'];
+                  final items = switch (tab) {
+                    'likes' => <Object?>[
+                      _inboxItem(
+                        notificationId: 'notice-like-1',
+                        tab: 'likes',
+                        targetType: 'forum_post',
+                        targetId: 'post-1',
+                        title: '赞了你在《搭建夜班排班》下的评论',
+                      ),
+                    ],
+                    'follows' => <Object?>[
+                      _inboxItem(
+                        notificationId: 'notice-follow-1',
+                        tab: 'follows',
+                        targetType: 'forum_topic',
+                        targetId: 'topic-1',
+                        title: '新关注了你的话题更新',
+                      ),
+                    ],
+                    _ => <Object?>[
+                      _inboxItem(
+                        notificationId: 'notice-reply-1',
+                        tab: 'replies',
+                        targetType: 'forum_post',
+                        targetId: 'post-1',
+                        title: '回复了你在《材料交接节点》里的问题',
+                        preview: '建议先锁定吊装批次。',
+                      ),
+                    ],
+                  };
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: <String, Object?>{
+                      'items': items,
+                      'page': const <String, Object?>{
+                        'nextCursor': null,
+                        'hasMore': false,
+                      },
+                    },
+                  );
                 },
-              );
-            },
           },
     );
+    await tester.tap(find.text('回复我的').last);
+    await tester.pumpAndSettle();
     await _capture(boundaryKey, '01_replies_inbox.png');
 
     await tester.tap(find.text('收到的赞').last);
@@ -135,28 +138,29 @@ void main() {
       boundaryKey,
       forumHandlerOverrides:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/interaction/inbox': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: <String, Object?>{
-                  'items': <Object?>[
-                    _inboxItem(
-                      notificationId: 'notice-comment-1',
-                      tab: 'replies',
-                      targetType: 'forum_comment',
-                      targetId: 'comment-1',
-                      title: '回复了你的评论',
-                      preview: '这是一条评论回复。',
-                    ),
-                  ],
-                  'page': const <String, Object?>{
-                    'nextCursor': null,
-                    'hasMore': false,
-                  },
+            'GET /api/app/forum/interaction/inbox':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: <String, Object?>{
+                      'items': <Object?>[
+                        _inboxItem(
+                          notificationId: 'notice-comment-1',
+                          tab: 'replies',
+                          targetType: 'forum_comment',
+                          targetId: 'comment-1',
+                          title: '回复了你的评论',
+                          preview: '这是一条评论回复。',
+                        ),
+                      ],
+                      'page': const <String, Object?>{
+                        'nextCursor': null,
+                        'hasMore': false,
+                      },
+                    },
+                  );
                 },
-              );
-            },
           },
     );
     await _capture(boundaryKey, '03_forum_comment_guidance.png');
@@ -166,13 +170,14 @@ void main() {
       boundaryKey,
       forumHandlerOverrides:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/interaction/inbox': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 404,
-                uri: request.uri,
-                body: <String, Object?>{'message': 'forum inbox missing'},
-              );
-            },
+            'GET /api/app/forum/interaction/inbox':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 404,
+                    uri: request.uri,
+                    body: <String, Object?>{'message': 'forum inbox missing'},
+                  );
+                },
           },
     );
     await tester.tap(find.text('新关注').last);

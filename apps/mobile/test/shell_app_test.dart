@@ -1527,6 +1527,50 @@ void main() {
     );
   });
 
+  testWidgets('shell back button keeps hover tooltip hidden', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            ...defaultHandlers(),
+            'GET /api/app/contract/detail': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'contractId': 'contract-1',
+                  'orderId': 'order-1',
+                  'state': 'pending_confirm',
+                  'summary': _summary('contract'),
+                },
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(buildApp(transport: transport));
+    await tester.pumpAndSettle();
+    await pushNamedRoute(
+      tester,
+      ExhibitionRoutes.contractDetailWithOrderId('order-1'),
+    );
+
+    final backButton = tester.widget<IconButton>(
+      find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded).first,
+    );
+    expect(backButton.tooltip, isNull);
+
+    await tester.tap(
+      find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded).first,
+    );
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('合同详情'), findsNothing);
+    expect(find.text('发现优质项目，把握商机'), findsOneWidget);
+  });
+
   testWidgets('exhibition root presents a clean weather shell home', (
     WidgetTester tester,
   ) async {
@@ -1926,6 +1970,16 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('聊天'), findsOneWidget);
       expect(find.text('想跟TA说点什么...'), findsOneWidget);
+
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded).first,
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('竞标沟通'), findsNothing);
+      expect(find.text('互动中心'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '进入项目沟通'), findsOneWidget);
     },
   );
 
@@ -2026,7 +2080,7 @@ void main() {
   );
 
   testWidgets(
-    'messages tab refreshes inbox when returning from another building',
+    'messages tab keeps forum inbox opt-in on first entry and refreshes the selected inbox after returning',
     (WidgetTester tester) async {
       final forumTransport = FakeAppApiTransport(
         handlers:
@@ -2152,6 +2206,17 @@ void main() {
                   request.canonicalPath == ForumCanonicalPaths.interactionInbox,
             )
             .length,
+        0,
+      );
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
+      expect(
+        forumTransport.requests
+            .where(
+              (AppApiRequest request) =>
+                  request.canonicalPath == ForumCanonicalPaths.interactionInbox,
+            )
+            .length,
         1,
       );
 
@@ -2167,6 +2232,19 @@ void main() {
       );
 
       await tapBottomDestination(tester, '消息');
+      await tester.pumpAndSettle();
+      expect(find.text('选择一个分类查看'), findsOneWidget);
+      expect(
+        forumTransport.requests
+            .where(
+              (AppApiRequest request) =>
+                  request.canonicalPath == ForumCanonicalPaths.interactionInbox,
+            )
+            .length,
+        1,
+      );
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
       expect(
         forumTransport.requests
             .where(
@@ -2176,6 +2254,111 @@ void main() {
             .length,
         2,
       );
+    },
+  );
+
+  testWidgets(
+    'forum post detail back button returns to interaction center when opened from message reminder',
+    (WidgetTester tester) async {
+      final forumTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/interaction/inbox':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'notificationId': 'notice-reply-1',
+                            'tab': 'replies',
+                            'actor': <String, Object?>{
+                              'authorId': 'member-1',
+                              'displayName': '王监理',
+                              'organizationName': '现场协作组',
+                            },
+                            'targetType': 'forum_post',
+                            'targetId': 'post-1',
+                            'title': '回复了你在《材料交接节点》里的问题',
+                            'preview': '建议先锁定吊装批次。',
+                            'createdAt': '2026-03-27T10:00:00Z',
+                            'unread': true,
+                            'canQuickReply': true,
+                          },
+                        ],
+                        'page': const <String, Object?>{
+                          'nextCursor': null,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+              'GET /api/app/forum/post/detail': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'postId': 'post-1',
+                    'topicId': 'expo-materials',
+                    'topicTitle': '布展进场',
+                    'state': 'published',
+                    'author': <String, Object?>{
+                      'authorId': 'member-1',
+                      'displayName': '赵工',
+                    },
+                    'content': '正式帖子正文',
+                    'attachmentRefs': <Object?>[],
+                    'engagement': <String, Object?>{
+                      'replyCount': 1,
+                      'likeCount': 2,
+                      'viewCount': 3,
+                    },
+                    'publishedAt': '2026-03-27T09:30:00Z',
+                    'viewerHasLiked': false,
+                    'viewerHasBookmarked': false,
+                    'viewerFollowsTopic': true,
+                  },
+                );
+              },
+              'GET /api/app/forum/post/comments':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'page': <String, Object?>{
+                          'nextCursor': null,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(buildApp(forumTransport: forumTransport));
+      await tester.pumpAndSettle();
+
+      await tapBottomDestination(tester, '消息');
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('回复了你在《材料交接节点》里的问题'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('帖子详情'), findsOneWidget);
+      expect(find.text('正式帖子正文'), findsOneWidget);
+
+      await tester.tap(
+        find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded).first,
+      );
+      await tester.pump();
+      await tester.pumpAndSettle();
+
+      expect(find.text('帖子详情'), findsNothing);
+      expect(find.text('互动中心'), findsOneWidget);
+      expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
     },
   );
 
@@ -2744,7 +2927,7 @@ void main() {
   );
 
   testWidgets(
-    'contract detail reload button bypasses cached result and sends a fresh GET',
+    'contract detail compact content omits route-only reload controls and technical ids',
     (WidgetTester tester) async {
       var contractDetailRequestCount = 0;
       final transport = FakeAppApiTransport(
@@ -2757,12 +2940,10 @@ void main() {
                   statusCode: 200,
                   uri: request.uri,
                   body: <String, Object?>{
-                    'contractId': 'contract-$contractDetailRequestCount',
+                    'contractId': 'contract-1',
                     'orderId': 'order-1',
                     'state': 'pending_confirm',
-                    'summary': <String, Object?>{
-                      'heading': 'contract-$contractDetailRequestCount',
-                    },
+                    'summary': <String, Object?>{'heading': 'contract'},
                   },
                 );
               },
@@ -2778,27 +2959,11 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(contractDetailRequestCount, 1);
-      await tester.scrollUntilVisible(
-        find.textContaining('contract-1'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.textContaining('contract-1'), findsWidgets);
-
-      final reloadButton = find.widgetWithText(FilledButton, '重新读取当前合同');
-      await tester.ensureVisible(reloadButton);
-      await tester.pumpAndSettle();
-      await tester.tap(reloadButton);
-      await tester.pump();
-      await tester.pumpAndSettle();
-
-      expect(contractDetailRequestCount, 2);
-      await tester.scrollUntilVisible(
-        find.textContaining('contract-2'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      expect(find.textContaining('contract-2'), findsWidgets);
+      expect(find.text('合同概览'), findsOneWidget);
+      expect(find.text('合同状态：待确认'), findsOneWidget);
+      expect(find.text('页面操作'), findsNothing);
+      expect(find.text('重新读取当前合同'), findsNothing);
+      expect(find.textContaining('contract-1'), findsNothing);
     },
   );
 
@@ -4843,27 +5008,26 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('订单详情'), findsWidgets);
-      expect(find.text('当前订单 ID：order-1'), findsOneWidget);
+      expect(find.text('当前订单 ID：order-1'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('订单编号：ORD-1'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('订单编号：ORD-1'), findsOneWidget);
-      expect(find.text('关联项目 ID：project-1'), findsOneWidget);
-      expect(find.text('关联投标 ID：bid-1'), findsOneWidget);
-      expect(find.text('当前状态：进行中'), findsOneWidget);
-      expect(
-        find.text('当前说明：订单最小读模型已经承接完成，当前页不会扩成订单后台或履约指挥台。'),
-        findsOneWidget,
-      );
+      expect(find.text('关联项目 ID：project-1'), findsNothing);
+      expect(find.text('关联投标 ID：bid-1'), findsNothing);
+      expect(find.text('订单状态：进行中'), findsWidgets);
+      expect(find.text('当前说明：订单最小读模型已经承接完成，当前页不会扩成订单后台或履约指挥台。'), findsNothing);
+      expect(find.text('完工处理'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('查看合同详情'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       expect(find.text('查看合同详情'), findsOneWidget);
-      expect(find.text('双方互评暂不可从订单页进入'), findsOneWidget);
+      expect(find.text('双方互评暂不可从订单页进入'), findsNothing);
+      expect(find.text('订单完成后开放双方互评。'), findsOneWidget);
       expect(find.text('查看双方互评入口'), findsNothing);
       expect(find.text('查看里程碑列表'), findsNothing);
       expect(find.text('去提交 initial delivery'), findsNothing);
@@ -4938,7 +5102,7 @@ void main() {
       await tester.tap(contractDetailButton);
       await tester.pumpAndSettle();
       expect(find.text('合同详情'), findsWidgets);
-      expect(find.text('当前订单 ID：order-1'), findsOneWidget);
+      expect(find.text('合同概览'), findsOneWidget);
 
       expect(
         transport.requests
@@ -5970,7 +6134,7 @@ void main() {
           transport: transport,
         ),
         pageTitle: '合同详情',
-        visibleTexts: const <String>['当前订单 ID：order-1', '当前合同 ID：contract-1'],
+        visibleTexts: const <String>['合同概览', '合同状态：待确认'],
       );
 
       await expectNoDefaultTechnicalDisclosure(

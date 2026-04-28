@@ -708,6 +708,72 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  testWidgets(
+    'profile page loads followed authors without generic cast crash',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: 'org-1',
+                    certificationStatus: 'approved',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final forumHandlers = _forumHandlers();
+      forumHandlers['GET /api/app/forum/me/follows'] =
+          (AppApiRequest request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'authorId': 'author-1',
+                    'displayName': '陈设计',
+                    'organizationName': '重庆海川展览工厂',
+                    'followedAt': '2026-04-28T09:00:00Z',
+                    'publicPostCount': 3,
+                    'publicCommentCount': 5,
+                    'viewerFollowsAuthor': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+              },
+            );
+          };
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          forumTransport: FakeAppApiTransport(handlers: forumHandlers),
+          shellContext: AppShellContextData(
+            userId: '13812345678',
+            organizationId: 'org-1',
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+            visibleBuildings: const <String>[
+              'exhibition',
+              'messages',
+              'profile',
+            ],
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(tester.takeException(), isNull);
+      expect(find.text('我的论坛'), findsOneWidget);
+    },
+  );
+
   testWidgets('profile page presents compact grouped hub', (
     WidgetTester tester,
   ) async {

@@ -296,7 +296,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
           if (isVisualEmptyState)
             const _EmptyNotice(
               title: '当前没有符合条件的公开项目',
-              message: '当前展示：真实空结果。请切换城市、状态、类型、面积或金额后再查看。',
+              message: '当前展示：真实空结果。请切换城市、状态、类型、面积或金额后再查看；项目也可能已经结束并退出公开展示。',
             ),
           if (result.state == AppPageState.content)
             ...items.map(
@@ -440,6 +440,14 @@ class _ProjectListPageState extends State<ProjectListPage> {
                 _ProjectFilterSummaryChip(label: '面积', value: areaSummary),
                 _ProjectFilterSummaryChip(label: '金额', value: budgetSummary),
               ],
+            ),
+            const SizedBox(height: 10),
+            Text(
+              '公开项目只展示当前仍在有效期内的项目；已过期或已结束项目不会进入公开接单列表，与当前账号相关的项目请到“我的项目”查看。',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
             ),
           ],
         ),

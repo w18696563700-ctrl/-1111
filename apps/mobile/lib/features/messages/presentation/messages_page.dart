@@ -11,9 +11,10 @@ part 'messages_page_support.dart';
 enum _MessagesInteractionTab { replies, likes, follows }
 
 class MessagesPage extends StatefulWidget {
-  const MessagesPage({super.key, this.refreshSignal});
+  const MessagesPage({super.key, this.refreshSignal, this.entrySignal});
 
   final ValueListenable<int>? refreshSignal;
+  final ValueListenable<int>? entrySignal;
 
   @override
   State<MessagesPage> createState() => _MessagesPageState();
@@ -29,10 +30,12 @@ class _MessagesPageState extends State<MessagesPage> {
         _MessagesInteractionTab,
         ForumReadResult<ForumPagedCollectionView<ForumInteractionInboxItemView>>
       >{};
-  _MessagesInteractionTab _selectedTab = _MessagesInteractionTab.replies;
+  _MessagesInteractionTab? _selectedTab;
   MessageInteractionListResult? _projectCommunicationResult;
   ValueListenable<int>? _refreshSignal;
+  ValueListenable<int>? _entrySignal;
   int _lastRefreshTick = 0;
+  int _lastEntryTick = 0;
   int _latestLoadToken = 0;
   int _latestReminderLoadToken = 0;
   bool _loading = false;
@@ -42,7 +45,7 @@ class _MessagesPageState extends State<MessagesPage> {
   void initState() {
     super.initState();
     _bindRefreshSignal(widget.refreshSignal);
-    _load();
+    _bindEntrySignal(widget.entrySignal);
     _loadProjectCommunication();
   }
 
@@ -52,11 +55,15 @@ class _MessagesPageState extends State<MessagesPage> {
     if (oldWidget.refreshSignal != widget.refreshSignal) {
       _bindRefreshSignal(widget.refreshSignal);
     }
+    if (oldWidget.entrySignal != widget.entrySignal) {
+      _bindEntrySignal(widget.entrySignal);
+    }
   }
 
   @override
   void dispose() {
     _refreshSignal?.removeListener(_handleRefreshSignal);
+    _entrySignal?.removeListener(_handleEntrySignal);
     super.dispose();
   }
 
@@ -65,6 +72,13 @@ class _MessagesPageState extends State<MessagesPage> {
     _refreshSignal = signal;
     _lastRefreshTick = signal?.value ?? 0;
     _refreshSignal?.addListener(_handleRefreshSignal);
+  }
+
+  void _bindEntrySignal(ValueListenable<int>? signal) {
+    _entrySignal?.removeListener(_handleEntrySignal);
+    _entrySignal = signal;
+    _lastEntryTick = signal?.value ?? 0;
+    _entrySignal?.addListener(_handleEntrySignal);
   }
 
   void _handleRefreshSignal() {
@@ -80,15 +94,41 @@ class _MessagesPageState extends State<MessagesPage> {
     _refreshAll(showLoading: false);
   }
 
-  Future<void> _refreshAll({bool showLoading = true}) async {
-    await Future.wait<void>(<Future<void>>[
-      _load(showLoading: showLoading),
-      _loadProjectCommunication(showLoading: showLoading),
-    ]);
+  void _handleEntrySignal() {
+    final signal = _entrySignal;
+    if (signal == null) {
+      return;
+    }
+    final tick = signal.value;
+    if (tick == _lastEntryTick) {
+      return;
+    }
+    _lastEntryTick = tick;
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _selectedTab = null;
+      _loading = false;
+    });
   }
 
-  Future<void> _load({bool showLoading = true}) async {
-    final requestedTab = _selectedTab;
+  Future<void> _refreshAll({bool showLoading = true}) async {
+    final tasks = <Future<void>>[
+      _loadProjectCommunication(showLoading: showLoading),
+    ];
+    final selectedTab = _selectedTab;
+    if (selectedTab != null) {
+      tasks.add(_load(tab: selectedTab, showLoading: showLoading));
+    }
+    await Future.wait<void>(tasks);
+  }
+
+  Future<void> _load({
+    required _MessagesInteractionTab tab,
+    bool showLoading = true,
+  }) async {
+    final requestedTab = tab;
     final loadToken = ++_latestLoadToken;
     final shouldShowLoading =
         showLoading || !_results.containsKey(requestedTab);
@@ -130,7 +170,8 @@ class _MessagesPageState extends State<MessagesPage> {
 
   @override
   Widget build(BuildContext context) {
-    final result = _results[_selectedTab];
+    final selectedTab = _selectedTab;
+    final result = selectedTab == null ? null : _results[selectedTab];
     final state = _loading ? AppPageState.loading : result?.state;
     final items =
         result?.data?.items ?? const <ForumInteractionInboxItemView>[];
@@ -156,19 +197,29 @@ class _MessagesPageState extends State<MessagesPage> {
             const SizedBox(height: 14),
           ],
           _MessagesForumInteractionSection(
-            selectedTab: _selectedTab,
+            selectedTab: selectedTab,
             onSelectTab: (_MessagesInteractionTab tab) {
-              if (tab == _selectedTab) {
+              if (tab == selectedTab) {
+                setState(() {
+                  _selectedTab = null;
+                  _loading = false;
+                });
                 return;
               }
               setState(() => _selectedTab = tab);
-              _load();
+              _load(tab: tab);
             },
             loading: _loading,
             state: state,
             message: result?.message,
             items: items,
-            onRetry: _load,
+            onRetry: () {
+              final currentTab = _selectedTab;
+              if (currentTab == null) {
+                return;
+              }
+              _load(tab: currentTab);
+            },
             onOpenSource: (ForumInteractionInboxItemView item) =>
                 _openSource(context, item),
           ),

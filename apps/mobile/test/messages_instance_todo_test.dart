@@ -178,8 +178,19 @@ void main() {
     expect(find.text('收到的赞'), findsWidgets);
     expect(find.text('新关注'), findsWidgets);
     expect(find.text('这里集中查看别人对你的回复、点赞、关注，以及项目沟通会话。'), findsNothing);
+    expect(find.text('选择一个分类查看'), findsOneWidget);
+    expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
+    expect(find.text('回到源对象'), findsNothing);
+
+    await tester.tap(find.text('回复我的').last);
+    await tester.pumpAndSettle();
     expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
-    expect(find.text('回到源对象'), findsOneWidget);
+    expect(find.text('回到源对象'), findsNothing);
+
+    await tester.tap(find.text('回复我的').last);
+    await tester.pumpAndSettle();
+    expect(find.text('选择一个分类查看'), findsOneWidget);
+    expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
 
     await tester.tap(find.text('收到的赞').last);
     await tester.pumpAndSettle();
@@ -296,6 +307,9 @@ void main() {
       expect(find.textContaining('只读 handoff'), findsNothing);
       expect(find.widgetWithText(FilledButton, '支付'), findsNothing);
       expect(find.text('进入项目沟通'), findsNWidgets(2));
+      expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('回复了你在《材料交接节点》里的问题'), 240);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
       expect(find.text('回复我的'), findsWidgets);
@@ -376,6 +390,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('第一次论坛回复'), findsNothing);
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
       await tester.scrollUntilVisible(find.text('第一次论坛回复'), 240);
       expect(find.text('第一次论坛回复'), findsOneWidget);
       expect(find.text('第一次项目沟通会话'), findsOneWidget);
@@ -483,6 +500,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      expect(find.text('首次论坛回复'), findsNothing);
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
       expect(find.text('首次论坛回复'), findsOneWidget);
       expect(find.text('首次项目沟通会话'), findsOneWidget);
 
@@ -531,6 +551,8 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('回复我的').last);
+    await tester.pumpAndSettle();
     expect(find.text('回复我的当前为空'), findsOneWidget);
     expect(find.text('暂无新的回复我的提醒。'), findsOneWidget);
     expect(find.text('这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。'), findsNothing);
@@ -556,6 +578,8 @@ void main() {
       await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
       await tester.pumpAndSettle();
 
+      await tester.tap(find.text('回复我的').last);
+      await tester.pumpAndSettle();
       expect(find.text('互动通知暂时不可用，请稍后再试'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '重试'), findsOneWidget);
     },
@@ -596,10 +620,12 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
-    expect(find.text('查看说明'), findsOneWidget);
+    await tester.tap(find.text('回复我的').last);
+    await tester.pumpAndSettle();
+    expect(find.text('查看说明'), findsNothing);
     expect(find.text('继续回复'), findsNothing);
 
-    await tester.tap(find.text('查看说明'));
+    await tester.tap(find.text('回复了你的评论'));
     await tester.pumpAndSettle();
 
     expect(find.text('这条提醒暂时还不能直接打开原评论，请稍后再试。'), findsOneWidget);
@@ -625,6 +651,8 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
+    await tester.tap(find.text('回复我的').last);
+    await tester.pumpAndSettle();
     expect(find.text('互动通知暂不可用'), findsOneWidget);
     expect(find.text('当前“回复我的”入口暂不可用，请稍后再试。'), findsOneWidget);
     expect(find.text('没有找到对应的论坛内容'), findsNothing);

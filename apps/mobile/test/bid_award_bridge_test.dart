@@ -299,7 +299,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('订单状态卡'));
+      await _scrollTo(tester, find.text('完工处理'));
       await _scrollTo(tester, find.text('申请完工'));
       expect(find.text('申请完工'), findsOneWidget);
       expect(find.text('确认完成'), findsNothing);
@@ -363,7 +363,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('订单状态卡'));
+      await _scrollTo(tester, find.text('完工处理'));
       await _scrollTo(tester, find.text('申请完工'));
       await tester.tap(find.text('申请完工'));
       await tester.pumpAndSettle();
@@ -515,9 +515,9 @@ void main() {
       expect(projectDetailRequestCount, 2);
       expect(myProjectListRequestCount, 1);
       expect(find.text('合作方选择已受理'), findsOneWidget);
-      await _scrollTo(tester, find.text('订单状态卡'));
-      expect(find.text('订单状态卡'), findsOneWidget);
-      expect(find.text('订单 ID：order-1'), findsWidgets);
+      await _scrollTo(tester, find.text('完工处理'));
+      expect(find.text('完工处理'), findsOneWidget);
+      expect(find.text('订单状态：进行中'), findsWidgets);
     },
   );
 

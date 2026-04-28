@@ -37,6 +37,7 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
   final Map<AppBuilding, Widget> _cachedPages = <AppBuilding, Widget>{};
   final Set<AppBuilding> _activatedBottomBuildings = <AppBuilding>{};
   final ValueNotifier<int> _messagesRefreshSignal = ValueNotifier<int>(0);
+  final ValueNotifier<int> _messagesEntrySignal = ValueNotifier<int>(0);
   Timer? _messagesRefreshTimer;
   late AppBuilding _currentBuilding = widget.initialBuilding;
 
@@ -51,6 +52,7 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
   void dispose() {
     _messagesRefreshTimer?.cancel();
     _messagesRefreshSignal.dispose();
+    _messagesEntrySignal.dispose();
     super.dispose();
   }
 
@@ -69,6 +71,7 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
       _activatedBottomBuildings.add(building);
     }
     if (building == AppBuilding.messages) {
+      _messagesEntrySignal.value += 1;
       _messagesRefreshSignal.value += 1;
     }
   }
@@ -175,7 +178,10 @@ class _PersistentShellPageState extends State<_PersistentShellPage> {
       AppBuilding.renovation => const RenovationPage(),
       AppBuilding.customFurniture => const CustomFurniturePage(),
       AppBuilding.messages =>
-        MessagesPage(refreshSignal: _messagesRefreshSignal),
+        MessagesPage(
+          refreshSignal: _messagesRefreshSignal,
+          entrySignal: _messagesEntrySignal,
+        ),
       AppBuilding.profile => const ProfilePage(),
     };
   }

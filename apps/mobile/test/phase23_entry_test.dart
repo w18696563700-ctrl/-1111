@@ -68,49 +68,53 @@ void main() {
   testWidgets(
     'contract detail canonical path is assembled from orderId and exposes the minimal confirm entry only',
     (WidgetTester tester) async {
-    final transport = FakeAppApiTransport(
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            ...defaultHandlers(),
-            'GET /api/app/contract/detail': (AppApiRequest request) async {
-              expect(request.uri.queryParameters['orderId'], 'order-1');
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _contractPayload(
-                  contractId: 'contract-1',
-                  orderId: 'order-1',
-                ),
-              );
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/contract/detail': (AppApiRequest request) async {
+                expect(request.uri.queryParameters['orderId'], 'order-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _contractPayload(
+                    contractId: 'contract-1',
+                    orderId: 'order-1',
+                  ),
+                );
+              },
             },
-          },
-    );
+      );
 
-    await tester.pumpWidget(
-      buildApp(
-        initialRoute: '${ExhibitionRoutes.contractDetail}?orderId=order-1',
-        transport: transport,
-      ),
-    );
-    await tester.pumpAndSettle();
+      await tester.pumpWidget(
+        buildApp(
+          initialRoute: '${ExhibitionRoutes.contractDetail}?orderId=order-1',
+          transport: transport,
+        ),
+      );
+      await tester.pumpAndSettle();
 
-    final confirmButton = find.byKey(
-      const ValueKey<String>('contract_confirm_button'),
-    );
-    await tester.scrollUntilVisible(
-      confirmButton,
-      200,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('合同详情'), findsWidgets);
-    expect(confirmButton, findsOneWidget);
-    expect(find.byKey(const ValueKey<String>('contract_amend_button')), findsNothing);
-    expect(find.text('继续合同改单'), findsNothing);
-    expect(
-      transport.requests.single.canonicalPath,
-      ExhibitionCanonicalPaths.contractDetail,
-    );
-  });
+      final confirmButton = find.byKey(
+        const ValueKey<String>('contract_confirm_button'),
+      );
+      await tester.scrollUntilVisible(
+        confirmButton,
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      expect(find.text('合同详情'), findsWidgets);
+      expect(confirmButton, findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('contract_amend_button')),
+        findsNothing,
+      );
+      expect(find.text('继续合同改单'), findsNothing);
+      expect(
+        transport.requests.single.canonicalPath,
+        ExhibitionCanonicalPaths.contractDetail,
+      );
+    },
+  );
 
   testWidgets(
     'contract confirm submits orderId and refreshes contract detail and my-project list',
@@ -118,45 +122,46 @@ void main() {
       var contractDetailRequestCount = 0;
       var myProjectListRequestCount = 0;
       final transport = FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          ...defaultHandlers(),
-          'GET /api/app/contract/detail': (AppApiRequest request) async {
-            contractDetailRequestCount += 1;
-            expect(request.uri.queryParameters['orderId'], 'order-1');
-            return AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: _contractPayload(
-                contractId: 'contract-1',
-                orderId: 'order-1',
-                state: contractDetailRequestCount == 1
-                    ? 'pending_confirm'
-                    : 'active',
-              ),
-            );
-          },
-          'POST /api/app/contract/confirm': (AppApiRequest request) async {
-            expect(request.body, <String, Object?>{'orderId': 'order-1'});
-            return AppApiResponse(
-              statusCode: 202,
-              uri: request.uri,
-              body: _contractPayload(
-                contractId: 'contract-1',
-                orderId: 'order-1',
-                state: 'active',
-                summaryHeading: 'confirmed',
-              ),
-            );
-          },
-          'GET /api/app/my/projects': (AppApiRequest request) async {
-            myProjectListRequestCount += 1;
-            return AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: <String, Object?>{'items': <Object?>[]},
-            );
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/contract/detail': (AppApiRequest request) async {
+                contractDetailRequestCount += 1;
+                expect(request.uri.queryParameters['orderId'], 'order-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _contractPayload(
+                    contractId: 'contract-1',
+                    orderId: 'order-1',
+                    state: contractDetailRequestCount == 1
+                        ? 'pending_confirm'
+                        : 'active',
+                  ),
+                );
+              },
+              'POST /api/app/contract/confirm': (AppApiRequest request) async {
+                expect(request.body, <String, Object?>{'orderId': 'order-1'});
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: _contractPayload(
+                    contractId: 'contract-1',
+                    orderId: 'order-1',
+                    state: 'active',
+                    summaryHeading: 'confirmed',
+                  ),
+                );
+              },
+              'GET /api/app/my/projects': (AppApiRequest request) async {
+                myProjectListRequestCount += 1;
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{'items': <Object?>[]},
+                );
+              },
+            },
       );
 
       await tester.pumpWidget(
@@ -188,10 +193,7 @@ void main() {
       );
       expect(find.text('当前动作已完成'), findsOneWidget);
       expect(find.text('合同确认已受理'), findsOneWidget);
-      expect(
-        find.text('如果当前合同需要最小改单，可以直接在这里执行；改单成功后页面会刷新合同详情和我的项目。'),
-        findsOneWidget,
-      );
+      expect(find.text('合同已生效。如需调整，可发起最小改单。'), findsOneWidget);
       expect(confirmButton, findsNothing);
       expect(contractDetailRequestCount, 2);
       expect(myProjectListRequestCount, 1);
@@ -212,21 +214,22 @@ void main() {
     'contract detail exposes the minimal amend entry only when contract is active',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          ...defaultHandlers(),
-          'GET /api/app/contract/detail': (AppApiRequest request) async {
-            expect(request.uri.queryParameters['orderId'], 'order-1');
-            return AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: _contractPayload(
-                contractId: 'contract-1',
-                orderId: 'order-1',
-                state: 'active',
-              ),
-            );
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/contract/detail': (AppApiRequest request) async {
+                expect(request.uri.queryParameters['orderId'], 'order-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _contractPayload(
+                    contractId: 'contract-1',
+                    orderId: 'order-1',
+                    state: 'active',
+                  ),
+                );
+              },
+            },
       );
 
       await tester.pumpWidget(
@@ -246,7 +249,10 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       expect(amendButton, findsOneWidget);
-      expect(find.byKey(const ValueKey<String>('contract_confirm_button')), findsNothing);
+      expect(
+        find.byKey(const ValueKey<String>('contract_confirm_button')),
+        findsNothing,
+      );
     },
   );
 
@@ -256,43 +262,46 @@ void main() {
       var contractDetailRequestCount = 0;
       var myProjectListRequestCount = 0;
       final transport = FakeAppApiTransport(
-        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-          ...defaultHandlers(),
-          'GET /api/app/contract/detail': (AppApiRequest request) async {
-            contractDetailRequestCount += 1;
-            expect(request.uri.queryParameters['orderId'], 'order-1');
-            return AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: _contractPayload(
-                contractId: 'contract-1',
-                orderId: 'order-1',
-                state: contractDetailRequestCount == 1 ? 'active' : 'amended',
-              ),
-            );
-          },
-          'POST /api/app/contract/amend': (AppApiRequest request) async {
-            expect(request.body, <String, Object?>{'orderId': 'order-1'});
-            return AppApiResponse(
-              statusCode: 202,
-              uri: request.uri,
-              body: _contractPayload(
-                contractId: 'contract-1',
-                orderId: 'order-1',
-                state: 'amended',
-                summaryHeading: 'amended',
-              ),
-            );
-          },
-          'GET /api/app/my/projects': (AppApiRequest request) async {
-            myProjectListRequestCount += 1;
-            return AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: <String, Object?>{'items': <Object?>[]},
-            );
-          },
-        },
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              ...defaultHandlers(),
+              'GET /api/app/contract/detail': (AppApiRequest request) async {
+                contractDetailRequestCount += 1;
+                expect(request.uri.queryParameters['orderId'], 'order-1');
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _contractPayload(
+                    contractId: 'contract-1',
+                    orderId: 'order-1',
+                    state: contractDetailRequestCount == 1
+                        ? 'active'
+                        : 'amended',
+                  ),
+                );
+              },
+              'POST /api/app/contract/amend': (AppApiRequest request) async {
+                expect(request.body, <String, Object?>{'orderId': 'order-1'});
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: _contractPayload(
+                    contractId: 'contract-1',
+                    orderId: 'order-1',
+                    state: 'amended',
+                    summaryHeading: 'amended',
+                  ),
+                );
+              },
+              'GET /api/app/my/projects': (AppApiRequest request) async {
+                myProjectListRequestCount += 1;
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{'items': <Object?>[]},
+                );
+              },
+            },
       );
 
       await tester.pumpWidget(
@@ -325,10 +334,7 @@ void main() {
       );
       expect(find.text('当前动作已完成'), findsOneWidget);
       expect(find.text('合同改单已受理'), findsOneWidget);
-      expect(
-        find.text('当前合同已改单，后续以回看当前状态为主，不再展开更多闭环。'),
-        findsOneWidget,
-      );
+      expect(find.text('合同已改单，当前以最新合同状态为准。'), findsOneWidget);
       expect(amendButton, findsNothing);
       expect(contractDetailRequestCount, 2);
       expect(myProjectListRequestCount, 1);
@@ -360,9 +366,7 @@ void main() {
               return AppApiResponse(
                 statusCode: 202,
                 uri: request.uri,
-                body: _disputePayload(
-                  orderId: 'order-1',
-                ),
+                body: _disputePayload(orderId: 'order-1'),
               );
             },
           },

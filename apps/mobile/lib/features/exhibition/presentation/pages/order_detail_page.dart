@@ -70,22 +70,18 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
 
     return _LoadPageFrame(
       title: '订单详情',
-      summary: '这里承接当前订单状态，并按发布方/承接方角色开放最小完工申请与确认动作；订单真值仍以后端为准。',
+      summary: '查看当前订单状态，并继续处理完工、合同和互评入口。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
-      sourceLabel: snapshot?.sourceLabel,
-      sourceMessage: snapshot?.sourceMessage,
+      sourceLabel: snapshot?.isDemo == true ? snapshot?.sourceLabel : null,
+      sourceMessage: snapshot?.isDemo == true ? snapshot?.sourceMessage : null,
       fallbackTitle: snapshot?.fallbackTitle,
       fallbackMessage: snapshot?.fallbackMessage,
       showConnectionInfo: false,
       showTechnicalDisclosure: false,
-      controls: _routeOnlyControls(
-        routeId: routeOrderId,
-        label: 'orderId',
-        onReload: () => _load(forceRefresh: true),
-        reloadLabel: '重新加载订单',
-      ),
+      showPageSummaryCard: false,
+      showContentStateCard: false,
       resultSectionsBuilder: (ExhibitionLoadResult result) =>
           _buildResultSections(context, result, snapshot, routeOrderId),
     );
@@ -103,23 +99,17 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final projectId =
         _normalizeId(payload?['projectId'] as String?) ??
         _normalizeId(widget.projectId);
-    final bidId = _normalizeId(payload?['bidId'] as String?);
     final orderState = _normalizeId(payload?['state'] as String?);
-    final summary = payload?['summary'];
+    final completionRequestState = _normalizeId(
+      payload?['completionRequestState'] as String?,
+    );
     if (result.state != AppPageState.content || orderId == null) {
       return const <Widget>[];
     }
 
     return <Widget>[
       const SizedBox(height: 16),
-      _buildOrderOverviewCard(
-        snapshot,
-        orderNo,
-        projectId,
-        bidId,
-        orderState,
-        summary,
-      ),
+      _buildOrderOverviewCard(orderNo, orderState, completionRequestState),
       const SizedBox(height: 16),
       _OrderStatusCard(
         orderId: orderId,
@@ -142,47 +132,26 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
   }
 
   Widget _buildOrderOverviewCard(
-    ExhibitionStageLoadSnapshot? snapshot,
     String? orderNo,
-    String? projectId,
-    String? bidId,
     String? orderState,
-    Object? summary,
+    String? completionRequestState,
   ) {
     return _ActionCard(
       title: '订单概览',
-      summary: '当前页先帮助你判断订单是否处于稳定可回看状态，完工动作由下方订单状态卡承接。',
       tone: _ActionCardTone.emphasis,
-      eyebrow: '当前订单',
       children: <Widget>[
         if (orderNo != null) _DetailLine(label: '订单编号', value: orderNo),
-        if (projectId != null) _DetailLine(label: '关联项目 ID', value: projectId),
-        if (bidId != null) _DetailLine(label: '关联投标 ID', value: bidId),
         if (orderState != null)
           _DetailLine(
-            label: '当前状态',
+            label: '订单状态',
             value: _frontStageStateLabel(orderState),
             highlight: true,
           ),
-        if (summary is Map)
-          const _DetailLine(
-            label: '当前说明',
-            value: '订单最小读模型已经承接完成，当前页不会扩成订单后台或履约指挥台。',
+        if (completionRequestState != null)
+          _DetailLine(
+            label: '完工申请',
+            value: _frontStageStateLabel(completionRequestState),
           ),
-        _DetailLine(
-          label: '当前展示来源',
-          value: snapshot?.isDemo == true ? '演示内容' : '已接通内容',
-        ),
-        const SizedBox(height: 8),
-        _StateMessage(
-          title: '现在先判断什么',
-          body: '先确认当前订单状态是否稳定，再决定是否继续查看合同详情或评价入口。履约、争议和更大范围写入动作不从这里直接展开。',
-        ),
-        const SizedBox(height: 12),
-        const _DetailLine(
-          label: '当前页面边界',
-          value: '当前页只提交订单完成命令，不在 Flutter 本地生成订单完成、争议或评价真值。',
-        ),
       ],
     );
   }
@@ -194,14 +163,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final ratingRoute = _projectCounterpartyRatingRouteForOrder(context, order);
     return _ActionCard(
       title: '当前可继续',
-      summary: '订单详情当前只保留读侧续接。需要查看合同时，可继续进入合同详情；其余链路继续保持边界提示。',
-      eyebrow: '只读续接',
       children: <Widget>[
-        const _DetailLine(
-          label: '当前能做什么',
-          value: '查看合同详情，或继续进入最小评价入口；是否真正可评价以后端评价锚点返回为准。',
-        ),
-        const SizedBox(height: 12),
         FilledButton.tonal(
           onPressed: () {
             Navigator.of(context).pushNamed(
@@ -219,16 +181,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
             child: const Text('查看双方互评入口'),
           )
         else
-          const _StateMessage(
-            title: '双方互评暂不可从订单页进入',
-            body:
-                '当前订单未完成，或读模型缺少 projectId、buyer/sellerOrganizationId、当前账号组织锚点；请从项目沟通头像主体卡进入评价，避免本地推断被评主体。',
-          ),
-        const SizedBox(height: 12),
-        const _EmptyNotice(
-          title: '当前不在这里开放',
-          message: '里程碑列表、里程碑提交、争议开启和更大范围写入动作不从订单详情页直接放开。',
-        ),
+          const Text('订单完成后开放双方互评。'),
       ],
     );
   }

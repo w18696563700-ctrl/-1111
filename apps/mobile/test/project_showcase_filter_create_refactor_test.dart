@@ -477,6 +477,7 @@ void main() {
       expect(find.text('跟随城市'), findsWidgets);
       expect(find.text('不限面积'), findsWidgets);
       expect(find.text('不限金额'), findsWidgets);
+      expect(find.textContaining('公开项目只展示当前仍在有效期内的项目'), findsOneWidget);
       expect(find.text('刷新当前结果'), findsNothing);
       expect(find.text('恢复默认筛选'), findsNothing);
       expect(find.textContaining('春季医疗器械展', skipOffstage: false), findsWidgets);
@@ -510,7 +511,11 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
-      expect(find.textContaining('当前展示：真实空结果'), findsWidgets);
+      expect(
+        find.textContaining('当前展示：真实空结果', skipOffstage: false),
+        findsWidgets,
+      );
+      expect(find.textContaining('退出公开展示', skipOffstage: false), findsWidgets);
     },
   );
 

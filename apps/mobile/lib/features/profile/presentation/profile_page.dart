@@ -44,7 +44,8 @@ class _ProfilePageState extends State<ProfilePage> {
   _commentsResult;
   ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>?
   _bookmarksResult;
-  ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>? _followsResult;
+  ForumReadResult<ForumPagedCollectionView<ForumFollowedAuthorItemView>>?
+  _followsResult;
   ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>? _draftsResult;
 
   @override
@@ -94,7 +95,9 @@ class _ProfilePageState extends State<ProfilePage> {
               as ForumReadResult<ForumPagedCollectionView<ForumPostCardView>>;
       _followsResult =
           results[7]
-              as ForumReadResult<ForumPagedCollectionView<ForumTopicCardView>>;
+              as ForumReadResult<
+                ForumPagedCollectionView<ForumFollowedAuthorItemView>
+              >;
       _draftsResult =
           results[8]
               as ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>;

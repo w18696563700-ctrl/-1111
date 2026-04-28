@@ -140,13 +140,11 @@ class _OrderStatusCardState extends State<_OrderStatusCard> {
     );
 
     return _ActionCard(
-      title: '订单状态卡',
-      summary: _placementSummary(widget.placement),
-      eyebrow: 'ProjectOrder',
+      title: '完工处理',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         if (_loading && result == null)
-          const _StateMessage(title: '正在读取订单', body: '正在从 BFF 读取订单详情。')
+          const _StateMessage(title: '正在读取订单', body: '正在读取最新订单状态。')
         else if (result != null && result.state != AppPageState.content)
           _buildLoadFailure(result)
         else
@@ -181,11 +179,6 @@ class _OrderStatusCardState extends State<_OrderStatusCard> {
     _OrderActorSide actorSide,
   ) {
     return <Widget>[
-      _DetailLine(label: '订单 ID', value: order.orderId),
-      if (order.orderNo != null)
-        _DetailLine(label: '订单编号', value: order.orderNo!),
-      if (order.projectId != null)
-        _DetailLine(label: '项目 ID', value: order.projectId!),
       _DetailLine(
         label: '订单状态',
         value: _frontStageStateLabel(order.state ?? 'active'),
@@ -210,7 +203,7 @@ class _OrderStatusCardState extends State<_OrderStatusCard> {
       OutlinedButton.icon(
         onPressed: _loading ? null : () => _load(forceRefresh: true),
         icon: const Icon(Icons.refresh_rounded),
-        label: const Text('刷新订单状态'),
+        label: const Text('刷新状态'),
       ),
     ];
   }
@@ -233,10 +226,7 @@ class _OrderStatusCardState extends State<_OrderStatusCard> {
             child: const Text('查看双方互评入口'),
           )
         else
-          const _StatusPill(
-            label: '缺少互评三锚点，请从项目沟通头像入口评价',
-            tone: _ActionCardTone.muted,
-          ),
+          const _StatusPill(label: '互评入口暂不可用', tone: _ActionCardTone.muted),
       ];
     }
     if (actorSide == _OrderActorSide.seller) {
@@ -416,31 +406,20 @@ String? _rateeOrganizationIdForCurrentActor(
   return null;
 }
 
-String _placementSummary(_OrderStatusPlacement placement) {
-  return switch (placement) {
-    _OrderStatusPlacement.projectDetail =>
-      '项目详情只读取订单真值并提交订单完成命令，不在项目页生成订单完成状态。',
-    _OrderStatusPlacement.conversation =>
-      '项目沟通页只把订单状态带入当前对话上下文，所有完成动作继续锚定 orderId。',
-    _OrderStatusPlacement.orderDetail =>
-      '订单详情承接订单完成动作，是否允许提交最终以后端 ProjectOrder 状态机为准。',
-  };
-}
-
 String _actorActionDescription(
   _OrderActorSide actorSide,
   _EffectiveOrderStatus order,
 ) {
   if (order.isCompleted) {
-    return '当前订单已进入完成态，下一步可查看双方互评入口。';
+    return '订单已完成，可继续查看双方互评入口。';
   }
   return switch (actorSide) {
     _OrderActorSide.seller =>
       order.completionRequestState == 'requested'
-          ? '承接方已申请完工，当前等待发布方确认。'
-          : '当前账号按承接方处理，可提交申请完工；能否受理以后端订单状态为准。',
-    _OrderActorSide.buyer => '当前账号按发布方处理，可确认完成或拒绝完工；若尚无待确认申请，后端会给出受控反馈。',
-    _OrderActorSide.unknown => '当前账号未能匹配订单双方，只展示订单状态，不开放完成动作。',
+          ? '已申请完工，等待发布方确认。'
+          : '当前账号可提交申请完工。',
+    _OrderActorSide.buyer => '当前账号可确认完成或拒绝完工。',
+    _OrderActorSide.unknown => '当前账号仅可查看订单状态。',
   };
 }
 
