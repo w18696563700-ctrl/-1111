@@ -12,19 +12,9 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
 
     return _ActionCard(
       title: '发布方选择合作方',
-      summary: '这里只消费 BFF 返回的竞标候选和选择合作方命令，不在 Flutter 本地生成订单或定标状态。',
       tone: canSelect ? _ActionCardTone.emphasis : _ActionCardTone.muted,
       children: <Widget>[
-        _StateMessage(
-          title: '当前状态',
-          body: _ownerBidSelectionStatusBody(
-            state: state,
-            selection: selection,
-            hasCandidates: candidates.isNotEmpty,
-          ),
-        ),
         if (selection != null) ...<Widget>[
-          const SizedBox(height: 12),
           if (selection.winningBidId != null)
             _DetailLine(label: '已选投标', value: selection.winningBidId!),
           if (selection.orderId != null)
@@ -34,11 +24,7 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
         ],
         const SizedBox(height: 12),
         if (candidates.isEmpty)
-          const _EmptyNotice(
-            title: '当前竞标列表暂未返回',
-            message:
-                '项目详情页不会本地编造竞标数据。等 BFF/Server 返回 bidCandidates 后，这里会直接展示候选并开放选择按钮。',
-          )
+          const _EmptyNotice(title: '暂无竞标工厂', message: '工厂提交竞标后，会在这里显示报价和方案。')
         else
           ..._buildBidCandidateCards(
             projectId: projectId,
@@ -84,11 +70,24 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
                   candidate: candidate,
                 )
               : null,
-          actionSummary: canSelect ? '确认后会提交选择合作方命令，并以后端返回的订单锚点继续。' : null,
+          secondaryActionLabel: '进入沟通',
+          onSecondaryPressed: () => _openBidCandidateThread(
+            projectId: projectId,
+            bidId: candidate.bidId,
+          ),
         ),
       );
     }
     return widgets;
+  }
+
+  void _openBidCandidateThread({
+    required String projectId,
+    required String bidId,
+  }) {
+    Navigator.of(context).pushNamed(
+      ExhibitionRoutes.bidThreadWithIds(projectId: projectId, bidId: bidId),
+    );
   }
 
   void _showBidSelectionConfirmSheet({
@@ -121,23 +120,6 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
     _ProjectBidSelectionState? selection,
   ) {
     return state == 'published' && selection?.orderId == null;
-  }
-
-  String _ownerBidSelectionStatusBody({
-    required String? state,
-    required _ProjectBidSelectionState? selection,
-    required bool hasCandidates,
-  }) {
-    if (selection?.orderId != null) {
-      return '当前项目已经承接到订单锚点；这里不再重复选择合作方，后续请进入订单详情继续。';
-    }
-    if (state != 'published') {
-      return '当前项目处于 ${state == null ? '未知状态' : _frontStageStateLabel(state)}，暂不开放选择合作方动作。';
-    }
-    if (!hasCandidates) {
-      return '当前项目处于竞标中，但详情返回里还没有竞标候选列表。页面只显示受控空态，不本地生成候选。';
-    }
-    return '当前项目处于竞标中，发布方可以从 BFF 返回的候选中选择一个合作方。';
   }
 }
 

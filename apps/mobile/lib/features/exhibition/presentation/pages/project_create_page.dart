@@ -1603,10 +1603,34 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           showIntroCopy: false,
           compactKindHints: true,
         )
+      else if (currentState == 'draft')
+        _ActionCard(
+          title: '报价依据资料',
+          children: <Widget>[
+            const _DetailLine(
+              label: '当前状态',
+              value: '当前项目尚未进入预发布附件补充阶段。',
+            ),
+            const _DetailLine(
+              label: '当前提示',
+              value: '请仔细核对上面信息，确认进入预发布列表。',
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                key: const ValueKey<String>(
+                  'project-edit-draft-submit-to-prepublish-bottom',
+                ),
+                onPressed: _submitting ? null : _submitProject,
+                child: const Text('确认保存到预发布列表'),
+              ),
+            ),
+          ],
+        )
       else
         const _ActionCard(
           title: '报价依据资料',
-          summary: '保存到草稿或预发布列表后，五类报价依据资料会在这里开放补充。',
           children: <Widget>[
             _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
           ],

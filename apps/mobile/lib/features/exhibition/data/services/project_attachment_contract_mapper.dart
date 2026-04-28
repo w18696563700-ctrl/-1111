@@ -15,10 +15,16 @@ const Set<String> _stableProjectAttachmentVisibilities = <String>{
 
 const Set<String> _stableProjectAttachmentDeleteStates = <String>{'deleted'};
 
-const Set<String> _stableProjectAttachmentMimeTypes = <String>{
+const Set<String> _knownProjectAttachmentMimeTypes = <String>{
   'image/png',
   'image/jpeg',
   'image/webp',
+  'image/gif',
+  'image/heic',
+  'image/heif',
+  'image/bmp',
+  'image/tiff',
+  'image/svg+xml',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -26,6 +32,15 @@ const Set<String> _stableProjectAttachmentMimeTypes = <String>{
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/csv',
   'application/csv',
+  'application/vnd.ms-powerpoint',
+  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  'text/plain',
+  'application/rtf',
+  'application/json',
+  'application/zip',
+  'application/vnd.rar',
+  'application/x-7z-compressed',
+  'application/octet-stream',
 };
 
 Map<String, Object?>? _sanitizeProjectAttachmentListPayload(Object? payload) {
@@ -111,13 +126,11 @@ Map<String, Object?> _sanitizeProjectAttachmentMap(
 }
 
 String? _sanitizeProjectAttachmentMimeType(Object? value) {
-  final normalized = value is String ? _normalize(value) : null;
-  if (normalized == null) {
+  final normalized = _normalizeProjectAttachmentMimeType(value);
+  if (normalized == null || !_isProjectAttachmentMimeTypeAllowed(normalized)) {
     return null;
   }
-  return _stableProjectAttachmentMimeTypes.contains(normalized)
-      ? normalized
-      : null;
+  return normalized;
 }
 
 int? _sanitizeProjectAttachmentSortOrder(Object? value) {
@@ -127,21 +140,16 @@ int? _sanitizeProjectAttachmentSortOrder(Object? value) {
   return value;
 }
 
-bool _isProjectAttachmentImageMimeType(String mimeType) {
-  return mimeType.startsWith('image/');
+String? _normalizeProjectAttachmentMimeType(Object? value) {
+  return value is String ? _normalize(value)?.toLowerCase() : null;
 }
 
-bool _isProjectAttachmentDocumentMimeType(String mimeType) {
-  return mimeType == 'application/pdf' ||
-      mimeType == 'application/msword' ||
-      mimeType ==
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-}
-
-bool _isProjectAttachmentSpreadsheetMimeType(String mimeType) {
-  return mimeType == 'application/vnd.ms-excel' ||
-      mimeType ==
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      mimeType == 'text/csv' ||
-      mimeType == 'application/csv';
+bool _isProjectAttachmentMimeTypeAllowed(String mimeType) {
+  if (_knownProjectAttachmentMimeTypes.contains(mimeType)) {
+    return true;
+  }
+  final slashIndex = mimeType.indexOf('/');
+  return slashIndex > 0 &&
+      slashIndex < mimeType.length - 1 &&
+      !RegExp(r'\s').hasMatch(mimeType);
 }

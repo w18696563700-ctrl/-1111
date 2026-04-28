@@ -491,13 +491,15 @@ class AppRouter {
       _ => '展览',
     };
 
-    final appBarActions = switch (routePath) {
-      ExhibitionRoutes.projectEdit => <Widget>[
-        ProjectEditStatusAppBarAction(
-          projectId: routeUri.queryParameters['projectId'],
-        ),
-      ],
-      _ => const <Widget>[],
+    final appBarActions = const <Widget>[];
+    final titleContent = switch (routePath) {
+      ExhibitionRoutes.myProjectDetail => MyProjectDetailHeaderTitle(
+        projectId: routeUri.queryParameters['projectId'],
+      ),
+      ExhibitionRoutes.projectEdit => ProjectEditHeaderTitle(
+        projectId: routeUri.queryParameters['projectId'],
+      ),
+      _ => null,
     };
 
     return MaterialPageRoute<void>(
@@ -505,6 +507,7 @@ class AppRouter {
       builder: (_) => AppShellScaffold(
         currentBuilding: AppBuilding.exhibition,
         titleOverride: title,
+        titleContent: titleContent,
         appBarActions: appBarActions,
         child: child,
       ),

@@ -88,6 +88,7 @@ inputs_canonical:
   - 保存项目附件业务真值。
   - 保存 `projectId / fileAssetId / attachmentKind / visibility / sortOrder / createdAt` 等业务绑定。
   - `attachmentKind` 是报价依据资料分类真源。
+  - `mimeType` 只是文件技术属性；经全格式补充冻结后，不再按 `attachmentKind` 收窄文件格式。
 - OSS：
   - 只保存二进制对象。
   - `objectKey` 不得作为业务分类、项目归属、权限或资料类型真源。

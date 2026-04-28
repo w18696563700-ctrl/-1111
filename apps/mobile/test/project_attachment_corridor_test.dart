@@ -497,6 +497,7 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, '材质图 / 材料样板'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '设备物料清单'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '服务清单'), findsOneWidget);
+    expect(find.textContaining('全格式文件'), findsOneWidget);
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
     expect(find.textContaining('展馆和展位图'), findsNothing);
     expect(find.textContaining('展商手册'), findsNothing);
@@ -520,7 +521,7 @@ void main() {
 
     await _scrollTo(tester, find.text('construction-plan.docx'));
     expect(find.text('construction-plan.docx'), findsWidgets);
-    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览文书'));
+    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览文件'));
     expect(
       openedAttachmentUri?.toString(),
       'https://files.example.com/construction-plan.docx',
@@ -549,6 +550,126 @@ void main() {
       openedUri?.toString(),
       'https://files.example.com/public-resource-contract-1.pdf',
     );
+  });
+
+  testWidgets('project attachment accepts full-format zip for service list', (
+    WidgetTester tester,
+  ) async {
+    ProjectAttachmentDebugOverrides.installPicker(
+      () async => const ProjectAttachmentDraft(
+        fileName: '服务清单资料.zip',
+        bytes: <int>[1, 2, 3, 4, 5],
+      ),
+    );
+
+    final attachments = <Map<String, Object?>>[];
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/my/projects/project-owner-full-format':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _myProjectDetailPayload(
+                    projectId: 'project-owner-full-format',
+                    viewerProjectRelation: 'owner',
+                    state: 'submitted',
+                  ),
+                ),
+            'GET /api/app/my/projects/project-owner-full-format/attachments':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _attachmentListResponse(
+                    'project-owner-full-format',
+                    attachments,
+                  ),
+                ),
+            'GET /api/app/project/public-resources':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _publicResourceListResponse(
+                    const <Map<String, Object?>>[],
+                  ),
+                ),
+            'POST /api/app/file/upload/init': (AppApiRequest request) async {
+              final body = request.body! as Map<String, Object?>;
+              expect(body['fileKind'], 'project_attachment');
+              expect(body['mimeType'], 'application/zip');
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'uploadSessionId': 'upload-session-full-format',
+                  'directUpload': <String, Object?>{
+                    'url': 'https://oss.example.com/full-format',
+                    'method': 'PUT',
+                  },
+                  'confirm': <String, Object?>{
+                    'endpoint': '/api/app/file/upload/confirm',
+                  },
+                },
+              );
+            },
+            'POST /api/app/file/upload/confirm':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'fileAssetId': 'file-asset-service-zip',
+                  },
+                ),
+            'POST /api/app/my/projects/project-owner-full-format/attachments':
+                (AppApiRequest request) async {
+                  final body = request.body! as Map<String, Object?>;
+                  expect(body['attachmentKind'], 'service_list');
+                  expect(body['mimeType'], 'application/zip');
+                  final item = _attachmentItem(
+                    attachmentId: 'attachment-service-zip',
+                    projectId: 'project-owner-full-format',
+                    fileAssetId: body['fileAssetId']! as String,
+                    fileName: body['fileName']! as String,
+                    attachmentKind: body['attachmentKind']! as String,
+                    mimeType: body['mimeType']! as String,
+                    sortOrder: body['sortOrder']! as int,
+                  );
+                  attachments.insert(0, item);
+                  return AppApiResponse(
+                    statusCode: 202,
+                    uri: request.uri,
+                    body: item,
+                  );
+                },
+          },
+      uploadHandler: (AppApiUploadRequest request) async {
+        return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionTransport: transport,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-owner-full-format',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.text('报价依据资料'));
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '服务清单'));
+    expect(find.textContaining('全格式文件'), findsOneWidget);
+
+    await _tapVisible(tester, find.text('选择服务清单', skipOffstage: false));
+    expect(find.text('服务清单资料.zip'), findsOneWidget);
+    expect(find.textContaining('ZIP 压缩包'), findsOneWidget);
+
+    await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
+    await _scrollTo(tester, find.text('服务清单资料.zip'));
+
+    expect(find.text('资料名称：服务清单'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '下载文件'), findsOneWidget);
   });
 
   testWidgets('selected effect image previews before upload', (
@@ -698,7 +819,7 @@ void main() {
 
       await _scrollTo(tester, find.text('报价依据资料'));
       await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
-      expect(find.text('当前文书预览服务暂不可用，请稍后再试。'), findsOneWidget);
+      expect(find.text('当前资料读取服务暂不可用，请稍后再试。'), findsOneWidget);
       expect(find.textContaining('unrecognized error code'), findsNothing);
     },
   );

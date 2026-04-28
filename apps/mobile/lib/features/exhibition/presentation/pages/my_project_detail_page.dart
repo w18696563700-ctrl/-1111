@@ -43,10 +43,21 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return;
     }
 
+    _publishProjectEditHeaderStatus(
+      widget.projectId,
+      _myProjectDetailHeaderState(snapshot.result.payload),
+    );
     setState(() {
       _snapshot = snapshot;
       _loading = false;
     });
+  }
+
+  String? _myProjectDetailHeaderState(Object? payload) {
+    final payloadMap = _payloadMap(payload);
+    final publicProject = _payloadMap(payloadMap?['publicProject']);
+    return _normalizeId(publicProject?['state'] as String?) ??
+        _stateFromPayload(payload);
   }
 
   @override

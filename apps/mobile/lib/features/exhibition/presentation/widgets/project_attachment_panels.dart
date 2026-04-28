@@ -300,7 +300,7 @@ class _ProjectAttachmentStatePanel extends StatelessWidget {
         '下一步：点击“再次绑定正式附件”或重新上传当前附件。',
       _ProjectAttachmentUploadUiStatus.bindSucceeded
           when selectedDraft != null =>
-        '已形成当前文书：${selectedDraft!.fileName}',
+        '已形成当前资料：${selectedDraft!.fileName}',
       _ => null,
     };
   }
@@ -346,13 +346,13 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
 
     if (!autoloaded && result == null) {
       return _EmptyNotice(
-        title: '当前还没有文书回读',
-        message: '$emptyMessage bind 成功后，页面会回读当前文书列表。',
+        title: '当前还没有资料回读',
+        message: '$emptyMessage bind 成功后，页面会回读当前资料列表。',
       );
     }
 
     if (loading) {
-      return const _EmptyNotice(title: '正在读取文书列表', message: '正在读取报价依据资料列表。');
+      return const _EmptyNotice(title: '正在读取资料列表', message: '正在读取报价依据资料列表。');
     }
 
     final loadResult = result;

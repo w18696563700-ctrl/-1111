@@ -863,6 +863,10 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(
+      find.textContaining('预发布补齐资料并发布页', findRichText: true),
+      findsOneWidget,
+    );
     await _scrollTo(tester, find.text('当前阶段动作'));
     expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);

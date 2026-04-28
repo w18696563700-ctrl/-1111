@@ -14,6 +14,7 @@ const String _projectAttachmentKindEquipmentMaterialList =
     'equipment_material_list';
 const String _projectAttachmentKindServiceList = 'service_list';
 const String _projectAttachmentKindOtherMaterial = 'other_material';
+const String _projectAttachmentFullFormatSupportedTypes = '全格式文件';
 
 class ProjectAttachmentDraft {
   const ProjectAttachmentDraft({required this.fileName, required this.bytes});
@@ -109,31 +110,31 @@ const List<_ProjectAttachmentKindOption> _projectAttachmentKindOptions =
         value: _projectAttachmentKindEffectImage,
         label: '效果图',
         summary: '用于补充效果图或展示图，帮助接单方判断视觉复杂度、造型和灯光氛围。',
-        supportedTypes: 'PNG / JPEG / WEBP',
+        supportedTypes: _projectAttachmentFullFormatSupportedTypes,
       ),
       _ProjectAttachmentKindOption(
         value: _projectAttachmentKindConstructionDoc,
         label: '尺寸图 / 施工图',
         summary: '用于补充尺寸、施工尺寸或平立面尺寸文档，帮助接单方判断面积、结构、用料和人工。',
-        supportedTypes: 'PDF / DOC / DOCX',
+        supportedTypes: _projectAttachmentFullFormatSupportedTypes,
       ),
       _ProjectAttachmentKindOption(
         value: _projectAttachmentKindMaterialSample,
         label: '材质图 / 材料样板',
         summary: '用于补充材质、工艺或现场参考资料，帮助接单方判断板材、饰面、五金和工艺成本。',
-        supportedTypes: 'PNG / JPEG / WEBP / PDF / DOC / DOCX',
+        supportedTypes: _projectAttachmentFullFormatSupportedTypes,
       ),
       _ProjectAttachmentKindOption(
         value: _projectAttachmentKindEquipmentMaterialList,
         label: '设备物料清单',
         summary: '用于补充 LED、电视、触摸机、桌椅、绿植、饮水机等非装修但必需物料。',
-        supportedTypes: 'XLS / XLSX / CSV / PDF / DOC / DOCX',
+        supportedTypes: _projectAttachmentFullFormatSupportedTypes,
       ),
       _ProjectAttachmentKindOption(
         value: _projectAttachmentKindServiceList,
         label: '服务清单',
         summary: '用于补充保洁、摄影摄像、礼仪、模特、演绎、安保等服务需求。',
-        supportedTypes: 'XLS / XLSX / CSV / PDF / DOC / DOCX',
+        supportedTypes: _projectAttachmentFullFormatSupportedTypes,
       ),
     ];
 
@@ -180,19 +181,10 @@ String? _projectAttachmentExtension(String fileName) {
   }
 
   final extension = normalized.substring(dotIndex + 1);
-  return switch (extension) {
-    'png' ||
-    'jpg' ||
-    'jpeg' ||
-    'webp' ||
-    'pdf' ||
-    'doc' ||
-    'docx' ||
-    'xls' ||
-    'xlsx' ||
-    'csv' => extension,
-    _ => null,
-  };
+  if (extension.length > 32 || RegExp(r'[\\/\s]').hasMatch(extension)) {
+    return null;
+  }
+  return extension;
 }
 
 String? _projectAttachmentMimeType(String? extension) {
@@ -200,6 +192,12 @@ String? _projectAttachmentMimeType(String? extension) {
     'png' => 'image/png',
     'jpg' || 'jpeg' => 'image/jpeg',
     'webp' => 'image/webp',
+    'gif' => 'image/gif',
+    'heic' => 'image/heic',
+    'heif' => 'image/heif',
+    'bmp' => 'image/bmp',
+    'tif' || 'tiff' => 'image/tiff',
+    'svg' => 'image/svg+xml',
     'pdf' => 'application/pdf',
     'doc' => 'application/msword',
     'docx' =>
@@ -208,7 +206,18 @@ String? _projectAttachmentMimeType(String? extension) {
     'xlsx' =>
       'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
     'csv' => 'text/csv',
-    _ => null,
+    'ppt' => 'application/vnd.ms-powerpoint',
+    'pptx' =>
+      'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'txt' => 'text/plain',
+    'rtf' => 'application/rtf',
+    'json' => 'application/json',
+    'zip' => 'application/zip',
+    'rar' => 'application/vnd.rar',
+    '7z' => 'application/x-7z-compressed',
+    'dwg' || 'dxf' => 'application/octet-stream',
+    null => null,
+    _ => 'application/octet-stream',
   };
 }
 
@@ -217,12 +226,28 @@ String _projectAttachmentFileTypeLabel(String extension) {
     'png' => 'PNG 图片',
     'jpg' || 'jpeg' => 'JPEG 图片',
     'webp' => 'WEBP 图片',
+    'gif' => 'GIF 图片',
+    'heic' => 'HEIC 图片',
+    'heif' => 'HEIF 图片',
+    'bmp' => 'BMP 图片',
+    'tif' || 'tiff' => 'TIFF 图片',
+    'svg' => 'SVG 文件',
     'pdf' => 'PDF 文档',
     'doc' => 'DOC 文档',
     'docx' => 'DOCX 文档',
     'xls' => 'XLS 表格',
     'xlsx' => 'XLSX 表格',
     'csv' => 'CSV 表格',
+    'ppt' => 'PPT 演示文稿',
+    'pptx' => 'PPTX 演示文稿',
+    'txt' => 'TXT 文本',
+    'rtf' => 'RTF 文档',
+    'json' => 'JSON 文件',
+    'zip' => 'ZIP 压缩包',
+    'rar' => 'RAR 压缩包',
+    '7z' => '7Z 压缩包',
+    'dwg' => 'DWG 图纸',
+    'dxf' => 'DXF 图纸',
     _ => extension.toUpperCase(),
   };
 }
@@ -232,6 +257,12 @@ String _projectAttachmentMimeTypeLabel(String mimeType) {
     'image/png' => 'PNG 图片',
     'image/jpeg' => 'JPEG 图片',
     'image/webp' => 'WEBP 图片',
+    'image/gif' => 'GIF 图片',
+    'image/heic' => 'HEIC 图片',
+    'image/heif' => 'HEIF 图片',
+    'image/bmp' => 'BMP 图片',
+    'image/tiff' => 'TIFF 图片',
+    'image/svg+xml' => 'SVG 文件',
     'application/pdf' => 'PDF 文档',
     'application/msword' => 'DOC 文档',
     'application/vnd.openxmlformats-officedocument.wordprocessingml.document' =>
@@ -240,6 +271,16 @@ String _projectAttachmentMimeTypeLabel(String mimeType) {
     'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' =>
       'XLSX 表格',
     'text/csv' || 'application/csv' => 'CSV 表格',
+    'application/vnd.ms-powerpoint' => 'PPT 演示文稿',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation' =>
+      'PPTX 演示文稿',
+    'text/plain' => 'TXT 文本',
+    'application/rtf' => 'RTF 文档',
+    'application/json' => 'JSON 文件',
+    'application/zip' => 'ZIP 压缩包',
+    'application/vnd.rar' => 'RAR 压缩包',
+    'application/x-7z-compressed' => '7Z 压缩包',
+    'application/octet-stream' => '通用文件',
     _ => mimeType,
   };
 }
@@ -310,56 +351,68 @@ _projectAttachmentFileAccessFromPayload(Object? payload) {
 
 String _projectAttachmentUnsupportedTypeMessage(String attachmentKind) {
   return switch (attachmentKind) {
-    _projectAttachmentKindEffectImage => '效果图只支持 PNG、JPEG、WEBP 图片。',
-    _projectAttachmentKindConstructionDoc => '尺寸图 / 施工图只支持 PDF、DOC、DOCX 文件。',
-    _projectAttachmentKindMaterialSample => '材质图 / 材料样板只支持图片、PDF、DOC、DOCX 文件。',
-    _projectAttachmentKindEquipmentMaterialList =>
-      '设备物料清单只支持 XLS、XLSX、CSV、PDF、DOC、DOCX 文件。',
-    _projectAttachmentKindServiceList =>
-      '服务清单只支持 XLS、XLSX、CSV、PDF、DOC、DOCX 文件。',
-    _projectAttachmentKindOtherMaterial => '其他资料只支持图片、PDF、DOC、DOCX 文件。',
-    _ => '当前文件类型暂不支持。',
+    _projectAttachmentKindEffectImage ||
+    _projectAttachmentKindConstructionDoc ||
+    _projectAttachmentKindMaterialSample ||
+    _projectAttachmentKindEquipmentMaterialList ||
+    _projectAttachmentKindServiceList ||
+    _projectAttachmentKindOtherMaterial => '当前资料类型支持全格式文件，请选择带有效扩展名的文件。',
+    _ => '当前资料类型暂不支持。',
   };
 }
 
 bool _projectAttachmentKindMatchesMimeType(String kind, String mimeType) {
-  final isImage = mimeType.startsWith('image/');
-  final isDocument =
-      mimeType == 'application/pdf' ||
-      mimeType == 'application/msword' ||
-      mimeType ==
-          'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-  final isSpreadsheet =
-      mimeType == 'application/vnd.ms-excel' ||
-      mimeType ==
-          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
-      mimeType == 'text/csv' ||
-      mimeType == 'application/csv';
   return switch (kind) {
-    _projectAttachmentKindEffectImage => isImage,
-    _projectAttachmentKindConstructionDoc => isDocument,
-    _projectAttachmentKindMaterialSample => isImage || isDocument,
+    _projectAttachmentKindEffectImage ||
+    _projectAttachmentKindConstructionDoc ||
+    _projectAttachmentKindMaterialSample ||
     _projectAttachmentKindEquipmentMaterialList ||
-    _projectAttachmentKindServiceList => isDocument || isSpreadsheet,
-    _projectAttachmentKindOtherMaterial => isImage || isDocument,
+    _projectAttachmentKindServiceList ||
+    _projectAttachmentKindOtherMaterial => _projectAttachmentIsValidMimeType(
+      mimeType,
+    ),
     _ => false,
   };
+}
+
+bool _projectAttachmentIsValidMimeType(String mimeType) {
+  final normalized = mimeType.trim();
+  final slashIndex = normalized.indexOf('/');
+  return slashIndex > 0 &&
+      slashIndex < normalized.length - 1 &&
+      !RegExp(r'\s').hasMatch(normalized);
 }
 
 bool _projectAttachmentIsImageMimeType(String mimeType) {
   return mimeType.startsWith('image/');
 }
 
-bool _projectAttachmentCanOpenLocally(String mimeType) {
+bool _projectAttachmentIsInlinePreviewMimeType(String mimeType) {
   return _projectAttachmentIsImageMimeType(mimeType) ||
-      _projectAttachmentKindMatchesMimeType(
-        _projectAttachmentKindConstructionDoc,
-        mimeType,
-      );
+      mimeType == 'application/pdf' ||
+      mimeType == 'application/msword' ||
+      mimeType ==
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
+      mimeType == 'application/vnd.ms-excel' ||
+      mimeType ==
+          'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+      mimeType == 'text/csv' ||
+      mimeType == 'application/csv' ||
+      mimeType == 'text/plain' ||
+      mimeType == 'application/rtf' ||
+      mimeType == 'application/vnd.ms-powerpoint' ||
+      mimeType ==
+          'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+}
+
+bool _projectAttachmentCanOpenLocally(String mimeType) {
+  return _projectAttachmentIsValidMimeType(mimeType);
 }
 
 String _projectAttachmentAccessMode(String mimeType) {
-  return _projectAttachmentCanOpenLocally(mimeType) ? 'preview' : 'download';
+  return _projectAttachmentIsInlinePreviewMimeType(mimeType)
+      ? 'preview'
+      : 'download';
 }
 
 String _projectAttachmentDraftPreviewButtonLabel(String mimeType) {
@@ -367,7 +420,10 @@ String _projectAttachmentDraftPreviewButtonLabel(String mimeType) {
 }
 
 String _projectAttachmentRecordPreviewButtonLabel(String mimeType) {
-  return _projectAttachmentIsImageMimeType(mimeType) ? '预览图片' : '预览文书';
+  if (_projectAttachmentIsImageMimeType(mimeType)) {
+    return '预览图片';
+  }
+  return _projectAttachmentIsInlinePreviewMimeType(mimeType) ? '预览文件' : '下载文件';
 }
 
 const int _projectAttachmentRemoteImagePreviewMaxBytes = 12 * 1024 * 1024;
@@ -486,17 +542,17 @@ String _projectAttachmentFileAccessFailureMessage(
   }
   if (rawMessage ==
       'current fake transport did not provide this canonical path') {
-    return '当前文书预览服务暂未接通。';
+    return '当前资料读取服务暂未接通。';
   }
 
   return switch (result.errorCode) {
     'AUTH_SESSION_INVALID' => '当前登录状态已失效，请重新登录后再试。',
-    'FILE_ACCESS_INVALID' => '当前文书预览参数不可用，请稍后再试。',
-    'FILE_ACCESS_FAILED' => '当前文书预览服务暂不可用，请稍后再试。',
-    'FILE_ACCESS_NOT_FOUND' => '当前文书不存在或暂不可预览。',
+    'FILE_ACCESS_INVALID' => '当前资料读取参数不可用，请稍后再试。',
+    'FILE_ACCESS_FAILED' => '当前资料读取服务暂不可用，请稍后再试。',
+    'FILE_ACCESS_NOT_FOUND' => '当前资料不存在或暂不可读取。',
     'FILE_ACCESS_PERMISSION_DENIED' => '当前账号暂不可读取这份资料。',
-    'FILE_ACCESS_UNAVAILABLE' => '当前文书预览服务暂不可用，请稍后再试。',
-    _ => '当前文书预览服务暂不可用，请稍后再试。',
+    'FILE_ACCESS_UNAVAILABLE' => '当前资料读取服务暂不可用，请稍后再试。',
+    _ => '当前资料读取服务暂不可用，请稍后再试。',
   };
 }
 
@@ -633,6 +689,6 @@ String _projectAttachmentDeleteFailureMessage(ExhibitionActionResult result) {
       result.message ==
               'current fake transport did not provide this canonical path'
           ? '当前报价依据资料暂未接通删除。'
-          : '当前文书删除未完成，请稍后重试。',
+          : '当前资料删除未完成，请稍后重试。',
   };
 }

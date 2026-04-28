@@ -97,7 +97,7 @@ extension _ProjectAttachmentActionService on _ExhibitionActionService {
         path: ExhibitionCanonicalPaths.fileAccess,
         isSuccess: false,
         controlledState: AppPageState.notFound,
-        message: '当前文书暂不可预览，请稍后再试。',
+        message: '当前资料暂不可读取，请稍后再试。',
       );
     }
 

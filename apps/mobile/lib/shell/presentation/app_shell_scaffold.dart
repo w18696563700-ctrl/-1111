@@ -8,6 +8,7 @@ class AppShellScaffold extends StatelessWidget {
     required this.currentBuilding,
     required this.child,
     this.titleOverride,
+    this.titleContent,
     this.appBarActions = const <Widget>[],
     this.floatingActionButton,
     this.onBuildingSelected,
@@ -17,6 +18,7 @@ class AppShellScaffold extends StatelessWidget {
   final AppBuilding currentBuilding;
   final Widget child;
   final String? titleOverride;
+  final Widget? titleContent;
   final List<Widget> appBarActions;
   final Widget? floatingActionButton;
   final ValueChanged<AppBuilding>? onBuildingSelected;
@@ -73,7 +75,8 @@ class AppShellScaffold extends StatelessWidget {
                       onPressed: navigator.pop,
                     )
                   : null,
-              title: Text(titleOverride ?? currentBuilding.label),
+              title:
+                  titleContent ?? Text(titleOverride ?? currentBuilding.label),
               actions: appBarActions.isEmpty ? null : appBarActions,
             ),
       body: SafeArea(

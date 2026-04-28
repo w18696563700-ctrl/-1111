@@ -82,7 +82,7 @@ String? _validateProjectBidMaterialEntity(
   }
 
   final mimeType = raw['mimeType']! as String;
-  if (!_stableProjectAttachmentMimeTypes.contains(mimeType)) {
+  if (!_isProjectAttachmentMimeTypeAllowed(mimeType)) {
     return 'contract drift at $context: unsupported attachment mime "$mimeType"';
   }
 

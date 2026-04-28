@@ -58,9 +58,14 @@ Flutter 继续复用三段式上传：
 
 Flutter 不缓存长期 OSS URL，不把列表响应中的 `fileAssetId` 当下载授权。
 
-## 4. Option Judgment
+## 4. Format Policy
 
-- 更稳：五类资料共用一套 Flutter 枚举和 MIME 校验，发布方与接单方同源展示。
+经 `docs/04_frontend/quote_basis_material_package_full_format_frontend_surface_addendum.md`
+补充冻结，发布方 5 类资料入口均显示支持全格式文件；Flutter 不再按资料类型拦截 MIME。
+
+## 5. Option Judgment
+
+- 更稳：五类资料共用一套 Flutter 枚举，发布方与接单方同源展示，不把文件格式写成业务分类规则。
 - 更省成本：复用既有上传、绑定、列表和 file-access action。
 - 更适合当前阶段：仅改展览发布/竞标链路，不扩模板中心和工程量清单。
 - 风险更大：继续使用 `other_material` 或在接单方直接展示 owner 管理能力。

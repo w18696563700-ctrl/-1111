@@ -743,7 +743,10 @@ void main() {
         findsOneWidget,
       );
       expect(
-        find.descendant(of: find.byType(AppBar), matching: find.text('草稿')),
+        find.descendant(
+          of: find.byType(AppBar),
+          matching: find.text('草稿 -> 预发布列表'),
+        ),
         findsOneWidget,
       );
       expect(find.text('当前状态：草稿'), findsNothing);
@@ -770,6 +773,28 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(_projectCreateField('project-create-description'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        find.widgetWithText(FilledButton, '确认保存到预发布列表'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        find.text('当前状态：当前项目尚未进入预发布附件补充阶段。'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('当前提示：请仔细核对上面信息，确认进入预发布列表。'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(FilledButton, '确认保存到预发布列表'),
+        findsOneWidget,
+      );
+      expect(
+        find.text('保存到草稿或预发布列表后，五类报价依据资料会在这里开放补充。'),
+        findsNothing,
+      );
     },
   );
 
@@ -900,9 +925,23 @@ void main() {
         isTrue,
       );
 
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const ValueKey<String>(
+            'project-edit-draft-submit-to-prepublish-bottom',
+          ),
+        ),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       await _scrollAndTap(
         tester,
-        find.widgetWithText(FilledButton, '保存到预发布列表'),
+        find.byKey(
+          const ValueKey<String>(
+            'project-edit-draft-submit-to-prepublish-bottom',
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       expect(

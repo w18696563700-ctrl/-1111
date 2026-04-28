@@ -528,7 +528,7 @@ test('submitted project bind success before publish', async () => {
   assert.equal(harness.state.attachments.length, 1);
 });
 
-test('effect_image mime validation rejects non-image truth', async () => {
+test('effect_image accepts non-image full-format truth', async () => {
   const { ProjectAttachmentService } = require('../dist/modules/project/project-attachment.service.js');
   const { ProjectAttachmentPresenter } = require('../dist/modules/project/project-attachment.presenter.js');
 
@@ -546,19 +546,18 @@ test('effect_image mime validation rejects non-image truth', async () => {
     new ProjectAttachmentPresenter(),
   );
 
-  await assert.rejects(
-    () =>
-      service.bind(
-        'project-1',
-        {
-          fileAssetId: 'asset-1',
-          fileName: '效果图.pdf',
-          attachmentKind: 'effect_image',
-        },
-        createContext('attachment-bind-effect-image-mime'),
-      ),
-    (error) => error?.response?.code === 'PROJECT_ATTACHMENT_INVALID',
+  const result = await service.bind(
+    'project-1',
+    {
+      fileAssetId: 'asset-1',
+      fileName: '效果图说明.pdf',
+      attachmentKind: 'effect_image',
+    },
+    createContext('attachment-bind-effect-image-full-format'),
   );
+
+  assert.equal(result.attachmentKind, 'effect_image');
+  assert.equal(result.mimeType, 'application/pdf');
 });
 
 test('project attachment bind rejects legacy project evidence truth', async () => {
@@ -594,7 +593,7 @@ test('project attachment bind rejects legacy project evidence truth', async () =
   );
 });
 
-test('construction_doc mime validation rejects image truth', async () => {
+test('construction_doc accepts image full-format truth', async () => {
   const { ProjectAttachmentService } = require('../dist/modules/project/project-attachment.service.js');
   const { ProjectAttachmentPresenter } = require('../dist/modules/project/project-attachment.presenter.js');
 
@@ -612,19 +611,18 @@ test('construction_doc mime validation rejects image truth', async () => {
     new ProjectAttachmentPresenter(),
   );
 
-  await assert.rejects(
-    () =>
-      service.bind(
-        'project-1',
-        {
-          fileAssetId: 'asset-1',
-          fileName: '施工文档.jpg',
-          attachmentKind: 'construction_doc',
-        },
-        createContext('attachment-bind-construction-doc-mime'),
-      ),
-    (error) => error?.response?.code === 'PROJECT_ATTACHMENT_INVALID',
+  const result = await service.bind(
+    'project-1',
+    {
+      fileAssetId: 'asset-1',
+      fileName: '现场尺寸照片.jpg',
+      attachmentKind: 'construction_doc',
+    },
+    createContext('attachment-bind-construction-doc-full-format'),
   );
+
+  assert.equal(result.attachmentKind, 'construction_doc');
+  assert.equal(result.mimeType, 'image/jpeg');
 });
 
 test('bind rejects legacy other_material for V1 writes', async () => {

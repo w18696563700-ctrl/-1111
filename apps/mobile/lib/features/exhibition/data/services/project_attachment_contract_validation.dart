@@ -122,7 +122,7 @@ String? _validateProjectAttachmentEntity(
   }
 
   final mimeType = raw['mimeType']! as String;
-  if (!_stableProjectAttachmentMimeTypes.contains(mimeType)) {
+  if (!_isProjectAttachmentMimeTypeAllowed(mimeType)) {
     return 'contract drift at $context: unsupported attachment mime "$mimeType"';
   }
 
@@ -136,17 +136,12 @@ String? _validateProjectAttachmentEntity(
 
 bool _projectAttachmentKindAllowsMimeType(String kind, String mimeType) {
   return switch (kind) {
-    'effect_image' => _isProjectAttachmentImageMimeType(mimeType),
-    'construction_doc' => _isProjectAttachmentDocumentMimeType(mimeType),
-    'material_sample' =>
-      _isProjectAttachmentImageMimeType(mimeType) ||
-          _isProjectAttachmentDocumentMimeType(mimeType),
-    'equipment_material_list' || 'service_list' =>
-      _isProjectAttachmentDocumentMimeType(mimeType) ||
-          _isProjectAttachmentSpreadsheetMimeType(mimeType),
-    'other_material' =>
-      _isProjectAttachmentImageMimeType(mimeType) ||
-          _isProjectAttachmentDocumentMimeType(mimeType),
+    'effect_image' ||
+    'construction_doc' ||
+    'material_sample' ||
+    'equipment_material_list' ||
+    'service_list' ||
+    'other_material' => _isProjectAttachmentMimeTypeAllowed(mimeType),
     _ => false,
   };
 }

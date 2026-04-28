@@ -142,17 +142,13 @@ ProjectBidMaterialListResponse:
 
 ## 7. MIME Contract
 
-当前建议 MIME family 固定为：
+经 `docs/01_contracts/quote_basis_material_package_full_format_contract_addendum.md`
+补充冻结，5 个报价依据资料分类均支持全格式文件：
 
-| attachmentKind | 允许文件类型 |
-| --- | --- |
-| `effect_image` | `image/png`, `image/jpeg`, `image/webp` |
-| `construction_doc` | `application/pdf`, `application/msword`, `application/vnd.openxmlformats-officedocument.wordprocessingml.document`, 可后续扩展 CAD |
-| `material_sample` | `image/png`, `image/jpeg`, `image/webp`, `application/pdf`, Word 文档 |
-| `equipment_material_list` | Excel, PDF, Word, CSV |
-| `service_list` | Excel, PDF, Word, CSV |
-
-Flutter 只负责前端提示和选择限制；Server 仍是最终校验真源。
+- `mimeType` 是 FileAsset 的文件技术属性。
+- `attachmentKind` 是报价依据资料分类真源。
+- Flutter、BFF、Server 不得再按 `attachmentKind` 制造第二套 MIME family 白名单。
+- 无法识别的扩展名可按 `application/octet-stream` 进入上传和绑定。
 
 ## 8. Error Contract
 

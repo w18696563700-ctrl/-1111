@@ -32,10 +32,6 @@ type ProjectQuoteBasisMaterialKind =
   | 'equipment_material_list'
   | 'service_list';
 
-type ProjectAttachmentKind =
-  | ProjectQuoteBasisMaterialKind
-  | 'other_material';
-
 const OWNER_PRIVATE_VISIBILITY = 'owner_private';
 const PROJECT_UPLOAD_BUSINESS_TYPE = 'project';
 const PROJECT_UPLOAD_FILE_KIND = 'project_attachment';
@@ -45,26 +41,6 @@ const ATTACHMENT_CORRIDOR_STATES = new Set([
   'bidding_closed',
   'awarded',
   'converted_to_order'
-]);
-const IMAGE_MIMES = new Set(['image/png', 'image/jpeg', 'image/webp']);
-const DOCUMENT_MIMES = new Set([
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-]);
-const SPREADSHEET_MIMES = new Set([
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'text/csv',
-  'application/csv'
-]);
-const ATTACHMENT_KIND_MIMES = new Map<ProjectAttachmentKind, Set<string>>([
-  ['effect_image', IMAGE_MIMES],
-  ['construction_doc', DOCUMENT_MIMES],
-  ['material_sample', new Set([...IMAGE_MIMES, ...DOCUMENT_MIMES])],
-  ['equipment_material_list', new Set([...DOCUMENT_MIMES, ...SPREADSHEET_MIMES])],
-  ['service_list', new Set([...DOCUMENT_MIMES, ...SPREADSHEET_MIMES])],
-  ['other_material', new Set([...IMAGE_MIMES, ...DOCUMENT_MIMES])]
 ]);
 const QUOTE_BASIS_MATERIAL_KINDS = new Set<ProjectQuoteBasisMaterialKind>([
   'effect_image',
@@ -129,7 +105,6 @@ export class ProjectAttachmentService {
         throw projectAttachmentUnavailable('Current FileAsset truth is unavailable for project attachment bind.');
       }
       this.ensureProjectFileAsset(fileAsset, project);
-      this.ensureAttachmentMime(command.attachmentKind, fileAsset.mimeType);
 
       const existing = await attachmentRepository.findOneBy({
         projectId: project.id,
@@ -260,16 +235,6 @@ export class ProjectAttachmentService {
     ) {
       throw projectAttachmentInvalid(
         'Current FileAsset truth is not aligned with the owner-private project attachment corridor.'
-      );
-    }
-  }
-
-  private ensureAttachmentMime(attachmentKind: ProjectQuoteBasisMaterialKind, mimeType: string) {
-    const normalizedMimeType = this.normalizeMimeType(mimeType);
-    const allowedMimes = ATTACHMENT_KIND_MIMES.get(attachmentKind);
-    if (!allowedMimes?.has(normalizedMimeType)) {
-      throw projectAttachmentInvalid(
-        `Current mime type is not allowed for attachmentKind \`${attachmentKind}\`.`
       );
     }
   }

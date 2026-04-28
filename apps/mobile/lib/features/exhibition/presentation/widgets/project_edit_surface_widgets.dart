@@ -60,7 +60,7 @@ class ProjectEditStatusAppBarAction extends StatelessWidget {
                   vertical: 6,
                 ),
                 child: Text(
-                  _frontStageStateLabel(value),
+                  _projectEditHeaderStatusLabel(value),
                   key: const ValueKey<String>('project-edit-app-bar-status'),
                   style: theme.textTheme.labelLarge?.copyWith(
                     color: colorScheme.primary,
@@ -69,6 +69,106 @@ class ProjectEditStatusAppBarAction extends StatelessWidget {
                 ),
               ),
             ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class ProjectEditHeaderTitle extends StatelessWidget {
+  const ProjectEditHeaderTitle({super.key, required this.projectId});
+
+  final String? projectId;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return const Text('编辑项目');
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+    final titleStyle = DefaultTextStyle.of(context).style;
+    return ValueListenableBuilder<String?>(
+      valueListenable: _projectEditHeaderStatusNotifierFor(normalizedProjectId),
+      builder: (BuildContext context, String? value, Widget? child) {
+        final label = value == null
+            ? null
+            : _projectEditHeaderStatusLabel(value);
+        return Row(
+          children: <Widget>[
+            Text('编辑项目', style: titleStyle),
+            if (label != null) ...<Widget>[
+              const SizedBox(width: 10),
+              Flexible(
+                child: Text(
+                  label,
+                  overflow: TextOverflow.ellipsis,
+                  key: const ValueKey<String>('project-edit-app-bar-status'),
+                  style: titleStyle.copyWith(
+                    color: colorScheme.error,
+                    fontWeight: titleStyle.fontWeight ?? FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        );
+      },
+    );
+  }
+}
+
+String _projectEditHeaderStatusLabel(String state) {
+  return switch (state) {
+    'draft' => '草稿 -> 预发布列表',
+    _ => _frontStageStateLabel(state),
+  };
+}
+
+class MyProjectDetailHeaderTitle extends StatelessWidget {
+  const MyProjectDetailHeaderTitle({super.key, required this.projectId});
+
+  final String? projectId;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return const Text('我的项目详情');
+    }
+
+    final theme = Theme.of(context);
+    final titleStyle = DefaultTextStyle.of(context).style;
+    return ValueListenableBuilder<String?>(
+      valueListenable: _projectEditHeaderStatusNotifierFor(normalizedProjectId),
+      builder: (BuildContext context, String? value, Widget? child) {
+        if (value != 'submitted') {
+          return Text('我的项目详情', style: titleStyle);
+        }
+
+        return FittedBox(
+          fit: BoxFit.scaleDown,
+          alignment: Alignment.centerLeft,
+          child: Text.rich(
+            TextSpan(
+              text: '我的项目详情',
+              children: <InlineSpan>[
+                TextSpan(
+                  text: '（预发布补齐资料并发布页）',
+                  style: titleStyle.copyWith(
+                    color: theme.colorScheme.error,
+                    fontWeight: titleStyle.fontWeight ?? FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+            key: const ValueKey<String>(
+              'my-project-detail-prepublish-app-bar-title',
+            ),
+            maxLines: 1,
+            style: titleStyle,
           ),
         );
       },

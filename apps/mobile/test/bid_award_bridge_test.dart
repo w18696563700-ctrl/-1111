@@ -495,6 +495,8 @@ void main() {
 
       await _scrollTo(tester, find.text('发布方选择合作方'));
       expect(find.text('重庆海川展览工厂'), findsOneWidget);
+      await _scrollTo(tester, find.widgetWithText(OutlinedButton, '进入沟通'));
+      expect(find.widgetWithText(OutlinedButton, '进入沟通'), findsOneWidget);
       await _scrollTo(tester, find.widgetWithText(FilledButton, '选择为合作方'));
       await tester.tap(find.widgetWithText(FilledButton, '选择为合作方'));
       await tester.pumpAndSettle();

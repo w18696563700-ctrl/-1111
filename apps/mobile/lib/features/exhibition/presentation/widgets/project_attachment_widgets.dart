@@ -160,7 +160,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     if (resolved == null) {
       setState(() {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.unsupportedType;
-        _uploadMessage = '当前只支持图片、PDF、DOC、DOCX、XLS、XLSX、CSV 文件。';
+        _uploadMessage = '请选择带有效文件名和扩展名的资料文件。';
       });
       return;
     }
@@ -635,7 +635,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     final access = _projectAttachmentFileAccessFromPayload(result.payload);
     if (access == null) {
       setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
-      _showSectionMessage('当前文书预览结果暂不可用，请稍后再试。');
+      _showSectionMessage('当前资料读取结果暂不可用，请稍后再试。');
       return;
     }
 
@@ -671,7 +671,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     if (!mounted) {
       return;
     }
-    _showSectionMessage(opened ? '已打开文书预览。' : '预览链接已生成，但当前设备未能直接打开，请稍后再试。');
+    _showSectionMessage(opened ? '资料链接已打开。' : '资料链接已生成，但当前设备未能直接打开，请稍后再试。');
   }
 
   void _showSectionMessage(String message) {

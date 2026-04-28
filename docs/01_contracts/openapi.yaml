@@ -9749,11 +9749,10 @@ components:
         mimeType:
           type: string
           description: >
-            Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx
-            / xls / xlsx / csv only. `effect_image` may use image MIME only;
-            `construction_doc` may use pdf/doc/docx only; `material_sample`
-            may use image/pdf/doc/docx; `equipment_material_list` and
-            `service_list` may use xls/xlsx/csv/pdf/doc/docx.
+            File technical MIME recorded from FileAsset truth. Quote Basis
+            Material Package V1 supports full-format files across all five
+            attachment kinds; `attachmentKind` remains the business category
+            truth and must not be inferred from MIME.
         visibility:
           $ref: '#/components/schemas/ProjectAttachmentVisibility'
         sortOrder:
@@ -9823,11 +9822,10 @@ components:
         mimeType:
           type: string
           description: >
-            Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx
-            / xls / xlsx / csv only. `effect_image` may use image MIME only;
-            `construction_doc` may use pdf/doc/docx only; `material_sample`
-            may use image/pdf/doc/docx; `equipment_material_list` and
-            `service_list` may use xls/xlsx/csv/pdf/doc/docx.
+            File technical MIME recorded from FileAsset truth. Quote Basis
+            Material Package V1 supports full-format files across all five
+            attachment kinds; `attachmentKind` remains the business category
+            truth and must not be inferred from MIME.
         sortOrder:
           type: integer
           minimum: 0
