@@ -93,6 +93,7 @@ part 'widgets/exhibition_status_messages.dart';
 part 'widgets/exhibition_surface_widgets.dart';
 part 'widgets/exhibition_surface_support.dart';
 part 'widgets/exhibition_form_widgets.dart';
+part 'widgets/project_edit_surface_widgets.dart';
 part 'widgets/project_create_round_a_widgets.dart';
 part 'widgets/project_showcase_card_widgets.dart';
 part 'widgets/project_list_filter_widgets.dart';

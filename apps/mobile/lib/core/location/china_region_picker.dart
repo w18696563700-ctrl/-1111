@@ -10,6 +10,7 @@ class SelectLikeField extends StatelessWidget {
     required this.placeholder,
     this.required = false,
     this.helperText,
+    this.errorText,
     this.onTap,
     this.trailing,
   });
@@ -19,6 +20,7 @@ class SelectLikeField extends StatelessWidget {
   final String placeholder;
   final bool required;
   final String? helperText;
+  final String? errorText;
   final VoidCallback? onTap;
   final Widget? trailing;
 
@@ -39,6 +41,8 @@ class SelectLikeField extends StatelessWidget {
       decoration: InputDecoration(
         label: _SelectFieldLabel(label: label, required: required),
         helperText: helperText,
+        errorText: errorText,
+        errorMaxLines: 2,
         border: const OutlineInputBorder(),
         suffixIcon:
             trailing ??

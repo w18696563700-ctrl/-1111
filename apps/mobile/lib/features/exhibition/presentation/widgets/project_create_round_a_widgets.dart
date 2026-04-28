@@ -234,46 +234,50 @@ List<Widget> _buildProjectCreateRoundABody({
           spacing: 12,
           runSpacing: 12,
           children: <Widget>[
-            _InputField(
-              controller: provinceNameController,
-              fieldKey: fieldKeys[_ProjectCreateFieldId.provinceName],
-              inputKey: const ValueKey<String>('project-create-province'),
-              label: '省',
-              hintText: '点击选择省 / 市',
-              helperText: standardizedLocationHelperText,
-              required: true,
-              readOnly: true,
-              errorText: fieldErrors[_ProjectCreateFieldId.provinceName],
-              onTap: onStandardizedLocationPressed,
-              suffixIcon: const Icon(Icons.keyboard_arrow_down_rounded),
+            Padding(
+              key: fieldKeys[_ProjectCreateFieldId.provinceName],
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SelectLikeField(
+                key: const ValueKey<String>('project-create-province'),
+                label: '省',
+                value: provinceNameController.text.trim(),
+                placeholder: '点击选择省 / 市',
+                helperText: standardizedLocationHelperText,
+                required: true,
+                errorText: fieldErrors[_ProjectCreateFieldId.provinceName],
+                onTap: onStandardizedLocationPressed,
+                trailing: const Icon(Icons.keyboard_arrow_down_rounded),
+              ),
             ),
-            _InputField(
-              controller: cityNameController,
-              fieldKey: fieldKeys[_ProjectCreateFieldId.cityName],
-              inputKey: const ValueKey<String>('project-create-city'),
-              label: '市',
-              hintText: '将随地区自动带入',
-              helperText: cityHelperText,
-              readOnly: true,
-              enabled: false,
-              errorText: fieldErrors[_ProjectCreateFieldId.cityName],
-              suffixIcon: const Icon(Icons.lock_outline_rounded),
+            Padding(
+              key: fieldKeys[_ProjectCreateFieldId.cityName],
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SelectLikeField(
+                key: const ValueKey<String>('project-create-city'),
+                label: '市',
+                value: cityNameController.text.trim(),
+                placeholder: '将随地区自动带入',
+                helperText: cityHelperText,
+                errorText: fieldErrors[_ProjectCreateFieldId.cityName],
+                trailing: const Icon(Icons.lock_outline_rounded),
+              ),
             ),
-            _InputField(
-              controller: districtNameController,
-              fieldKey: fieldKeys[_ProjectCreateFieldId.districtName],
-              inputKey: const ValueKey<String>('project-create-district'),
-              label: '区/县',
-              hintText: districtHintText,
-              helperText: districtHelperText,
-              readOnly: true,
-              enabled: districtSelectionEnabled,
-              errorText: fieldErrors[_ProjectCreateFieldId.districtName],
-              onTap: districtSelectionEnabled ? onDistrictPressed : null,
-              suffixIcon: Icon(
-                districtSelectionEnabled
-                    ? Icons.keyboard_arrow_down_rounded
-                    : Icons.lock_outline_rounded,
+            Padding(
+              key: fieldKeys[_ProjectCreateFieldId.districtName],
+              padding: const EdgeInsets.only(bottom: 10),
+              child: SelectLikeField(
+                key: const ValueKey<String>('project-create-district'),
+                label: '区/县',
+                value: districtNameController.text.trim(),
+                placeholder: districtHintText,
+                helperText: districtHelperText,
+                errorText: fieldErrors[_ProjectCreateFieldId.districtName],
+                onTap: districtSelectionEnabled ? onDistrictPressed : null,
+                trailing: Icon(
+                  districtSelectionEnabled
+                      ? Icons.keyboard_arrow_down_rounded
+                      : Icons.lock_outline_rounded,
+                ),
               ),
             ),
           ],

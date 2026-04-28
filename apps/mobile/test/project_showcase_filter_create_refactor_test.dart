@@ -738,10 +738,38 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('编辑项目'), findsWidgets);
+      expect(
+        _projectCreateField('project-edit-app-bar-status'),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('草稿')),
+        findsOneWidget,
+      );
+      expect(find.text('当前状态：草稿'), findsNothing);
       expect(find.text('当前生命周期'), findsOneWidget);
-      expect(find.text('当前状态：草稿'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '保存到预发布列表'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '仅保存草稿'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '收起当前内容核对'), findsOneWidget);
+      expect(find.text('基础信息'), findsOneWidget);
+      expect(find.text('项目地点与范围'), findsOneWidget);
+      await tester.scrollUntilVisible(
+        _projectCreateField('project-create-planned-start-at'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(
+        _projectCreateField('project-create-planned-start-at'),
+        findsOneWidget,
+      );
+      await tester.scrollUntilVisible(
+        _projectCreateField('project-create-description'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(_projectCreateField('project-create-description'), findsOneWidget);
     },
   );
 
@@ -857,7 +885,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('当前状态：草稿'), findsOneWidget);
+      expect(
+        _projectCreateField('project-edit-app-bar-status'),
+        findsOneWidget,
+      );
+      expect(find.text('当前状态：草稿'), findsNothing);
       await _scrollAndTap(tester, find.widgetWithText(OutlinedButton, '仅保存草稿'));
       await tester.pumpAndSettle();
       expect(
@@ -873,18 +905,57 @@ void main() {
         find.widgetWithText(FilledButton, '保存到预发布列表'),
       );
       await tester.pumpAndSettle();
-      expect(find.text('当前状态：预发布列表'), findsOneWidget);
+      expect(
+        _projectCreateField('project-edit-app-bar-status'),
+        findsOneWidget,
+      );
+      expect(
+        find.descendant(of: find.byType(AppBar), matching: find.text('预发布列表')),
+        findsOneWidget,
+      );
+      expect(find.text('当前状态：预发布列表'), findsNothing);
       expect(find.widgetWithText(FilledButton, '发布项目'), findsNothing);
       expect(find.widgetWithText(FilledButton, '返回预发布列表详情'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '继续核对当前内容'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '展开当前内容核对'), findsOneWidget);
+      expect(find.text('基础信息'), findsNothing);
+      expect(find.text('项目地点与范围'), findsNothing);
+      expect(find.text('计划时间'), findsNothing);
+      expect(find.text('补充说明'), findsNothing);
+      expect(find.textContaining('西部糖酒会 / 古井贡'), findsOneWidget);
+      expect(find.textContaining('四川 / 成都'), findsOneWidget);
+      expect(find.textContaining('2026年4月10日 至 2026年4月18日'), findsOneWidget);
       expect(
-        find.textContaining('最终发布请回到“我的项目 -> 预发布列表 -> 单项目详情”'),
+        find.textContaining('最终发布确认回到“我的项目 -> 预发布列表 -> 单项目详情”完成'),
         findsOneWidget,
       );
 
       await _scrollAndTap(
         tester,
-        find.widgetWithText(FilledButton, '返回预发布列表详情'),
+        find.widgetWithText(OutlinedButton, '继续核对当前内容'),
+      );
+      await tester.pumpAndSettle();
+      expect(find.widgetWithText(OutlinedButton, '收起当前内容核对'), findsOneWidget);
+      expect(find.text('基础信息'), findsOneWidget);
+      expect(find.text('项目地点与范围'), findsOneWidget);
+      expect(_projectCreateField('project-create-title'), findsOneWidget);
+      expect(_projectCreateField('project-create-brand-name'), findsOneWidget);
+
+      await tester.scrollUntilVisible(
+        find.text('报价依据资料'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('报价依据资料'), findsOneWidget);
+
+      await _scrollAndTap(
+        tester,
+        find.byKey(
+          const ValueKey<String>(
+            'project-edit-review-return-to-prepublish-bottom',
+          ),
+        ),
       );
       await tester.pumpAndSettle();
       expect(

@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
+import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
@@ -271,6 +272,69 @@ void main() {
     expect(find.text('点击选择省 / 市'), findsOneWidget);
     expect(find.text('请选择项目所在省 / 市，系统会自动带入对应地区信息。'), findsOneWidget);
   });
+
+  testWidgets(
+    'Round A province selector opens and confirms a province-city choice',
+    (WidgetTester tester) async {
+      addTearDown(() {
+        tester.binding.setSurfaceSize(null);
+        ChinaRegionCatalogLoader.reset();
+      });
+      await tester.binding.setSurfaceSize(const Size(900, 1100));
+      ChinaRegionCatalogLoader.installLoadOverrideForTest(() async {
+        return ChinaRegionCatalog(
+          provinces: const <ChinaProvinceOption>[
+            ChinaProvinceOption(
+              provinceCode: '510000',
+              provinceName: '四川',
+              cities: <ChinaCityOption>[
+                ChinaCityOption(
+                  provinceCode: '510000',
+                  provinceName: '四川',
+                  cityCode: '510100',
+                  cityName: '成都',
+                  districts: <ChinaDistrictOption>[
+                    ChinaDistrictOption(
+                      districtCode: '510107',
+                      districtName: '武侯区',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      });
+
+      await tester.pumpWidget(
+        _buildApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{},
+          ),
+          sessionStore: _buildAuthenticatedSessionStore(
+            deviceId: 'region-picker-open',
+          ),
+          shellContextConsumer: _buildShellContextConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(_projectCreateField('省'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('选择省 / 市'), findsOneWidget);
+      await tester.tap(find.text('确定'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('已选择四川 / 成都'), findsOneWidget);
+      expect(find.text('四川'), findsWidgets);
+      expect(find.text('成都'), findsWidgets);
+    },
+  );
 
   testWidgets(
     'Round A validation shows unified message and scrolls to first invalid field',

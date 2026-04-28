@@ -281,14 +281,32 @@ class ChinaRegionCatalogLoader {
     try {
       return await rootBundle.loadString(assetPath);
     } catch (error) {
-      final fallback = await _readFromLocalFile(assetPath);
+      final fallback = await _readFromFlutterAssetBundleFile(assetPath);
       if (fallback != null) {
         debugPrint(
-          'ChinaRegionCatalogLoader: fallback to local file for $assetPath ($error)',
+          'ChinaRegionCatalogLoader: fallback to app bundle file for $assetPath ($error)',
         );
         return fallback;
       }
-      rethrow;
+      final localFallback = await _readFromLocalFile(assetPath);
+      if (localFallback != null) {
+        debugPrint(
+          'ChinaRegionCatalogLoader: fallback to local file for $assetPath ($error)',
+        );
+        return localFallback;
+      }
+      if (error is Exception) {
+        throw Exception(
+          'Unable to load $assetPath from rootBundle, app bundle, or local file: $error',
+        );
+      }
+      if (error is Error) {
+        rethrow;
+      }
+      final message = error.toString();
+      throw Exception(
+        'Unable to load $assetPath from rootBundle, app bundle, or local file: $message',
+      );
     }
   }
 
@@ -302,27 +320,95 @@ class ChinaRegionCatalogLoader {
     return catalog;
   }
 
-  static Future<String?> _readFromLocalFile(String relativePath) async {
+  static Future<String?> _readFromFlutterAssetBundleFile(
+    String relativePath,
+  ) async {
     final visited = <String>{};
-    for (final candidate in _assetSearchRoots()) {
-      if (!visited.add(candidate.path)) {
+    for (final candidate in _flutterAssetBundleRoots()) {
+      final path = _joinPath(candidate.path, relativePath);
+      if (!visited.add(path)) {
         continue;
       }
-      final file = File(_joinPath(candidate.path, relativePath));
-      if (!await file.exists()) {
-        continue;
-      }
-      final raw = await file.readAsString();
-      if (raw.trim().isNotEmpty) {
+      final raw = await _tryReadFile(path);
+      if (raw != null) {
         return raw;
       }
     }
     return null;
   }
 
+  static Future<String?> _readFromLocalFile(String relativePath) async {
+    final visited = <String>{};
+    for (final candidate in _assetSearchRoots()) {
+      final path = _joinPath(candidate.path, relativePath);
+      if (!visited.add(path)) {
+        continue;
+      }
+      final raw = await _tryReadFile(path);
+      if (raw != null) {
+        return raw;
+      }
+    }
+    return null;
+  }
+
+  static Future<String?> _tryReadFile(String absolutePath) async {
+    final file = File(absolutePath);
+    try {
+      if (!await file.exists()) {
+        return null;
+      }
+      final raw = await file.readAsString();
+      if (raw.trim().isEmpty) {
+        return null;
+      }
+      return raw;
+    } on FileSystemException catch (error) {
+      debugPrint(
+        'ChinaRegionCatalogLoader: skip unreadable file $absolutePath (${error.message})',
+      );
+      return null;
+    }
+  }
+
   @visibleForTesting
   static Future<String?> readFromLocalFileForTest(String relativePath) {
     return _readFromLocalFile(relativePath);
+  }
+
+  static Iterable<Directory> _flutterAssetBundleRoots() sync* {
+    final executable = File(Platform.resolvedExecutable).absolute;
+    final executableDir = executable.parent;
+    final contentsDir = executableDir.parent;
+    final appBundleDir = contentsDir.parent;
+
+    final bundleRoots = <String>[
+      _joinPath(
+        contentsDir.path,
+        'Frameworks${Platform.pathSeparator}App.framework${Platform.pathSeparator}Versions${Platform.pathSeparator}A${Platform.pathSeparator}Resources${Platform.pathSeparator}flutter_assets',
+      ),
+      _joinPath(
+        contentsDir.path,
+        'Frameworks${Platform.pathSeparator}App.framework${Platform.pathSeparator}Resources${Platform.pathSeparator}flutter_assets',
+      ),
+      _joinPath(
+        contentsDir.path,
+        'Resources${Platform.pathSeparator}flutter_assets',
+      ),
+      _joinPath(appBundleDir.path, 'flutter_assets'),
+    ];
+    final visited = <String>{};
+    for (final root in bundleRoots) {
+      if (!visited.add(root)) {
+        continue;
+      }
+      yield Directory(root);
+    }
+  }
+
+  @visibleForTesting
+  static Iterable<String> flutterAssetBundleRootsForTest() {
+    return _flutterAssetBundleRoots().map((Directory item) => item.path);
   }
 
   static Iterable<Directory> _assetSearchRoots() sync* {

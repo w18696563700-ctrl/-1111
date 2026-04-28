@@ -206,6 +206,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         for (final fieldId in _ProjectCreateFieldId.values)
           fieldId: GlobalKey(),
       };
+  final GlobalKey _editReviewSectionKey = GlobalKey();
+  final GlobalKey _editReviewContentKey = GlobalKey();
   ChinaRegionCatalog? _regionCatalog;
   _ProjectStandardizedLocationOption? _selectedStandardizedLocation;
   String? _selectedDistrictCode;
@@ -231,6 +233,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   ExhibitionActionResult? _p0PayDepositInitResult;
   ExhibitionLoadResult? _p0PayDepositStatusResult;
   P0PayPaymentPollResult? _p0PayDepositPollResult;
+  bool? _editReviewExpandedOverride;
   Map<_ProjectCreateFieldId, String> _fieldErrors =
       <_ProjectCreateFieldId, String>{};
   String? _formErrorMessage;
@@ -284,6 +287,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
 
   @override
   void dispose() {
+    _publishProjectEditHeaderStatus(_editingProjectId, null);
     _titleController.dispose();
     _brandNameController.dispose();
     _buildingTypeController.dispose();
@@ -687,6 +691,10 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         _payloadMap(result.payload) ?? const <String, Object?>{},
       );
     }
+    _publishProjectEditHeaderStatus(
+      projectId,
+      _stateFromPayload(result.payload),
+    );
 
     setState(() {
       _editDetailResult = result;
@@ -1487,20 +1495,18 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     final canManageAttachments = _canEnterProjectAttachmentCorridor(
       currentState,
     );
+    final reviewExpanded = _isEditReviewExpanded(currentState);
+    final showBottomReturnToPrepublish = currentState == 'submitted';
     return <Widget>[
       _ActionCard(
         title: '当前生命周期',
         summary: _projectLifecycleSummary(currentState),
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
-          _DetailLine(
-            label: '当前状态',
-            value: currentState == null
-                ? '未提供'
-                : _frontStageStateLabel(currentState),
-            highlight: true,
+          _StateMessage(
+            title: '当前任务',
+            body: _projectLifecycleBody(currentState),
           ),
-          _DetailLine(label: '说明', value: _projectLifecycleBody(currentState)),
           const SizedBox(height: 12),
           Wrap(
             spacing: 12,
@@ -1513,58 +1519,79 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         ],
       ),
       const SizedBox(height: 16),
-      ..._buildProjectCreateRoundABody(
-        context: context,
-        guardLoading: false,
-        accessGuard: const _ProjectCreateAccessGuard.allowed(),
-        formErrorMessage: _formErrorMessage,
-        selectedProjectTypeLabel: _selectedProjectTypeLabel,
-        selectedStandardizedLocationLabel: _selectedStandardizedLocationLabel,
-        selectedP0PayTaskType: _p0PayTaskType,
-        showSupplementalSection: true,
-        hasStandardizedLocationSelection: _selectedStandardizedLocation != null,
-        districtSelectionEnabled:
-            _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
-        exhibitionNameController: _titleController,
-        brandNameController: _brandNameController,
-        buildingTypeController: _buildingTypeController,
-        buildingTypeRemarkController: _buildingTypeRemarkController,
-        budgetAmountController: _budgetAmountController,
-        areaSqmController: _areaSqmController,
-        provinceNameController: _provinceNameController,
-        cityNameController: _cityNameController,
-        districtNameController: _districtNameController,
-        detailAddressController: _detailAddressController,
-        scopeSummaryController: _scopeSummaryController,
-        plannedStartAtController: _plannedStartAtController,
-        plannedEndAtController: _plannedEndAtController,
-        scheduleDetailController: _scheduleDetailController,
-        descriptionController: _descriptionController,
-        fieldKeys: _fieldKeys,
-        fieldErrors: _fieldErrors,
-        onFieldInteracted: _handleFieldInteracted,
-        onProjectTypePressed: _pickProjectType,
-        onStandardizedLocationPressed: _pickStandardizedLocation,
-        onDistrictPressed: _pickDistrict,
-        onScopeSummaryPressed: _editScopeSummary,
-        onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
-        onPlannedStartDatePressed: () => _pickDate(
-          controller: _plannedStartAtController,
-          fieldId: _ProjectCreateFieldId.plannedStartAt,
-        ),
-        onPlannedEndDatePressed: () => _pickDate(
-          controller: _plannedEndAtController,
-          fieldId: _ProjectCreateFieldId.plannedEndAt,
-        ),
-        onPlannedStartDateCleared: () => _clearDate(
-          controller: _plannedStartAtController,
-          fieldId: _ProjectCreateFieldId.plannedStartAt,
-        ),
-        onPlannedEndDateCleared: () => _clearDate(
-          controller: _plannedEndAtController,
-          fieldId: _ProjectCreateFieldId.plannedEndAt,
+      KeyedSubtree(
+        key: _editReviewSectionKey,
+        child: _ProjectEditReviewSectionCard(
+          expanded: reviewExpanded,
+          summary: _projectEditReviewSummary(currentState),
+          titleBrandLabel: _projectEditTitleBrandSummary(),
+          locationScheduleLabel: _projectEditLocationScheduleSummary(),
+          budgetAreaLabel: _projectEditBudgetAreaSummary(),
+          onToggle: () => _toggleEditReviewExpanded(currentState),
         ),
       ),
+      if (reviewExpanded) ...<Widget>[
+        const SizedBox(height: 16),
+        KeyedSubtree(
+          key: _editReviewContentKey,
+          child: Column(
+            children: _buildProjectCreateRoundABody(
+              context: context,
+              guardLoading: false,
+              accessGuard: const _ProjectCreateAccessGuard.allowed(),
+              formErrorMessage: _formErrorMessage,
+              selectedProjectTypeLabel: _selectedProjectTypeLabel,
+              selectedStandardizedLocationLabel:
+                  _selectedStandardizedLocationLabel,
+              selectedP0PayTaskType: _p0PayTaskType,
+              showSupplementalSection: true,
+              hasStandardizedLocationSelection:
+                  _selectedStandardizedLocation != null,
+              districtSelectionEnabled:
+                  _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
+              exhibitionNameController: _titleController,
+              brandNameController: _brandNameController,
+              buildingTypeController: _buildingTypeController,
+              buildingTypeRemarkController: _buildingTypeRemarkController,
+              budgetAmountController: _budgetAmountController,
+              areaSqmController: _areaSqmController,
+              provinceNameController: _provinceNameController,
+              cityNameController: _cityNameController,
+              districtNameController: _districtNameController,
+              detailAddressController: _detailAddressController,
+              scopeSummaryController: _scopeSummaryController,
+              plannedStartAtController: _plannedStartAtController,
+              plannedEndAtController: _plannedEndAtController,
+              scheduleDetailController: _scheduleDetailController,
+              descriptionController: _descriptionController,
+              fieldKeys: _fieldKeys,
+              fieldErrors: _fieldErrors,
+              onFieldInteracted: _handleFieldInteracted,
+              onProjectTypePressed: _pickProjectType,
+              onStandardizedLocationPressed: _pickStandardizedLocation,
+              onDistrictPressed: _pickDistrict,
+              onScopeSummaryPressed: _editScopeSummary,
+              onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
+              onPlannedStartDatePressed: () => _pickDate(
+                controller: _plannedStartAtController,
+                fieldId: _ProjectCreateFieldId.plannedStartAt,
+              ),
+              onPlannedEndDatePressed: () => _pickDate(
+                controller: _plannedEndAtController,
+                fieldId: _ProjectCreateFieldId.plannedEndAt,
+              ),
+              onPlannedStartDateCleared: () => _clearDate(
+                controller: _plannedStartAtController,
+                fieldId: _ProjectCreateFieldId.plannedStartAt,
+              ),
+              onPlannedEndDateCleared: () => _clearDate(
+                controller: _plannedEndAtController,
+                fieldId: _ProjectCreateFieldId.plannedEndAt,
+              ),
+            ),
+          ),
+        ),
+      ],
       const SizedBox(height: 16),
       if (canManageAttachments)
         _ProjectAttachmentSection(
@@ -1584,6 +1611,21 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
             _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
           ],
         ),
+      if (showBottomReturnToPrepublish) ...<Widget>[
+        const SizedBox(height: 16),
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton(
+            key: const ValueKey<String>(
+              'project-edit-review-return-to-prepublish-bottom',
+            ),
+            onPressed: _submitting
+                ? null
+                : () => _openMyProjectDetail(projectId),
+            child: const Text('信息核对无误，返回预发布列表详情'),
+          ),
+        ),
+      ],
     ];
   }
 
@@ -2086,6 +2128,56 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     messenger?.showSnackBar(SnackBar(content: Text(message)));
   }
 
+  bool _isEditReviewExpanded(String? currentState) {
+    return _editReviewExpandedOverride ??
+        _defaultEditReviewExpanded(currentState);
+  }
+
+  bool _defaultEditReviewExpanded(String? currentState) {
+    return currentState == 'draft';
+  }
+
+  void _toggleEditReviewExpanded(String? currentState) {
+    setState(() {
+      _editReviewExpandedOverride = !_isEditReviewExpanded(currentState);
+    });
+  }
+
+  void _continueReviewFlow(String? currentState) {
+    if (!_isEditReviewExpanded(currentState)) {
+      setState(() {
+        _editReviewExpandedOverride = true;
+      });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) {
+          return;
+        }
+        final targetContext = _editReviewSectionKey.currentContext;
+        if (targetContext == null) {
+          return;
+        }
+        _scrollToEditReviewTarget(targetContext);
+      });
+      return;
+    }
+    final targetContext =
+        _editReviewContentKey.currentContext ??
+        _editReviewSectionKey.currentContext;
+    if (targetContext == null) {
+      return;
+    }
+    _scrollToEditReviewTarget(targetContext);
+  }
+
+  void _scrollToEditReviewTarget(BuildContext targetContext) {
+    Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+    );
+  }
+
   List<Widget> _buildLifecycleActionButtons({
     required String projectId,
     required String? currentState,
@@ -2113,7 +2205,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         OutlinedButton(
           onPressed: _submitting
               ? null
-              : () => _scrollToField(_ProjectCreateFieldId.title),
+              : () => _continueReviewFlow(currentState),
           child: const Text('继续核对当前内容'),
         ),
       ],
@@ -2142,9 +2234,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
 
   String _projectLifecycleSummary(String? state) {
     return switch (state) {
-      'draft' => '当前项目还在草稿态，主动作是保存到预发布列表。',
-      'submitted' => '当前项目已进入预发布列表，当前可先补充报价依据资料，再回到我的项目详情完成正式发布确认。',
-      'published' => '当前项目已进入竞标中，页面继续保留编辑与回显入口。',
+      'draft' => '继续完善当前内容，准备进入预发布列表。',
+      'submitted' => '先核对已保存内容，再补充报价依据资料。',
+      'published' => '当前已进入竞标中，页面只保留回看和补资料入口。',
       final String value => '当前项目处于 ${_frontStageStateLabel(value)}。',
       _ => '当前项目生命周期正在读取。',
     };
@@ -2152,14 +2244,69 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
 
   String _projectLifecycleBody(String? state) {
     return switch (state) {
-      'draft' => '点击“保存到预发布列表”后，项目会先进入发布前核对阶段，不会立即进入公域展示；如只想暂存，请使用“仅保存草稿”。',
+      'draft' => '先核对下方内容；准备好后保存到预发布列表。如只想暂存，继续使用“仅保存草稿”。',
       'submitted' =>
-        '当前页只继续核对预发布内容并补充报价依据资料；最终发布请回到“我的项目 -> 预发布列表 -> 单项目详情”点击“检查无误，确定发布”。',
-      'published' => '当前项目已进入竞标中；公域详情与我的项目详情会继续按真实状态回显。',
+        '当前页只负责回看已保存内容和补充报价依据资料；最终发布确认回到“我的项目 -> 预发布列表 -> 单项目详情”完成。',
+      'published' => '当前可继续回看编辑回显或补充报价依据资料；公域详情和我的项目详情会按真实状态同步回显。',
       final String value =>
-        '当前项目处于 ${_frontStageStateLabel(value)}，页面只按真实状态承接。',
+        '当前项目处于 ${_frontStageStateLabel(value)}；页面只按真实状态承接下一步。',
       _ => '当前页只消费真实生命周期状态，不在本地伪造第二状态机。',
     };
+  }
+
+  String _projectEditReviewSummary(String? state) {
+    return switch (state) {
+      'draft' => '基础信息当前保持展开，可直接继续修改。',
+      'submitted' => '已保存内容已收起，按需展开继续核对或修改。',
+      'published' => '已保存内容已收起，按需展开回看当前编辑回显。',
+      final String value => '当前内容已按 ${_frontStageStateLabel(value)} 阶段收敛。',
+      _ => '已保存内容会按当前阶段决定默认展开方式。',
+    };
+  }
+
+  String _projectEditTitleBrandSummary() {
+    final title = _normalizeOptionalText(_titleController.text) ?? '待补充';
+    final brand = _normalizeOptionalText(_brandNameController.text);
+    return brand == null ? title : '$title / $brand';
+  }
+
+  String _projectEditLocationScheduleSummary() {
+    final region = _publishedProjectRegionLabel();
+    final address = _normalizeOptionalText(_detailAddressController.text);
+    final start = _normalizeOptionalText(_plannedStartAtController.text);
+    final end = _normalizeOptionalText(_plannedEndAtController.text);
+    final scheduleDetail = _normalizeOptionalText(
+      _scheduleDetailController.text,
+    );
+
+    final locationText = <String>[
+      if (region case final String value) value,
+      if (address case final String value) value,
+    ].join(' · ');
+    final scheduleText = switch ((start, end)) {
+      (final String startValue?, final String endValue?) =>
+        '$startValue 至 $endValue',
+      (final String startValue?, null) => startValue,
+      (null, final String endValue?) => endValue,
+      _ => '',
+    };
+
+    final parts = <String>[
+      if (locationText.isNotEmpty) locationText,
+      if (scheduleText.isNotEmpty) scheduleText,
+      if (scheduleDetail case final String value) value,
+    ];
+    return parts.isEmpty ? '待补充' : parts.join(' · ');
+  }
+
+  String _projectEditBudgetAreaSummary() {
+    final budget = _normalizeOptionalText(_budgetAmountController.text);
+    final area = _normalizeOptionalText(_areaSqmController.text);
+    final parts = <String>[
+      if (budget != null) '¥$budget',
+      if (area != null) '$area㎡',
+    ];
+    return parts.isEmpty ? '待补充' : parts.join(' / ');
   }
 
   void _applyValidationFeedback(_ProjectCreateValidationResult validation) {
