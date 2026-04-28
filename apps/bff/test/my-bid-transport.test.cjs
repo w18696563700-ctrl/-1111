@@ -15,6 +15,7 @@ const { NestFactory } = require('@nestjs/core');
 const { MyBidController } = require('../src/routes/my_bid/my-bid.controller.ts');
 const { AppBidController } = require('../src/routes/bid/app-bid.controller.ts');
 const { MyBidService } = require('../src/routes/my_bid/my-bid.service.ts');
+const { readMyBidsReadModel } = require('../src/routes/my_bid/my-bid.read-model.ts');
 const { ErrorNormalizerService } = require('../src/core/errors/error-normalizer.service.ts');
 const { BidService } = require('../src/routes/bid/bid.service.ts');
 
@@ -148,7 +149,19 @@ test('my bids and snapshot services forward frozen server paths and accepted res
 
   const list = await myBidService.getMyBids(undefined, {});
   assert.equal(list.items.length, 1);
-  assert.equal(list.items[0].bidId, 'bid-1');
+  assert.deepEqual(list.items[0], {
+    bidId: 'bid-1',
+    projectId: 'project-1',
+    projectNo: 'PROJ-1',
+    projectTitle: '展台项目',
+    submittedAt: '2026-04-24T00:00:00.000Z',
+    quoteAmount: 1000,
+    proposalSummaryPreview: '最小摘要',
+    outcomeState: 'published',
+    canOpenBidThread: true,
+    canOpenBidResult: false,
+    snapshotReadable: true,
+  });
 
   const bidService = new BidService(
     {
@@ -296,4 +309,35 @@ test('my bids and snapshot services forward frozen server paths and accepted res
       },
     },
   });
+});
+
+test('my bids read model requires project number and proposal preview', () => {
+  const baseItem = {
+    bidId: 'bid-1',
+    projectId: 'project-1',
+    projectNo: 'PROJ-1',
+    projectTitle: '展台项目',
+    quoteAmount: 1000,
+    proposalSummaryPreview: '最小摘要',
+    submittedAt: '2026-04-24T00:00:00.000Z',
+    outcomeState: 'published',
+    canOpenBidThread: true,
+    canOpenBidResult: false,
+    snapshotReadable: true,
+  };
+
+  assert.throws(
+    () =>
+      readMyBidsReadModel({
+        items: [{ ...baseItem, projectNo: undefined }],
+      }),
+    /projectNo/,
+  );
+  assert.throws(
+    () =>
+      readMyBidsReadModel({
+        items: [{ ...baseItem, proposalSummaryPreview: undefined }],
+      }),
+    /proposalSummaryPreview/,
+  );
 });

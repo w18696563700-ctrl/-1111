@@ -36,9 +36,14 @@ function readMyBidItem(record: BidPayload) {
   return {
     bidId: readRequiredString(record.bidId, 'bidId'),
     projectId: readRequiredString(record.projectId, 'projectId'),
+    projectNo: readRequiredString(record.projectNo, 'projectNo'),
     projectTitle: readRequiredString(record.projectTitle, 'projectTitle'),
     submittedAt: readRequiredString(record.submittedAt, 'submittedAt'),
     quoteAmount: readRequiredNumber(record.quoteAmount, 'quoteAmount'),
+    proposalSummaryPreview: readRequiredString(
+      record.proposalSummaryPreview,
+      'proposalSummaryPreview',
+    ),
     outcomeState: readRequiredString(record.outcomeState, 'outcomeState'),
     canOpenBidThread: readRequiredBoolean(record.canOpenBidThread, 'canOpenBidThread'),
     canOpenBidResult: readRequiredBoolean(record.canOpenBidResult, 'canOpenBidResult'),
