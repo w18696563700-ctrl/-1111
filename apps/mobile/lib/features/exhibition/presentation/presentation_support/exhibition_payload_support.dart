@@ -78,6 +78,22 @@ String? _projectIdFromPayload(Object? payload) {
   return _normalizeId(_payloadMap(payload)?['projectId'] as String?);
 }
 
+String? _currentViewerBidIdFromPayload(Object? payload) {
+  return _normalizeDynamicText(
+    _payloadMap(_payloadMap(payload)?['currentViewerBid'])?['bidId'],
+  );
+}
+
+String? _currentViewerBidStateFromPayload(Object? payload) {
+  return _normalizeDynamicText(
+    _payloadMap(_payloadMap(payload)?['currentViewerBid'])?['state'],
+  );
+}
+
+bool _hasCurrentViewerBid(Object? payload) {
+  return _currentViewerBidIdFromPayload(payload) != null;
+}
+
 String? _taskIdFromPayload(Object? payload) {
   return _stringFromPayload(payload, 'taskId') ??
       _projectIdFromPayload(payload);

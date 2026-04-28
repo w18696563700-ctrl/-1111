@@ -29,6 +29,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   bool _guardInitialized = false;
   int _guardRetryCount = 0;
   bool _submitting = false;
+  bool _bidAlreadySubmitted = false;
   ExhibitionActionResult? _lastResult;
   ExhibitionLoadResult? _bidResult;
   ExhibitionLoadResult? _projectDetailResult;
@@ -107,6 +108,10 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   }
 
   Future<void> _submit() async {
+    if (_bidAlreadySubmitted) {
+      return;
+    }
+
     if (_guardLoading) {
       setState(() {
         _lastResult = ExhibitionActionResult(
@@ -224,9 +229,12 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     setState(() {
       _submitting = false;
       _lastResult = result;
+      if (result.isSuccess || _isBidDuplicateSubmissionResult(result)) {
+        _bidAlreadySubmitted = true;
+      }
     });
 
-    if (result.isSuccess) {
+    if (result.isSuccess || _isBidDuplicateSubmissionResult(result)) {
       final projectId = _normalizeId(_projectIdController.text);
       if (projectId != null) {
         await Future.wait<void>(<Future<void>>[
@@ -305,7 +313,13 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     final canContinueBidFlow =
         showContinueBidFlowAction &&
         _projectDetailResult?.state == AppPageState.content;
-    final submitDisabledMessage = _bidSubmitFinalSubmitDisabledMessage();
+    final bidAlreadySubmitted =
+        _bidAlreadySubmitted ||
+        _hasCurrentViewerBid(_projectDetailResult?.payload) ||
+        _isBidDuplicateSubmissionResult(_lastResult);
+    final submitDisabledMessage = bidAlreadySubmitted
+        ? null
+        : _bidSubmitFinalSubmitDisabledMessage();
 
     return _SubmissionPageFrame(
       title: '竞标提交',
@@ -314,10 +328,12 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       submitting: _submitting || _p0PaySubmitting,
       lastResult: _lastResult,
       onSubmitPressed: _submitCurrentBidFlow,
-      submitButtonLabel: '提交竞标',
+      submitButtonLabel: bidAlreadySubmitted ? '已提交竞标' : '提交竞标',
       showSubmitButton:
-          !_guardLoading && _accessGuard == null && _bidFlowExpanded,
-      submitEnabled: submitDisabledMessage == null,
+          !_guardLoading &&
+          _accessGuard == null &&
+          (_bidFlowExpanded || bidAlreadySubmitted),
+      submitEnabled: !bidAlreadySubmitted && submitDisabledMessage == null,
       submitDisabledMessage: submitDisabledMessage,
       showConnectionInfo: false,
       showTechnicalDisclosure: false,
@@ -580,6 +596,9 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     if (mounted) {
       setState(() {
         _projectDetailResult = detailResult;
+        if (_hasCurrentViewerBid(detailResult.payload)) {
+          _bidAlreadySubmitted = true;
+        }
       });
     }
     return _deriveBidProjectAccessGuard(
@@ -687,6 +706,9 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     setState(() {
       _projectDetailResult = result;
+      if (_hasCurrentViewerBid(result.payload)) {
+        _bidAlreadySubmitted = true;
+      }
     });
   }
 

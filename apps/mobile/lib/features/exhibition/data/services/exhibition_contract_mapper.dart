@@ -89,9 +89,15 @@ const Set<String> _stableErrorCodes = <String>{
   'FILE_UPLOAD_INIT_FAILED',
   'PROJECT_CREATE_INVALID',
   'PROJECT_INVALID_STATE',
+  'PROJECT_EXIT_INVALID_STATE',
   'PROJECT_WITHDRAW_INVALID',
   'PROJECT_ARCHIVE_INVALID',
   'PROJECT_CLOSE_INVALID',
+  'PROJECT_WITHDRAW_PUBLISHED_INVALID',
+  'PROJECT_SUBMITTED_DISCARD_INVALID',
+  'PROJECT_CANCELLATION_REQUEST_INVALID',
+  'PROJECT_CANCELLATION_RESPONSE_INVALID',
+  'PROJECT_BREACH_RECORD_INVALID',
   'BID_SUBMIT_INVALID',
   'BID_DUPLICATE_SUBMISSION',
   'BID_AWARD_INVALID',
@@ -315,6 +321,27 @@ Map<String, Object?>? _sanitizeProjectLifecycleAcceptedPayload(
   });
 }
 
+Map<String, Object?>? _sanitizeProjectExitCaseAcceptedPayload(Object? payload) {
+  if (payload is! Map) {
+    return null;
+  }
+
+  final map = payload.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  return _compactMap(<String, Object?>{
+    'projectId': _normalize(map['projectId'] as String?),
+    'exitCaseId': _normalize(map['exitCaseId'] as String?),
+    'projectState': _sanitizeState(map['projectState'], _stableProjectStates),
+    'caseStatus': _normalize(map['caseStatus'] as String?),
+    'action': _normalize(map['action'] as String?),
+    'breachParty': _normalize(map['breachParty'] as String?),
+    'creditImpactCandidate': map['creditImpactCandidate'] is bool
+        ? map['creditImpactCandidate'] as bool
+        : null,
+  });
+}
+
 Map<String, Object?>? _sanitizeBidSubmitPayload(Object? payload) {
   if (payload is! Map) {
     return null;
@@ -506,6 +533,9 @@ Map<String, Object?> _sanitizeProjectDetailMap(Map<String, Object?> payload) {
     'taskId': _normalize(payload['taskId'] as String?),
     'tradeTaskId': _normalize(payload['tradeTaskId'] as String?),
     'p0PaySummary': _asMap(payload['p0PaySummary']),
+    'currentViewerBid': _sanitizeCurrentViewerBidMap(
+      payload['currentViewerBid'],
+    ),
     'bidCandidates': _sanitizeEntityList(
       payload['bidCandidates'] ?? payload['bids'],
       _sanitizeProjectBidCandidateMap,
@@ -523,6 +553,22 @@ Map<String, Object?> _sanitizeProjectDetailMap(Map<String, Object?> payload) {
       _stableProjectViewerRelations,
     ),
   });
+}
+
+Map<String, Object?>? _sanitizeCurrentViewerBidMap(Object? payload) {
+  if (payload is! Map) {
+    return null;
+  }
+
+  final map = payload.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  final bidId = _normalize(map['bidId'] as String?);
+  final state = _normalize(map['state'] as String?);
+  if (bidId == null || state == null) {
+    return null;
+  }
+  return <String, Object?>{'bidId': bidId, 'state': state};
 }
 
 Map<String, Object?> _sanitizeProjectBidCandidateMap(
@@ -571,11 +617,31 @@ Map<String, Object?> _sanitizeOrderMap(Map<String, Object?> payload) {
     'completionRejectionReason': _normalize(
       payload['completionRejectionReason'] as String?,
     ),
+    'exitGovernance': _sanitizeExitGovernanceMap(payload['exitGovernance']),
     'summary': _sanitizeSummary(payload['summary']),
     'milestones': _sanitizeEntityList(
       payload['milestones'],
       _sanitizeMilestoneMap,
     ),
+  });
+}
+
+Map<String, Object?>? _sanitizeExitGovernanceMap(Object? payload) {
+  if (payload is! Map) {
+    return null;
+  }
+  final map = payload.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  return _compactMap(<String, Object?>{
+    'exitCaseId': _normalize(map['exitCaseId'] as String?),
+    'exitType': _normalize(map['exitType'] as String?),
+    'caseStatus': _normalize(map['caseStatus'] as String?),
+    'breachParty': _normalize(map['breachParty'] as String?),
+    'counterpartyAction':
+        _normalize(map['counterpartyAction'] as String?) ??
+        _normalize(map['actionHint'] as String?),
+    'updatedAt': _normalize(map['updatedAt'] as String?),
   });
 }
 

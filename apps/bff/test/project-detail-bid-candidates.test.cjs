@@ -107,4 +107,26 @@ test('project detail BFF read model defaults missing bidCandidates to empty owne
 
   assert.deepEqual(detail.bidCandidates, []);
   assert.equal(detail.bidSelection, null);
+  assert.equal(detail.currentViewerBid, null);
+});
+
+test('project detail BFF read model projects currentViewerBid from server only', () => {
+  const service = createService();
+
+  const detail = service.toProjectDetailReadModel(
+    createProjectDetail({
+      viewerProjectRelation: 'non_owner',
+      currentViewerBid: {
+        bidId: 'bid-current',
+        state: 'submitted',
+        ignored: 'must-strip',
+      },
+    }),
+  );
+
+  assert.deepEqual(detail.currentViewerBid, {
+    bidId: 'bid-current',
+    state: 'submitted',
+  });
+  assert.deepEqual(detail.bidCandidates, []);
 });

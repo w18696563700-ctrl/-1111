@@ -63,6 +63,18 @@ function createService({ project = createProject(), actorOrganizationId = 'buyer
     },
     async query(sql, params) {
       queryCalls.push({ sql, params });
+      if (sql.includes('bid.bidder_organization_id = $2')) {
+        assert.deepEqual(params, [project.id, actorOrganizationId]);
+        if (actorOrganizationId === 'seller-org') {
+          return [
+            {
+              bidId: 'bid-current',
+              state: 'submitted',
+            },
+          ];
+        }
+        return [];
+      }
       assert.match(sql, /from public\.bids bid/);
       assert.deepEqual(params, [project.id]);
       return [
@@ -165,6 +177,31 @@ test('non-owner project detail does not expose owner-only bidCandidates', async 
   const detail = await service.getProjectById('project-1', createContext('non-owner-detail'));
 
   assert.equal(detail.viewerProjectRelation, 'non_owner');
+  assert.equal(detail.currentViewerBid, null);
   assert.equal('bidCandidates' in detail, false);
-  assert.equal(queryCalls.length, 0);
+  assert.equal(
+    queryCalls.some((call) => call.sql.includes('order by bid.submitted_at asc')),
+    false,
+  );
+});
+
+test('non-owner bidder project detail exposes current viewer bid only', async () => {
+  const { service, queryCalls } = createService({ actorOrganizationId: 'seller-org' });
+
+  const detail = await service.getProjectById('project-1', createContext('bidder-detail'));
+
+  assert.equal(detail.viewerProjectRelation, 'non_owner');
+  assert.deepEqual(detail.currentViewerBid, {
+    bidId: 'bid-current',
+    state: 'submitted',
+  });
+  assert.equal('bidCandidates' in detail, false);
+  assert.equal(
+    queryCalls.some((call) => call.sql.includes('bid.bidder_organization_id = $2')),
+    true,
+  );
+  assert.equal(
+    queryCalls.some((call) => call.sql.includes('order by bid.submitted_at asc')),
+    false,
+  );
 });

@@ -9293,6 +9293,23 @@ components:
         messaging and controlled handoff into private `my/projects` or
         `workbench` continuation only and must not be expanded into raw
         internal identity fields or an action-capability matrix.
+    ProjectCurrentViewerBid:
+      type: object
+      required:
+        - bidId
+        - state
+      description: >
+        Minimum current-viewer bid carrier returned by `project/detail` when
+        the current logged-in organization has already submitted a bid for
+        this project. Server is the only owner of this truth; BFF may only
+        project it and Flutter may only use it for display and navigation.
+        This is not a bid detail read model and must not reopen compare,
+        award, order, payment, or post-award surfaces.
+      properties:
+        bidId:
+          type: string
+        state:
+          type: string
     ProjectReadModel:
       type: object
       required:
@@ -9439,6 +9456,15 @@ components:
             schedule object or time-slot array.
         viewerProjectRelation:
           $ref: '#/components/schemas/ProjectViewerRelation'
+        currentViewerBid:
+          oneOf:
+            - $ref: '#/components/schemas/ProjectCurrentViewerBid'
+            - type: 'null'
+          description: >
+            Current logged-in organization bid summary. `null` or missing means
+            the current viewer has not submitted a bid for this project, is the
+            owner, or is using an older upstream that does not yet provide the
+            carrier.
         state:
           $ref: '#/components/schemas/ProjectState'
         summary:

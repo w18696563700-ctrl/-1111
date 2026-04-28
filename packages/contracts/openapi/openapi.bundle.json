@@ -12654,6 +12654,22 @@
         ],
         "description": "Minimum owner-aware viewer-to-project relation carrier for the shared detail `ProjectReadModel` only. This enum supports public-detail messaging and controlled handoff into private `my/projects` or `workbench` continuation only and must not be expanded into raw internal identity fields or an action-capability matrix.\n"
       },
+      "ProjectCurrentViewerBid": {
+        "type": "object",
+        "required": [
+          "bidId",
+          "state"
+        ],
+        "description": "Minimum current-viewer bid carrier returned by `project/detail` when the current logged-in organization has already submitted a bid for this project. Server is the only owner of this truth; BFF may only project it and Flutter may only use it for display and navigation. This is not a bid detail read model and must not reopen compare, award, order, payment, or post-award surfaces.\n",
+        "properties": {
+          "bidId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string"
+          }
+        }
+      },
       "ProjectReadModel": {
         "type": "object",
         "required": [
@@ -12793,6 +12809,17 @@
           },
           "viewerProjectRelation": {
             "$ref": "#/components/schemas/ProjectViewerRelation"
+          },
+          "currentViewerBid": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectCurrentViewerBid"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Current logged-in organization bid summary. `null` or missing means the current viewer has not submitted a bid for this project, is the owner, or is using an older upstream that does not yet provide the carrier.\n"
           },
           "state": {
             "$ref": "#/components/schemas/ProjectState"
@@ -13107,7 +13134,7 @@
           },
           "mimeType": {
             "type": "string",
-            "description": "Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx / xls / xlsx / csv only. `effect_image` may use image MIME only; `construction_doc` may use pdf/doc/docx only; `material_sample` may use image/pdf/doc/docx; `equipment_material_list` and `service_list` may use xls/xlsx/csv/pdf/doc/docx.\n"
+            "description": "File technical MIME recorded from FileAsset truth. Quote Basis Material Package V1 supports full-format files across all five attachment kinds; `attachmentKind` remains the business category truth and must not be inferred from MIME.\n"
           },
           "visibility": {
             "$ref": "#/components/schemas/ProjectAttachmentVisibility"
@@ -13187,7 +13214,7 @@
           },
           "mimeType": {
             "type": "string",
-            "description": "Allowed MIME set is frozen to png / jpeg / webp / pdf / doc / docx / xls / xlsx / csv only. `effect_image` may use image MIME only; `construction_doc` may use pdf/doc/docx only; `material_sample` may use image/pdf/doc/docx; `equipment_material_list` and `service_list` may use xls/xlsx/csv/pdf/doc/docx.\n"
+            "description": "File technical MIME recorded from FileAsset truth. Quote Basis Material Package V1 supports full-format files across all five attachment kinds; `attachmentKind` remains the business category truth and must not be inferred from MIME.\n"
           },
           "sortOrder": {
             "type": "integer",

@@ -55,10 +55,16 @@ type ProjectDetailReadModel = ProjectListItemReadModel & {
   plannedEndAt: string | null;
   scheduleDetail: string | null;
   viewerProjectRelation: ProjectViewerRelation;
+  currentViewerBid: ProjectCurrentViewerBidReadModel | null;
   description: string | null;
   nameAccess: ProjectDetailNameAccessReadModel;
   bidCandidates: ProjectBidCandidateReadModel[];
   bidSelection: ProjectBidSelectionReadModel | null;
+};
+
+type ProjectCurrentViewerBidReadModel = {
+  bidId: string;
+  state: string;
 };
 
 type ProjectBidCandidateReadModel = {
@@ -550,11 +556,25 @@ export class ProjectService {
       plannedEndAt: this.asNullableDateString(result.plannedEndAt),
       scheduleDetail: this.asNullableString(result.scheduleDetail),
       viewerProjectRelation: this.asViewerProjectRelation(result.viewerProjectRelation),
+      currentViewerBid: this.toProjectCurrentViewerBid(result.currentViewerBid),
       description: this.asNullableString(result.description),
       nameAccess: displayState.nameAccess,
       bidCandidates: this.toProjectBidCandidates(result.bidCandidates),
       bidSelection: this.toProjectBidSelection(result.bidSelection),
     };
+  }
+
+  private toProjectCurrentViewerBid(value: unknown) {
+    const record = this.asOptionalRecord(value);
+    if (!record) {
+      return null;
+    }
+    const bidId = this.asString(record.bidId);
+    const state = this.asString(record.state);
+    if (!bidId || !state) {
+      return null;
+    }
+    return { bidId, state } satisfies ProjectCurrentViewerBidReadModel;
   }
 
   private toProjectBidCandidates(value: unknown): ProjectBidCandidateReadModel[] {

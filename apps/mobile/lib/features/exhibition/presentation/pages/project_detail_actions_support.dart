@@ -56,6 +56,8 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
         const SizedBox(height: 12),
         _buildProjectPrimaryActionSection(
           projectId: projectId,
+          currentViewerBidId: _currentViewerBidIdFromPayload(projectMap),
+          currentViewerBidState: _currentViewerBidStateFromPayload(projectMap),
           state: state,
           viewerProjectRelation: viewerProjectRelation,
         ),
@@ -164,12 +166,18 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
 
   Widget _buildProjectPrimaryActionSection({
     required String projectId,
+    required String? currentViewerBidId,
+    required String? currentViewerBidState,
     required String? state,
     required String? viewerProjectRelation,
   }) {
     final ownerSurface = _isOwnerSurface(viewerProjectRelation);
+    final hasCurrentViewerBid = currentViewerBidId != null;
     final canContinueBid = !ownerSurface && _canContinueBidFromState(state);
-    final canReadBidResult = !ownerSurface && _canReadBidResultFromState(state);
+    final canReadBidResult =
+        !ownerSurface &&
+        !hasCurrentViewerBid &&
+        _canReadBidResultFromState(state);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -177,6 +185,8 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
         Text(
           ownerSurface
               ? '继续处理'
+              : hasCurrentViewerBid
+              ? '已提交竞标'
               : canContinueBid
               ? '参与竞标'
               : canReadBidResult
@@ -187,7 +197,14 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
           ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
-        Text(_projectPrimaryActionBody(state, ownerSurface: ownerSurface)),
+        Text(
+          _projectPrimaryActionBody(
+            state,
+            ownerSurface: ownerSurface,
+            currentViewerBidId: currentViewerBidId,
+            currentViewerBidState: currentViewerBidState,
+          ),
+        ),
         const SizedBox(height: 12),
         if (ownerSurface)
           FilledButton(
@@ -195,6 +212,17 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
               ExhibitionRoutes.myProjectDetailWithProjectId(projectId),
             ),
             child: const Text('进入我的项目'),
+          )
+        else if (currentViewerBidId != null)
+          FilledButton.icon(
+            onPressed: () => Navigator.of(context).pushNamed(
+              ExhibitionRoutes.bidThreadWithIds(
+                projectId: projectId,
+                bidId: currentViewerBidId,
+              ),
+            ),
+            icon: const Icon(Icons.handshake_rounded),
+            label: const Text('沟通与投标'),
           )
         else if (canContinueBid)
           FilledButton(
@@ -213,9 +241,19 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
   String _projectPrimaryActionBody(
     String? state, {
     required bool ownerSurface,
+    required String? currentViewerBidId,
+    required String? currentViewerBidState,
   }) {
     if (ownerSurface) {
       return '你是当前项目发布方，可进入我的项目继续处理。';
+    }
+    if (currentViewerBidId != null) {
+      final stateLabel = currentViewerBidState == null
+          ? null
+          : _frontStageStateLabel(currentViewerBidState);
+      return stateLabel == null
+          ? '当前账号已对该项目提交竞标，本页不再开放重复提交。'
+          : '当前账号已对该项目提交竞标，竞标状态：$stateLabel。';
     }
     return switch (state) {
       'published' => '当前项目正在竞标中。',

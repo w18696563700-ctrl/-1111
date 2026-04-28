@@ -36,6 +36,14 @@ type ProjectBidCandidateReadModel = {
   state: string | null;
   submittedAt: string | null;
 };
+type ProjectCurrentViewerBidRow = {
+  bidId: string;
+  state: string | null;
+};
+type ProjectCurrentViewerBidReadModel = {
+  bidId: string;
+  state: string;
+};
 type ProjectListQuery = {
   provinceCode?: string;
   cityCode?: string;
@@ -144,6 +152,13 @@ export class ProjectQueryService {
       throw projectUnavailable('Current project is unavailable.');
     }
 
+    const currentViewerBid =
+      viewerProjectRelation === 'owner'
+        ? null
+        : await this.fetchCurrentViewerBid(
+            project.id,
+            viewer.scope?.organization.id ?? null,
+          );
     const readModel = {
       ...this.presenter.toReadModel(
         project,
@@ -153,7 +168,8 @@ export class ProjectQueryService {
           isOwnerViewer: this.isOwnerOrganizationViewer(project, viewer.scope),
         }),
       ),
-      viewerProjectRelation
+      viewerProjectRelation,
+      currentViewerBid
     };
     if (viewerProjectRelation !== 'owner') {
       return readModel;
@@ -279,6 +295,49 @@ export class ProjectQueryService {
     return rows
       .map((row) => this.toProjectBidCandidate(row))
       .filter((row): row is ProjectBidCandidateReadModel => row !== null);
+  }
+
+  private async fetchCurrentViewerBid(
+    projectId: string,
+    organizationId: string | null,
+  ) {
+    const normalizedOrganizationId = this.normalizeNullableText(organizationId);
+    if (!normalizedOrganizationId) {
+      return null;
+    }
+
+    const rows = (await this.projectRepository.query(
+      `
+        select
+          bid.id as "bidId",
+          bid.state as "state"
+        from public.bids bid
+        where bid.project_id = $1
+          and (
+            bid.bidder_organization_id = $2
+            or bid.organization_id = $2
+          )
+        order by bid.submitted_at desc nulls last, bid.created_at desc nulls last, bid.id desc
+        limit 1
+      `,
+      [projectId, normalizedOrganizationId]
+    )) as ProjectCurrentViewerBidRow[];
+
+    return this.toProjectCurrentViewerBid(rows[0]);
+  }
+
+  private toProjectCurrentViewerBid(row: ProjectCurrentViewerBidRow | undefined) {
+    if (!row) {
+      return null;
+    }
+    const bidId = this.normalizeText(row.bidId);
+    if (!bidId) {
+      return null;
+    }
+    return {
+      bidId,
+      state: this.normalizeNullableText(row.state) ?? 'submitted',
+    } satisfies ProjectCurrentViewerBidReadModel;
   }
 
   private toProjectBidCandidate(row: ProjectBidCandidateRow) {

@@ -122,6 +122,7 @@ Map<String, Object?> _projectPayload({
   String? scheduleDetail,
   String? taskId,
   String? tradeTaskId,
+  Map<String, Object?>? currentViewerBid,
 }) {
   return <String, Object?>{
     'projectId': projectId,
@@ -129,6 +130,8 @@ Map<String, Object?> _projectPayload({
     'title': title,
     if (taskId case final String value) 'taskId': value,
     if (tradeTaskId case final String value) 'tradeTaskId': value,
+    if (currentViewerBid case final Map<String, Object?> value)
+      'currentViewerBid': value,
     'buildingType': buildingType,
     'budgetAmount': budgetAmount,
     if (areaSqm case final num value) 'areaSqm': value,
@@ -2754,6 +2757,51 @@ void main() {
     },
   );
 
+  testWidgets('project detail current viewer bid closes repeat bid entry', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            ...defaultHandlers(),
+            'GET /api/app/project/detail': (AppApiRequest request) async {
+              expect(request.uri.queryParameters['projectId'], 'project-1');
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _projectPayload(
+                  projectId: 'project-1',
+                  currentViewerBid: <String, Object?>{
+                    'bidId': 'bid-current',
+                    'state': 'submitted',
+                  },
+                ),
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: ExhibitionRoutes.projectDetailWithProjectId('project-1'),
+        transport: transport,
+        shellContextConsumer: buildShellContextConsumer(
+          organizationId: 'org-1',
+          roleKeys: const <String>['supplier_admin'],
+          certificationStatus: 'verified',
+        ),
+        sessionStore: buildAuthenticatedSessionStore(
+          deviceId: 'device-project-current-bid',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _expectVisibleText(tester, '已提交竞标');
+    expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '沟通与投标'), findsOneWidget);
+  });
+
   testWidgets(
     'project detail reload button bypasses cached result and sends a fresh GET',
     (WidgetTester tester) async {
@@ -4555,6 +4603,9 @@ void main() {
 
     expect(find.text('竞标已提交'), findsOneWidget);
     expect(find.text('竞标 ID：bid-123'), findsOneWidget);
+    final submittedButton = find.widgetWithText(FilledButton, '已提交竞标');
+    expect(submittedButton, findsOneWidget);
+    expect(tester.widget<FilledButton>(submittedButton).onPressed, isNull);
     expect(find.widgetWithText(FilledButton, '继续创建订单'), findsNothing);
     expect(find.widgetWithText(FilledButton, '查看订单详情'), findsNothing);
     expect(
@@ -5663,10 +5714,10 @@ void main() {
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
     await _expectVisibleText(tester, '平台成交服务费确认');
-    await _expectVisibleTextContaining(tester, '待平台返回，正式金额以平台返回为准');
+    await _expectVisibleTextContaining(tester, '当前正式费率 3.0%');
+    await _expectVisibleTextContaining(tester, '约 36.00 元，正式金额以平台返回为准');
     await _expectVisibleText(tester, '48小时');
     expect(find.textContaining('成交金额的 3%'), findsNothing);
-    expect(find.textContaining('约 36.00 元'), findsNothing);
     expect(find.text('含税'), findsNothing);
     expect(find.text('含运输'), findsNothing);
     expect(find.text('含安装'), findsNothing);
@@ -6433,7 +6484,23 @@ void main() {
   testWidgets('duplicate bid submission stays controlled and visible', (
     WidgetTester tester,
   ) async {
+    var submitRequestCount = 0;
+    final uploadedKinds = <String>[];
+    BidSubmitAttachmentDebugOverrides.installPicker(() async {
+      final nextFile = switch (uploadedKinds.length) {
+        0 => 'project-understanding.png',
+        1 => 'quote-sheet.xlsx',
+        _ => 'schedule-plan.docx',
+      };
+      return BidSubmitAttachmentDraft(
+        fileName: nextFile,
+        bytes: utf8.encode('mock-$nextFile'),
+      );
+    });
     final transport = FakeAppApiTransport(
+      uploadHandler: (AppApiUploadRequest request) async {
+        return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+      },
       handlers:
           <String, Future<AppApiResponse> Function(AppApiRequest request)>{
             ...defaultHandlers(),
@@ -6454,7 +6521,46 @@ void main() {
                 ),
               );
             },
+            'GET /api/app/project/public-resources':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: <String, Object?>{'resources': <Object?>[]},
+                  );
+                },
+            'POST /api/app/file/upload/init': (AppApiRequest request) async {
+              final body = request.body as Map<String, Object?>;
+              final fileKind = '${body['fileKind']}';
+              uploadedKinds.add(fileKind);
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'uploadSessionId': 'session-$fileKind',
+                  'directUpload': <String, Object?>{
+                    'url': 'https://upload.test/$fileKind',
+                    'method': 'PUT',
+                    'headers': <String, Object?>{},
+                  },
+                  'confirm': <String, Object?>{
+                    'endpoint': '/api/app/file/upload/confirm',
+                  },
+                },
+              );
+            },
+            'POST /api/app/file/upload/confirm': (AppApiRequest request) async {
+              final body = request.body as Map<String, Object?>;
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'fileAssetId': 'fa-${body['uploadSessionId']}',
+                },
+              );
+            },
             'POST /api/app/bid/submit': (AppApiRequest request) async {
+              submitRequestCount += 1;
               return AppApiResponse(
                 statusCode: 409,
                 uri: request.uri,
@@ -6485,18 +6591,99 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
+    await _confirmBidSubmitServiceFeeRules(tester);
     await _enterVisibleTextField(
       tester,
       label: '方案说明',
       value: 'phase 2.2 duplicate bid',
     );
+    await _uploadBidAttachment(tester, '项目理解');
+    await _uploadBidAttachment(tester, '报价表');
+    await _uploadBidAttachment(tester, '进度安排');
     final submitButton = find.widgetWithText(FilledButton, '提交竞标');
     await _scrollAndTap(tester, submitButton);
+    await tester.pumpAndSettle();
+
+    final submittedButton = find.widgetWithText(FilledButton, '已提交竞标');
+    expect(submittedButton, findsOneWidget);
+    expect(tester.widget<FilledButton>(submittedButton).onPressed, isNull);
+    await _scrollAndTap(tester, submittedButton);
+    expect(submitRequestCount, 1);
 
     expect(find.textContaining('controlled state'), findsNothing);
     expect(find.textContaining('error code'), findsNothing);
-    expect(find.textContaining('duplicate bid'), findsWidgets);
+    await _expectVisibleTextContaining(tester, '当前项目已提交过竞标');
+    await _expectVisibleTextContaining(tester, '这不是本次新提交成功');
     expect(find.text('回到项目展示'), findsWidgets);
+  });
+
+  testWidgets('bid submit current viewer bid starts locked without POST', (
+    WidgetTester tester,
+  ) async {
+    var submitRequestCount = 0;
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            ...defaultHandlers(),
+            'GET /api/app/project/detail': (AppApiRequest request) async {
+              expect(request.uri.queryParameters['projectId'], 'proj-1');
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _projectPayload(
+                  projectId: 'proj-1',
+                  projectNo: 'PROJ-1',
+                  title: '展览项目 1',
+                  buildingType: 'exhibition',
+                  budgetAmount: 1888,
+                  state: 'published',
+                  viewerProjectRelation: 'non_owner',
+                  summaryHeading: 'project',
+                  currentViewerBid: <String, Object?>{
+                    'bidId': 'bid-current',
+                    'state': 'submitted',
+                  },
+                ),
+              );
+            },
+            'POST /api/app/bid/submit': (AppApiRequest request) async {
+              submitRequestCount += 1;
+              return AppApiResponse(
+                statusCode: 202,
+                uri: request.uri,
+                body: <String, Object?>{'bidId': 'should-not-submit'},
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: '${ExhibitionRoutes.bidSubmit}?projectId=proj-1',
+        transport: transport,
+        shellContextConsumer: buildShellContextConsumer(
+          organizationId: 'org-1',
+          roleKeys: const <String>['supplier_admin'],
+          certificationStatus: 'verified',
+        ),
+        sessionStore: buildAuthenticatedSessionStore(
+          deviceId: 'device-bid-current-viewer',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final submittedButton = find.widgetWithText(FilledButton, '已提交竞标');
+    await tester.scrollUntilVisible(
+      submittedButton,
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+    expect(submittedButton, findsOneWidget);
+    expect(tester.widget<FilledButton>(submittedButton).onPressed, isNull);
+    await _scrollAndTap(tester, submittedButton);
+    expect(submitRequestCount, 0);
   });
 
   testWidgets('submitted milestone stays in controlled invalid_state failure', (

@@ -391,7 +391,13 @@ module ContractsGeneration
         scopeSummary: string | null;
         scheduleDetail: string | null;
         viewerProjectRelation: ProjectViewerRelation;
+        currentViewerBid?: ProjectCurrentViewerBid | null;
         description: string | null;
+      }
+
+      export interface ProjectCurrentViewerBid {
+        bidId: string;
+        state: string;
       }
 
       export interface ProjectListPagination {
