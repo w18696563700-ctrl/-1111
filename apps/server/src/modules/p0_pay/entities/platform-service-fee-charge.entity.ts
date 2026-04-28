@@ -1,5 +1,9 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryColumn, UpdateDateColumn } from 'typeorm';
-import { PlatformServiceFeeChargeStatus } from '../p0-pay.types';
+import {
+  P0PayFeeRateSource,
+  P0PayMembershipTierSnapshot,
+  PlatformServiceFeeChargeStatus
+} from '../p0-pay.types';
 
 @Entity({ name: 'platform_service_fee_charges' })
 @Index('idx_platform_service_fee_charges_contract', ['contractConfirmationId'])
@@ -28,6 +32,24 @@ export class PlatformServiceFeeChargeEntity {
 
   @Column({ name: 'final_fee_amount', type: 'numeric', precision: 12, scale: 2 })
   finalFeeAmount!: string | number;
+
+  @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '默认费率 3.0%' })
+  feeRateLabel!: string;
+
+  @Column({ name: 'fee_rate_source', type: 'varchar', length: 32, default: 'legacy_fixed_default' })
+  feeRateSource!: P0PayFeeRateSource;
+
+  @Column({ name: 'membership_tier_snapshot', type: 'varchar', length: 32, default: 'none' })
+  membershipTierSnapshot!: P0PayMembershipTierSnapshot;
+
+  @Column({ name: 'fee_rate_rule_version', type: 'varchar', length: 64, default: '' })
+  feeRateRuleVersion!: string;
+
+  @Column({ name: 'fee_rate_snapshot_hash', type: 'varchar', length: 128, default: '' })
+  feeRateSnapshotHash!: string;
+
+  @Column({ name: 'fee_calculated_at', type: 'timestamptz', nullable: true })
+  feeCalculatedAt!: Date | null;
 
   @Column({ name: 'payment_order_id', type: 'varchar', length: 64, nullable: true })
   paymentOrderId!: string | null;

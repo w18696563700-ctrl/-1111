@@ -28,6 +28,14 @@ type ShellMembershipSummary = {
   paidMembershipNextRefreshAt: Date | null;
 };
 
+export type PaidMembershipTierSnapshotProjection = {
+  tierCode: string | null;
+  effectiveAt: Date | null;
+  expiresAt: Date | null;
+  sourceType: string | null;
+  sourceRef: string | null;
+};
+
 @Injectable()
 export class MembershipQueryService {
   constructor(
@@ -105,6 +113,20 @@ export class MembershipQueryService {
     };
   }
 
+  async getPaidMembershipTierSnapshotForOrganization(
+    organizationId: string,
+    at: Date = new Date()
+  ): Promise<PaidMembershipTierSnapshotProjection> {
+    const currentCycle = await this.findCurrentCycle(organizationId, at);
+    return {
+      tierCode: currentCycle?.tierCode ?? null,
+      effectiveAt: currentCycle?.effectiveAt ?? null,
+      expiresAt: currentCycle?.expiresAt ?? null,
+      sourceType: currentCycle?.sourceType ?? null,
+      sourceRef: currentCycle?.sourceRef ?? null
+    };
+  }
+
   private async requireCurrentOrganizationId(context: RequestContext) {
     const currentSession = await requireVerifiedCurrentSessionContext(
       context,
@@ -151,13 +173,12 @@ export class MembershipQueryService {
     };
   }
 
-  private findCurrentCycle(organizationId: string) {
-    const now = new Date();
+  private findCurrentCycle(organizationId: string, at: Date = new Date()) {
     return this.paidMembershipRepository
       .createQueryBuilder('membership')
       .where('membership.organization_id = :organizationId', { organizationId })
-      .andWhere('membership.effective_at <= :now', { now })
-      .andWhere('(membership.expires_at IS NULL OR membership.expires_at > :now)', { now })
+      .andWhere('membership.effective_at <= :at', { at })
+      .andWhere('(membership.expires_at IS NULL OR membership.expires_at > :at)', { at })
       .orderBy('membership.effective_at', 'DESC')
       .addOrderBy('membership.created_at', 'DESC')
       .getOne();

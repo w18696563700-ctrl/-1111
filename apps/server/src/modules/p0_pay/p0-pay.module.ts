@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { AuthModule } from '../auth/auth.module';
 import { BidEntity } from '../bid/entities/bid.entity';
+import { MembershipModule } from '../membership/membership.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { TradingImModule } from '../trading_im/trading-im.module';
@@ -27,12 +28,14 @@ import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
 import { P0PayPresenter } from './p0-pay.presenter';
 import { P0PayServiceFeeAuthorizationService } from './p0-pay-service-fee-authorization.service';
 import { P0PayServiceFeeFactory } from './p0-pay-service-fee.factory';
+import { P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
 import { P0PayStateActionService } from './p0-pay-state-action.service';
 import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
 
 @Module({
   imports: [
     AuthModule,
+    MembershipModule,
     OrganizationModule,
     TradingImModule,
     TypeOrmModule.forFeature([
@@ -62,6 +65,7 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
     P0PayPaymentChannelService,
     P0PayPresenter,
     P0PayServiceFeeFactory,
+    P0PayServiceFeeRatePolicy,
     P0PayServiceFeeAuthorizationService,
     P0PayStateActionService,
     P0PayTradeTaskService

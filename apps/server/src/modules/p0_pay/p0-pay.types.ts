@@ -57,6 +57,21 @@ export type PlatformServiceFeeChargeStatus =
   | 'refunded'
   | 'cancelled';
 
+export type P0PayFeeRateSource =
+  | 'fixed_default'
+  | 'paid_membership_tier'
+  | 'legacy_fixed_default'
+  | 'unknown';
+
+export type P0PayMembershipTierSnapshot =
+  | 'none'
+  | 'free_certified'
+  | 'standard'
+  | 'professional'
+  | 'ka'
+  | 'flagship'
+  | 'unknown';
+
 export type P0PayCallbackVerificationStatus =
   | 'received'
   | 'verified'

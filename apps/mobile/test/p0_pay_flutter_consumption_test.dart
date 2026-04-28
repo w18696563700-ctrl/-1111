@@ -206,9 +206,14 @@ void main() {
                     'bidId': 'bid-1',
                     'bidStatus': 'pending_authorization',
                     'platformServiceFeeRequirement': <String, Object?>{
-                      'feeRate': '0.03',
+                      'feeRate': '0.025',
+                      'feeRateLabel': '标准会员费率',
+                      'feeRateSource': 'paid_membership_tier',
+                      'membershipTierSnapshot': 'standard',
+                      'feeRateRuleVersion': 'membership-fee-linkage-v1',
+                      'feeRateSnapshotHash': 'hash-standard-025',
                       'quotedAmount': '80000.00',
-                      'estimatedFeeAmount': '2400.00',
+                      'estimatedFeeAmount': '2000.00',
                       'currency': 'CNY',
                       'authorizationRequired': true,
                       'authorizationStatus': 'pending_authorization',
@@ -222,8 +227,8 @@ void main() {
               (AppApiRequest request) async {
                 final body = _body(request);
                 expect(body['expectedQuotedAmount'], 80000);
-                expect(body['expectedFeeRate'], '0.03');
-                expect(body['expectedAuthorizationAmount'], '2400.00');
+                expect(body['expectedFeeRate'], '0.025');
+                expect(body['expectedAuthorizationAmount'], '2000.00');
                 expect(body['currency'], 'CNY');
                 expect(body, contains('idempotencyKey'));
                 return AppApiResponse(
@@ -232,7 +237,7 @@ void main() {
                   body: const <String, Object?>{
                     'authorizationId': 'auth-1',
                     'authorizationStatus': 'pending_authorization',
-                    'estimatedFeeAmount': '2400.00',
+                    'estimatedFeeAmount': '2000.00',
                     'currency': 'CNY',
                     'channelCandidates': <Object?>['wechat_candidate'],
                     'updatedAt': '2026-05-13T00:01:00Z',
@@ -270,8 +275,10 @@ void main() {
                     'authorizationId': 'auth-1',
                     'authorizationStatus': 'authorized',
                     'quotedAmount': '80000.00',
-                    'feeRate': '0.03',
-                    'estimatedFeeAmount': '2400.00',
+                    'feeRate': '0.025',
+                    'feeRateLabel': '标准会员费率',
+                    'membershipTierSnapshot': 'standard',
+                    'estimatedFeeAmount': '2000.00',
                     'currency': 'CNY',
                     'channelSummary': <String, Object?>{
                       'paymentChannel': 'wechat_candidate',
@@ -316,8 +323,8 @@ void main() {
             bidId: 'bid-1',
             command: P0PayServiceFeeAuthorizationCommand(
               expectedQuotedAmount: 80000,
-              expectedFeeRate: '0.03',
-              expectedAuthorizationAmount: '2400.00',
+              expectedFeeRate: '0.025',
+              expectedAuthorizationAmount: '2000.00',
             ),
           );
       final initResult = await consumer.initP0PayServiceFeeAuthorization(
@@ -412,8 +419,8 @@ void main() {
                   'authorizationId': 'auth-1',
                   'authorizationStatus': 'pending_authorization',
                   'quotedAmount': '80000.00',
-                  'feeRate': '0.03',
-                  'estimatedFeeAmount': '2400.00',
+                  'feeRate': '0.025',
+                  'estimatedFeeAmount': '2000.00',
                   'currency': 'CNY',
                   'updatedAt': '2026-05-14T00:00:00Z',
                 },
@@ -491,8 +498,8 @@ void main() {
                       ? 'pending_user_confirm'
                       : 'succeeded',
                   'quotedAmount': '80000.00',
-                  'feeRate': '0.03',
-                  'estimatedFeeAmount': '2400.00',
+                  'feeRate': '0.025',
+                  'estimatedFeeAmount': '2000.00',
                   'currency': 'CNY',
                   'updatedAt': '2026-05-14T00:0$attempts:00Z',
                 },
@@ -525,8 +532,8 @@ void main() {
                   'authorizationId': 'auth-2',
                   'authorizationStatus': 'failed',
                   'quotedAmount': '80000.00',
-                  'feeRate': '0.03',
-                  'estimatedFeeAmount': '2400.00',
+                  'feeRate': '0.025',
+                  'estimatedFeeAmount': '2000.00',
                   'currency': 'CNY',
                   'failureReasonCode': 'PAYMENT_CHANNEL_UNAVAILABLE',
                   'updatedAt': '2026-05-14T00:03:00Z',
@@ -553,9 +560,10 @@ void main() {
     expect(failedTransport.requests.length, 1);
   });
 
-  test('project detail can render full read-only P0-Pay charged summary lines', () {
-    final summary = parseP0PayReadOnlySummary(
-      const <String, Object?>{
+  test(
+    'project detail can render full read-only P0-Pay charged summary lines',
+    () {
+      final summary = parseP0PayReadOnlySummary(const <String, Object?>{
         'taskId': 'task-1',
         'taskType': 'fixed_price_bid',
         'platformServiceFee': <String, Object?>{
@@ -569,25 +577,25 @@ void main() {
           'readOnly': true,
           'statusTextKey': 'charged',
         },
-      },
-    );
+      });
 
-    expect(summary, isNotNull);
-    expect(summary!.readOnly, isTrue);
-    expect(summary.platformServiceFeeStatus, 'charged');
-    expect(summary.platformServiceFeeFinalAmount, '2700.00');
-    expect(summary.contractConfirmationStatus, 'confirmed');
-    expect(
-      summary.statusLines.map((P0PayReadOnlyStatusLine line) {
-        return '${line.label}:${line.value}';
-      }),
-      containsAll(<String>[
-        '平台服务费:已扣取',
-        '最终服务费:2700.00',
-        '合同确认:已确认',
-        '消息楼状态:已扣取',
-        '消息楼只读:是',
-      ]),
-    );
-  });
+      expect(summary, isNotNull);
+      expect(summary!.readOnly, isTrue);
+      expect(summary.platformServiceFeeStatus, 'charged');
+      expect(summary.platformServiceFeeFinalAmount, '2700.00');
+      expect(summary.contractConfirmationStatus, 'confirmed');
+      expect(
+        summary.statusLines.map((P0PayReadOnlyStatusLine line) {
+          return '${line.label}:${line.value}';
+        }),
+        containsAll(<String>[
+          '平台服务费:已扣取',
+          '最终服务费:2700.00',
+          '合同确认:已确认',
+          '消息楼状态:已扣取',
+          '消息楼只读:是',
+        ]),
+      );
+    },
+  );
 }

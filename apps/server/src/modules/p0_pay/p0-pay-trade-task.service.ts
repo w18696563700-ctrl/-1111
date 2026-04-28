@@ -12,11 +12,10 @@ import { BidSubmittedSeedService } from '../trading_im/bid-submitted-seed.servic
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { InquiryQuoteDepositEntity } from './entities/inquiry-quote-deposit.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
-import { calculatePlatformServiceFeeAmount } from './p0-pay-calculator';
 import { p0PayInvalid, p0PayPermissionDenied, p0PayResourceUnavailable } from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
+import { P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
 import { P0PayStateActionService } from './p0-pay-state-action.service';
-import { P0_PAY_DEFAULT_SERVICE_FEE_RATE } from './p0-pay.state';
 
 type SummaryRecord = Record<string, unknown>;
 @Injectable()
@@ -34,7 +33,8 @@ export class P0PayTradeTaskService {
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly auditService: P0PayAuditService,
     private readonly stateActions: P0PayStateActionService,
-    private readonly bidSubmittedSeedService: BidSubmittedSeedService
+    private readonly bidSubmittedSeedService: BidSubmittedSeedService,
+    private readonly feeRatePolicy: P0PayServiceFeeRatePolicy
   ) {}
 
   async createTradeTask(payload: Record<string, unknown>, context: RequestContext) {
@@ -152,6 +152,10 @@ export class P0PayTradeTaskService {
       submittedBy: currentSession.actorId ?? currentSession.userId,
       submittedAt: new Date()
     });
+    const platformServiceFeeRequirement = await this.feeRatePolicy.buildRequirement({
+      factoryOrganizationId: scope.organization.id,
+      quotedAmount: bid.quoteAmount
+    });
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(BidEntity).save(bid);
       await this.bidSubmittedSeedService.createForSubmittedBid({
@@ -159,18 +163,10 @@ export class P0PayTradeTaskService {
         bidderDisplayName: scope.organization.name ?? ''
       });
     });
-    const estimatedFeeAmount = calculatePlatformServiceFeeAmount(bid.quoteAmount, P0_PAY_DEFAULT_SERVICE_FEE_RATE);
     return {
       bidId: bid.id,
       bidStatus: 'pending_service_fee_authorization',
-      platformServiceFeeRequirement: {
-        feeRate: '0.030000',
-        quotedAmount: bid.quoteAmount,
-        estimatedFeeAmount,
-        currency: 'CNY',
-        authorizationRequired: true,
-        authorizationStatus: 'pending_authorization'
-      },
+      platformServiceFeeRequirement,
       nextAction: 'create_service_fee_authorization',
       updatedAt: bid.updatedAt
     };
@@ -282,6 +278,14 @@ export class P0PayTradeTaskService {
         ? {
             authorizationId: authorization.id,
             status: authorization.status,
+            quotedAmount: authorization.quotedAmount,
+            feeRate: authorization.feeRate,
+            feeRateLabel: authorization.feeRateLabel || '默认费率 3.0%',
+            feeRateSource: authorization.feeRateSource || 'legacy_fixed_default',
+            membershipTierSnapshot: authorization.membershipTierSnapshot || 'none',
+            feeRateRuleVersion: authorization.feeRateRuleVersion || authorization.ruleVersion,
+            feeRateSnapshotHash: authorization.feeRateSnapshotHash || authorization.ruleSnapshotHash,
+            feeCalculatedAt: authorization.feeCalculatedAt ?? authorization.agreedAt ?? authorization.createdAt,
             estimatedFeeAmount: authorization.estimatedFeeAmount,
             finalFeeAmount: authorization.finalFeeAmount,
             currency: 'CNY'

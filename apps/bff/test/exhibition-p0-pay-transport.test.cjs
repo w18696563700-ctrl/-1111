@@ -245,8 +245,8 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
       );
       assert.deepEqual(body, {
         expectedQuotedAmount: '80000',
-        expectedFeeRate: '0.03',
-        expectedAuthorizationAmount: '2400',
+        expectedFeeRate: '0.025',
+        expectedAuthorizationAmount: '2000',
         currency: 'CNY',
         idempotencyKey: 'idem-auth',
       });
@@ -255,7 +255,15 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
         authorization: {
           authorizationId: 'auth-1',
           status: 'pending_authorization',
-          estimatedFeeAmount: '2400',
+          quotedAmount: '80000.00',
+          feeRate: '0.025000',
+          feeRateLabel: '标准会员 2.5%',
+          feeRateSource: 'paid_membership_tier',
+          membershipTierSnapshot: 'standard',
+          feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
+          feeRateSnapshotHash: 'snapshot-hash',
+          feeCalculatedAt: '2026-05-10T09:59:00.000Z',
+          estimatedFeeAmount: '2000.00',
           currency: 'CNY',
           updatedAt: '2026-05-10T10:00:00.000Z',
         },
@@ -270,8 +278,8 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
     'bid-1',
     {
       expectedQuotedAmount: 80000,
-      expectedFeeRate: '0.03',
-      expectedAuthorizationAmount: '2400',
+      expectedFeeRate: '0.025',
+      expectedAuthorizationAmount: '2000',
       currency: 'CNY',
       idempotencyKey: 'idem-auth',
       objectKey: 'must-not-forward',
@@ -283,13 +291,70 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
   assert.deepEqual(result, {
     authorizationId: 'auth-1',
     authorizationStatus: 'pending_authorization',
-    estimatedFeeAmount: '2400',
+    quotedAmount: '80000.00',
+    feeRate: '0.025000',
+    feeRateLabel: '标准会员 2.5%',
+    feeRateSource: 'paid_membership_tier',
+    membershipTierSnapshot: 'standard',
+    feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
+    feeRateSnapshotHash: 'snapshot-hash',
+    feeCalculatedAt: '2026-05-10T09:59:00.000Z',
+    estimatedFeeAmount: '2000.00',
     currency: 'CNY',
     channelCandidates: ['alipay_candidate', 'wechat_candidate'],
     expiresAt: null,
     updatedAt: '2026-05-10T10:00:00.000Z',
   });
   assert.equal(calls.length, 1);
+});
+
+test('P0-Pay BFF read model projects Server fee snapshots without calculating fee rate', async () => {
+  const service = createService({
+    async post(pathName) {
+      assert.equal(pathName, '/server/exhibition/trade-tasks/task-1/contract-confirmations');
+      return {
+        contractConfirmationId: 'contract-1',
+        contractStatus: 'confirmed',
+        finalConfirmedAmount: '90000.00',
+        platformServiceFeeFinalAmount: '2250.00',
+        platformServiceFeeStatus: 'charged',
+        platformServiceFeeCharge: {
+          finalConfirmedAmount: '90000.00',
+          feeRate: '0.025000',
+          feeRateLabel: '标准会员 2.5%',
+          feeRateSource: 'paid_membership_tier',
+          membershipTierSnapshot: 'standard',
+          feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
+          feeRateSnapshotHash: 'snapshot-hash',
+          feeCalculatedAt: '2026-05-10T09:59:00.000Z',
+          finalFeeAmount: '2250.00',
+          currency: 'CNY',
+          chargeStatus: 'charged',
+        },
+        nextAction: 'enter_fulfillment',
+        updatedAt: '2026-05-10T10:00:00.000Z',
+        serverInternalFeeDebug: 'must-not-forward',
+      };
+    },
+  });
+
+  const result = await service.createContractConfirmation(
+    'task-1',
+    {
+      selectedBidId: 'bid-1',
+      finalConfirmedAmount: '90000.00',
+      currency: 'CNY',
+      contractFileAssetIds: [],
+      confirmationRole: 'factory',
+      platformServiceFeeRecalculationAwarenessConfirmed: true,
+      idempotencyKey: 'idem-contract',
+    },
+    {},
+  );
+
+  assert.equal(result.platformServiceFeeCharge.feeRate, '0.025000');
+  assert.equal(result.platformServiceFeeCharge.membershipTierSnapshot, 'standard');
+  assert.equal(result.serverInternalFeeDebug, undefined);
 });
 
 test('P0-Pay app routes resolve to controlled 400 or 401 instead of Nest route 404', async () => {
@@ -390,7 +455,16 @@ test('P0-Pay summary is read-only for task detail and message-building display',
       return {
         taskId: 'task-1',
         taskType: 'fixed_price_bid',
-        platformServiceFee: { status: 'authorized' },
+        platformServiceFee: {
+          status: 'authorized',
+          feeRate: '0.025000',
+          feeRateLabel: '标准会员 2.5%',
+          feeRateSource: 'paid_membership_tier',
+          membershipTierSnapshot: 'standard',
+          feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
+          feeRateSnapshotHash: 'snapshot-hash',
+          feeCalculatedAt: '2026-05-10T09:59:00.000Z',
+        },
         inquiryDeposit: null,
         contractConfirmation: { status: 'pending' },
         messageDisplaySummary: {
@@ -412,6 +486,8 @@ test('P0-Pay summary is read-only for task detail and message-building display',
     statusTextKey: 'service_fee_authorized',
     routeTarget: { objectType: 'trade_task', taskId: 'task-1' },
   });
+  assert.equal(result.platformServiceFee.feeRate, '0.025000');
+  assert.equal(result.platformServiceFee.membershipTierSnapshot, 'standard');
 });
 
 test('P0-Pay state actions forward as controlled BFF operations', async () => {

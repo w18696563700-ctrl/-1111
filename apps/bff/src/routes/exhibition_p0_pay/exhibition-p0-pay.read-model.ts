@@ -58,6 +58,9 @@ export function readServiceFeeAuthorizationCreateReadModel(value: unknown) {
   return {
     authorizationId: readFirst(record.authorizationId, authorization?.authorizationId),
     authorizationStatus: readFirst(record.authorizationStatus, authorization?.status),
+    quotedAmount: readFirst(record.quotedAmount, authorization?.quotedAmount),
+    feeRate: readFirst(record.feeRate, authorization?.feeRate),
+    ...readFeeSnapshot(record, authorization),
     estimatedFeeAmount: readFirst(record.estimatedFeeAmount, authorization?.estimatedFeeAmount),
     currency: readFirst(record.currency, authorization?.currency, 'CNY'),
     channelCandidates: readArray(record.channelCandidates),
@@ -89,6 +92,7 @@ export function readServiceFeeAuthorizationStatusReadModel(value: unknown) {
     authorizationStatus: readFirst(record.authorizationStatus, authorization?.status),
     quotedAmount: readFirst(record.quotedAmount, authorization?.quotedAmount),
     feeRate: readFirst(record.feeRate, authorization?.feeRate),
+    ...readFeeSnapshot(record, authorization),
     estimatedFeeAmount: readFirst(record.estimatedFeeAmount, authorization?.estimatedFeeAmount),
     currency: readFirst(record.currency, authorization?.currency, order?.currency, 'CNY'),
     channelSummary: readFirst(record.channelSummary, compactOptional({
@@ -170,6 +174,7 @@ export function readContractConfirmationReadModel(value: unknown) {
     'finalConfirmedAmount',
     'platformServiceFeeFinalAmount',
     'platformServiceFeeStatus',
+    'platformServiceFeeCharge',
     'nextAction',
     'updatedAt',
   ]);
@@ -215,6 +220,13 @@ function forceReadOnly(value: unknown) {
       'platformServiceFeeStatus',
       'platformServiceFeeEstimatedAmount',
       'platformServiceFeeFinalAmount',
+      'feeRate',
+      'feeRateLabel',
+      'feeRateSource',
+      'membershipTierSnapshot',
+      'feeRateRuleVersion',
+      'feeRateSnapshotHash',
+      'feeCalculatedAt',
       'inquiryDepositStatus',
       'inquiryDepositAmount',
       'paymentChannelSummary',
@@ -252,6 +264,26 @@ function compactOptional(value: Payload) {
     }
   }
   return Object.keys(result).length > 0 ? result : null;
+}
+
+function readFeeSnapshot(...records: Array<Payload | undefined>) {
+  return {
+    feeRateLabel: readFromRecords(records, 'feeRateLabel'),
+    feeRateSource: readFromRecords(records, 'feeRateSource'),
+    membershipTierSnapshot: readFromRecords(records, 'membershipTierSnapshot'),
+    feeRateRuleVersion: readFromRecords(records, 'feeRateRuleVersion'),
+    feeRateSnapshotHash: readFromRecords(records, 'feeRateSnapshotHash'),
+    feeCalculatedAt: readFromRecords(records, 'feeCalculatedAt'),
+  };
+}
+
+function readFromRecords(records: Array<Payload | undefined>, key: string) {
+  for (const record of records) {
+    if (record && record[key] !== undefined) {
+      return record[key];
+    }
+  }
+  return undefined;
 }
 
 function readArray(value: unknown) {

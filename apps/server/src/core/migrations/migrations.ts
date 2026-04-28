@@ -2146,6 +2146,50 @@ export const p0PayMigrations = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_payment_idempotency_records_scope_key
        ON payment_idempotency_records (operation_key, scope_key, idempotency_key_hash)`
     ]
+  },
+  {
+    key: '20260505_p0_pay_membership_fee_snapshot_truth',
+    statements: [
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS fee_rate_label varchar(64) NOT NULL DEFAULT '默认费率 3.0%'`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS fee_rate_source varchar(32) NOT NULL DEFAULT 'legacy_fixed_default'`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS membership_tier_snapshot varchar(32) NOT NULL DEFAULT 'none'`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS fee_rate_rule_version varchar(64) NOT NULL DEFAULT 'exhibition_trade_task_payment_mainline_p0_pay_v1_3'`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS fee_rate_snapshot_hash varchar(128) NOT NULL DEFAULT ''`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS fee_calculated_at timestamptz`,
+      `UPDATE platform_service_fee_authorizations
+       SET fee_rate_snapshot_hash = rule_snapshot_hash
+       WHERE fee_rate_snapshot_hash = ''`,
+      `UPDATE platform_service_fee_authorizations
+       SET fee_calculated_at = COALESCE(agreed_at, created_at)
+       WHERE fee_calculated_at IS NULL`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS fee_rate_label varchar(64) NOT NULL DEFAULT '默认费率 3.0%'`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS fee_rate_source varchar(32) NOT NULL DEFAULT 'legacy_fixed_default'`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS membership_tier_snapshot varchar(32) NOT NULL DEFAULT 'none'`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS fee_rate_rule_version varchar(64) NOT NULL DEFAULT 'exhibition_trade_task_payment_mainline_p0_pay_v1_3'`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS fee_rate_snapshot_hash varchar(128) NOT NULL DEFAULT ''`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS fee_calculated_at timestamptz`,
+      `UPDATE platform_service_fee_charges charge
+       SET fee_rate_label = COALESCE(auth.fee_rate_label, charge.fee_rate_label),
+           fee_rate_source = COALESCE(auth.fee_rate_source, charge.fee_rate_source),
+           membership_tier_snapshot = COALESCE(auth.membership_tier_snapshot, charge.membership_tier_snapshot),
+           fee_rate_rule_version = COALESCE(auth.fee_rate_rule_version, charge.fee_rate_rule_version),
+           fee_rate_snapshot_hash = COALESCE(NULLIF(auth.fee_rate_snapshot_hash, ''), auth.rule_snapshot_hash, charge.fee_rate_snapshot_hash),
+           fee_calculated_at = COALESCE(auth.fee_calculated_at, auth.agreed_at, charge.created_at)
+       FROM platform_service_fee_authorizations auth
+       WHERE charge.authorization_id = auth.id`
+    ]
   }
 ];
 

@@ -5280,7 +5280,7 @@ void main() {
       await _expectVisibleText(tester, '第二步 查看报价依据资料');
       await _expectVisibleText(tester, '第三步 填写竞标价格与服务费确认');
       await _expectVisibleText(tester, '平台成交服务费确认');
-      await _expectVisibleTextContaining(tester, '最终金额以平台提交后返回为准');
+      await _expectVisibleTextContaining(tester, '本页不本地计算正式金额');
       await _expectVisibleText(tester, '你需要做什么');
       await _expectVisibleText(tester, '48小时');
       await _expectVisibleText(tester, '第四步 上传文档和方案说明');
@@ -5583,9 +5583,14 @@ void main() {
                   'bidId': 'bid-1',
                   'bidStatus': 'pending_authorization',
                   'platformServiceFeeRequirement': <String, Object?>{
-                    'feeRate': '0.03',
+                    'feeRate': '0.025',
+                    'feeRateLabel': '标准会员费率',
+                    'feeRateSource': 'paid_membership_tier',
+                    'membershipTierSnapshot': 'standard',
+                    'feeRateRuleVersion': 'membership-fee-linkage-v1',
+                    'feeRateSnapshotHash': 'hash-standard-025',
                     'quotedAmount': '1200.00',
-                    'estimatedFeeAmount': '36.00',
+                    'estimatedFeeAmount': '30.00',
                     'currency': 'CNY',
                     'authorizationRequired': true,
                     'authorizationStatus': 'pending_authorization',
@@ -5594,16 +5599,22 @@ void main() {
               );
             },
         'POST ${ExhibitionCanonicalPaths.p0PayServiceFeeAuthorizations('proj-1', 'bid-1')}':
-            (AppApiRequest request) async => AppApiResponse(
-              statusCode: 201,
-              uri: request.uri,
-              body: const <String, Object?>{
-                'authorizationId': 'auth-1',
-                'authorizationStatus': 'pending_authorization',
-                'estimatedFeeAmount': '36.00',
-                'currency': 'CNY',
-              },
-            ),
+            (AppApiRequest request) async {
+              final body = request.body as Map<String, Object?>;
+              expect(body['expectedQuotedAmount'], 1200);
+              expect(body['expectedFeeRate'], '0.025');
+              expect(body['expectedAuthorizationAmount'], '30.00');
+              return AppApiResponse(
+                statusCode: 201,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'authorizationId': 'auth-1',
+                  'authorizationStatus': 'pending_authorization',
+                  'estimatedFeeAmount': '30.00',
+                  'currency': 'CNY',
+                },
+              );
+            },
         'POST ${ExhibitionCanonicalPaths.p0PayServiceFeeAuthorizeInit('proj-1', 'bid-1', 'auth-1')}':
             (AppApiRequest request) async => AppApiResponse(
               statusCode: 200,
@@ -5623,8 +5634,10 @@ void main() {
                 'authorizationId': 'auth-1',
                 'authorizationStatus': 'authorized',
                 'quotedAmount': '1200.00',
-                'feeRate': '0.03',
-                'estimatedFeeAmount': '36.00',
+                'feeRate': '0.025',
+                'feeRateLabel': '标准会员费率',
+                'membershipTierSnapshot': 'standard',
+                'estimatedFeeAmount': '30.00',
                 'currency': 'CNY',
                 'updatedAt': '2026-05-13T00:03:00Z',
               },
@@ -5650,7 +5663,10 @@ void main() {
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
     await _expectVisibleText(tester, '平台成交服务费确认');
+    await _expectVisibleTextContaining(tester, '待平台返回，正式金额以平台返回为准');
     await _expectVisibleText(tester, '48小时');
+    expect(find.textContaining('成交金额的 3%'), findsNothing);
+    expect(find.textContaining('约 36.00 元'), findsNothing);
     expect(find.text('含税'), findsNothing);
     expect(find.text('含运输'), findsNothing);
     expect(find.text('含安装'), findsNothing);

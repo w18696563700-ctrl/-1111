@@ -345,9 +345,7 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
     if (requirement == null) {
       return null;
     }
-    final quotedAmount =
-        _p0PayRequirementNumber(requirement, 'quotedAmount') ??
-        double.tryParse(_quoteAmountController.text.trim());
+    final quotedAmount = _p0PayRequirementNumber(requirement, 'quotedAmount');
     final feeRate = _p0PayRequirementText(requirement, 'feeRate');
     final estimatedFeeAmount = _p0PayRequirementText(
       requirement,

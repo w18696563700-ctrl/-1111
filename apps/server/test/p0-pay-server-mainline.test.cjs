@@ -14,6 +14,11 @@ test('P0-Pay migration registers inquiry deposit, callback, contract confirmatio
   assert.match(sql, /apply_status/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS contract_confirmations/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS platform_service_fee_charges/);
+  assert.match(sql, /fee_rate_source varchar\(32\)/);
+  assert.match(sql, /membership_tier_snapshot varchar\(32\)/);
+  assert.match(sql, /fee_rate_rule_version varchar\(64\)/);
+  assert.match(sql, /fee_rate_snapshot_hash varchar\(128\)/);
+  assert.match(sql, /fee_calculated_at timestamptz/);
   assert.match(sql, /platform_service_fee_charge/);
   assert.doesNotMatch(sql, /wallet_pending/);
   assert.doesNotMatch(sql, /guarantee_freezing/);
@@ -99,6 +104,94 @@ test('P0-Pay fixed-price bid submission seeds the approved message interaction c
   assert.match(moduleSource, /TradingImModule/);
 });
 
+test('P0-Pay contract confirmation charges with authorization locked fee snapshot', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src/modules/p0_pay/p0-pay-contract-confirmation.service.ts'),
+    'utf8',
+  );
+
+  assert.match(source, /const lockedFeeRate = ownership\.authorization\.feeRate/);
+  assert.match(source, /feeRateSource: ownership\.authorization\.feeRateSource/);
+  assert.match(source, /feeRateSnapshotHash: ownership\.authorization\.feeRateSnapshotHash/);
+  assert.match(source, /finalFeeAmount = calculatePlatformServiceFeeAmount\(confirmation\.finalConfirmedAmount, lockedFeeRate\)/);
+  assert.doesNotMatch(source, /P0_PAY_DEFAULT_SERVICE_FEE_RATE/);
+});
+
+test('P0-Pay contract confirmation behavior copies locked authorization snapshot into charge', async () => {
+  const {
+    P0PayContractConfirmationService,
+  } = require('../dist/modules/p0_pay/p0-pay-contract-confirmation.service.js');
+
+  const savedCharges = [];
+  const service = new P0PayContractConfirmationService(
+    null,
+    null,
+    { create: (value) => value },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+  );
+  service.createChargePaymentOrder = async () => ({ id: 'order-1' });
+  service.saveChargeTransaction = async () => undefined;
+  service.markAuthorizationCharged = async () => undefined;
+  service.recordChargeAudit = async () => undefined;
+
+  const manager = {
+    getRepository(entity) {
+      if (entity?.name === 'PlatformServiceFeeChargeEntity') {
+        return {
+          async findOneBy() { return null; },
+          async save(value) { savedCharges.push(value); return value; },
+        };
+      }
+      return { async save(value) { return value; } };
+    },
+  };
+  const authorization = {
+    id: 'auth-1',
+    paymentChannel: 'alipay',
+    authorizationOrderId: 'merchant-auth-1',
+    feeRate: '0.025000',
+    feeRateLabel: '标准会员 2.5%',
+    feeRateSource: 'paid_membership_tier',
+    membershipTierSnapshot: 'standard',
+    feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
+    feeRateSnapshotHash: 'snapshot-hash',
+    feeCalculatedAt: new Date('2026-05-10T10:00:00.000Z'),
+  };
+  const charge = await service.ensureCharge(
+    manager,
+    {
+      id: 'contract-1',
+      taskId: 'task-1',
+      finalConfirmedAmount: '90000.00',
+      platformServiceFeeChargeId: null,
+    },
+    {
+      authorization,
+      bid: { id: 'bid-1', bidderOrganizationId: 'factory-1' },
+      project: { projectNo: 'EXH-1' },
+      scope: { membership: { roleKey: 'factory' } },
+      currentSession: { userId: 'user-1' },
+    },
+    { requestId: 'req-1', traceId: 'trace-1' },
+  );
+
+  assert.equal(charge.feeRate, '0.025000');
+  assert.equal(charge.finalFeeAmount, '2250.00');
+  assert.equal(charge.feeRateSource, 'paid_membership_tier');
+  assert.equal(charge.membershipTierSnapshot, 'standard');
+  assert.equal(charge.feeRateSnapshotHash, 'snapshot-hash');
+  assert.equal(savedCharges.length, 1);
+});
+
 test('message interaction bid-thread projection carries only read-only P0-Pay summary', () => {
   const source = fs.readFileSync(
     path.join(__dirname, '../src/modules/message_interaction/counterpart-conversation.bid-thread-source.ts'),
@@ -116,6 +209,24 @@ test('message interaction bid-thread projection carries only read-only P0-Pay su
   assert.doesNotMatch(source, /\.save\(/);
   assert.match(moduleSource, /PlatformServiceFeeAuthorizationEntity/);
   assert.match(moduleSource, /InquiryQuoteDepositEntity/);
+});
+
+test('P0-Pay summary carries fee snapshot fields for read-only BFF projection', () => {
+  const source = fs.readFileSync(
+    path.join(__dirname, '../src/modules/p0_pay/p0-pay-trade-task.service.ts'),
+    'utf8',
+  );
+
+  [
+    'quotedAmount: authorization.quotedAmount',
+    'feeRate: authorization.feeRate',
+    'feeRateLabel: authorization.feeRateLabel',
+    'feeRateSource: authorization.feeRateSource',
+    'membershipTierSnapshot: authorization.membershipTierSnapshot',
+    'feeRateRuleVersion: authorization.feeRateRuleVersion',
+    'feeRateSnapshotHash: authorization.feeRateSnapshotHash',
+    'feeCalculatedAt: authorization.feeCalculatedAt',
+  ].forEach((snippet) => assert.match(source, new RegExp(escapeRegExp(snippet))));
 });
 
 function escapeRegExp(value) {

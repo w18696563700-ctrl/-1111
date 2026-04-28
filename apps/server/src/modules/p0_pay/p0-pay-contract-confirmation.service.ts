@@ -20,7 +20,7 @@ import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity';
 import { PlatformServiceFeeChargeEntity } from './entities/platform-service-fee-charge.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
-import { calculatePlatformServiceFeeAmount, normalizeFeeRate } from './p0-pay-calculator';
+import { calculatePlatformServiceFeeAmount } from './p0-pay-calculator';
 import { ContractConfirmationCommand } from './p0-pay.commands';
 import { p0PayInvalid, p0PayPermissionDenied, p0PayResourceUnavailable, p0PayStateConflict } from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
@@ -28,7 +28,6 @@ import { P0PayCommandParser } from './p0-pay-command.parser';
 import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayPresenter } from './p0-pay.presenter';
-import { P0_PAY_DEFAULT_SERVICE_FEE_RATE } from './p0-pay.state';
 
 @Injectable()
 export class P0PayContractConfirmationService {
@@ -164,10 +163,8 @@ export class P0PayContractConfirmationService {
     if (!ownership.authorization.paymentChannel) {
       throw p0PayStateConflict('Current service fee authorization has no payment channel to charge.');
     }
-    const finalFeeAmount = calculatePlatformServiceFeeAmount(
-      confirmation.finalConfirmedAmount,
-      P0_PAY_DEFAULT_SERVICE_FEE_RATE
-    );
+    const lockedFeeRate = ownership.authorization.feeRate;
+    const finalFeeAmount = calculatePlatformServiceFeeAmount(confirmation.finalConfirmedAmount, lockedFeeRate);
     const chargeId = randomUUID();
     const order = await this.createChargePaymentOrder(manager, confirmation, ownership, chargeId, finalFeeAmount, context);
     const charge = this.chargeRepository.create({
@@ -177,8 +174,14 @@ export class P0PayContractConfirmationService {
       authorizationId: ownership.authorization.id,
       factoryOrganizationId: ownership.bid.bidderOrganizationId,
       finalConfirmedAmount: confirmation.finalConfirmedAmount,
-      feeRate: normalizeFeeRate(P0_PAY_DEFAULT_SERVICE_FEE_RATE),
+      feeRate: lockedFeeRate,
       finalFeeAmount,
+      feeRateLabel: ownership.authorization.feeRateLabel,
+      feeRateSource: ownership.authorization.feeRateSource,
+      membershipTierSnapshot: ownership.authorization.membershipTierSnapshot,
+      feeRateRuleVersion: ownership.authorization.feeRateRuleVersion || ownership.authorization.ruleVersion,
+      feeRateSnapshotHash: ownership.authorization.feeRateSnapshotHash || ownership.authorization.ruleSnapshotHash,
+      feeCalculatedAt: ownership.authorization.feeCalculatedAt ?? ownership.authorization.agreedAt,
       paymentOrderId: order.id,
       chargeStatus: 'charged',
       chargedAt: new Date(),
@@ -440,10 +443,5 @@ export class P0PayContractConfirmationService {
   }
 }
 
-type ContractOwnership = {
-  project: ProjectEntity;
-  bid: BidEntity;
-  authorization: PlatformServiceFeeAuthorizationEntity;
-  scope: CurrentOrganizationScope;
-  currentSession: VerifiedCurrentSessionContext;
-};
+type ContractOwnership = { project: ProjectEntity; bid: BidEntity; authorization: PlatformServiceFeeAuthorizationEntity;
+  scope: CurrentOrganizationScope; currentSession: VerifiedCurrentSessionContext };

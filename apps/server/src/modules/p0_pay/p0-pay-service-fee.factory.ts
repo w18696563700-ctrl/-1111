@@ -7,16 +7,12 @@ import { BidEntity } from '../bid/entities/bid.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
-import {
-  calculatePlatformServiceFeeAmount,
-  normalizeFeeRate,
-  normalizePositiveMoney
-} from './p0-pay-calculator';
+import { normalizePositiveMoney } from './p0-pay-calculator';
 import { AuthorizeInitCommand, CreateAuthorizationCommand } from './p0-pay.commands';
 import { p0PayInvalid } from './p0-pay.errors';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
+import { P0PayServiceFeeRequirement, P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
 import {
-  P0_PAY_DEFAULT_SERVICE_FEE_RATE,
   P0_PAY_RULE_VERSION,
   P0_PAY_SERVICE_FEE_AGREEMENT_TEXT
 } from './p0-pay.state';
@@ -28,25 +24,29 @@ export class P0PayServiceFeeFactory {
     private readonly authorizationRepository: Repository<PlatformServiceFeeAuthorizationEntity>,
     @InjectRepository(PaymentOrderEntity)
     private readonly paymentOrderRepository: Repository<PaymentOrderEntity>,
-    private readonly idempotencyService: P0PayIdempotencyService
+    private readonly idempotencyService: P0PayIdempotencyService,
+    private readonly feeRatePolicy: P0PayServiceFeeRatePolicy
   ) {}
 
-  assertExpectedAmounts(command: CreateAuthorizationCommand, bid: BidEntity) {
+  async assertExpectedAmounts(command: CreateAuthorizationCommand, bid: BidEntity) {
     const quotedAmount = normalizePositiveMoney(bid.quoteAmount, 'quotedAmount');
-    const feeRate = normalizeFeeRate(P0_PAY_DEFAULT_SERVICE_FEE_RATE);
-    const feeAmount = calculatePlatformServiceFeeAmount(quotedAmount, feeRate);
+    const feeRequirement = await this.feeRatePolicy.buildRequirement({
+      factoryOrganizationId: bid.bidderOrganizationId,
+      quotedAmount
+    });
     if (command.expectedQuotedAmount !== quotedAmount) {
       throw p0PayInvalid('Field `expectedQuotedAmount` does not match Server bid truth.');
     }
-    if (command.expectedFeeRate !== feeRate) {
+    if (command.expectedFeeRate !== feeRequirement.feeRate) {
       throw p0PayInvalid('Field `expectedFeeRate` does not match Server fee rule truth.');
     }
-    if (command.expectedAuthorizationAmount !== feeAmount) {
+    if (command.expectedAuthorizationAmount !== feeRequirement.estimatedFeeAmount) {
       throw p0PayInvalid('Field `expectedAuthorizationAmount` does not match Server fee calculation.');
     }
     if (command.currency !== 'CNY') {
       throw p0PayInvalid('P0-Pay service fee authorization only supports CNY.');
     }
+    return feeRequirement;
   }
 
   buildAuthorization(input: {
@@ -54,9 +54,9 @@ export class P0PayServiceFeeFactory {
     project: ProjectEntity;
     currentSession: { userId: string; actorId: string };
     context: RequestContext;
+    feeRequirement: P0PayServiceFeeRequirement;
   }) {
     const quotedAmount = normalizePositiveMoney(input.bid.quoteAmount, 'quotedAmount');
-    const feeRate = normalizeFeeRate(P0_PAY_DEFAULT_SERVICE_FEE_RATE);
     return this.authorizationRepository.create({
       id: randomUUID(),
       taskId: input.project.id,
@@ -64,8 +64,14 @@ export class P0PayServiceFeeFactory {
       factoryOrganizationId: input.bid.bidderOrganizationId,
       publisherOrganizationId: input.project.organizationId,
       quotedAmount,
-      feeRate,
-      estimatedFeeAmount: calculatePlatformServiceFeeAmount(quotedAmount, feeRate),
+      feeRate: input.feeRequirement.feeRate,
+      estimatedFeeAmount: input.feeRequirement.estimatedFeeAmount,
+      feeRateLabel: input.feeRequirement.feeRateLabel,
+      feeRateSource: input.feeRequirement.feeRateSource,
+      membershipTierSnapshot: input.feeRequirement.membershipTierSnapshot,
+      feeRateRuleVersion: input.feeRequirement.feeRateRuleVersion,
+      feeRateSnapshotHash: input.feeRequirement.feeRateSnapshotHash,
+      feeCalculatedAt: input.feeRequirement.feeCalculatedAt,
       finalConfirmedAmount: null,
       finalFeeAmount: null,
       paymentChannel: null,

@@ -18,7 +18,14 @@ export class P0PayPresenter {
     authorization: PlatformServiceFeeAuthorizationEntity,
     order: PaymentOrderEntity | null
   ) {
+    const feeSnapshot = this.toAuthorizationFeeSnapshot(authorization);
     return {
+      authorizationId: authorization.id,
+      authorizationStatus: authorization.status,
+      quotedAmount: authorization.quotedAmount,
+      estimatedFeeAmount: authorization.estimatedFeeAmount,
+      currency: 'CNY',
+      ...feeSnapshot,
       authorization: {
         authorizationId: authorization.id,
         taskId: authorization.taskId,
@@ -26,8 +33,8 @@ export class P0PayPresenter {
         factoryOrganizationId: authorization.factoryOrganizationId,
         publisherOrganizationId: authorization.publisherOrganizationId,
         quotedAmount: authorization.quotedAmount,
-        feeRate: authorization.feeRate,
         estimatedFeeAmount: authorization.estimatedFeeAmount,
+        ...feeSnapshot,
         paymentChannel: authorization.paymentChannel,
         paymentOrderId: authorization.paymentOrderId,
         authorizationOrderId: authorization.authorizationOrderId,
@@ -143,11 +150,42 @@ export class P0PayPresenter {
       finalConfirmedAmount: input.confirmation.finalConfirmedAmount,
       platformServiceFeeFinalAmount: input.charge?.finalFeeAmount ?? input.authorization?.finalFeeAmount ?? null,
       platformServiceFeeStatus: input.charge?.chargeStatus ?? input.authorization?.status ?? 'not_required',
+      platformServiceFeeCharge: input.charge ? this.toChargeFeeSnapshot(input.charge) : null,
       nextAction:
         input.confirmation.contractStatus === 'confirmed'
           ? 'enter_fulfillment'
           : 'wait_counterparty_confirmation',
       updatedAt: input.confirmation.updatedAt
+    };
+  }
+
+  private toAuthorizationFeeSnapshot(authorization: PlatformServiceFeeAuthorizationEntity) {
+    return {
+      feeRate: authorization.feeRate,
+      feeRateLabel: authorization.feeRateLabel || '默认费率 3.0%',
+      feeRateSource: authorization.feeRateSource || 'legacy_fixed_default',
+      membershipTierSnapshot: authorization.membershipTierSnapshot || 'none',
+      feeRateRuleVersion: authorization.feeRateRuleVersion || authorization.ruleVersion,
+      feeRateSnapshotHash: authorization.feeRateSnapshotHash || authorization.ruleSnapshotHash,
+      feeCalculatedAt: authorization.feeCalculatedAt ?? authorization.agreedAt ?? authorization.createdAt
+    };
+  }
+
+  private toChargeFeeSnapshot(charge: PlatformServiceFeeChargeEntity) {
+    return {
+      finalConfirmedAmount: charge.finalConfirmedAmount,
+      feeRate: charge.feeRate,
+      feeRateLabel: charge.feeRateLabel || '默认费率 3.0%',
+      feeRateSource: charge.feeRateSource || 'legacy_fixed_default',
+      membershipTierSnapshot: charge.membershipTierSnapshot || 'none',
+      feeRateRuleVersion: charge.feeRateRuleVersion,
+      feeRateSnapshotHash: charge.feeRateSnapshotHash,
+      feeCalculatedAt: charge.feeCalculatedAt ?? charge.createdAt,
+      finalFeeAmount: charge.finalFeeAmount,
+      currency: 'CNY',
+      chargeStatus: charge.chargeStatus,
+      chargedAt: charge.chargedAt,
+      updatedAt: charge.updatedAt
     };
   }
 

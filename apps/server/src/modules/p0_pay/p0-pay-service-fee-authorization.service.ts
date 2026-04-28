@@ -57,7 +57,7 @@ export class P0PayServiceFeeAuthorizationService {
     const { bid, project, scope, currentSession } = await this.requireBidOwnership(command, context);
     const idempotencyKeyHash = this.idempotencyService.hashKey(command.idempotencyKey);
     const requestHash = this.idempotencyService.hashRequest(command);
-    this.serviceFeeFactory.assertExpectedAmounts(command, bid);
+    const feeRequirement = await this.serviceFeeFactory.assertExpectedAmounts(command, bid);
 
     const scopeKey = this.buildCreateScopeKey(command.taskId, command.bidId, scope.organization.id);
     const existing = await this.idempotencyRecordService.findAuthorization(
@@ -84,7 +84,8 @@ export class P0PayServiceFeeAuthorizationService {
         bid,
         project,
         currentSession,
-        context
+        context,
+        feeRequirement
       });
       await manager.getRepository(PlatformServiceFeeAuthorizationEntity).save(authorization);
       await this.saveAuthorizationIdempotency(manager, scopeKey, idempotencyKeyHash, requestHash, authorization.id, context);
