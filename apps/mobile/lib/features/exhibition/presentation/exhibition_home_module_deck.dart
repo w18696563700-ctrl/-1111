@@ -73,10 +73,10 @@ class _HomeModuleDeck extends StatelessWidget {
         borderRadius: BorderRadius.circular(
           ExhibitionHomeVisualTokens.radiusLarge,
         ),
-        boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.055),
+        boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 14, 14, 16),
+        padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -84,7 +84,7 @@ class _HomeModuleDeck extends StatelessWidget {
               selectedTab: selectedTab,
               onTabSelected: onTabSelected,
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             AnimatedSwitcher(
               duration: const Duration(milliseconds: 180),
               child: KeyedSubtree(
@@ -167,7 +167,7 @@ class _HomeModuleTabStrip extends StatelessWidget {
         children: _HomeModuleTab.values
             .map((_HomeModuleTab tab) {
               return Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 6),
                 child: Builder(
                   builder: (BuildContext chipContext) {
                     return _HomeModuleTabChip(
@@ -227,41 +227,29 @@ class _HomeModuleTabChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.fromLTRB(12, 9, 12, 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
           decoration: BoxDecoration(
             color: selected
                 ? ExhibitionHomeVisualTokens.brandGoldLight
                 : Colors.transparent,
+            border: Border.all(
+              color: selected
+                  ? ExhibitionHomeVisualTokens.brandGold.withValues(alpha: 0.3)
+                  : ExhibitionHomeVisualTokens.borderSoft,
+            ),
             borderRadius: BorderRadius.circular(18),
           ),
-          child: Column(
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(tab.icon, size: 18, color: foreground),
-                  const SizedBox(width: 6),
-                  Text(
-                    tab.title,
-                    style: theme.textTheme.titleSmall?.copyWith(
-                      fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
-                      color: foreground,
-                      height: 1.1,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                curve: Curves.easeOutCubic,
-                width: selected ? 24 : 0,
-                height: 2.5,
-                decoration: BoxDecoration(
-                  color: selected
-                      ? ExhibitionHomeVisualTokens.brandGold
-                      : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
+              Icon(tab.icon, size: 16, color: foreground),
+              const SizedBox(width: 5),
+              Text(
+                tab.title,
+                style: theme.textTheme.labelLarge?.copyWith(
+                  fontWeight: selected ? FontWeight.w900 : FontWeight.w700,
+                  color: foreground,
+                  height: 1,
                 ),
               ),
             ],

@@ -11,23 +11,25 @@ class _HomeHeroHeader extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Wrap(
+            spacing: 12,
+            runSpacing: 2,
+            crossAxisAlignment: WrapCrossAlignment.end,
             children: <Widget>[
               Text(
                 '展览',
-                style: theme.textTheme.displaySmall?.copyWith(
+                style: theme.textTheme.headlineMedium?.copyWith(
                   color: ExhibitionHomeVisualTokens.textPrimary,
                   fontWeight: FontWeight.w900,
-                  height: 1.05,
+                  height: 1,
                 ),
               ),
-              const SizedBox(height: 10),
               Text(
                 '发现优质项目，把握商机',
-                style: theme.textTheme.titleMedium?.copyWith(
+                style: theme.textTheme.bodyLarge?.copyWith(
                   color: ExhibitionHomeVisualTokens.textSecondary,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
+                  height: 1.15,
                 ),
               ),
             ],

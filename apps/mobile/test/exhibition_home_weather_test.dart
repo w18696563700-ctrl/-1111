@@ -818,9 +818,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(secondHomeClient.lastLoadLocationContext?.provinceName, '重庆市');
+      expect(secondHomeClient.lastLoadLocationContext?.provinceName, '重庆');
       expect(secondHomeClient.lastLoadLocationContext?.latitude, 29.5630);
-      expect(find.textContaining('重庆市'), findsWidgets);
+      expect(find.textContaining('重庆'), findsWidgets);
       expect(find.text('当前地区说明：地区已同步，天气暂不可用'), findsNothing);
     },
   );

@@ -72,7 +72,7 @@ class _HomeWeatherCard extends StatelessWidget {
               ),
             ),
             Padding(
-              padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
@@ -86,18 +86,18 @@ class _HomeWeatherCard extends StatelessWidget {
                           ),
                           child: Padding(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 12,
-                              vertical: 8,
+                              horizontal: 10,
+                              vertical: 6,
                             ),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: <Widget>[
                                 const Icon(
                                   Icons.location_on_rounded,
-                                  size: 18,
+                                  size: 16,
                                   color: Color(0xFF2F7DCB),
                                 ),
-                                const SizedBox(width: 6),
+                                const SizedBox(width: 5),
                                 Flexible(
                                   child: Text(
                                     _locationLabel(),
@@ -122,6 +122,7 @@ class _HomeWeatherCard extends StatelessWidget {
                             ExhibitionHomeVisualTokens.brandGoldLight,
                         foregroundColor:
                             ExhibitionHomeVisualTokens.brandGoldDeep,
+                        dense: true,
                       ),
                       const Spacer(),
                       IconButton(
@@ -129,11 +130,13 @@ class _HomeWeatherCard extends StatelessWidget {
                         onPressed: refreshing ? null : onRefreshPressed,
                         icon: Icon(
                           refreshing ? Icons.sync : Icons.refresh_rounded,
-                          size: 20,
+                          size: 18,
                         ),
                         color: colorScheme.onSurfaceVariant,
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.white.withValues(alpha: 0.64),
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                       IconButton(
@@ -143,40 +146,42 @@ class _HomeWeatherCard extends StatelessWidget {
                           expanded
                               ? Icons.keyboard_arrow_up_rounded
                               : Icons.keyboard_arrow_down_rounded,
-                          size: 22,
+                          size: 20,
                         ),
                         color: colorScheme.onSurfaceVariant,
                         style: IconButton.styleFrom(
                           backgroundColor: Colors.white.withValues(alpha: 0.64),
+                          visualDensity: VisualDensity.compact,
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 9),
                   Text(
                     _heroTitle(),
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: theme.textTheme.headlineSmall?.copyWith(
+                    style: theme.textTheme.titleLarge?.copyWith(
                       color: ExhibitionHomeVisualTokens.textPrimary,
                       fontWeight: FontWeight.w900,
-                      height: 1.18,
+                      height: 1.1,
                     ),
                   ),
                   if (_heroSubtitle() case final String subtitle) ...<Widget>[
-                    const SizedBox(height: 7),
+                    const SizedBox(height: 5),
                     Text(
                       subtitle,
-                      maxLines: 2,
+                      maxLines: expanded ? 2 : 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodyMedium?.copyWith(
                         color: ExhibitionHomeVisualTokens.textSecondary,
                         fontWeight: FontWeight.w600,
-                        height: 1.38,
+                        height: 1.28,
                       ),
                     ),
                   ],
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     physics: const BouncingScrollPhysics(),
@@ -191,10 +196,10 @@ class _HomeWeatherCard extends StatelessWidget {
                           .toList(growable: false),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 9),
                   Wrap(
-                    spacing: 12,
-                    runSpacing: 10,
+                    spacing: 8,
+                    runSpacing: 8,
                     children: <Widget>[
                       OutlinedButton.icon(
                         onPressed: refreshing ? null : onRelocatePressed,
@@ -202,16 +207,17 @@ class _HomeWeatherCard extends StatelessWidget {
                           backgroundColor: Colors.white.withValues(alpha: 0.7),
                           foregroundColor:
                               ExhibitionHomeVisualTokens.textPrimary,
+                          visualDensity: VisualDensity.compact,
                           side: BorderSide(
                             color: ExhibitionHomeVisualTokens.borderSoft
                                 .withValues(alpha: 0.72),
                           ),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 12,
+                            horizontal: 12,
+                            vertical: 9,
                           ),
                         ),
-                        icon: const Icon(Icons.my_location_outlined, size: 18),
+                        icon: const Icon(Icons.my_location_outlined, size: 16),
                         label: Text(_locationActionLabel(), maxLines: 1),
                       ),
                       OutlinedButton.icon(
@@ -220,16 +226,17 @@ class _HomeWeatherCard extends StatelessWidget {
                           backgroundColor: Colors.white.withValues(alpha: 0.78),
                           foregroundColor:
                               ExhibitionHomeVisualTokens.brandGoldDeep,
+                          visualDensity: VisualDensity.compact,
                           side: BorderSide(
                             color: ExhibitionHomeVisualTokens.brandGold
                                 .withValues(alpha: 0.24),
                           ),
                           padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 12,
+                            horizontal: 12,
+                            vertical: 9,
                           ),
                         ),
-                        icon: const Icon(Icons.map_outlined, size: 18),
+                        icon: const Icon(Icons.map_outlined, size: 16),
                         label: const Text('手动选择地区', maxLines: 1),
                       ),
                     ],

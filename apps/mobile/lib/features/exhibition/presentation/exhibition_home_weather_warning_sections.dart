@@ -12,24 +12,24 @@ class _HomeConstructionRiskPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               '施工风险卡',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Wrap(
-              spacing: 10,
-              runSpacing: 10,
+              spacing: 6,
+              runSpacing: 6,
               children: <Widget>[
                 _HomeMetricChip(
                   label: '风险等级',
@@ -56,12 +56,12 @@ class _HomeConstructionRiskPanel extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _HomeInfoLine(
               title: '风险时段',
               value: weatherProjection.riskTimeLabel ?? '风险时段待确认',
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 8),
             if (weatherProjection.hourlyForecast.isNotEmpty)
               _HomeForecastList(
                 title: '小时预报',
@@ -87,32 +87,32 @@ class _HomeConstructionSuggestionPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               '今日施工建议',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             ...suggestions.map(
               (String item) => Padding(
-                padding: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: Text(
                   '• $item',
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+                  style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
                 ),
               ),
             ),
             if (weatherProjection.dailyForecast.isNotEmpty) ...<Widget>[
-              const SizedBox(height: 8),
+              const SizedBox(height: 6),
               _HomeForecastList(
                 title: '每日预报',
                 items: weatherProjection.dailyForecast,
@@ -138,24 +138,24 @@ class _HomeOfficialAlertPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               '官方预警',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             ...shownAlerts.map(
               (String alert) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.only(bottom: 6),
                 child: _HomeInfoLine(title: alert, value: '请结合现场安排及时调整施工计划。'),
               ),
             ),

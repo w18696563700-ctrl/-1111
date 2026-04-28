@@ -40,9 +40,10 @@ class _HomeChannelActionRail extends StatelessWidget {
                     backgroundColor: ExhibitionHomeVisualTokens.brandGoldLight,
                     foregroundColor: ExhibitionHomeVisualTokens.brandGoldDeep,
                     elevation: 0,
+                    visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 11,
+                      horizontal: 13,
+                      vertical: 8,
                     ),
                     shape: pillShape,
                     textStyle: theme.textTheme.labelLarge?.copyWith(
@@ -51,7 +52,7 @@ class _HomeChannelActionRail extends StatelessWidget {
                   ),
                   icon: Icon(
                     action.icon ?? Icons.arrow_forward_rounded,
-                    size: 18,
+                    size: 17,
                   ),
                   label: Text(action.label),
                 );
@@ -60,21 +61,22 @@ class _HomeChannelActionRail extends StatelessWidget {
                   onPressed: action.onPressed,
                   style: TextButton.styleFrom(
                     foregroundColor: ExhibitionHomeVisualTokens.textSecondary,
+                    visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 10,
+                      horizontal: 8,
+                      vertical: 8,
                     ),
                     shape: pillShape,
                     textStyle: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  icon: Icon(action.icon ?? Icons.more_horiz_rounded, size: 18),
+                  icon: Icon(action.icon ?? Icons.more_horiz_rounded, size: 17),
                   label: Text(action.label),
                 );
               }
               return Padding(
-                padding: const EdgeInsets.only(right: 8),
+                padding: const EdgeInsets.only(right: 6),
                 child: button,
               );
             })
@@ -122,8 +124,8 @@ class _HomeChannelFilterRail<T> extends StatelessWidget {
                     onTap: () => onSelected(option.value),
                     child: Ink(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 9,
+                        horizontal: 11,
+                        vertical: 7,
                       ),
                       decoration: BoxDecoration(
                         color: selected

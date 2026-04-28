@@ -22,24 +22,24 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               isWeatherUnavailable ? '当前地区天气总览' : '今日施工天气总览',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
-                final cellWidth = (constraints.maxWidth - 8) / 2;
+                final cellWidth = (constraints.maxWidth - 6) / 2;
                 final locationValue =
                     weatherProjection?.displayName ??
                     (locationSnapshot?.hasCoordinates == true
@@ -68,8 +68,8 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
                     : _homeRiskTagsLabel(weatherProjection!.riskTags);
 
                 return Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
+                  spacing: 6,
+                  runSpacing: 6,
                   children: <Widget>[
                     SizedBox(
                       width: cellWidth,
@@ -103,7 +103,7 @@ class _HomeWeatherStatusPanel extends StatelessWidget {
                 );
               },
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             _HomeCompactOverviewTile(
               title: isWeatherUnavailable ? '地区与天气状态' : '位置与同步状态',
               value: weatherProjection != null
@@ -128,10 +128,10 @@ class _HomeForecastPanel extends StatelessWidget {
     return Column(
       children: <Widget>[
         _HomeConstructionRiskPanel(weatherProjection: weatherProjection),
-        const SizedBox(height: 12),
+        const SizedBox(height: 8),
         _HomeConstructionSuggestionPanel(weatherProjection: weatherProjection),
         if (weatherProjection.officialAlerts.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
           _HomeOfficialAlertPanel(alerts: weatherProjection.officialAlerts),
         ],
       ],
@@ -165,33 +165,35 @@ class _HomeUnavailableForecastPanel extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
               '天气与施工说明',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              isWeatherUnavailable ? '地区已同步，天气暂不可用' : '当前地区说明尚未就绪',
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.titleSmall?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              summary,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
+              isWeatherUnavailable ? '地区已同步，天气暂不可用' : '当前地区说明尚未就绪',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 6),
+            Text(
+              summary,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(height: 1.35),
+            ),
+            const SizedBox(height: 8),
             _HomeInfoLine(
               title: '当前状态',
               value: isWeatherUnavailable && weatherProjection != null
@@ -236,10 +238,10 @@ class _HomeForecastList extends StatelessWidget {
             fontWeight: FontWeight.w800,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 8),
         ...shownItems.map(
           (_HomeForecastItem item) => Padding(
-            padding: const EdgeInsets.only(bottom: 10),
+            padding: const EdgeInsets.only(bottom: 6),
             child: _HomeForecastTile(item: item),
           ),
         ),
@@ -259,15 +261,15 @@ class _HomeForecastTile extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Row(
           children: <Widget>[
             SizedBox(
-              width: 82,
+              width: 70,
               child: Text(
                 item.leadingLabel,
                 style: Theme.of(
@@ -304,11 +306,11 @@ class _HomeMetricChip extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -321,8 +323,8 @@ class _HomeMetricChip extends StatelessWidget {
             const SizedBox(height: 4),
             Text(
               value,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w900,
               ),
             ),
           ],
@@ -350,11 +352,11 @@ class _HomeCompactOverviewTile extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
+        borderRadius: BorderRadius.circular(12),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 7),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -392,7 +394,7 @@ class _HomeInfoLine extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.only(bottom: 7),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -402,12 +404,12 @@ class _HomeInfoLine extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             value,
             style: Theme.of(
               context,
-            ).textTheme.bodyMedium?.copyWith(height: 1.4),
+            ).textTheme.bodySmall?.copyWith(height: 1.32),
           ),
         ],
       ),

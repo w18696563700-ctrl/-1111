@@ -12,10 +12,10 @@ final class ExhibitionHomeVisualTokens {
   static const cardBackground = Color(0xFFFFFFFF);
   static const borderSoft = Color(0xFFECEEF2);
   static const shadowSoft = Color(0xFF1A2233);
-  static const radiusLarge = 30.0;
-  static const radiusMedium = 18.0;
-  static const spacingPage = 20.0;
-  static const spacingCard = 18.0;
+  static const radiusLarge = 20.0;
+  static const radiusMedium = 14.0;
+  static const spacingPage = 16.0;
+  static const spacingCard = 14.0;
 
   static List<BoxShadow> cardShadow({double opacity = 0.07}) {
     return <BoxShadow>[

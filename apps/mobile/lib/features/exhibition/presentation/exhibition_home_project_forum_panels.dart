@@ -190,7 +190,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
             ),
           ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         _HomeChannelFilterRail<_HomeProjectFilter>(
           options: _HomeProjectFilter.values
               .map(
@@ -203,7 +203,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
           selectedValue: _selectedFilter,
           onSelected: _handleFilterSelected,
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         ...body,
       ],
     );
@@ -264,7 +264,7 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
         final item = visibleItems[index];
         final isLast = index == visibleItems.length - 1;
         return Padding(
-          padding: EdgeInsets.only(bottom: isLast ? 0 : 12),
+          padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
           child: _HomeProjectCard(
             title:
                 _homeTrimmedString(item['displayTitle']) ??

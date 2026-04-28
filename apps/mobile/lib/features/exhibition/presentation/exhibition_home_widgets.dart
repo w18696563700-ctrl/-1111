@@ -29,7 +29,7 @@ class _HomeProjectCard extends StatelessWidget {
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: ExhibitionHomeVisualTokens.cardBackground,
-          borderRadius: BorderRadius.circular(26),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(
             color: ExhibitionHomeVisualTokens.borderSoft.withValues(
               alpha: 0.78,
@@ -38,15 +38,15 @@ class _HomeProjectCard extends StatelessWidget {
           boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.035),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(13),
+          padding: const EdgeInsets.all(10),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               LayoutBuilder(
                 builder: (BuildContext context, BoxConstraints constraints) {
-                  final useSideCover = constraints.maxWidth >= 370;
-                  final coverWidth = useSideCover ? 124.0 : double.infinity;
-                  final coverHeight = useSideCover ? 96.0 : 124.0;
+                  final useSideCover = constraints.maxWidth >= 360;
+                  final coverWidth = useSideCover ? 96.0 : double.infinity;
+                  final coverHeight = useSideCover ? 78.0 : 96.0;
 
                   final information = Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -61,9 +61,9 @@ class _HomeProjectCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: theme.textTheme.titleLarge?.copyWith(
                                 color: ExhibitionHomeVisualTokens.textPrimary,
-                                fontSize: 18,
+                                fontSize: 16,
                                 fontWeight: FontWeight.w800,
-                                height: 1.14,
+                                height: 1.12,
                               ),
                             ),
                           ),
@@ -79,7 +79,7 @@ class _HomeProjectCard extends StatelessWidget {
                           ),
                         ],
                       ),
-                      const SizedBox(height: 9),
+                      const SizedBox(height: 7),
                       LayoutBuilder(
                         builder:
                             (
@@ -87,10 +87,10 @@ class _HomeProjectCard extends StatelessWidget {
                               BoxConstraints infoConstraints,
                             ) {
                               final infoTileWidth =
-                                  (infoConstraints.maxWidth - 8) / 2;
+                                  (infoConstraints.maxWidth - 6) / 2;
                               return Wrap(
-                                spacing: 8,
-                                runSpacing: 8,
+                                spacing: 6,
+                                runSpacing: 6,
                                 children: <Widget>[
                                   _HomeProjectInfoTile(
                                     width: infoTileWidth,
@@ -135,7 +135,7 @@ class _HomeProjectCard extends StatelessWidget {
                           width: coverWidth,
                           height: coverHeight,
                         ),
-                        const SizedBox(height: 12),
+                        const SizedBox(height: 9),
                         information,
                       ],
                     );
@@ -148,13 +148,13 @@ class _HomeProjectCard extends StatelessWidget {
                         width: coverWidth,
                         height: coverHeight,
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: 10),
                       Expanded(child: information),
                     ],
                   );
                 },
               ),
-              const SizedBox(height: 11),
+              const SizedBox(height: 8),
               _HomeProjectPrimaryAction(
                 label: actionLabel,
                 onPressed: onPressed,
@@ -175,7 +175,7 @@ class _HomeDefaultProjectCover extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(16);
+    final borderRadius = BorderRadius.circular(12);
 
     return Semantics(
       label: '商业示意默认封面，不代表项目真实图片',
@@ -451,62 +451,38 @@ class _HomeProjectInfoTile extends StatelessWidget {
 
     return SizedBox(
       width: width,
-      height: compact ? 48 : null,
+      height: compact ? 36 : 38,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: const Color(0xFFF8F9FB),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(11),
           border: Border.all(color: const Color(0xFFF0F1F4)),
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(
-            horizontal: compact ? 8 : 10,
-            vertical: compact ? 7 : 9,
+            horizontal: compact ? 7 : 8,
+            vertical: compact ? 6 : 7,
           ),
-          child: compact
-              ? Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    Row(
-                      children: <Widget>[
-                        Icon(
-                          icon,
-                          size: 14,
-                          color: ExhibitionHomeVisualTokens.textSecondary,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(label, style: labelStyle),
-                      ],
-                    ),
-                    const SizedBox(height: 5),
-                    Text(
-                      value,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: valueStyle,
-                    ),
-                  ],
-                )
-              : Row(
-                  children: <Widget>[
-                    Icon(
-                      icon,
-                      size: 15,
-                      color: ExhibitionHomeVisualTokens.textSecondary,
-                    ),
-                    const SizedBox(width: 5),
-                    Text(label, style: labelStyle),
-                    const SizedBox(width: 5),
-                    Expanded(
-                      child: Text(
-                        value,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: valueStyle,
-                      ),
-                    ),
-                  ],
+          child: Row(
+            children: <Widget>[
+              Icon(
+                icon,
+                size: compact ? 13 : 14,
+                color: ExhibitionHomeVisualTokens.textSecondary,
+              ),
+              const SizedBox(width: 4),
+              Text(label, style: labelStyle),
+              const SizedBox(width: 4),
+              Expanded(
+                child: Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: valueStyle,
                 ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -532,12 +508,12 @@ class _HomeProjectPrimaryAction extends StatelessWidget {
       enabled: enabled,
       child: Material(
         color: Colors.transparent,
-        borderRadius: BorderRadius.circular(17),
+        borderRadius: BorderRadius.circular(13),
         child: InkWell(
           onTap: onPressed,
-          borderRadius: BorderRadius.circular(17),
+          borderRadius: BorderRadius.circular(13),
           child: Ink(
-            height: 46,
+            height: 38,
             decoration: BoxDecoration(
               gradient: enabled
                   ? const LinearGradient(
@@ -548,15 +524,15 @@ class _HomeProjectPrimaryAction extends StatelessWidget {
                   : const LinearGradient(
                       colors: <Color>[Color(0xFFE6E2DA), Color(0xFFD8D3CA)],
                     ),
-              borderRadius: BorderRadius.circular(17),
+              borderRadius: BorderRadius.circular(13),
               boxShadow: enabled
                   ? <BoxShadow>[
                       BoxShadow(
                         color: ExhibitionHomeVisualTokens.brandGold.withValues(
-                          alpha: 0.18,
+                          alpha: 0.12,
                         ),
-                        blurRadius: 14,
-                        offset: const Offset(0, 7),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
                       ),
                     ]
                   : const <BoxShadow>[],
@@ -567,16 +543,16 @@ class _HomeProjectPrimaryAction extends StatelessWidget {
                 children: <Widget>[
                   Text(
                     label,
-                    style: theme.textTheme.titleSmall?.copyWith(
+                    style: theme.textTheme.labelLarge?.copyWith(
                       color: Colors.white,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w900,
                       height: 1,
                     ),
                   ),
-                  const SizedBox(width: 7),
+                  const SizedBox(width: 6),
                   const Icon(
                     Icons.arrow_forward_rounded,
-                    size: 18,
+                    size: 17,
                     color: Colors.white,
                   ),
                 ],
@@ -796,7 +772,7 @@ class _HomePill extends StatelessWidget {
       child: Padding(
         padding: EdgeInsets.symmetric(
           horizontal: dense ? 10 : 12,
-          vertical: dense ? 5 : 6,
+          vertical: dense ? 4 : 5,
         ),
         child: Text(
           label,
@@ -837,21 +813,21 @@ class _HomeIconPill extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: <Widget>[
             Icon(
               icon,
-              size: 18,
+              size: 16,
               color: ExhibitionHomeVisualTokens.textSecondary,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 6),
             Text(
               label,
-              style: theme.textTheme.labelLarge?.copyWith(
+              style: theme.textTheme.labelMedium?.copyWith(
                 color: ExhibitionHomeVisualTokens.textPrimary,
-                fontWeight: FontWeight.w700,
+                fontWeight: FontWeight.w800,
               ),
             ),
           ],
