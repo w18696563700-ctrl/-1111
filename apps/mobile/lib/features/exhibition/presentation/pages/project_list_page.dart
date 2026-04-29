@@ -240,9 +240,8 @@ class _ProjectListPageState extends State<ProjectListPage> {
     }
 
     setState(() => _requestingProjectId = normalizedProjectId);
-    final result = await ProjectNameAccessConsumerLayer.instance.requestAccess(
-      projectId: normalizedProjectId,
-    );
+    final result = await ProjectNameAccessConsumerLayer.instance
+        .requestBidParticipation(projectId: normalizedProjectId);
     if (!mounted) {
       return;
     }
@@ -254,7 +253,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
       SnackBar(
         content: Text(
           result.isSuccess
-              ? '已提交项目名称查看申请，等待发布方审批。'
+              ? '已提交参与竞标申请，等待发布方审批。'
               : (result.message ?? '当前申请未完成，请稍后再试。'),
         ),
       ),
@@ -301,7 +300,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
           if (result.state == AppPageState.content)
             ...items.map(
               (Map<String, Object?> item) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.only(bottom: 14),
                 child: _ProjectShowcaseCompactCard(
                   item: item,
                   onPressed: () {
@@ -327,6 +326,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
                 ),
               ),
             ),
+          const AppBottomSafePadding(),
         ];
       },
     );
@@ -348,110 +348,102 @@ class _ProjectListPageState extends State<ProjectListPage> {
     final budgetSummary =
         _bucketLabel(_selectedBudgetBucket, _budgetBucketOptions) ?? '不限金额';
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final isWide = constraints.maxWidth >= 520;
-                final columns = isWide ? 3 : 2;
-                final itemWidth =
-                    (constraints.maxWidth - (columns - 1) * 10) / columns;
-                return Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: <Widget>[
-                    SizedBox(
-                      width: itemWidth,
-                      child: _ProjectFilterFieldButton(
-                        label: '城市',
-                        value: _selectedCity == null
-                            ? null
-                            : '${_selectedCity!.provinceName} / ${_selectedCity!.cityName}',
-                        placeholder: '跟随城市',
-                        onTap: _pickCityFilter,
-                      ),
-                    ),
-                    SizedBox(
-                      width: itemWidth,
-                      child: _ProjectFilterFieldButton(
-                        label: '状态',
-                        value: _bucketLabel(_selectedState, _stateOptions),
-                        placeholder: '全部状态',
-                        onTap: _pickStateFilter,
-                      ),
-                    ),
-                    SizedBox(
-                      width: itemWidth,
-                      child: _ProjectFilterFieldButton(
-                        label: '类型',
-                        value: _bucketLabel(
-                          _selectedType,
-                          _typeOptionsFromPayload(_snapshot?.result.payload),
-                        ),
-                        placeholder: '全部类型',
-                        onTap: _pickTypeFilter,
-                      ),
-                    ),
-                    SizedBox(
-                      width: itemWidth,
-                      child: _ProjectFilterFieldButton(
-                        label: '面积',
-                        value: _bucketLabel(
-                          _selectedAreaBucket,
-                          _areaBucketOptions,
-                        ),
-                        placeholder: '不限面积',
-                        onTap: _pickAreaBucket,
-                      ),
-                    ),
-                    SizedBox(
-                      width: itemWidth,
-                      child: _ProjectFilterFieldButton(
-                        label: '金额',
-                        value: _bucketLabel(
-                          _selectedBudgetBucket,
-                          _budgetBucketOptions,
-                        ),
-                        placeholder: '不限金额',
-                        onTap: _pickBudgetBucket,
-                      ),
-                    ),
-                  ],
-                );
-              },
-            ),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+    return AppSectionCard(
+      title: '筛选项目',
+      subtitle: '按城市、状态、类型、面积和金额快速收敛公开项目。',
+      withShadow: true,
+      children: <Widget>[
+        LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final isWide = constraints.maxWidth >= 520;
+            final columns = isWide ? 3 : 2;
+            final itemWidth =
+                (constraints.maxWidth - (columns - 1) * 10) / columns;
+            return Wrap(
+              spacing: 10,
+              runSpacing: 10,
               children: <Widget>[
-                _ProjectFilterSummaryChip(label: '城市', value: citySummary),
-                _ProjectFilterSummaryChip(label: '状态', value: stateSummary),
-                _ProjectFilterSummaryChip(label: '类型', value: typeSummary),
-                _ProjectFilterSummaryChip(label: '面积', value: areaSummary),
-                _ProjectFilterSummaryChip(label: '金额', value: budgetSummary),
+                SizedBox(
+                  width: itemWidth,
+                  child: _ProjectFilterFieldButton(
+                    label: '城市',
+                    value: _selectedCity == null
+                        ? null
+                        : '${_selectedCity!.provinceName} / ${_selectedCity!.cityName}',
+                    placeholder: '跟随城市',
+                    onTap: _pickCityFilter,
+                  ),
+                ),
+                SizedBox(
+                  width: itemWidth,
+                  child: _ProjectFilterFieldButton(
+                    label: '状态',
+                    value: _bucketLabel(_selectedState, _stateOptions),
+                    placeholder: '全部状态',
+                    onTap: _pickStateFilter,
+                  ),
+                ),
+                SizedBox(
+                  width: itemWidth,
+                  child: _ProjectFilterFieldButton(
+                    label: '类型',
+                    value: _bucketLabel(
+                      _selectedType,
+                      _typeOptionsFromPayload(_snapshot?.result.payload),
+                    ),
+                    placeholder: '全部类型',
+                    onTap: _pickTypeFilter,
+                  ),
+                ),
+                SizedBox(
+                  width: itemWidth,
+                  child: _ProjectFilterFieldButton(
+                    label: '面积',
+                    value: _bucketLabel(
+                      _selectedAreaBucket,
+                      _areaBucketOptions,
+                    ),
+                    placeholder: '不限面积',
+                    onTap: _pickAreaBucket,
+                  ),
+                ),
+                SizedBox(
+                  width: itemWidth,
+                  child: _ProjectFilterFieldButton(
+                    label: '金额',
+                    value: _bucketLabel(
+                      _selectedBudgetBucket,
+                      _budgetBucketOptions,
+                    ),
+                    placeholder: '不限金额',
+                    onTap: _pickBudgetBucket,
+                  ),
+                ),
               ],
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '公开项目只展示当前仍在有效期内的项目；已过期或已结束项目不会进入公开接单列表，与当前账号相关的项目请到“我的项目”查看。',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                height: 1.45,
-              ),
-            ),
+            );
+          },
+        ),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: AppVisualTokens.chipGap,
+          runSpacing: AppVisualTokens.chipGap,
+          children: <Widget>[
+            _ProjectFilterSummaryChip(label: '城市', value: citySummary),
+            _ProjectFilterSummaryChip(label: '状态', value: stateSummary),
+            _ProjectFilterSummaryChip(label: '类型', value: typeSummary),
+            _ProjectFilterSummaryChip(label: '面积', value: areaSummary),
+            _ProjectFilterSummaryChip(label: '金额', value: budgetSummary),
           ],
         ),
-      ),
+        const SizedBox(height: 10),
+        Text(
+          '公开项目只展示当前仍在有效期内的项目；已过期或已结束项目不会进入公开接单列表，与当前账号相关的项目请到“我的项目”查看。',
+          style: AppTextTokens.caption.copyWith(
+            color: AppVisualTokens.textSecondary,
+            height: 1.45,
+          ),
+        ),
+      ],
     );
   }
 

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/features/profile/presentation/profile_login_types.dart';
+import 'package:mobile/shared/ui/app_visual_components.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 
 class LoginHeroHeader extends StatelessWidget {
   const LoginHeroHeader({super.key});
@@ -12,22 +14,19 @@ class LoginHeroHeader extends StatelessWidget {
       height: compactHeight ? 204 : 238,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: AppVisualTokens.radiusXLargeBorder,
           gradient: const LinearGradient(
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
-            colors: <Color>[Color(0xFFFFFBF5), Color(0xFFF3D9B3)],
+            colors: <Color>[
+              AppVisualTokens.cardBackground,
+              AppVisualTokens.brandGoldLight,
+            ],
           ),
-          boxShadow: <BoxShadow>[
-            BoxShadow(
-              color: const Color(0xFF9C6A22).withValues(alpha: 0.08),
-              blurRadius: 30,
-              offset: const Offset(0, 18),
-            ),
-          ],
+          boxShadow: AppVisualTokens.shadowCard(opacity: 0.06),
         ),
         child: ClipRRect(
-          borderRadius: BorderRadius.circular(34),
+          borderRadius: AppVisualTokens.radiusXLargeBorder,
           child: Stack(
             children: <Widget>[
               Positioned.fill(child: CustomPaint(painter: _VenueHeroPainter())),
@@ -41,29 +40,17 @@ class LoginHeroHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      '欢迎登录',
-                      style: theme.textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        color: const Color(0xFF1F2328),
-                      ),
-                    ),
+                    Text('欢迎登录', style: AppTextTokens.pageTitle),
                     const SizedBox(height: 12),
                     Text(
                       '展览装修之家',
                       style: theme.textTheme.titleLarge?.copyWith(
                         fontWeight: FontWeight.w800,
-                        color: const Color(0xFF3D3429),
+                        color: AppVisualTokens.textPrimary,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    Text(
-                      '登录后管理项目、企业身份与沟通协作',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF6F6255),
-                        height: 1.4,
-                      ),
-                    ),
+                    Text('登录后管理项目、企业身份与沟通协作', style: AppTextTokens.body),
                   ],
                 ),
               ),
@@ -93,18 +80,10 @@ class AuthLoginCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(32),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
-            blurRadius: 28,
-            offset: const Offset(0, 16),
-          ),
-        ],
-      ),
+    return AppCard(
+      padding: EdgeInsets.zero,
+      radius: AppVisualTokens.radiusXLarge,
+      withShadow: true,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(20, 22, 20, 22),
         child: Column(
@@ -166,28 +145,28 @@ class _LoginTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Expanded(
       child: InkWell(
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: AppVisualTokens.radiusPillBorder,
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           padding: const EdgeInsets.symmetric(vertical: 11),
           decoration: BoxDecoration(
-            color: selected ? const Color(0xFFFFF3E1) : Colors.transparent,
-            borderRadius: BorderRadius.circular(999),
+            color: selected
+                ? AppVisualTokens.brandGoldLight
+                : Colors.transparent,
+            borderRadius: AppVisualTokens.radiusPillBorder,
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
               Text(
                 label,
-                style: theme.textTheme.titleSmall?.copyWith(
+                style: AppTextTokens.bodyStrong.copyWith(
                   color: selected
-                      ? const Color(0xFFA86610)
-                      : theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w800,
+                      ? AppVisualTokens.brandGoldDark
+                      : AppVisualTokens.textSecondary,
                 ),
               ),
               const SizedBox(height: 6),
@@ -196,8 +175,8 @@ class _LoginTab extends StatelessWidget {
                 width: selected ? 30 : 0,
                 height: 3,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFB97418),
-                  borderRadius: BorderRadius.circular(999),
+                  color: AppVisualTokens.brandGold,
+                  borderRadius: AppVisualTokens.radiusPillBorder,
                 ),
               ),
             ],

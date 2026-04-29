@@ -2,6 +2,7 @@ part of 'profile_page.dart';
 
 class _ProfileHubHeader extends StatelessWidget {
   const _ProfileHubHeader({
+    required this.hasSession,
     required this.shellContext,
     required this.certificationLabel,
     required this.membershipLabel,
@@ -9,6 +10,7 @@ class _ProfileHubHeader extends StatelessWidget {
     required this.onTap,
   });
 
+  final bool hasSession;
   final AppShellContextData shellContext;
   final String certificationLabel;
   final String membershipLabel;
@@ -19,14 +21,17 @@ class _ProfileHubHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Material(
-      color: theme.colorScheme.surfaceContainerLow,
-      borderRadius: BorderRadius.circular(28),
+    return AppCard(
+      padding: EdgeInsets.zero,
+      radius: AppVisualTokens.radiusXLarge,
+      borderColor: AppVisualTokens.borderSoft,
+      backgroundColor: AppVisualTokens.cardBackground,
+      withShadow: true,
       child: InkWell(
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: AppVisualTokens.radiusXLargeBorder,
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
+          padding: const EdgeInsets.fromLTRB(18, 18, 18, 18),
           child: Row(
             children: <Widget>[
               ProfileAvatarBadge(
@@ -48,29 +53,39 @@ class _ProfileHubHeader extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
-                      '个人资料',
-                      style: theme.textTheme.labelMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        Expanded(
+                          child: Text(
+                            '个人资料',
+                            style: theme.textTheme.labelMedium?.copyWith(
+                              color: AppVisualTokens.textSecondary,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                        AppStatusBadge(
+                          label: hasSession ? '已登录' : '去登录',
+                          tone: hasSession
+                              ? AppStatusTone.success
+                              : AppStatusTone.brand,
+                        ),
+                      ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Text(
                       profileResolvedDisplayName(
                         displayName: shellContext.displayName,
                         rawUserId: shellContext.userId,
                       ),
-                      style: theme.textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.w800,
-                      ),
+                      style: AppTextTokens.sectionTitle.copyWith(fontSize: 22),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       profileDisplayAccountLabel(shellContext.userId),
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
+                      style: AppTextTokens.body,
                     ),
                     if (_profileHomeStatusVisible) ...<Widget>[
                       const SizedBox(height: 10),
@@ -85,8 +100,8 @@ class _ProfileHubHeader extends StatelessWidget {
                       const SizedBox(height: 8),
                     Text(
                       activitySummary,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                      style: AppTextTokens.caption.copyWith(
+                        color: AppVisualTokens.textSecondary,
                       ),
                     ),
                   ],

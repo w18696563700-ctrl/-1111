@@ -15,8 +15,6 @@ class _ProjectFilterFieldButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
     final display = value?.trim().isNotEmpty == true
         ? value!.trim()
         : placeholder;
@@ -24,12 +22,16 @@ class _ProjectFilterFieldButton extends StatelessWidget {
 
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: AppVisualTokens.radiusMediumBorder,
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: colorScheme.outlineVariant),
+          color: AppVisualTokens.cardBackground,
+          borderRadius: AppVisualTokens.radiusMediumBorder,
+          border: Border.all(
+            color: isSelected
+                ? AppVisualTokens.brandGold.withValues(alpha: 0.24)
+                : AppVisualTokens.borderSoft,
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(12, 10, 8, 10),
@@ -40,8 +42,8 @@ class _ProjectFilterFieldButton extends StatelessWidget {
                 label,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.labelMedium?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
+                style: AppTextTokens.caption.copyWith(
+                  color: AppVisualTokens.textSecondary,
                   fontWeight: FontWeight.w700,
                 ),
               ),
@@ -53,13 +55,13 @@ class _ProjectFilterFieldButton extends StatelessWidget {
                       display,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.bodyMedium?.copyWith(
+                      style: AppTextTokens.bodyStrong.copyWith(
                         fontWeight: isSelected
                             ? FontWeight.w700
                             : FontWeight.w500,
                         color: isSelected
-                            ? colorScheme.onSurface
-                            : colorScheme.onSurfaceVariant,
+                            ? AppVisualTokens.textPrimary
+                            : AppVisualTokens.textSecondary,
                       ),
                     ),
                   ),
@@ -67,7 +69,7 @@ class _ProjectFilterFieldButton extends StatelessWidget {
                   Icon(
                     Icons.keyboard_arrow_down_rounded,
                     size: 20,
-                    color: colorScheme.onSurfaceVariant,
+                    color: AppVisualTokens.textSecondary,
                   ),
                 ],
               ),
@@ -87,42 +89,6 @@ class _ProjectFilterSummaryChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-        child: RichText(
-          text: TextSpan(
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.2,
-            ),
-            children: <InlineSpan>[
-              TextSpan(
-                text: '$label ',
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-              TextSpan(
-                text: value,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurface,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+    return AppInfoChip(label: label, value: value);
   }
 }

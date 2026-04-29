@@ -9,6 +9,7 @@ import 'package:mobile/features/profile/presentation/profile_login_frame.dart';
 import 'package:mobile/features/profile/presentation/profile_login_notice.dart';
 import 'package:mobile/features/profile/presentation/profile_login_types.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 
 class OnePageLoginEntryPage extends StatefulWidget {
   const OnePageLoginEntryPage({super.key});
@@ -164,7 +165,10 @@ class _LoginEntryPageState extends State<OnePageLoginEntryPage> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: <Color>[Color(0xFFFFFBF4), Color(0xFFF8F4ED)],
+          colors: <Color>[
+            AppVisualTokens.cardBackground,
+            AppVisualTokens.pageBackground,
+          ],
         ),
       ),
       child: AnimatedBuilder(

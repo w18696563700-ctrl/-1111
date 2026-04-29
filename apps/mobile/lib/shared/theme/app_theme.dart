@@ -1,16 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 
 final class AppTheme {
   const AppTheme._();
 
   static ThemeData light() {
-    const surface = Color(0xFFFFFFFF);
-    const brand = Color(0xFFA36A2B);
-    const onSurface = Color(0xFF1C1B1A);
-    const onSurfaceVariant = Color(0xFF6F6A64);
-    const outline = Color(0xFFD5CEC6);
-    const outlineVariant = Color(0xFFE8E2DB);
-    const primaryContainer = Color(0xFFF5E9DA);
+    const surface = AppVisualTokens.cardBackground;
+    const brand = AppVisualTokens.brandGold;
+    const onSurface = AppVisualTokens.textPrimary;
+    const onSurfaceVariant = AppVisualTokens.textSecondary;
+    const outline = Color(0xFFD8D0C8);
+    const outlineVariant = AppVisualTokens.borderSoft;
+    const primaryContainer = AppVisualTokens.brandGoldLight;
     const onPrimaryContainer = Color(0xFF4F2F0F);
     const secondaryContainer = Color(0xFFF7ECDF);
     const onSecondaryContainer = Color(0xFF503519);

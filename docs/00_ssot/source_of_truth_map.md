@@ -15,6 +15,11 @@ layer: L0 SSOT
 
 ## Current Round Registrations
 
+### 2026-04-29 App Visual System V1
+
+- [app_visual_system_v1_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/app_visual_system_v1_freeze_addendum.md) is the formal `L0` ruling for App Visual System V1, freezing the first-release visible buildings, hidden-building exclusion, Flutter-only visual-token/component/page-template scope, first migration batch, and the veto on BFF / Server / OpenAPI / database / state-machine / route changes.
+- [app_visual_system_v1_frontend_plan.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/app_visual_system_v1_frontend_plan.md) is the formal `L5` frontend plan for the same round, recording Day1 inventory, baseline screenshots, existing theme/token locations, first-batch page scope, file boundaries, and acceptance criteria.
+
 ### 2026-04-27 Publisher Project Detail Information Density Optimization
 
 - [publisher_project_detail_information_density_optimization_ruling_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/publisher_project_detail_information_density_optimization_ruling_addendum.md) is the formal `L0` ruling for the publisher-side my-project detail information-density optimization round, freezing the default-collapsed basic information summary, hiding the project-communication main card on the current page without deleting the capability, promoting quote-basis materials as the primary task, weakening public resources, and blocking BFF / Server changes plus any new material-title field.

@@ -15,7 +15,6 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final title = _projectDisplayTitle(item);
     final brandName = _projectDisplayBrandLine(item);
     final location = _projectPrimaryLocationText(item);
@@ -27,14 +26,11 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
     );
     final nameAccessStatus = _projectNameAccessStatus(item);
 
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
+    return AppCard(
+      radius: AppVisualTokens.radiusXLarge,
+      withShadow: true,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 14),
+        padding: const EdgeInsets.fromLTRB(2, 2, 2, 0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -44,15 +40,15 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     title,
-                    style: theme.textTheme.titleLarge?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: AppTextTokens.sectionTitle,
                   ),
                 ),
                 if (status != null)
-                  _StatusPill(
+                  AppStatusBadge(
                     label: _frontStageStateLabel(status),
-                    tone: _ActionCardTone.muted,
+                    tone: AppStatusTone.warning,
                   ),
               ],
             ),
@@ -60,16 +56,15 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
               const SizedBox(height: 6),
               Text(
                 brandName,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w600,
-                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextTokens.body,
               ),
             ],
             const SizedBox(height: 14),
             Wrap(
-              spacing: 14,
-              runSpacing: 10,
+              spacing: AppVisualTokens.chipGap,
+              runSpacing: AppVisualTokens.chipGap,
               children: <Widget>[
                 _CompactProjectMeta(label: '项目编号', value: projectNo),
                 _CompactProjectMeta(
@@ -82,59 +77,25 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
                   value: _projectAreaText(item['areaSqm'] as num?),
                 ),
                 _CompactProjectMeta(label: '搭建地', value: location),
+                _CompactProjectMeta(label: '时间', value: dateRange),
               ],
             ),
             const SizedBox(height: 14),
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text.rich(
-                    TextSpan(
-                      style: theme.textTheme.bodyMedium?.copyWith(height: 1.3),
-                      children: <InlineSpan>[
-                        TextSpan(
-                          text: '时间：',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.onSurfaceVariant,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        TextSpan(
-                          text: dateRange,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: onPressed,
-                  style: OutlinedButton.styleFrom(
-                    minimumSize: const Size(0, 40),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 10,
-                    ),
-                  ),
-                  child: const Text('查看详情'),
-                ),
-              ],
+            Align(
+              alignment: Alignment.centerRight,
+              child: AppSecondaryButton(
+                onPressed: onPressed,
+                icon: Icons.chevron_right_rounded,
+                label: '查看详情',
+              ),
             ),
             if (shouldShowNameAccessControls) ...<Widget>[
               const SizedBox(height: 14),
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.surfaceContainerLow,
-                  borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: theme.colorScheme.outlineVariant),
-                ),
+              AppCard(
+                backgroundColor: const Color(0xFFFEFDFB),
+                radius: AppVisualTokens.radiusMedium,
                 child: Padding(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.zero,
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
@@ -142,34 +103,29 @@ class _ProjectShowcaseCompactCard extends StatelessWidget {
                         spacing: 8,
                         runSpacing: 8,
                         children: <Widget>[
-                          _StatusPill(
+                          AppStatusBadge(
                             label: _projectNameAccessStatusLabel(
                               nameAccessStatus,
                             ),
-                            tone: _ActionCardTone.muted,
+                            tone: AppStatusTone.brand,
                           ),
                         ],
                       ),
                       const SizedBox(height: 8),
                       Text(
                         _projectNameAccessStatusBody(item),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          height: 1.45,
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
+                        style: AppTextTokens.caption.copyWith(height: 1.45),
                       ),
                       const SizedBox(height: 10),
-                      OutlinedButton(
+                      AppSecondaryButton(
                         onPressed:
                             requestInProgress ||
                                 !_projectCanRequestNameAccess(item)
                             ? null
                             : onRequestNameAccess,
-                        child: Text(
-                          requestInProgress
-                              ? '提交中...'
-                              : _projectNameAccessActionLabel(item),
-                        ),
+                        label: requestInProgress
+                            ? '提交中...'
+                            : _projectNameAccessActionLabel(item),
                       ),
                     ],
                   ),
@@ -196,27 +152,40 @@ class _CompactProjectMeta extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final labelStyle = theme.textTheme.bodyLarge?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-      fontWeight: FontWeight.w700,
-      height: 1.3,
-    );
-    final valueStyle =
-        (highlight ? theme.textTheme.titleMedium : theme.textTheme.titleSmall)
-            ?.copyWith(
-              fontWeight: highlight ? FontWeight.w800 : FontWeight.w700,
-              height: 1.25,
-            );
-
     return ConstrainedBox(
-      constraints: const BoxConstraints(minWidth: 128, maxWidth: 220),
-      child: Text.rich(
-        TextSpan(
-          children: <InlineSpan>[
-            TextSpan(text: '$label：', style: labelStyle),
-            TextSpan(text: value, style: valueStyle),
-          ],
+      constraints: const BoxConstraints(minWidth: 122, maxWidth: 220),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: highlight
+              ? AppVisualTokens.brandGoldLight
+              : const Color(0xFFF8F7F5),
+          borderRadius: AppVisualTokens.radiusPillBorder,
+          border: Border.all(color: AppVisualTokens.borderSoft),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          child: Text.rich(
+            TextSpan(
+              children: <InlineSpan>[
+                TextSpan(
+                  text: '$label：',
+                  style: AppTextTokens.badgeText.copyWith(
+                    color: highlight
+                        ? AppVisualTokens.brandGoldDark
+                        : AppVisualTokens.textSecondary,
+                  ),
+                ),
+                TextSpan(
+                  text: value,
+                  style: AppTextTokens.badgeText.copyWith(
+                    color: AppVisualTokens.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
         ),
       ),
     );

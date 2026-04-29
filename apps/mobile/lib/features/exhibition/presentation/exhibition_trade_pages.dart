@@ -27,6 +27,8 @@ import 'package:mobile/features/messages/data/messages_registered_entry_registry
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
+import 'package:mobile/shared/ui/app_visual_components.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 
 part 'models/milestone_link.dart';

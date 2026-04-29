@@ -17,7 +17,10 @@ import 'package:mobile/features/profile/presentation/profile_member_management_s
 import 'package:mobile/features/profile/presentation/profile_personal_edit_support.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_consumer_layer.dart';
+import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
+import 'package:mobile/shared/ui/app_visual_components.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 
 part 'profile_page_sections.dart';
 part 'profile_page_support.dart';
@@ -196,9 +199,15 @@ class _ProfilePageState extends State<ProfilePage> {
       onRefresh: _load,
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(16, 18, 16, 28),
+        padding: const EdgeInsets.fromLTRB(
+          AppVisualTokens.pagePadding,
+          18,
+          AppVisualTokens.pagePadding,
+          28,
+        ),
         children: <Widget>[
           _ProfileHubHeader(
+            hasSession: hasSession,
             shellContext: shellContext,
             certificationLabel: certificationLabel,
             membershipLabel: membershipLabel,
@@ -206,8 +215,9 @@ class _ProfilePageState extends State<ProfilePage> {
               hasSession: hasSession,
               profileData: profileData,
             ),
-            onTap: () =>
-                Navigator.of(context).pushNamed(ProfileRoutes.personal),
+            onTap: () => Navigator.of(context).pushNamed(
+              hasSession ? ProfileRoutes.personal : ProfileIdentityRoutes.login,
+            ),
           ),
           if (_profileHomeStatusVisible) ...<Widget>[
             const SizedBox(height: 12),
