@@ -375,6 +375,10 @@ class _ExhibitionActionService {
     );
   }
 
+  String _idempotencyKey(String action) {
+    return '$action-${DateTime.now().microsecondsSinceEpoch}';
+  }
+
   AppPageState _mapHttpFailureState(int statusCode) {
     if (statusCode == 401) {
       return AppPageState.unauthorized;

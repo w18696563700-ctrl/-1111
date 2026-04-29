@@ -105,6 +105,60 @@ export class AppProjectController {
     return this.lifecycleService.closeProject(payload, headers);
   }
 
+  @Post('withdraw-published')
+  @HttpCode(HttpStatus.ACCEPTED)
+  withdrawPublishedProject(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.lifecycleService.withdrawPublishedProject(payload, headers);
+  }
+
+  @Post('discard-submitted')
+  @HttpCode(HttpStatus.ACCEPTED)
+  discardSubmittedProject(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.lifecycleService.discardSubmittedProject(payload, headers);
+  }
+
+  @Post('cancellation/request')
+  @HttpCode(HttpStatus.ACCEPTED)
+  requestProjectCancellation(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.lifecycleService.requestCancellation(payload, headers);
+  }
+
+  @Post('cancellation/respond')
+  @HttpCode(HttpStatus.ACCEPTED)
+  respondProjectCancellation(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.lifecycleService.respondCancellation(payload, headers);
+  }
+
+  @Post('breach/record-publisher')
+  @HttpCode(HttpStatus.ACCEPTED)
+  recordPublisherBreach(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.lifecycleService.recordPublisherBreach(payload, headers);
+  }
+
+  @Post('breach/record-factory')
+  @HttpCode(HttpStatus.ACCEPTED)
+  recordFactoryBreach(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.lifecycleService.recordFactoryBreach(payload, headers);
+  }
+
   @Get('detail')
   getProjectDetail(
     @Query('projectId') projectId: string | undefined,

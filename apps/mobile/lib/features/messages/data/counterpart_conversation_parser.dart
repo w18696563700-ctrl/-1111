@@ -178,6 +178,26 @@ CounterpartConversationOrderSummaryView? _parseOrderSummary(Object? payload) {
         _nullableString(map['supplierOrganizationId']),
     state: _nullableString(map['state']),
     completionRequestState: _nullableString(map['completionRequestState']),
+    exitGovernance: _parseExitGovernance(map['exitGovernance']),
+  );
+}
+
+CounterpartConversationExitGovernanceView? _parseExitGovernance(
+  Object? payload,
+) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload, 'counterpart conversation exitGovernance');
+  return CounterpartConversationExitGovernanceView(
+    exitCaseId: _nullableString(map['exitCaseId']),
+    exitType: _nullableString(map['exitType']),
+    caseStatus: _nullableString(map['caseStatus']),
+    breachParty: _nullableString(map['breachParty']),
+    counterpartyAction:
+        _nullableString(map['counterpartyAction']) ??
+        _nullableString(map['actionHint']),
+    updatedAt: _nullableString(map['updatedAt']),
   );
 }
 

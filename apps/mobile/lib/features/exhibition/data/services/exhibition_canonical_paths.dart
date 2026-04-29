@@ -25,6 +25,18 @@ final class ExhibitionCanonicalPaths {
   static const String projectWithdraw = '/api/app/project/withdraw';
   static const String projectArchive = '/api/app/project/archive';
   static const String projectClose = '/api/app/project/close';
+  static const String projectWithdrawPublished =
+      '/api/app/project/withdraw-published';
+  static const String projectDiscardSubmitted =
+      '/api/app/project/discard-submitted';
+  static const String projectCancellationRequest =
+      '/api/app/project/cancellation/request';
+  static const String projectCancellationRespond =
+      '/api/app/project/cancellation/respond';
+  static const String projectPublisherBreachRecord =
+      '/api/app/project/breach/record-publisher';
+  static const String projectFactoryBreachRecord =
+      '/api/app/project/breach/record-factory';
   static const String projectDetail = '/api/app/project/detail';
   static const String projectBidMaterials = '/api/app/project/bid-materials';
   static const String bidSubmit = '/api/app/bid/submit';

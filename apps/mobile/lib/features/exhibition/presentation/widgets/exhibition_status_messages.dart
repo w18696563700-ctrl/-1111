@@ -72,6 +72,14 @@ String _frontStageSuccessMessage({required String path}) {
     ExhibitionCanonicalPaths.projectWithdraw => '项目已经撤回到草稿，下一步可以继续编辑。',
     ExhibitionCanonicalPaths.projectArchive => '项目已经作废归档，后续只保留归档查看入口。',
     ExhibitionCanonicalPaths.projectClose => '项目已经下架关闭，后续只保留归档查看入口。',
+    ExhibitionCanonicalPaths.projectWithdrawPublished =>
+      '项目已经撤回到预发布列表，并退出公域展示。',
+    ExhibitionCanonicalPaths.projectDiscardSubmitted => '项目已经作废删除，后续只保留归档查看入口。',
+    ExhibitionCanonicalPaths.projectCancellationRequest => '取消申请已受理，等待对方确认。',
+    ExhibitionCanonicalPaths.projectCancellationRespond => '取消响应已受理。',
+    ExhibitionCanonicalPaths.projectPublisherBreachRecord ||
+    ExhibitionCanonicalPaths.projectFactoryBreachRecord =>
+      '违约记录已受理，本期只做留痕，不自动扣钱。',
     ExhibitionCanonicalPaths.bidAward =>
       '当前定标桥接已受理，页面会同步刷新项目详情与我的项目，并继续保留最小结果承接。',
     ExhibitionCanonicalPaths.bidSelectAndCreateOrder =>
@@ -271,6 +279,12 @@ String? _controlledBusinessFailureMessage({required String? errorCode}) {
     'PROJECT_WITHDRAW_INVALID' => '当前项目尚未提交，暂不支持撤回到草稿。',
     'PROJECT_ARCHIVE_INVALID' => '当前项目尚未提交，暂不支持作废归档。',
     'PROJECT_CLOSE_INVALID' => '当前项目状态暂不支持下架关闭。',
+    'PROJECT_EXIT_INVALID_STATE' => '当前项目状态暂不支持这个退出动作。',
+    'PROJECT_WITHDRAW_PUBLISHED_INVALID' => '竞标中撤回参数无效，请检查后再试。',
+    'PROJECT_SUBMITTED_DISCARD_INVALID' => '预发布作废删除参数无效，请检查后再试。',
+    'PROJECT_CANCELLATION_REQUEST_INVALID' => '取消申请参数无效，请检查后再试。',
+    'PROJECT_CANCELLATION_RESPONSE_INVALID' => '取消响应参数无效，请检查后再试。',
+    'PROJECT_BREACH_RECORD_INVALID' => '违约记录参数无效，请检查后再试。',
     'BID_DUPLICATE_SUBMISSION' => '当前项目已提交过竞标，本页不再重复提交。请回到项目详情查看最新竞标状态。',
     'BID_AWARD_INVALID' => '当前定标参数未通过校验。请回到我的项目详情确认中标投标 ID 与定标原因后再试。',
     'BID_AWARD_INVALID_STATE' => '当前项目状态暂时不能继续定标。请先回到我的项目详情确认项目是否已进入后续链路。',
@@ -349,7 +363,13 @@ String _missingInstanceMessageForPath(String path) {
     ExhibitionCanonicalPaths.projectPublish ||
     ExhibitionCanonicalPaths.projectWithdraw ||
     ExhibitionCanonicalPaths.projectArchive ||
-    ExhibitionCanonicalPaths.projectClose =>
+    ExhibitionCanonicalPaths.projectClose ||
+    ExhibitionCanonicalPaths.projectWithdrawPublished ||
+    ExhibitionCanonicalPaths.projectDiscardSubmitted ||
+    ExhibitionCanonicalPaths.projectCancellationRequest ||
+    ExhibitionCanonicalPaths.projectCancellationRespond ||
+    ExhibitionCanonicalPaths.projectPublisherBreachRecord ||
+    ExhibitionCanonicalPaths.projectFactoryBreachRecord =>
       '当前入口还没有承接到所需项目，这一页暂时不能继续。你现在可以先回到项目池，再从已承接项目重新进入。',
     ExhibitionCanonicalPaths.contractConfirm =>
       '当前入口还没有承接到所需订单与合同，这一页暂时不能继续。你现在可以先回到订单或合同详情，再从已承接订单重新进入。',
@@ -399,7 +419,14 @@ String _recoveryHintForPath(String path) {
     ExhibitionCanonicalPaths.projectCreate => '回到项目池，再从已承接项目重新进入',
     ExhibitionCanonicalPaths.projectWithdraw ||
     ExhibitionCanonicalPaths.projectArchive ||
-    ExhibitionCanonicalPaths.projectClose => '回到我的项目，再从当前组织项目资产重新进入',
+    ExhibitionCanonicalPaths.projectClose ||
+    ExhibitionCanonicalPaths.projectWithdrawPublished ||
+    ExhibitionCanonicalPaths.projectDiscardSubmitted ||
+    ExhibitionCanonicalPaths.projectCancellationRequest ||
+    ExhibitionCanonicalPaths.projectCancellationRespond ||
+    ExhibitionCanonicalPaths.projectPublisherBreachRecord ||
+    ExhibitionCanonicalPaths.projectFactoryBreachRecord =>
+      '回到我的项目，再从当前组织项目资产重新进入',
     ExhibitionCanonicalPaths.bidAward => '回到我的项目详情，再从当前项目重新进入',
     ExhibitionCanonicalPaths.projectEditDetail ||
     ExhibitionCanonicalPaths.projectSave ||
@@ -453,7 +480,14 @@ String _recoveryRouteForPath(String path) {
     ExhibitionCanonicalPaths.projectEditDetail ||
     ExhibitionCanonicalPaths.projectSave ||
     ExhibitionCanonicalPaths.projectSubmit ||
-    ExhibitionCanonicalPaths.projectPublish => ExhibitionRoutes.myProjectList,
+    ExhibitionCanonicalPaths.projectPublish ||
+    ExhibitionCanonicalPaths.projectWithdrawPublished ||
+    ExhibitionCanonicalPaths.projectDiscardSubmitted ||
+    ExhibitionCanonicalPaths.projectCancellationRequest ||
+    ExhibitionCanonicalPaths.projectCancellationRespond ||
+    ExhibitionCanonicalPaths.projectPublisherBreachRecord ||
+    ExhibitionCanonicalPaths.projectFactoryBreachRecord =>
+      ExhibitionRoutes.myProjectList,
     ExhibitionCanonicalPaths.disputeWithdraw => ExhibitionRoutes.disputeOpen,
     _ => AppBuilding.exhibition.routePath,
   };

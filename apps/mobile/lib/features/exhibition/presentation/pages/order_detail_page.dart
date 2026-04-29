@@ -103,6 +103,9 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final completionRequestState = _normalizeId(
       payload?['completionRequestState'] as String?,
     );
+    final exitGovernanceSnapshot = _projectExitGovernanceSnapshotFromMap(
+      payload,
+    );
     if (result.state != AppPageState.content || orderId == null) {
       return const <Widget>[];
     }
@@ -110,6 +113,15 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     return <Widget>[
       const SizedBox(height: 16),
       _buildOrderOverviewCard(orderNo, orderState, completionRequestState),
+      if (exitGovernanceSnapshot != null) ...<Widget>[
+        const SizedBox(height: 16),
+        _ProjectExitGovernanceStatusCard(
+          snapshot: exitGovernanceSnapshot,
+          placement: _ProjectExitGovernancePlacement.orderDetail,
+          projectId: projectId,
+          orderId: orderId,
+        ),
+      ],
       const SizedBox(height: 16),
       _OrderStatusCard(
         orderId: orderId,

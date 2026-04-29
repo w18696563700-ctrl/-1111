@@ -145,20 +145,16 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 ? _scrollToAttachments
                 : null,
           ),
-          // Published detail intentionally keeps only the summary-card
-          // handoff for materials to avoid duplicating a second action block.
-          if (stage.value != _MyProjectStageBucket.published) ...<Widget>[
-            const SizedBox(height: 16),
-            _buildStageActionCard(
-              context,
-              projectId: projectId,
-              stage: stage,
-              state: state,
-              isOwnerSurface: isOwnerSurface,
-              canRunLifecycleActions: canRunLifecycleActions,
-              canManageAttachments: canManageAttachments,
-            ),
-          ],
+          const SizedBox(height: 16),
+          _buildStageActionCard(
+            context,
+            projectId: projectId,
+            stage: stage,
+            state: state,
+            isOwnerSurface: isOwnerSurface,
+            canRunLifecycleActions: canRunLifecycleActions,
+            canManageAttachments: canManageAttachments,
+          ),
           if (canManageAttachments && projectId != null) ...<Widget>[
             const SizedBox(height: 16),
             KeyedSubtree(
@@ -352,15 +348,16 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         children.add(const SizedBox(height: 12));
         children.add(
           OutlinedButton(
-            onPressed: !canRunLifecycleActions || !_myProjectCanArchive(state)
+            onPressed:
+                !canRunLifecycleActions || !_myProjectCanDiscardSubmitted(state)
                 ? null
                 : () => _runLifecycleAction(
-                    _MyProjectLifecycleActionKind.archive,
+                    _MyProjectLifecycleActionKind.discardSubmitted,
                     projectId: projectId,
                   ),
             child: Text(
               _buttonLabelForLifecycleAction(
-                _MyProjectLifecycleActionKind.archive,
+                _MyProjectLifecycleActionKind.discardSubmitted,
               ),
             ),
           ),
@@ -375,22 +372,74 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         children.add(const SizedBox(height: 12));
         children.add(
           OutlinedButton(
-            onPressed: !canRunLifecycleActions || !_myProjectCanClose(state)
+            onPressed:
+                !canRunLifecycleActions ||
+                    !_myProjectCanWithdrawPublished(state)
                 ? null
                 : () => _runLifecycleAction(
-                    _MyProjectLifecycleActionKind.close,
+                    _MyProjectLifecycleActionKind.withdrawPublished,
                     projectId: projectId,
                   ),
             child: Text(
               _buttonLabelForLifecycleAction(
-                _MyProjectLifecycleActionKind.close,
+                _MyProjectLifecycleActionKind.withdrawPublished,
               ),
             ),
           ),
         );
       case _MyProjectStageBucket.active:
         children.add(
-          const OutlinedButton(onPressed: null, child: Text('业务继续处理入口待开放')),
+          FilledButton(
+            onPressed:
+                !canRunLifecycleActions ||
+                    !_myProjectCanUseActiveExitGovernance(state)
+                ? null
+                : () => _runLifecycleAction(
+                    _MyProjectLifecycleActionKind.requestCancellation,
+                    projectId: projectId,
+                  ),
+            child: Text(
+              _buttonLabelForLifecycleAction(
+                _MyProjectLifecycleActionKind.requestCancellation,
+              ),
+            ),
+          ),
+        );
+        children.add(const SizedBox(height: 12));
+        children.add(
+          OutlinedButton(
+            onPressed:
+                !canRunLifecycleActions ||
+                    !_myProjectCanUseActiveExitGovernance(state)
+                ? null
+                : () => _runLifecycleAction(
+                    _MyProjectLifecycleActionKind.recordPublisherBreach,
+                    projectId: projectId,
+                  ),
+            child: Text(
+              _buttonLabelForLifecycleAction(
+                _MyProjectLifecycleActionKind.recordPublisherBreach,
+              ),
+            ),
+          ),
+        );
+        children.add(const SizedBox(height: 12));
+        children.add(
+          OutlinedButton(
+            onPressed:
+                !canRunLifecycleActions ||
+                    !_myProjectCanUseActiveExitGovernance(state)
+                ? null
+                : () => _runLifecycleAction(
+                    _MyProjectLifecycleActionKind.recordFactoryBreach,
+                    projectId: projectId,
+                  ),
+            child: Text(
+              _buttonLabelForLifecycleAction(
+                _MyProjectLifecycleActionKind.recordFactoryBreach,
+              ),
+            ),
+          ),
         );
       case _MyProjectStageBucket.archived:
         children.add(
@@ -401,7 +450,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     return _ActionCard(
       title: '当前阶段动作',
       summary: stage.value == _MyProjectStageBucket.submitted
-          ? '先补资料后确认发布；返回草稿和作废归档继续使用现有动作。'
+          ? '先补资料后确认发布；返回草稿和作废删除继续使用受控动作。'
           : '动作区严格跟随当前阶段，不再混放跨阶段入口。',
       children: children,
     );
@@ -448,8 +497,26 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         ),
       _MyProjectLifecycleActionKind.withdraw =>
         ExhibitionConsumerLayer.instance.withdrawProject(projectId: projectId),
-      _MyProjectLifecycleActionKind.archive =>
-        ExhibitionConsumerLayer.instance.archiveProject(projectId: projectId),
+      _MyProjectLifecycleActionKind.discardSubmitted =>
+        ExhibitionConsumerLayer.instance.discardSubmittedProject(
+          projectId: projectId,
+        ),
+      _MyProjectLifecycleActionKind.withdrawPublished =>
+        ExhibitionConsumerLayer.instance.withdrawPublishedProject(
+          projectId: projectId,
+        ),
+      _MyProjectLifecycleActionKind.requestCancellation =>
+        ExhibitionConsumerLayer.instance.requestProjectCancellation(
+          projectId: projectId,
+        ),
+      _MyProjectLifecycleActionKind.recordPublisherBreach =>
+        ExhibitionConsumerLayer.instance.recordPublisherBreach(
+          projectId: projectId,
+        ),
+      _MyProjectLifecycleActionKind.recordFactoryBreach =>
+        ExhibitionConsumerLayer.instance.recordFactoryBreach(
+          projectId: projectId,
+        ),
       _MyProjectLifecycleActionKind.close =>
         ExhibitionConsumerLayer.instance.closeProject(projectId: projectId),
     };

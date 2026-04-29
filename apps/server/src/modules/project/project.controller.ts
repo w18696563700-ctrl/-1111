@@ -2,6 +2,7 @@ import { Body, Controller, Delete, Get, Headers, HttpCode, Param, Post, Query, R
 import type { Request } from 'express';
 import type { HeaderBag } from '../../shared/request-context';
 import { resolveRequestContext } from '../../shared/request-context';
+import { ProjectExitGovernanceService } from './project-exit-governance.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
 import { ProjectQueryService } from './project-query.service';
 import { ProjectWriteService } from './project-write.service';
@@ -11,7 +12,8 @@ export class ProjectController {
   constructor(
     private readonly queryService: ProjectQueryService,
     private readonly writeService: ProjectWriteService,
-    private readonly lifecycleService: ProjectLifecycleService
+    private readonly lifecycleService: ProjectLifecycleService,
+    private readonly exitGovernanceService: ProjectExitGovernanceService
   ) {}
 
   @Get()
@@ -107,6 +109,60 @@ export class ProjectController {
     @Headers() headers: HeaderBag
   ) {
     return this.lifecycleService.closeProject(body, resolveRequestContext(headers));
+  }
+
+  @Post('withdraw-published')
+  @HttpCode(202)
+  withdrawPublishedProject(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.exitGovernanceService.withdrawPublishedProject(body, resolveRequestContext(headers));
+  }
+
+  @Post('discard-submitted')
+  @HttpCode(202)
+  discardSubmittedProject(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.exitGovernanceService.discardSubmittedProject(body, resolveRequestContext(headers));
+  }
+
+  @Post('cancellation/request')
+  @HttpCode(202)
+  requestProjectCancellation(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.exitGovernanceService.requestCancellation(body, resolveRequestContext(headers));
+  }
+
+  @Post('cancellation/respond')
+  @HttpCode(202)
+  respondProjectCancellation(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.exitGovernanceService.respondCancellation(body, resolveRequestContext(headers));
+  }
+
+  @Post('breach/record-publisher')
+  @HttpCode(202)
+  recordPublisherBreach(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.exitGovernanceService.recordPublisherBreach(body, resolveRequestContext(headers));
+  }
+
+  @Post('breach/record-factory')
+  @HttpCode(202)
+  recordFactoryBreach(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.exitGovernanceService.recordFactoryBreach(body, resolveRequestContext(headers));
   }
 
   @Get(':projectId')

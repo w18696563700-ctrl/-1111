@@ -105,6 +105,7 @@ final class CounterpartConversationOrderSummaryView {
     required this.sellerOrganizationId,
     required this.state,
     required this.completionRequestState,
+    required this.exitGovernance,
   });
 
   final String orderId;
@@ -113,6 +114,25 @@ final class CounterpartConversationOrderSummaryView {
   final String? sellerOrganizationId;
   final String? state;
   final String? completionRequestState;
+  final CounterpartConversationExitGovernanceView? exitGovernance;
+}
+
+final class CounterpartConversationExitGovernanceView {
+  const CounterpartConversationExitGovernanceView({
+    required this.exitCaseId,
+    required this.exitType,
+    required this.caseStatus,
+    required this.breachParty,
+    required this.counterpartyAction,
+    required this.updatedAt,
+  });
+
+  final String? exitCaseId;
+  final String? exitType;
+  final String? caseStatus;
+  final String? breachParty;
+  final String? counterpartyAction;
+  final String? updatedAt;
 }
 
 final class CounterpartConversationRatingEntryView {

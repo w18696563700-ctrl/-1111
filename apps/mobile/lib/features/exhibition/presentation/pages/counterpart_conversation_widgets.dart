@@ -114,6 +114,8 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final maskedTitle = group.titleVisibility == 'masked';
+    const maskedTitleColor = Color(0xFF1F7A3A);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surfaceContainerLowest,
@@ -136,15 +138,38 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            Text(
-              group.projectDisplayTitle,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w900,
+            if (maskedTitle)
+              Row(
+                children: <Widget>[
+                  const Icon(
+                    Icons.lock_outline_rounded,
+                    size: 16,
+                    color: maskedTitleColor,
+                  ),
+                  const SizedBox(width: 4),
+                  Expanded(
+                    child: Text(
+                      group.projectDisplayTitle,
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: maskedTitleColor,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                ],
+              )
+            else
+              Text(
+                group.projectDisplayTitle,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-            ),
             const SizedBox(height: 6),
             Text(
-              '进入后才加载此项目聊天、订单入口和项目相册入口。',
+              maskedTitle
+                  ? '进入后可申请查看项目名称，并继续项目聊天、订单入口和项目相册。'
+                  : '进入后可继续项目聊天、订单入口和项目相册。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.35,

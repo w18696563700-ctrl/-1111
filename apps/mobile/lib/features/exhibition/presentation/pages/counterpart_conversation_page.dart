@@ -559,6 +559,11 @@ class _CounterpartConversationPageState
         ),
       ];
     }
+    final exitGovernanceSnapshot =
+        _projectExitGovernanceSnapshotFromConversation(
+          selectedGroup.orderSummary?.exitGovernance,
+        );
+    final selectedOrderId = _orderIdFromConversationGroup(selectedGroup);
     return <Widget>[
       _CounterpartConversationHeader(
         data: data,
@@ -573,12 +578,24 @@ class _CounterpartConversationPageState
           selectedGroup,
           'project_name_access_request',
         ),
-        orderId: _orderIdFromConversationGroup(selectedGroup),
+        orderId: selectedOrderId,
         onBackToProjectList: _backToProjectList,
         onOpenNameAccess: _openBusinessCard,
         onOpenOrder: () => _openOrderDetail(selectedGroup),
         onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
       ),
+      if (exitGovernanceSnapshot != null) ...<Widget>[
+        const SizedBox(height: 16),
+        _ProjectExitGovernanceStatusCard(
+          snapshot: exitGovernanceSnapshot,
+          placement: _ProjectExitGovernancePlacement.conversation,
+          projectId: selectedGroup.projectId,
+          orderId: selectedOrderId,
+          onOpenOrder: selectedOrderId == null
+              ? null
+              : () => _openOrderDetail(selectedGroup),
+        ),
+      ],
       Padding(
         padding: const EdgeInsets.only(bottom: 16),
         child: _ProjectCommunicationTimeline(

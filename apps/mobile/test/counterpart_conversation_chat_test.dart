@@ -513,6 +513,7 @@ Map<String, Object?> _orderSummaryPayload({
   String state = 'active',
   String completionRequestState = 'none',
   bool includeOrganizationAnchors = true,
+  Map<String, Object?>? exitGovernance,
 }) {
   return <String, Object?>{
     'orderId': 'order-1',
@@ -523,6 +524,9 @@ Map<String, Object?> _orderSummaryPayload({
     },
     'state': state,
     'completionRequestState': completionRequestState,
+    ...?exitGovernance == null
+        ? null
+        : <String, Object?>{'exitGovernance': exitGovernance},
   };
 }
 
@@ -530,6 +534,7 @@ Map<String, Object?> _orderDetailPayload({
   String state = 'active',
   String completionRequestState = 'none',
   bool includeOrganizationAnchors = true,
+  Map<String, Object?>? exitGovernance,
 }) {
   return <String, Object?>{
     'orderId': 'order-1',
@@ -542,8 +547,28 @@ Map<String, Object?> _orderDetailPayload({
     },
     'state': state,
     'completionRequestState': completionRequestState,
+    ...?exitGovernance == null
+        ? null
+        : <String, Object?>{'exitGovernance': exitGovernance},
     'summary': const <String, Object?>{'heading': '订单已承接'},
     'milestones': const <Object?>[],
+  };
+}
+
+Map<String, Object?> _exitGovernancePayload({
+  String exitType = 'mutual_cancellation',
+  String caseStatus = 'requested',
+  String? breachParty,
+}) {
+  return <String, Object?>{
+    'exitCaseId': 'exit-case-1',
+    'exitType': exitType,
+    'caseStatus': caseStatus,
+    ...?breachParty == null
+        ? null
+        : <String, Object?>{'breachParty': breachParty},
+    'counterpartyAction': '等待对方确认',
+    'updatedAt': '2026-05-04T10:03:00Z',
   };
 }
 
@@ -864,6 +889,71 @@ void main() {
   );
 
   testWidgets(
+    'conversation and order detail show exit governance as read-only status',
+    (WidgetTester tester) async {
+      final exitGovernance = _exitGovernancePayload();
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _detailPayload(
+                        projectState: 'converted_to_order',
+                        orderSummary: _orderSummaryPayload(
+                          exitGovernance: exitGovernance,
+                        ),
+                      ),
+                    );
+                  },
+              'GET /api/app/message/project-communication/thread':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _threadPayload(),
+                    );
+                  },
+              'GET /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'nextCursor': null,
+                      },
+                    );
+                  },
+              'GET /api/app/order/detail': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _orderDetailPayload(exitGovernance: exitGovernance),
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+
+      await _enterFirstProjectCommunication(tester);
+      await _ensureVisible(tester, find.text('退出/违约状态'));
+      expect(find.text('当前状态：等待对方确认'), findsOneWidget);
+      expect(find.text('消息楼仅展示状态，不在这里裁决取消或违约；需要处理时回到项目或订单详情。'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, '查看订单详情'));
+      await tester.pumpAndSettle();
+      await _ensureVisible(tester, find.text('回到我的项目处理'));
+      expect(find.text('订单详情只承接当前状态和入口，不自动扣钱、不删除订单合同。'), findsOneWidget);
+      expect(find.text('回到我的项目处理'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'conversation order summary lets buyer confirm requested completion',
     (WidgetTester tester) async {
       var confirmCount = 0;
@@ -1067,6 +1157,38 @@ void main() {
   );
 
   testWidgets(
+    'masked project entry is green access hint and keeps state chips separate',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _detailPayload(projectState: 'converted_to_order'),
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+
+      expect(find.text('项目列表'), findsOneWidget);
+      expect(find.text('已转订单'), findsOneWidget);
+      expect(find.text('2 项业务'), findsOneWidget);
+      expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
+      final maskedTitle = tester.widget<Text>(find.text('项目名称需申请查看').first);
+      expect(maskedTitle.style?.color, const Color(0xFF1F7A3A));
+      expect(find.text('进入后可申请查看项目名称，并继续项目聊天、订单入口和项目相册。'), findsOneWidget);
+      expect(find.text('进入后才加载此项目聊天、订单入口和项目相册入口。'), findsNothing);
+      expect(find.text('想跟TA说点什么...'), findsNothing);
+    },
+  );
+
+  testWidgets(
     'counterpart total frame switches between two projects without mixing messages',
     (WidgetTester tester) async {
       final messagesByProject = <String, String>{
@@ -1160,6 +1282,8 @@ void main() {
       expect(find.text('项目列表'), findsOneWidget);
       expect(find.text('西洽会 - 泸州'), findsOneWidget);
       expect(find.text('西洽会 - 成都'), findsOneWidget);
+      expect(find.text('进入后可继续项目聊天、订单入口和项目相册。'), findsNWidgets(2));
+      expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
       expect(
         transport.requests.where(
@@ -1288,7 +1412,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(orderDetailCount, 1);
-      expect(find.text('订单详情'), findsOneWidget);
+      expect(find.text('订单概览'), findsOneWidget);
     },
   );
 

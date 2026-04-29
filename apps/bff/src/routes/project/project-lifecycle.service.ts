@@ -4,15 +4,33 @@ import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
 
-type ProjectLifecycleAction = 'withdraw' | 'archive' | 'close';
+type ProjectLifecycleAction =
+  | 'withdraw'
+  | 'archive'
+  | 'close'
+  | 'withdrawPublished'
+  | 'discardSubmitted'
+  | 'cancellationRequest'
+  | 'cancellationRespond'
+  | 'publisherBreach'
+  | 'factoryBreach';
 type ProjectLifecycleInvalidCode =
   | 'PROJECT_WITHDRAW_INVALID'
   | 'PROJECT_ARCHIVE_INVALID'
-  | 'PROJECT_CLOSE_INVALID';
+  | 'PROJECT_CLOSE_INVALID'
+  | 'PROJECT_WITHDRAW_PUBLISHED_INVALID'
+  | 'PROJECT_SUBMITTED_DISCARD_INVALID'
+  | 'PROJECT_CANCELLATION_REQUEST_INVALID'
+  | 'PROJECT_CANCELLATION_RESPONSE_INVALID'
+  | 'PROJECT_BREACH_RECORD_INVALID';
 
 type ProjectLifecycleAcceptedResponse = {
   projectId: string;
-  state: string;
+  state?: string;
+  exitCaseId?: string;
+  projectState?: string;
+  caseStatus?: string;
+  [key: string]: unknown;
 };
 
 @Injectable()
@@ -56,6 +74,72 @@ export class ProjectLifecycleService {
     );
   }
 
+  async withdrawPublishedProject(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
+    return this.executeLifecycleCommand(
+      '/server/projects/withdraw-published',
+      payload,
+      headers,
+      'withdrawPublished',
+      'PROJECT_WITHDRAW_PUBLISHED_INVALID',
+      '竞标中撤回参数无效，请检查后再试。'
+    );
+  }
+
+  async discardSubmittedProject(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
+    return this.executeLifecycleCommand(
+      '/server/projects/discard-submitted',
+      payload,
+      headers,
+      'discardSubmitted',
+      'PROJECT_SUBMITTED_DISCARD_INVALID',
+      '预发布作废删除参数无效，请检查后再试。'
+    );
+  }
+
+  async requestCancellation(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
+    return this.executeLifecycleCommand(
+      '/server/projects/cancellation/request',
+      payload,
+      headers,
+      'cancellationRequest',
+      'PROJECT_CANCELLATION_REQUEST_INVALID',
+      '取消申请参数无效，请检查后再试。'
+    );
+  }
+
+  async respondCancellation(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
+    return this.executeLifecycleCommand(
+      '/server/projects/cancellation/respond',
+      payload,
+      headers,
+      'cancellationRespond',
+      'PROJECT_CANCELLATION_RESPONSE_INVALID',
+      '取消响应参数无效，请检查后再试。'
+    );
+  }
+
+  async recordPublisherBreach(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
+    return this.executeLifecycleCommand(
+      '/server/projects/breach/record-publisher',
+      payload,
+      headers,
+      'publisherBreach',
+      'PROJECT_BREACH_RECORD_INVALID',
+      '发布方违约记录参数无效，请检查后再试。'
+    );
+  }
+
+  async recordFactoryBreach(payload: Record<string, unknown>, headers: IncomingHttpHeaders) {
+    return this.executeLifecycleCommand(
+      '/server/projects/breach/record-factory',
+      payload,
+      headers,
+      'factoryBreach',
+      'PROJECT_BREACH_RECORD_INVALID',
+      '工厂违约记录参数无效，请检查后再试。'
+    );
+  }
+
   private async executeLifecycleCommand(
     path: string,
     payload: Record<string, unknown>,
@@ -93,7 +177,7 @@ export class ProjectLifecycleService {
         401: 'AUTH_SESSION_INVALID',
         403: 'AUTH_PERMISSION_INSUFFICIENT',
         404: 'AUTH_RESOURCE_UNAVAILABLE',
-        409: 'PROJECT_INVALID_STATE'
+        409: 'PROJECT_EXIT_INVALID_STATE'
       }
     );
     const payload = this.asOptionalRecord(normalized.getResponse()) ?? {};
@@ -112,7 +196,7 @@ export class ProjectLifecycleService {
         ...payload,
         statusCode: normalized.getStatus(),
         source: payload.source === 'server' ? 'server' : 'bff',
-        code: code || (normalized.getStatus() === 409 ? 'PROJECT_INVALID_STATE' : invalidCode),
+        code: code || (normalized.getStatus() === 409 ? 'PROJECT_EXIT_INVALID_STATE' : invalidCode),
         message
       },
       normalized.getStatus()
@@ -139,7 +223,7 @@ export class ProjectLifecycleService {
       return this.rewritePermissionMessage(payload, action);
     }
 
-    if (statusCode === 409 && code === 'PROJECT_INVALID_STATE') {
+    if (statusCode === 409 && (code === 'PROJECT_INVALID_STATE' || code === 'PROJECT_EXIT_INVALID_STATE')) {
       return this.rewriteInvalidStateMessage(payload, action);
     }
 
@@ -175,8 +259,22 @@ export class ProjectLifecycleService {
     if (action === 'withdraw') {
       return '当前项目尚未提交，暂不支持撤回到草稿。';
     }
+    if (action === 'withdrawPublished') {
+      return message.includes('authorization')
+        ? '当前项目已有平台服务费授权记录，需先走安全释放链路后再撤回。'
+        : '当前项目状态暂不支持撤回到预发布列表。';
+    }
     if (action === 'archive') {
       return '当前项目尚未提交，暂不支持作废归档。';
+    }
+    if (action === 'discardSubmitted') {
+      return '当前项目状态暂不支持作废删除。';
+    }
+    if (action === 'cancellationRequest' || action === 'cancellationRespond') {
+      return '当前项目暂不支持从这里推进取消申请。';
+    }
+    if (action === 'publisherBreach' || action === 'factoryBreach') {
+      return '当前项目暂不支持从这里记录违约。';
     }
     if (message.includes('order continuation')) {
       return '当前项目已进入业务继续链，暂不支持从这里下架关闭。';
@@ -190,11 +288,33 @@ export class ProjectLifecycleService {
   ): ProjectLifecycleAcceptedResponse {
     const projectId = this.asString(result.projectId);
     const state = this.asString(result.state);
-    const expectedState = action === 'withdraw' ? 'draft' : 'archived';
-    if (!projectId || state !== expectedState) {
+    if (!projectId) {
       throw new Error('Project lifecycle accepted response is missing required fields.');
     }
-    return { projectId, state };
+    if (action === 'cancellationRequest' || action === 'cancellationRespond') {
+      const exitCaseId = this.asString(result.exitCaseId);
+      const caseStatus = this.asString(result.caseStatus);
+      const projectState = this.asString(result.projectState);
+      if (!exitCaseId || !caseStatus || !projectState) {
+        throw new Error('Project cancellation accepted response is missing required fields.');
+      }
+      return { ...result, projectId, exitCaseId, caseStatus, projectState };
+    }
+    if (action === 'publisherBreach' || action === 'factoryBreach') {
+      const exitCaseId = this.asString(result.exitCaseId);
+      const caseStatus = this.asString(result.caseStatus);
+      const projectState = this.asString(result.projectState);
+      if (!exitCaseId || caseStatus !== 'recorded' || !projectState) {
+        throw new Error('Project breach accepted response is missing required fields.');
+      }
+      return { ...result, projectId, exitCaseId, caseStatus, projectState };
+    }
+
+    const expectedState = this.expectedLifecycleState(action);
+    if (state !== expectedState) {
+      throw new Error('Project lifecycle accepted response is missing required fields.');
+    }
+    return { ...result, projectId, state };
   }
 
   private toProjectActionPayload(
@@ -204,6 +324,7 @@ export class ProjectLifecycleService {
   ) {
     const source = this.requireRecord(payload, code, message);
     return {
+      ...source,
       projectId: this.readRequiredString(source.projectId, code, message)
     };
   }
@@ -215,7 +336,31 @@ export class ProjectLifecycleService {
     if (action === 'archive') {
       return '作废归档';
     }
+    if (action === 'withdrawPublished') {
+      return '撤回到预发布列表';
+    }
+    if (action === 'discardSubmitted') {
+      return '作废删除';
+    }
+    if (action === 'cancellationRequest') {
+      return '发起取消申请';
+    }
+    if (action === 'cancellationRespond') {
+      return '响应取消申请';
+    }
+    if (action === 'publisherBreach') {
+      return '记录发布方违约';
+    }
+    if (action === 'factoryBreach') {
+      return '记录工厂违约';
+    }
     return '下架关闭';
+  }
+
+  private expectedLifecycleState(action: ProjectLifecycleAction) {
+    if (action === 'withdraw') return 'draft';
+    if (action === 'withdrawPublished') return 'submitted';
+    return 'archived';
   }
 
   private requireRecord(

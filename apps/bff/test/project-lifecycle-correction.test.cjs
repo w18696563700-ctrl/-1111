@@ -70,6 +70,119 @@ test('project lifecycle correction forwards withdraw/archive/close and preserves
   assert.deepEqual(closed, { projectId: 'project-1', state: 'archived' });
 });
 
+test('project exit governance forwards new routes without calculating business state', async () => {
+  const calls = [];
+  const service = createService({
+    serverClient: {
+      async post(path, payload) {
+        calls.push([path, payload]);
+        if (path === '/server/projects/withdraw-published') {
+          return {
+            projectId: payload.projectId,
+            previousState: 'published',
+            state: 'submitted',
+            action: 'withdraw_published_to_submitted',
+            affectedBidCount: 2,
+            affectedAuthorizationCount: 0,
+            exitCaseId: 'exit-1'
+          };
+        }
+        if (path === '/server/projects/discard-submitted') {
+          return {
+            projectId: payload.projectId,
+            previousState: 'submitted',
+            state: 'archived',
+            action: 'discard_submitted',
+            exitCaseId: 'exit-2'
+          };
+        }
+        if (path === '/server/projects/cancellation/request') {
+          return {
+            projectId: payload.projectId,
+            exitCaseId: 'exit-3',
+            projectState: 'converted_to_order',
+            caseStatus: 'requested',
+            action: 'request_cancellation'
+          };
+        }
+        if (path === '/server/projects/cancellation/respond') {
+          return {
+            projectId: payload.projectId,
+            exitCaseId: payload.exitCaseId,
+            projectState: 'submitted',
+            caseStatus: 'accepted',
+            action: 'accept_cancellation',
+            orderId: 'order-1',
+            orderState: 'cancelled'
+          };
+        }
+        if (path === '/server/projects/breach/record-factory') {
+          return {
+            projectId: payload.projectId,
+            exitCaseId: 'exit-4',
+            projectState: 'converted_to_order',
+            caseStatus: 'recorded',
+            breachParty: 'factory',
+            action: 'record_factory_breach',
+            creditImpactCandidate: true
+          };
+        }
+        throw new Error(`unexpected path ${path}`);
+      }
+    }
+  });
+
+  const withdrawn = await service.withdrawPublishedProject(
+    { projectId: 'project-1', reasonCode: 'content_needs_revision' },
+    {}
+  );
+  const discarded = await service.discardSubmittedProject(
+    { projectId: 'project-2', reasonCode: 'no_longer_needed' },
+    {}
+  );
+  const cancellation = await service.requestCancellation(
+    {
+      projectId: 'project-3',
+      reasonCode: 'mutual_change',
+      noAutomaticPenaltyConfirmed: true
+    },
+    {}
+  );
+  const cancellationAccepted = await service.respondCancellation(
+    {
+      projectId: 'project-3',
+      exitCaseId: 'exit-3',
+      decision: 'accept',
+      noAutomaticPenaltyConfirmed: true
+    },
+    {}
+  );
+  const breach = await service.recordFactoryBreach(
+    {
+      projectId: 'project-4',
+      reasonCode: 'factory_refused_fulfillment',
+      noAutomaticPenaltyConfirmed: true
+    },
+    {}
+  );
+
+  assert.deepEqual(calls.map((item) => item[0]), [
+    '/server/projects/withdraw-published',
+    '/server/projects/discard-submitted',
+    '/server/projects/cancellation/request',
+    '/server/projects/cancellation/respond',
+    '/server/projects/breach/record-factory'
+  ]);
+  assert.equal(withdrawn.state, 'submitted');
+  assert.equal(discarded.state, 'archived');
+  assert.equal(cancellation.caseStatus, 'requested');
+  assert.equal(cancellationAccepted.caseStatus, 'accepted');
+  assert.equal(cancellationAccepted.projectState, 'submitted');
+  assert.equal(cancellationAccepted.orderState, 'cancelled');
+  assert.equal(breach.caseStatus, 'recorded');
+  assert.equal(breach.creditImpactCandidate, true);
+});
+
 test('project lifecycle correction uses route-specific invalid request codes before upstream forwarding', async () => {
   const service = createService();
 
@@ -124,6 +237,30 @@ test('project lifecycle correction rewrites invalid state per route and preserve
       assert.equal(error.getStatus(), 409);
       assert.equal(error.getResponse().code, 'PROJECT_INVALID_STATE');
       assert.equal(error.getResponse().message, '当前项目已进入业务继续链，暂不支持从这里下架关闭。');
+      return true;
+    }
+  );
+});
+
+test('project exit governance rewrites authorization and active-state failures', async () => {
+  const service = createService({
+    serverClient: {
+      async post() {
+        throw createAxiosError(
+          409,
+          'PROJECT_EXIT_INVALID_STATE',
+          'Current project has platform fee authorization records and must use the P0-Pay release chain first.'
+        );
+      }
+    }
+  });
+
+  await assert.rejects(
+    () => service.withdrawPublishedProject({ projectId: 'project-1' }, {}),
+    (error) => {
+      assert.equal(error.getStatus(), 409);
+      assert.equal(error.getResponse().code, 'PROJECT_EXIT_INVALID_STATE');
+      assert.equal(error.getResponse().message, '当前项目已有平台服务费授权记录，需先走安全释放链路后再撤回。');
       return true;
     }
   );

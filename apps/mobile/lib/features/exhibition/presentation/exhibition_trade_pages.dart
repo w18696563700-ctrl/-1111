@@ -72,6 +72,7 @@ part 'presentation_support/bid_award_support.dart';
 part 'presentation_support/project_bid_selection_support.dart';
 part 'presentation_support/project_bid_selection_models.dart';
 part 'presentation_support/order_status_card.dart';
+part 'presentation_support/project_exit_governance_status_support.dart';
 part 'presentation_support/p0_pay_bid_authorization_support.dart';
 part 'presentation_support/p0_pay_bid_authorization_actions.dart';
 part 'presentation_support/exhibition_payload_support.dart';

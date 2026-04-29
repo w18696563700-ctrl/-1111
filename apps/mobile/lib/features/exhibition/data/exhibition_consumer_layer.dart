@@ -32,6 +32,7 @@ part 'models/project_public_resource_read_models.dart';
 part 'models/upload_directive.dart';
 part 'models/upload_flow_result.dart';
 part 'services/exhibition_action_service.dart';
+part 'services/exhibition_project_exit_action_service.dart';
 part 'services/exhibition_canonical_paths.dart';
 part 'services/p0_pay_consumer_service.dart';
 part 'services/exhibition_contract_mapper.dart';
@@ -180,6 +181,21 @@ class ExhibitionConsumerLayer {
     }
 
     return _actionService.deleteMyProject(projectId: normalizedProjectId);
+  }
+
+  Future<ExhibitionActionResult> _missingProjectActionResult({
+    required String path,
+  }) {
+    return Future<ExhibitionActionResult>.value(
+      ExhibitionActionResult(
+        method: 'POST',
+        path: path,
+        isSuccess: false,
+        controlledState: AppPageState.notFound,
+        errorCode: 'AUTH_RESOURCE_UNAVAILABLE',
+        message: '当前项目不可用。',
+      ),
+    );
   }
 
   Future<ExhibitionLoadResult> loadProjectAttachments({
@@ -402,6 +418,81 @@ class ExhibitionConsumerLayer {
     }
 
     return _actionService.closeProject(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> withdrawPublishedProject({
+    required String? projectId,
+  }) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return _missingProjectActionResult(
+        path: ExhibitionCanonicalPaths.projectWithdrawPublished,
+      );
+    }
+
+    return _actionService.withdrawPublishedProject(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> discardSubmittedProject({
+    required String? projectId,
+  }) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return _missingProjectActionResult(
+        path: ExhibitionCanonicalPaths.projectDiscardSubmitted,
+      );
+    }
+
+    return _actionService.discardSubmittedProject(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> requestProjectCancellation({
+    required String? projectId,
+  }) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return _missingProjectActionResult(
+        path: ExhibitionCanonicalPaths.projectCancellationRequest,
+      );
+    }
+
+    return _actionService.requestProjectCancellation(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> recordPublisherBreach({
+    required String? projectId,
+  }) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return _missingProjectActionResult(
+        path: ExhibitionCanonicalPaths.projectPublisherBreachRecord,
+      );
+    }
+
+    return _actionService.recordPublisherBreach(
+      ProjectLifecycleActionCommand(projectId: normalizedProjectId),
+    );
+  }
+
+  Future<ExhibitionActionResult> recordFactoryBreach({
+    required String? projectId,
+  }) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return _missingProjectActionResult(
+        path: ExhibitionCanonicalPaths.projectFactoryBreachRecord,
+      );
+    }
+
+    return _actionService.recordFactoryBreach(
       ProjectLifecycleActionCommand(projectId: normalizedProjectId),
     );
   }

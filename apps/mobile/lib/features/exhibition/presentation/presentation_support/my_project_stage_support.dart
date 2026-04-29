@@ -4,7 +4,16 @@ enum _MyProjectWorkspaceBucket { published, bids }
 
 enum _MyProjectStageBucket { draft, submitted, published, active, archived }
 
-enum _MyProjectLifecycleActionKind { publish, withdraw, archive, close }
+enum _MyProjectLifecycleActionKind {
+  publish,
+  withdraw,
+  discardSubmitted,
+  withdrawPublished,
+  requestCancellation,
+  recordPublisherBreach,
+  recordFactoryBreach,
+  close,
+}
 
 final class _MyProjectWorkspaceOption {
   const _MyProjectWorkspaceOption({
@@ -95,7 +104,7 @@ const List<_MyProjectStageOption> _myProjectPrimaryStageOptions =
         value: _MyProjectStageBucket.submitted,
         label: '预发布列表',
         description: '项目已经进入发布前核对阶段，当前应先补充报价依据资料，再检查无误并正式发布。',
-        cardNextStep: '查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废归档',
+        cardNextStep: '查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废删除',
         detailNextStep: '当前应先补充报价依据资料，再检查无误并正式发布。',
         emptyTitle: '当前没有预发布项目',
         emptyMessage: '还没有进入预发布列表的项目。',
@@ -103,9 +112,9 @@ const List<_MyProjectStageOption> _myProjectPrimaryStageOptions =
       _MyProjectStageOption(
         value: _MyProjectStageBucket.published,
         label: '竞标中',
-        description: '项目已经进入公域竞标阶段，当前以补充资料和只读承接为主。',
-        cardNextStep: '查看详情 / 补充资料',
-        detailNextStep: '优先补充资料；当前没有返回预发布列表的正式动作。',
+        description: '项目已经进入公域竞标阶段，当前可以补充资料，必要时撤回到预发布并下架公域展示。',
+        cardNextStep: '查看详情 / 补充资料 / 撤回到预发布',
+        detailNextStep: '优先补充资料；如发现内容需要调整，可以撤回到预发布列表并下架公域展示。',
         emptyTitle: '当前没有竞标中项目',
         emptyMessage: '还没有处于竞标中阶段的项目。',
       ),
@@ -113,8 +122,8 @@ const List<_MyProjectStageOption> _myProjectPrimaryStageOptions =
         value: _MyProjectStageBucket.active,
         label: '进行中',
         description: '项目已经进入授标、订单、合同或履约承接，当前以业务继续处理为主。',
-        cardNextStep: '查看详情 / 进入业务继续处理',
-        detailNextStep: '当前应进入订单、合同或履约继续处理；没有真实入口时会明确提示只读说明。',
+        cardNextStep: '查看详情 / 发起取消 / 记录违约',
+        detailNextStep: '当前项目已经进入业务继续链；如需退出，应先发起双方取消，单方问题只做违约留痕。',
         emptyTitle: '当前没有进行中项目',
         emptyMessage: '还没有处于进行中阶段的项目。',
       ),
@@ -155,15 +164,59 @@ const _MyProjectLifecycleActionOption _withdrawLifecycleAction =
       loadingLabel: '撤回中...',
     );
 
-const _MyProjectLifecycleActionOption _archiveLifecycleAction =
+const _MyProjectLifecycleActionOption _discardSubmittedLifecycleAction =
     _MyProjectLifecycleActionOption(
-      kind: _MyProjectLifecycleActionKind.archive,
-      buttonLabel: '作废归档',
-      confirmTitle: '作废归档',
-      confirmMessage: '归档后，项目会退出当前活跃流转，不会进入公域展示。归档项目仅保留 owner 私域查看入口。',
-      confirmLabel: '确认归档',
-      successMessage: '已作废归档',
-      loadingLabel: '归档中...',
+      kind: _MyProjectLifecycleActionKind.discardSubmitted,
+      buttonLabel: '作废删除',
+      confirmTitle: '作废删除预发布项目',
+      confirmMessage: '预发布项目不会被硬删除，确认后会作废归档并退出当前活跃流转；历史记录和附件审计仍由后端保留。',
+      confirmLabel: '确认作废',
+      successMessage: '已作废删除',
+      loadingLabel: '作废中...',
+    );
+
+const _MyProjectLifecycleActionOption _withdrawPublishedLifecycleAction =
+    _MyProjectLifecycleActionOption(
+      kind: _MyProjectLifecycleActionKind.withdrawPublished,
+      buttonLabel: '撤回到预发布',
+      confirmTitle: '撤回到预发布',
+      confirmMessage: '确认后，项目会下架公域展示并回到预发布列表；已产生的竞标记录保留为历史，不会自动扣钱。',
+      confirmLabel: '确认撤回',
+      successMessage: '已撤回到预发布',
+      loadingLabel: '撤回中...',
+    );
+
+const _MyProjectLifecycleActionOption _requestCancellationLifecycleAction =
+    _MyProjectLifecycleActionOption(
+      kind: _MyProjectLifecycleActionKind.requestCancellation,
+      buttonLabel: '发起取消申请',
+      confirmTitle: '发起取消申请',
+      confirmMessage: '进行中项目不能单方直接撤回。确认后只发起双方取消申请，不删除订单、合同或支付记录，也不会自动扣钱。',
+      confirmLabel: '确认发起',
+      successMessage: '已发起取消申请',
+      loadingLabel: '提交中...',
+    );
+
+const _MyProjectLifecycleActionOption _recordPublisherBreachLifecycleAction =
+    _MyProjectLifecycleActionOption(
+      kind: _MyProjectLifecycleActionKind.recordPublisherBreach,
+      buttonLabel: '记录发布方违约',
+      confirmTitle: '记录发布方违约',
+      confirmMessage: '本期只记录违约留痕和信用候选，不自动扣钱、不删除订单合同。',
+      confirmLabel: '确认记录',
+      successMessage: '已记录发布方违约',
+      loadingLabel: '记录中...',
+    );
+
+const _MyProjectLifecycleActionOption _recordFactoryBreachLifecycleAction =
+    _MyProjectLifecycleActionOption(
+      kind: _MyProjectLifecycleActionKind.recordFactoryBreach,
+      buttonLabel: '记录工厂违约',
+      confirmTitle: '记录工厂违约',
+      confirmMessage: '本期只记录违约留痕和信用候选，不自动扣钱、不删除订单合同。',
+      confirmLabel: '确认记录',
+      successMessage: '已记录工厂违约',
+      loadingLabel: '记录中...',
     );
 
 const _MyProjectLifecycleActionOption _closeLifecycleAction =
@@ -192,7 +245,16 @@ _MyProjectLifecycleActionOption _myProjectLifecycleActionOption(
   return switch (kind) {
     _MyProjectLifecycleActionKind.publish => _publishLifecycleAction,
     _MyProjectLifecycleActionKind.withdraw => _withdrawLifecycleAction,
-    _MyProjectLifecycleActionKind.archive => _archiveLifecycleAction,
+    _MyProjectLifecycleActionKind.discardSubmitted =>
+      _discardSubmittedLifecycleAction,
+    _MyProjectLifecycleActionKind.withdrawPublished =>
+      _withdrawPublishedLifecycleAction,
+    _MyProjectLifecycleActionKind.requestCancellation =>
+      _requestCancellationLifecycleAction,
+    _MyProjectLifecycleActionKind.recordPublisherBreach =>
+      _recordPublisherBreachLifecycleAction,
+    _MyProjectLifecycleActionKind.recordFactoryBreach =>
+      _recordFactoryBreachLifecycleAction,
     _MyProjectLifecycleActionKind.close => _closeLifecycleAction,
   };
 }
@@ -293,12 +355,16 @@ bool _myProjectCanPublish(String? state) {
       _MyProjectStageBucket.submitted;
 }
 
-bool _myProjectCanArchive(String? state) {
+bool _myProjectCanDiscardSubmitted(String? state) {
   return _myProjectStageBucketFromState(state) ==
       _MyProjectStageBucket.submitted;
 }
 
-bool _myProjectCanClose(String? state) {
+bool _myProjectCanWithdrawPublished(String? state) {
   return _myProjectStageBucketFromState(state) ==
       _MyProjectStageBucket.published;
+}
+
+bool _myProjectCanUseActiveExitGovernance(String? state) {
+  return _myProjectStageBucketFromState(state) == _MyProjectStageBucket.active;
 }

@@ -2193,6 +2193,46 @@ export const p0PayMigrations = [
   }
 ];
 
+export const projectExitGovernancePhase1Migrations = [
+  {
+    key: '20260603_project_exit_governance_phase1_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_exit_cases (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        order_id varchar(64),
+        contract_id varchar(64),
+        exit_type varchar(48) NOT NULL,
+        status varchar(48) NOT NULL,
+        initiator_organization_id varchar(64) NOT NULL,
+        counterparty_organization_id varchar(64),
+        breach_party varchar(32),
+        reason_code varchar(64) NOT NULL,
+        reason_text text,
+        credit_impact_candidate boolean NOT NULL DEFAULT false,
+        no_automatic_penalty_confirmed boolean NOT NULL DEFAULT true,
+        requested_at timestamptz,
+        responded_at timestamptz,
+        closed_at timestamptz,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_by_user_id varchar(64) NOT NULL DEFAULT '',
+        responded_by_user_id varchar(64),
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_exit_cases_project_created
+       ON project_exit_cases (project_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_exit_cases_project_status
+       ON project_exit_cases (project_id, status)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_exit_cases_initiator_created
+       ON project_exit_cases (initiator_organization_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_exit_cases_counterparty_created
+       ON project_exit_cases (counterparty_organization_id, created_at DESC)`
+    ]
+  }
+];
+
 export const serverMigrations = [
   ...enterpriseHubMigrations,
   ...projectPublishCorridorMigrations,
@@ -2232,5 +2272,6 @@ export const serverMigrations = [
   ...projectNameAccessRequestMigrations,
   ...projectCommunicationAlbumMigrations,
   ...projectCounterpartyRatingMigrations,
+  ...projectExitGovernancePhase1Migrations,
   ...p0PayMigrations
 ];

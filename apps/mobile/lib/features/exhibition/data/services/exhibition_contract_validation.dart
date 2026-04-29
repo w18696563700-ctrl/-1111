@@ -78,8 +78,15 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
     ExhibitionCanonicalPaths.projectPublish ||
     ExhibitionCanonicalPaths.projectWithdraw ||
     ExhibitionCanonicalPaths.projectArchive ||
-    ExhibitionCanonicalPaths.projectClose =>
+    ExhibitionCanonicalPaths.projectClose ||
+    ExhibitionCanonicalPaths.projectWithdrawPublished ||
+    ExhibitionCanonicalPaths.projectDiscardSubmitted =>
       _validateProjectLifecycleAcceptedPayload(canonicalPath, payload),
+    ExhibitionCanonicalPaths.projectCancellationRequest ||
+    ExhibitionCanonicalPaths.projectCancellationRespond ||
+    ExhibitionCanonicalPaths.projectPublisherBreachRecord ||
+    ExhibitionCanonicalPaths.projectFactoryBreachRecord =>
+      _validateProjectExitCaseAcceptedPayload(canonicalPath, payload),
     ExhibitionCanonicalPaths.projectEditDetail ||
     ExhibitionCanonicalPaths.projectDetail => _validateProjectPayload(
       canonicalPath,
@@ -184,6 +191,21 @@ _SuccessContractValidation _validateProjectLifecycleAcceptedPayload(
   payload,
   fields: const <String>['projectId', 'state'],
   sanitizedPayload: _sanitizeProjectLifecycleAcceptedPayload(payload),
+);
+
+_SuccessContractValidation _validateProjectExitCaseAcceptedPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateRequiredFieldsPayload(
+  canonicalPath,
+  payload,
+  fields: const <String>[
+    'projectId',
+    'exitCaseId',
+    'projectState',
+    'caseStatus',
+  ],
+  sanitizedPayload: _sanitizeProjectExitCaseAcceptedPayload(payload),
 );
 
 _SuccessContractValidation _validateProjectCreatePayload(

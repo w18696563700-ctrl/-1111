@@ -28,6 +28,41 @@ export function projectCloseInvalid(message: string) {
   });
 }
 
+export function projectWithdrawPublishedInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PROJECT_WITHDRAW_PUBLISHED_INVALID',
+    message
+  });
+}
+
+export function projectSubmittedDiscardInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PROJECT_SUBMITTED_DISCARD_INVALID',
+    message
+  });
+}
+
+export function projectCancellationRequestInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PROJECT_CANCELLATION_REQUEST_INVALID',
+    message
+  });
+}
+
+export function projectCancellationResponseInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PROJECT_CANCELLATION_RESPONSE_INVALID',
+    message
+  });
+}
+
+export function projectBreachRecordInvalid(message: string) {
+  return new BadRequestException({
+    code: 'PROJECT_BREACH_RECORD_INVALID',
+    message
+  });
+}
+
 export function projectUnavailable(message = 'Current project is unavailable.') {
   return new NotFoundException({
     code: 'AUTH_RESOURCE_UNAVAILABLE',
@@ -59,6 +94,13 @@ export function projectPublishInvalid(message: string) {
 export function projectInvalidState(message: string) {
   return new ConflictException({
     code: 'PROJECT_INVALID_STATE',
+    message
+  });
+}
+
+export function projectExitInvalidState(message: string) {
+  return new ConflictException({
+    code: 'PROJECT_EXIT_INVALID_STATE',
     message
   });
 }

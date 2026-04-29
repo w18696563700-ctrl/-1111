@@ -602,6 +602,101 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
         allow: (String state) => state == 'published',
       );
     },
+    'POST /api/app/project/withdraw-published': (AppApiRequest request) {
+      return lifecycleSuccess(
+        request,
+        nextState: 'submitted',
+        invalidCode: 'PROJECT_WITHDRAW_PUBLISHED_INVALID',
+        invalidMessage: '当前项目状态暂不支持撤回到预发布列表。',
+        allow: (String state) => state == 'published',
+      );
+    },
+    'POST /api/app/project/discard-submitted': (AppApiRequest request) {
+      return lifecycleSuccess(
+        request,
+        nextState: 'archived',
+        invalidCode: 'PROJECT_SUBMITTED_DISCARD_INVALID',
+        invalidMessage: '当前项目状态暂不支持作废删除。',
+        allow: (String state) => state == 'submitted',
+      );
+    },
+    'POST /api/app/project/cancellation/request':
+        (AppApiRequest request) async {
+          final body = request.body as Map<String, Object?>;
+          final projectId = body['projectId'] as String?;
+          final state = projectId == null ? null : projectStates[projectId];
+          if (projectId == null ||
+              state == null ||
+              state != 'converted_to_order') {
+            return AppApiResponse(
+              statusCode: 409,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'errorCode': 'PROJECT_EXIT_INVALID_STATE',
+                'message': '当前项目暂不支持从这里推进取消申请。',
+              },
+            );
+          }
+          return AppApiResponse(
+            statusCode: 202,
+            uri: request.uri,
+            body: <String, Object?>{
+              'projectId': projectId,
+              'exitCaseId': 'exit-$projectId',
+              'projectState': state,
+              'caseStatus': 'requested',
+              'action': 'request_cancellation',
+            },
+          );
+        },
+    'POST /api/app/project/breach/record-publisher':
+        (AppApiRequest request) async {
+          final body = request.body as Map<String, Object?>;
+          final projectId = body['projectId'] as String?;
+          final state = projectId == null ? null : projectStates[projectId];
+          return AppApiResponse(
+            statusCode: state == 'converted_to_order' ? 202 : 409,
+            uri: request.uri,
+            body: state == 'converted_to_order'
+                ? <String, Object?>{
+                    'projectId': projectId,
+                    'exitCaseId': 'exit-publisher-$projectId',
+                    'projectState': state,
+                    'caseStatus': 'recorded',
+                    'breachParty': 'publisher',
+                    'action': 'record_publisher_breach',
+                    'creditImpactCandidate': true,
+                  }
+                : const <String, Object?>{
+                    'errorCode': 'PROJECT_EXIT_INVALID_STATE',
+                    'message': '当前项目暂不支持从这里记录违约。',
+                  },
+          );
+        },
+    'POST /api/app/project/breach/record-factory':
+        (AppApiRequest request) async {
+          final body = request.body as Map<String, Object?>;
+          final projectId = body['projectId'] as String?;
+          final state = projectId == null ? null : projectStates[projectId];
+          return AppApiResponse(
+            statusCode: state == 'converted_to_order' ? 202 : 409,
+            uri: request.uri,
+            body: state == 'converted_to_order'
+                ? <String, Object?>{
+                    'projectId': projectId,
+                    'exitCaseId': 'exit-factory-$projectId',
+                    'projectState': state,
+                    'caseStatus': 'recorded',
+                    'breachParty': 'factory',
+                    'action': 'record_factory_breach',
+                    'creditImpactCandidate': true,
+                  }
+                : const <String, Object?>{
+                    'errorCode': 'PROJECT_EXIT_INVALID_STATE',
+                    'message': '当前项目暂不支持从这里记录违约。',
+                  },
+          );
+        },
   };
 
   for (final projectId in projectStates.keys.toList()) {
@@ -805,18 +900,18 @@ void main() {
     await _tapChoiceChipLabel(tester, '预发布列表 · 1');
     expect(find.text('当前阶段：预发布列表'), findsOneWidget);
     expect(
-      find.text('当前下一步：查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废归档'),
+      find.text('当前下一步：查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废删除'),
       findsOneWidget,
     );
     expect(find.widgetWithText(FilledButton, '补资料后确认发布'), findsOneWidget);
 
     await _tapChoiceChipLabel(tester, '竞标中 · 1');
     expect(find.text('当前阶段：竞标中'), findsOneWidget);
-    expect(find.text('当前下一步：查看详情 / 补充资料'), findsOneWidget);
+    expect(find.text('当前下一步：查看详情 / 补充资料 / 撤回到预发布'), findsOneWidget);
 
     await _tapChoiceChipLabel(tester, '进行中 · 1');
     expect(find.text('当前阶段：进行中'), findsOneWidget);
-    expect(find.text('当前下一步：查看详情 / 进入业务继续处理'), findsOneWidget);
+    expect(find.text('当前下一步：查看详情 / 发起取消 / 记录违约'), findsOneWidget);
 
     await _scrollTo(tester, find.text('已归档项目'));
     expect(find.text('当前阶段：已归档'), findsOneWidget);
@@ -870,14 +965,14 @@ void main() {
     await _scrollTo(tester, find.text('当前阶段动作'));
     expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '作废归档'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '作废删除'), findsOneWidget);
     expect(find.text('发布前确认'), findsOneWidget);
     expect(find.textContaining('预发布阶段已开放报价依据资料'), findsOneWidget);
     expect(find.textContaining('补充效果图、尺寸图 / 施工图'), findsWidgets);
     expect(find.text('删除此项目'), findsNothing);
   });
 
-  testWidgets('已发布详情把补资料入口收进摘要卡并隐藏阶段动作', (WidgetTester tester) async {
+  testWidgets('已发布详情展示补资料和撤回到预发布入口', (WidgetTester tester) async {
     final handlers = _mutableMyProjectHandlers(
       projectStates: <String, String>{'project-published-detail': 'published'},
     );
@@ -892,18 +987,20 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('当前阶段动作'), findsNothing);
     expect(find.text('项目沟通'), findsNothing);
     expect(find.text('项目澄清'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '展开项目基础信息'), findsOneWidget);
     expect(find.textContaining('正式完结补充'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
     expect(find.textContaining('请补充五类报价依据资料'), findsOneWidget);
-    expect(find.text('下架关闭'), findsNothing);
     await tester.tap(find.widgetWithText(OutlinedButton, '展开项目基础信息'));
     await tester.pumpAndSettle();
     expect(find.widgetWithText(OutlinedButton, '收起项目基础信息'), findsOneWidget);
     expect(find.textContaining('正式完结补充'), findsOneWidget);
+    await _scrollTo(tester, find.text('当前阶段动作'));
+    expect(find.text('当前阶段动作'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '撤回到预发布'), findsOneWidget);
+    expect(find.text('下架关闭'), findsNothing);
     await _scrollTo(tester, find.text('报价依据资料'));
     expect(find.text('报价依据资料'), findsOneWidget);
     expect(find.textContaining('效果图、尺寸图 / 施工图、材质图 / 材料样板'), findsWidgets);
@@ -966,7 +1063,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '删除此项目'), findsOneWidget);
   });
 
-  testWidgets('预发布列表作废归档后详情进入归档只读承接', (WidgetTester tester) async {
+  testWidgets('预发布列表作废删除后详情进入归档只读承接', (WidgetTester tester) async {
     final projectStates = <String, String>{
       'project-draft-1': 'draft',
       'project-archive-flow': 'submitted',
@@ -982,15 +1079,15 @@ void main() {
       title: '项目 project-archive-flow',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '作废归档'));
-    await tester.tap(find.widgetWithText(OutlinedButton, '作废归档'));
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '作废删除'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '作废删除'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('归档后，项目会退出当前活跃流转，不会进入公域展示'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, '确认归档'));
+    expect(find.textContaining('预发布项目不会被硬删除'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认作废'));
     await tester.pumpAndSettle();
 
-    expect(find.text('已作废归档'), findsOneWidget);
+    expect(find.text('已作废删除'), findsOneWidget);
     expect(projectStates['project-archive-flow'], 'archived');
     expect(find.text('删除此项目'), findsNothing);
   });
@@ -1049,7 +1146,7 @@ void main() {
     expect(projectStates['project-missing-effect'], 'submitted');
   });
 
-  testWidgets('已发布详情不再提供阶段动作和下架关闭入口', (WidgetTester tester) async {
+  testWidgets('已发布详情撤回到预发布后退出竞标中承接', (WidgetTester tester) async {
     final projectStates = <String, String>{
       'project-draft-1': 'draft',
       'project-close-flow': 'published',
@@ -1065,10 +1162,53 @@ void main() {
       title: '项目 project-close-flow',
       actionLabel: '查看详情',
     );
-    expect(find.text('当前阶段动作'), findsNothing);
+    await _scrollTo(tester, find.text('当前阶段动作'));
+    expect(find.text('当前阶段动作'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '撤回到预发布'), findsOneWidget);
     expect(find.text('下架关闭'), findsNothing);
-    expect(projectStates['project-close-flow'], 'published');
+    await tester.tap(find.widgetWithText(OutlinedButton, '撤回到预发布'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('项目会下架公域展示并回到预发布列表'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认撤回'));
+    await tester.pumpAndSettle();
+
+    expect(projectStates['project-close-flow'], 'submitted');
+    expect(find.text('已撤回到预发布'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
+  });
+
+  testWidgets('进行中详情只展示取消申请和违约留痕入口', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-active-exit': 'converted_to_order',
+    };
+    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+          'project-active-exit',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.text('当前阶段动作'));
+    expect(find.widgetWithText(FilledButton, '发起取消申请'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '记录发布方违约'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '记录工厂违约'), findsOneWidget);
+    expect(find.text('删除此项目'), findsNothing);
+    expect(find.text('撤回到预发布'), findsNothing);
+
+    await tester.tap(find.widgetWithText(FilledButton, '发起取消申请'));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('不能单方直接撤回'), findsOneWidget);
+    await tester.tap(find.widgetWithText(FilledButton, '确认发起'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('已发起取消申请'), findsOneWidget);
+    expect(projectStates['project-active-exit'], 'converted_to_order');
   });
 
   testWidgets('生命周期动作失败时显示中文业务错误', (WidgetTester tester) async {
