@@ -33,6 +33,10 @@ export class P0PayIdempotencyRecordService {
     return this.loadAuthorizationFromRecord(null, record, requestHash);
   }
 
+  async findBidServiceFeeAuthorization(operationKey: string, scopeKey: string, keyHash: string, requestHash: string) {
+    return this.findAuthorization(operationKey, scopeKey, keyHash, requestHash);
+  }
+
   async findPaymentOrder(operationKey: string, scopeKey: string, keyHash: string, requestHash: string) {
     const record = await this.findRecord(operationKey, scopeKey, keyHash);
     if (!record) {
@@ -59,6 +63,15 @@ export class P0PayIdempotencyRecordService {
     return deposit;
   }
 
+  async findProjectAuthenticitySincerityOrder(
+    operationKey: string,
+    scopeKey: string,
+    keyHash: string,
+    requestHash: string
+  ) {
+    return this.findInquiryDeposit(operationKey, scopeKey, keyHash, requestHash);
+  }
+
   async findContractConfirmation(operationKey: string, scopeKey: string, keyHash: string, requestHash: string) {
     const record = await this.findRecord(operationKey, scopeKey, keyHash);
     if (!record) {
@@ -70,6 +83,10 @@ export class P0PayIdempotencyRecordService {
       throw p0PayResourceUnavailable('Current idempotent contract confirmation resource is unavailable.');
     }
     return confirmation;
+  }
+
+  async findDealConfirmation(operationKey: string, scopeKey: string, keyHash: string, requestHash: string) {
+    return this.findContractConfirmation(operationKey, scopeKey, keyHash, requestHash);
   }
 
   async findRecordInTransaction(

@@ -60,9 +60,14 @@ class _CounterpartConversationSubjectSheetState
     final theme = Theme.of(context);
     final counterpart = widget.data.counterpart;
     final group = widget.projectGroup;
-    final displayName = counterpart.displayName.trim().isEmpty
-        ? '未命名对方'
+    final nickname = counterpart.nickname?.trim() ?? '';
+    final companyName = counterpart.companyName.trim().isNotEmpty
+        ? counterpart.companyName.trim()
         : counterpart.displayName.trim();
+    final displayName = nickname.isNotEmpty
+        ? nickname
+        : (companyName.isNotEmpty ? companyName : '未命名对方');
+    final certification = counterpart.certificationSummary;
     final ratingEntry = group?.ratingEntry;
     final projectEnded = _projectIsEnded(group?.projectState);
     final canShowSubmit = projectEnded && (ratingEntry?.canRate ?? false);
@@ -95,14 +100,40 @@ class _CounterpartConversationSubjectSheetState
               children: <Widget>[
                 _ActionCard(
                   title: displayName,
-                  summary: '这里承接项目沟通里的对方主体摘要。评价与信用只锚定项目/订单真值，不在前端计算信用分。',
+                  summary: companyName.isNotEmpty
+                      ? companyName
+                      : '当前仅展示系统返回的对方主体摘要。',
                   tone: _ActionCardTone.emphasis,
                   children: <Widget>[
-                    _DetailLine(label: '主体类型', value: '昵称'),
+                    if (nickname.isNotEmpty)
+                      _DetailLine(label: '昵称', value: nickname),
                     _DetailLine(
-                      label: '组织 ID',
-                      value: counterpart.organizationId,
+                      label: '公司名称',
+                      value: companyName.isNotEmpty ? companyName : '当前未提供',
                     ),
+                    _DetailLine(
+                      label: '认证状态',
+                      value: _certificationStatusLabel(
+                        certification?.certificationStatus,
+                      ),
+                    ),
+                    if (certification?.legalName.trim().isNotEmpty ?? false)
+                      _DetailLine(
+                        label: '认证主体',
+                        value: certification!.legalName,
+                      ),
+                    if (certification?.usccMasked?.trim().isNotEmpty ?? false)
+                      _DetailLine(
+                        label: '统一社会信用代码',
+                        value: certification!.usccMasked!,
+                      ),
+                    if (certification?.businessType?.trim().isNotEmpty ?? false)
+                      _DetailLine(
+                        label: '企业类型',
+                        value: certification!.businessType!,
+                      ),
+                    if (certification?.address?.trim().isNotEmpty ?? false)
+                      _DetailLine(label: '住所', value: certification!.address!),
                     _DetailLine(
                       label: '当前项目',
                       value:
@@ -199,6 +230,14 @@ class _CounterpartConversationSubjectSheetState
         ],
       ),
     );
+  }
+
+  String _certificationStatusLabel(String? status) {
+    return switch (status?.trim()) {
+      'approved' || 'verified' => '认证已通过',
+      null || '' => '当前未提供认证摘要',
+      _ => '当前未提供认证摘要',
+    };
   }
 
   String? _ratingUnavailableReason(

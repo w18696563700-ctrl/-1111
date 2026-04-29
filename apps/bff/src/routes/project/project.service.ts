@@ -958,6 +958,10 @@ export class ProjectService {
       return this.rewriteLifecycleInvalidStateMessage(action);
     }
 
+    if (action === 'publish' && code === 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED') {
+      return '发布项目需先完成 200 元项目真实性诚意金冻结。';
+    }
+
     if (invalidMessage && code) {
       const invalidCodes: ProjectLifecycleInvalidCode[] = [
         'PROJECT_CREATE_INVALID',

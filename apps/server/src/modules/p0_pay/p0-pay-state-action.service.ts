@@ -11,6 +11,11 @@ import { ProjectEntity } from '../project/entities/project.entity';
 import { p0PayInvalid } from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
+import {
+  PLATFORM_PRICING_AUDIT_ACTIONS,
+  PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES,
+  PLATFORM_PRICING_RESOURCE_TYPES
+} from './p0-pay.state';
 
 type ReleaseReason = 'non_winning_bid' | 'publisher_breach';
 
@@ -36,7 +41,7 @@ export class P0PayStateActionService {
       const authorizations = await manager.getRepository(PlatformServiceFeeAuthorizationEntity).find({
         where: {
           taskId: taskId.trim(),
-          status: In(['authorized', 'pending_contract_confirm'])
+          status: In(['frozen', 'charge_pending', 'authorized', 'pending_contract_confirm'])
         }
       });
       const targets = authorizations.filter((item) => item.bidId !== winningBidId.trim());
@@ -53,7 +58,7 @@ export class P0PayStateActionService {
       const authorizations = await manager.getRepository(PlatformServiceFeeAuthorizationEntity).find({
         where: {
           taskId: taskId.trim(),
-          status: In(['authorized', 'pending_contract_confirm', 'breach_hold'])
+          status: In(['frozen', 'charge_pending', 'authorized', 'pending_contract_confirm', 'breach_hold'])
         }
       });
       const targets = bidId ? authorizations.filter((item) => item.bidId === bidId) : authorizations;
@@ -70,7 +75,7 @@ export class P0PayStateActionService {
         where: {
           taskId: taskId.trim(),
           bidId: bidId.trim(),
-          status: In(['authorized', 'pending_contract_confirm'])
+          status: In(['frozen', 'charge_pending', 'authorized', 'pending_contract_confirm'])
         },
         order: { updatedAt: 'DESC' }
       });
@@ -107,7 +112,7 @@ export class P0PayStateActionService {
       }
       await this.auditService.record(
         {
-          objectType: 'platform_service_fee_authorization',
+          objectType: PLATFORM_PRICING_RESOURCE_TYPES.bidServiceFeeAuthorization,
           objectId: authorization.id,
           objectNo: authorization.taskId,
           action: 'P0PayStateTransitionBlocked',
@@ -158,13 +163,13 @@ export class P0PayStateActionService {
     await manager.getRepository(ProjectEntity).save(project);
     await this.auditService.record(
       {
-        objectType: 'trade_task',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.project,
         objectId: project.id,
         objectNo: project.projectNo,
-        action: 'P0PayPublisherBreachMarked',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationReleaseRequested,
         beforeState,
         afterState: project.state,
-        reason: 'publisher_breach_release_without_service_fee_charge'
+        reason: `projectId=${project.id}; bidId=${bidId ?? ''}; releaseReason=publisher_breach`
       },
       context,
       manager
@@ -180,7 +185,7 @@ export class P0PayStateActionService {
     const releasedIds: string[] = [];
     for (const authorization of authorizations) {
       const beforeState = authorization.status;
-      authorization.status = 'authorization_released';
+      authorization.status = 'released';
       authorization.releasedAt = new Date();
       if (reason === 'publisher_breach') {
         authorization.refundedAt = authorization.releasedAt;
@@ -205,13 +210,13 @@ export class P0PayStateActionService {
   ) {
     const order = manager.getRepository(PaymentOrderEntity).create({
       id: randomUUID(),
-      businessType: 'platform_service_fee_authorization',
+      businessType: PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES.bidServiceFeeAuthorizationRelease,
       businessId: authorization.id,
       taskId: authorization.taskId,
       bidId: authorization.bidId,
       payerOrganizationId: authorization.factoryOrganizationId,
       payeeOrganizationId: '',
-      amount: authorization.estimatedFeeAmount,
+      amount: authorization.authorizationQuotaAmount ?? authorization.estimatedFeeAmount,
       currency: 'CNY',
       paymentChannel: authorization.paymentChannel ?? 'other',
       orderRole: 'release',
@@ -254,10 +259,10 @@ export class P0PayStateActionService {
   ) {
     await this.auditService.record(
       {
-        objectType: 'platform_service_fee_authorization',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.bidServiceFeeAuthorization,
         objectId: authorization.id,
         objectNo: authorization.taskId,
-        action: 'PlatformServiceFeePreauthorizationReleased',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationReleased,
         beforeState,
         afterState: authorization.status,
         reason

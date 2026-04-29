@@ -13,6 +13,8 @@ import { p0PayInvalid } from './p0-pay.errors';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayServiceFeeRequirement, P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
 import {
+  BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT,
+  PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES,
   P0_PAY_RULE_VERSION,
   P0_PAY_SERVICE_FEE_AGREEMENT_TEXT
 } from './p0-pay.state';
@@ -40,8 +42,8 @@ export class P0PayServiceFeeFactory {
     if (command.expectedFeeRate !== feeRequirement.feeRate) {
       throw p0PayInvalid('Field `expectedFeeRate` does not match Server fee rule truth.');
     }
-    if (command.expectedAuthorizationAmount !== feeRequirement.estimatedFeeAmount) {
-      throw p0PayInvalid('Field `expectedAuthorizationAmount` does not match Server fee calculation.');
+    if (command.expectedAuthorizationAmount !== BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT) {
+      throw p0PayInvalid('Field `expectedAuthorizationAmount` must be the fixed 4000.00 CNY authorization quota.');
     }
     if (command.currency !== 'CNY') {
       throw p0PayInvalid('P0-Pay service fee authorization only supports CNY.');
@@ -61,11 +63,16 @@ export class P0PayServiceFeeFactory {
       id: randomUUID(),
       taskId: input.project.id,
       bidId: input.bid.id,
+      bidParticipationRequestId: null,
       factoryOrganizationId: input.bid.bidderOrganizationId,
+      bidderOrganizationId: input.bid.bidderOrganizationId,
       publisherOrganizationId: input.project.organizationId,
       quotedAmount,
       feeRate: input.feeRequirement.feeRate,
       estimatedFeeAmount: input.feeRequirement.estimatedFeeAmount,
+      authorizationQuotaAmount: BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT,
+      chargedAmountUsed: '0.00',
+      releasedAmount: '0.00',
       feeRateLabel: input.feeRequirement.feeRateLabel,
       feeRateSource: input.feeRequirement.feeRateSource,
       membershipTierSnapshot: input.feeRequirement.membershipTierSnapshot,
@@ -77,12 +84,13 @@ export class P0PayServiceFeeFactory {
       paymentChannel: null,
       paymentOrderId: null,
       authorizationOrderId: null,
-      status: 'pending_authorization',
+      status: 'pending_freeze',
       ruleVersion: P0_PAY_RULE_VERSION,
       ruleSnapshotHash: this.ruleSnapshotHash(),
       agreementTextSnapshot: P0_PAY_SERVICE_FEE_AGREEMENT_TEXT,
       agreedAt: new Date(),
       authorizedAt: null,
+      frozenAt: null,
       releasedAt: null,
       chargedAt: null,
       createdByUserId: input.currentSession.userId,
@@ -100,13 +108,13 @@ export class P0PayServiceFeeFactory {
   }) {
     return this.paymentOrderRepository.create({
       id: randomUUID(),
-      businessType: 'platform_service_fee_authorization',
+      businessType: PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES.bidServiceFeeAuthorizationFreeze,
       businessId: input.authorization.id,
       taskId: input.command.taskId,
       bidId: input.command.bidId,
       payerOrganizationId: input.payerOrganizationId,
       payeeOrganizationId: '',
-      amount: normalizePositiveMoney(input.authorization.estimatedFeeAmount, 'estimatedFeeAmount'),
+      amount: BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT,
       currency: 'CNY',
       paymentChannel: input.command.payChannel,
       orderRole: 'authorization',

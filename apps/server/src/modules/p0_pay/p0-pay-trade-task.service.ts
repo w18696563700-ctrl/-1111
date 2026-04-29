@@ -97,7 +97,7 @@ export class P0PayTradeTaskService {
       projectSummary: { projectName: project.title, exhibitionName: project.exhibitionName },
       authenticitySummary: this.authenticitySummary(project),
       quoteSeatSummary: await this.quoteSeatSummary(project.id),
-      p0PaySummary: await this.buildInlineP0Summary(project, context),
+      pricingSummary: await this.buildInlinePricingSummary(project, context),
       resultProcessingSummary: this.readP0(project).inquiryResult ?? null,
       messageHandoff: { readOnly: true, routeTarget: `/exhibition/trade-tasks/${project.id}` },
       contractHandoff: { available: true },
@@ -239,7 +239,7 @@ export class P0PayTradeTaskService {
   async getP0PaySummary(taskId: string, context: RequestContext) {
     const project = await this.requireProject(taskId);
     await this.assertRelatedScope(project, context);
-    return this.toP0PaySummary(project);
+    return this.toPricingSummary(project);
   }
 
   async releaseNonWinning(taskId: string, payload: Record<string, unknown>, context: RequestContext) {
@@ -258,7 +258,7 @@ export class P0PayTradeTaskService {
     return this.stateActions.holdForFactoryRefusal(taskId, this.readString(payload.bidId, 'bidId'), context);
   }
 
-  private async buildInlineP0Summary(project: ProjectEntity, context: RequestContext) {
+  private async buildInlinePricingSummary(project: ProjectEntity, context: RequestContext) {
     try {
       return await this.getP0PaySummary(project.id, context);
     } catch {
@@ -266,40 +266,39 @@ export class P0PayTradeTaskService {
     }
   }
 
-  private async toP0PaySummary(project: ProjectEntity) {
+  private async toPricingSummary(project: ProjectEntity) {
     const [authorization, deposit] = await Promise.all([
       this.authorizationRepository.findOne({ where: { taskId: project.id }, order: { updatedAt: 'DESC' } }),
       this.depositRepository.findOne({ where: { taskId: project.id }, order: { updatedAt: 'DESC' } })
     ]);
     return {
-      taskId: project.id,
-      taskType: this.taskType(project),
-      platformServiceFee: authorization
+      projectId: project.id,
+      pricingRuleVersion: authorization?.ruleVersion ?? deposit?.ruleVersion ?? null,
+      bidServiceFeeAuthorization: authorization
         ? {
             authorizationId: authorization.id,
             status: authorization.status,
-            quotedAmount: authorization.quotedAmount,
-            feeRate: authorization.feeRate,
-            feeRateLabel: authorization.feeRateLabel || '默认费率 3.0%',
-            feeRateSource: authorization.feeRateSource || 'legacy_fixed_default',
-            membershipTierSnapshot: authorization.membershipTierSnapshot || 'none',
-            feeRateRuleVersion: authorization.feeRateRuleVersion || authorization.ruleVersion,
-            feeRateSnapshotHash: authorization.feeRateSnapshotHash || authorization.ruleSnapshotHash,
-            feeCalculatedAt: authorization.feeCalculatedAt ?? authorization.agreedAt ?? authorization.createdAt,
-            estimatedFeeAmount: authorization.estimatedFeeAmount,
+            quotaAmount: authorization.authorizationQuotaAmount ?? '4000.00',
+            chargedAmountUsed: authorization.chargedAmountUsed,
+            releasedAmount: authorization.releasedAmount,
             finalFeeAmount: authorization.finalFeeAmount,
             currency: 'CNY'
           }
         : { status: 'not_required' },
-      inquiryDeposit: deposit
-        ? { depositOrderId: deposit.id, status: deposit.status, amount: deposit.amount, currency: deposit.currency }
+      projectAuthenticitySincerity: deposit
+        ? { orderId: deposit.id, status: deposit.status, amount: deposit.amount, currency: deposit.currency }
         : { status: 'not_required' },
-      contractConfirmation: { status: authorization?.status === 'charged' ? 'confirmed' : 'not_confirmed' },
+      dealConfirmation: { status: authorization?.status === 'charged' ? 'confirmed_deal' : 'not_confirmed' },
       messageDisplaySummary: {
         displayAllowed: Boolean(authorization || deposit),
         readOnly: true,
-        statusTextKey: authorization?.status ?? deposit?.status ?? 'p0_pay_status_unavailable',
-        routeTarget: { path: `/exhibition/trade-tasks/${project.id}/p0-pay-summary` }
+        statusTextKey: authorization?.status ?? deposit?.status ?? 'pricing_status_unavailable',
+        routeTarget: {
+          objectType: 'project_pricing',
+          actionKey: 'pricing_summary.read',
+          canonicalPath: `/api/app/project/${project.id}/pricing-summary`,
+          params: { projectId: project.id }
+        }
       },
       updatedAt: project.updatedAt
     };

@@ -72,7 +72,9 @@ class AppShellScaffold extends StatelessWidget {
               leading: canPop
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded),
-                      onPressed: navigator.pop,
+                      onPressed: () {
+                        navigator.maybePop();
+                      },
                     )
                   : null,
               title:

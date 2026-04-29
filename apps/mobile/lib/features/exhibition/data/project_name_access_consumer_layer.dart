@@ -18,6 +18,20 @@ final class ProjectNameAccessCanonicalPaths {
       '/api/app/my/projects/{projectId}/name-access/{requestId}/reject';
 }
 
+final class BidParticipationCanonicalPaths {
+  const BidParticipationCanonicalPaths._();
+
+  static const String request = '/api/app/project/bid-participation/request';
+  static const String threadDetail =
+      '/api/app/project/bid-participation/thread/detail';
+  static const String pendingPattern =
+      '/api/app/my/projects/{projectId}/bid-participation/pending';
+  static const String approvePattern =
+      '/api/app/my/projects/{projectId}/bid-participation/{requestId}/approve';
+  static const String rejectPattern =
+      '/api/app/my/projects/{projectId}/bid-participation/{requestId}/reject';
+}
+
 class ProjectNameAccessResult<T> {
   const ProjectNameAccessResult({
     required this.state,
@@ -213,6 +227,26 @@ class ProjectNameAccessConsumerLayer {
     );
   }
 
+  Future<ProjectNameAccessResult<ProjectNameAccessRequestAcceptedView>>
+  requestBidParticipation({required String? projectId}) {
+    final normalizedProjectId = _normalize(projectId);
+    if (normalizedProjectId == null) {
+      return Future.value(
+        const ProjectNameAccessResult<ProjectNameAccessRequestAcceptedView>(
+          state: AppPageState.errorNonRetryable,
+          method: 'POST',
+          path: BidParticipationCanonicalPaths.request,
+          message: 'projectId is required before requesting bid participation',
+        ),
+      );
+    }
+    return _post(
+      BidParticipationCanonicalPaths.request,
+      body: <String, Object?>{'projectId': normalizedProjectId},
+      parser: _parseRequestAccepted,
+    );
+  }
+
   Future<ProjectNameAccessResult<ProjectNameAccessThreadDetailView>>
   loadThreadDetail({required String? threadId}) {
     final normalizedThreadId = _normalize(threadId);
@@ -229,6 +263,27 @@ class ProjectNameAccessConsumerLayer {
     }
     return _get(
       ProjectNameAccessCanonicalPaths.threadDetail,
+      queryParameters: <String, String>{'threadId': normalizedThreadId},
+      parser: _parseThreadDetail,
+    );
+  }
+
+  Future<ProjectNameAccessResult<ProjectNameAccessThreadDetailView>>
+  loadBidParticipationThreadDetail({required String? threadId}) {
+    final normalizedThreadId = _normalize(threadId);
+    if (normalizedThreadId == null) {
+      return Future.value(
+        const ProjectNameAccessResult<ProjectNameAccessThreadDetailView>(
+          state: AppPageState.notFound,
+          method: 'GET',
+          path: BidParticipationCanonicalPaths.threadDetail,
+          message:
+              'threadId is required before loading bid participation thread',
+        ),
+      );
+    }
+    return _get(
+      BidParticipationCanonicalPaths.threadDetail,
       queryParameters: <String, String>{'threadId': normalizedThreadId},
       parser: _parseThreadDetail,
     );
@@ -265,6 +320,20 @@ class ProjectNameAccessConsumerLayer {
     );
   }
 
+  Future<ProjectNameAccessResult<ProjectNameAccessDecisionView>>
+  approveBidParticipationRequest({
+    required String? projectId,
+    required String? requestId,
+  }) {
+    return _submitDecision(
+      decision: 'approve',
+      projectId: projectId,
+      requestId: requestId,
+      successStatus: 'approved',
+      bidParticipation: true,
+    );
+  }
+
   Future<ProjectNameAccessResult<ProjectNameAccessDecisionView>> rejectRequest({
     required String? projectId,
     required String? requestId,
@@ -278,19 +347,40 @@ class ProjectNameAccessConsumerLayer {
   }
 
   Future<ProjectNameAccessResult<ProjectNameAccessDecisionView>>
+  rejectBidParticipationRequest({
+    required String? projectId,
+    required String? requestId,
+  }) {
+    return _submitDecision(
+      decision: 'reject',
+      projectId: projectId,
+      requestId: requestId,
+      successStatus: 'rejected',
+      bidParticipation: true,
+    );
+  }
+
+  Future<ProjectNameAccessResult<ProjectNameAccessDecisionView>>
   _submitDecision({
     required String decision,
     required String? projectId,
     required String? requestId,
     required String successStatus,
+    bool bidParticipation = false,
   }) {
     final normalizedProjectId = _normalize(projectId);
     final normalizedRequestId = _normalize(requestId);
-    final canonicalPath = _decisionPath(
-      projectId: projectId,
-      requestId: requestId,
-      decision: decision,
-    );
+    final canonicalPath = bidParticipation
+        ? _bidParticipationDecisionPath(
+            projectId: projectId,
+            requestId: requestId,
+            decision: decision,
+          )
+        : _decisionPath(
+            projectId: projectId,
+            requestId: requestId,
+            decision: decision,
+          );
     if (normalizedProjectId == null || normalizedRequestId == null) {
       return Future.value(
         ProjectNameAccessResult<ProjectNameAccessDecisionView>(
@@ -303,11 +393,17 @@ class ProjectNameAccessConsumerLayer {
       );
     }
     return _post(
-      _decisionPath(
-        projectId: normalizedProjectId,
-        requestId: normalizedRequestId,
-        decision: decision,
-      ),
+      bidParticipation
+          ? _bidParticipationDecisionPath(
+              projectId: normalizedProjectId,
+              requestId: normalizedRequestId,
+              decision: decision,
+            )
+          : _decisionPath(
+              projectId: normalizedProjectId,
+              requestId: normalizedRequestId,
+              decision: decision,
+            ),
       body: const <String, Object?>{},
       parser: (Object? payload) =>
           _parseDecision(payload, expectedStatus: successStatus),
@@ -435,6 +531,16 @@ class ProjectNameAccessConsumerLayer {
     final resolvedRequestId = Uri.encodeComponent(requestId ?? '{requestId}');
     return '/api/app/my/projects/$resolvedProjectId/name-access/$resolvedRequestId/$decision';
   }
+
+  static String _bidParticipationDecisionPath({
+    required String? projectId,
+    required String? requestId,
+    required String decision,
+  }) {
+    final resolvedProjectId = Uri.encodeComponent(projectId ?? '{projectId}');
+    final resolvedRequestId = Uri.encodeComponent(requestId ?? '{requestId}');
+    return '/api/app/my/projects/$resolvedProjectId/bid-participation/$resolvedRequestId/$decision';
+  }
 }
 
 ProjectNameAccessRequestAcceptedView _parseRequestAccepted(Object? payload) {
@@ -508,6 +614,7 @@ ProjectNameAccessThreadDetailView _parseThreadDetail(Object? payload) {
     threadId: _requiredString(map, 'threadId'),
     threadType: _enumValue(_requiredString(map, 'threadType'), const <String>{
       'project_name_access_review',
+      'bid_participation_review',
     }, 'project name access thread type'),
     projectId: _requiredString(map, 'projectId'),
     requestId: _requiredString(map, 'requestId'),
@@ -544,6 +651,9 @@ ProjectNameAccessThreadItemActionView? _parseThreadItemAction(Object? payload) {
     actionKey: _enumValue(_requiredString(map, 'actionKey'), const <String>{
       'project_name_access.review',
       'project_name_access.refresh',
+      'bid_participation.review',
+      'bid_participation.refresh',
+      'bid_submit.open',
     }, 'project name access item action key'),
     objectType: _nullableString(map['objectType']),
     canonicalPath: _nullableString(map['canonicalPath']),
@@ -574,7 +684,7 @@ ProjectNameAccessPrimaryReviewActionView? _parsePrimaryReviewAction(
   return ProjectNameAccessPrimaryReviewActionView(
     actionKey: _enumValue(
       _requiredString(map, 'actionKey'),
-      const <String>{'project_name_access.review'},
+      const <String>{'project_name_access.review', 'bid_participation.review'},
       'project name access primary review action key',
     ),
     enabled: _requiredBool(map, 'enabled'),

@@ -62,6 +62,12 @@ class MessagesRegisteredEntryDefinition {
         return _counterpartConversationRouteLocation(routeParams);
       case 'project_name_access_thread.open':
         return _projectNameAccessThreadRouteLocation(routeParams);
+      case 'bid_participation_request.open':
+        return _bidParticipationThreadRouteLocation(routeParams);
+      case 'bid_service_fee_authorization.open':
+        return _bidServiceFeeAuthorizationRouteLocation(routeParams);
+      case 'bid_submit.open':
+        return _bidSubmitRouteLocation(routeParams);
       case 'bid_thread.open':
         return _bidThreadRouteLocation(routeParams);
       case 'order_detail.open':
@@ -78,7 +84,10 @@ const Set<String> messagesAllowedObjectTypes = <String>{
   'project_clarification',
   'counterpart_conversation',
   'project_name_access_thread',
+  'bid_participation_request',
+  'bid_service_fee_authorization',
   'bid_thread',
+  'bid_submit',
   'order',
 };
 
@@ -88,6 +97,9 @@ const Set<String> messagesAllowedActionKeys = <String>{
   'project_clarification.open',
   'counterpart_conversation.open',
   'project_name_access_thread.open',
+  'bid_participation_request.open',
+  'bid_service_fee_authorization.open',
+  'bid_submit.open',
   'bid_thread.open',
   'order_detail.open',
 };
@@ -96,6 +108,9 @@ const Set<String> messagesProjectCommunicationActionKeys = <String>{
   'counterpart_conversation.open',
   'project_clarification.open',
   'project_name_access_thread.open',
+  'bid_participation_request.open',
+  'bid_service_fee_authorization.open',
+  'bid_submit.open',
   'bid_thread.open',
   'order_detail.open',
 };
@@ -106,6 +121,9 @@ const Map<String, String> messagesActionKeyToObjectType = <String, String>{
   'project_clarification.open': 'project_clarification',
   'counterpart_conversation.open': 'counterpart_conversation',
   'project_name_access_thread.open': 'project_name_access_thread',
+  'bid_participation_request.open': 'bid_participation_request',
+  'bid_service_fee_authorization.open': 'bid_service_fee_authorization',
+  'bid_submit.open': 'bid_submit',
   'bid_thread.open': 'bid_thread',
   'order_detail.open': 'order',
 };
@@ -147,6 +165,28 @@ messagesRegisteredEntryByActionKey =
         canonicalPath: '/api/app/project/name-access/thread/detail',
         localEntryKey: 'registered.project_name_access_thread.open',
         requiredParams: <String>['threadId', 'projectId', 'requestId'],
+      ),
+      'bid_participation_request.open': MessagesRegisteredEntryDefinition(
+        objectType: 'bid_participation_request',
+        actionKey: 'bid_participation_request.open',
+        canonicalPath: '/api/app/project/bid-participation/thread/detail',
+        localEntryKey: 'registered.bid_participation_request.open',
+        requiredParams: <String>['threadId', 'projectId', 'requestId'],
+      ),
+      'bid_submit.open': MessagesRegisteredEntryDefinition(
+        objectType: 'bid_submit',
+        actionKey: 'bid_submit.open',
+        canonicalPath: '/api/app/bid/submit',
+        localEntryKey: 'registered.bid_submit.open',
+        requiredParams: <String>['projectId'],
+      ),
+      'bid_service_fee_authorization.open': MessagesRegisteredEntryDefinition(
+        objectType: 'bid_service_fee_authorization',
+        actionKey: 'bid_service_fee_authorization.open',
+        canonicalPath:
+            '/api/app/project/{projectId}/bid-service-fee-authorizations',
+        localEntryKey: 'registered.bid_service_fee_authorization.open',
+        requiredParams: <String>['projectId', 'bidParticipationRequestId'],
       ),
       'bid_thread.open': MessagesRegisteredEntryDefinition(
         objectType: 'bid_thread',
@@ -255,6 +295,63 @@ String? _projectNameAccessThreadRouteLocation(Map<String, String> routeParams) {
     threadId: threadId,
     projectId: projectId,
     requestId: requestId,
+  );
+}
+
+String? _bidParticipationThreadRouteLocation(Map<String, String> routeParams) {
+  if (routeParams.length != 3 ||
+      !routeParams.containsKey('threadId') ||
+      !routeParams.containsKey('projectId') ||
+      !routeParams.containsKey('requestId')) {
+    return 'routeTarget.routeParams must include only "threadId", "projectId", and "requestId"';
+  }
+  final threadId = routeParams['threadId'];
+  final projectId = routeParams['projectId'];
+  final requestId = routeParams['requestId'];
+  if (threadId == null ||
+      threadId.trim().isEmpty ||
+      projectId == null ||
+      projectId.trim().isEmpty ||
+      requestId == null ||
+      requestId.trim().isEmpty) {
+    return 'routeTarget.routeParams threadId, projectId, and requestId must be non-empty';
+  }
+  return ExhibitionRoutes.bidParticipationThreadWithIds(
+    threadId: threadId,
+    projectId: projectId,
+    requestId: requestId,
+  );
+}
+
+String? _bidSubmitRouteLocation(Map<String, String> routeParams) {
+  if (routeParams.length != 1 || !routeParams.containsKey('projectId')) {
+    return 'routeTarget.routeParams must include only "projectId"';
+  }
+  final projectId = routeParams['projectId'];
+  if (projectId == null || projectId.trim().isEmpty) {
+    return 'routeTarget.routeParams projectId must be non-empty';
+  }
+  return ExhibitionRoutes.bidSubmitWithProjectId(projectId);
+}
+
+String? _bidServiceFeeAuthorizationRouteLocation(
+  Map<String, String> routeParams,
+) {
+  if (!routeParams.containsKey('projectId') ||
+      !routeParams.containsKey('bidParticipationRequestId')) {
+    return 'routeTarget.routeParams must include projectId and bidParticipationRequestId';
+  }
+  final projectId = routeParams['projectId'];
+  final requestId = routeParams['bidParticipationRequestId'];
+  if (projectId == null ||
+      projectId.trim().isEmpty ||
+      requestId == null ||
+      requestId.trim().isEmpty) {
+    return 'routeTarget.routeParams projectId and bidParticipationRequestId must be non-empty';
+  }
+  return ExhibitionRoutes.bidSubmitWithProjectId(
+    projectId,
+    bidParticipationRequestId: requestId,
   );
 }
 

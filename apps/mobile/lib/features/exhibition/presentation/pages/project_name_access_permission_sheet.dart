@@ -36,7 +36,7 @@ class ProjectNameAccessPermissionSheet extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '项目名称查看权限',
+              '参与竞标申请',
               style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.w900,
               ),

@@ -1,4 +1,4 @@
-// ignore_for_file: invalid_use_of_protected_member
+// ignore_for_file: invalid_use_of_protected_member, unused_element
 
 part of '../exhibition_trade_pages.dart';
 
@@ -328,8 +328,8 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
 
   Map<String, Object?> _p0PayPlatformServiceFeeAgreement() {
     return <String, Object?>{
-      'ruleVersion': 'p0-pay-v1.3',
-      'ruleSnapshotHash': 'p0-pay-v1.3-freeze',
+      'ruleVersion': 'platform_pricing_rules_master_v1',
+      'ruleSnapshotHash': 'platform_pricing_rules_master_v1',
       'agreedAtClient': DateTime.now().toIso8601String(),
       'readConfirmed': _p0PayReadRuleConfirmed,
       'authorizationAwarenessConfirmed': _p0PayAuthorizationAwarenessConfirmed,

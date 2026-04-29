@@ -260,7 +260,7 @@ test('project exit governance rewrites authorization and active-state failures',
     (error) => {
       assert.equal(error.getStatus(), 409);
       assert.equal(error.getResponse().code, 'PROJECT_EXIT_INVALID_STATE');
-      assert.equal(error.getResponse().message, '当前项目已有平台服务费授权记录，需先走安全释放链路后再撤回。');
+      assert.equal(error.getResponse().message, '当前项目存在竞标服务费预授权额度记录，需先完成释放或平台处理后再撤回。');
       return true;
     }
   );

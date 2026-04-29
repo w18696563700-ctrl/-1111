@@ -1,13 +1,10 @@
 ---
 owner: Codex 总控
-status: frozen
+status: superseded
 purpose: >
-  Freeze the L2 app-facing contract family for `exhibition_trade_task_p0_pay`,
-  including fixed-price bid task, inquiry quote task, platform service fee
-  preauthorization, inquiry sincerity money, post-contract-confirm platform
-  service fee, read-only message-building handoff, and strict payment boundary
-  rules without unlocking backend implementation, BFF implementation, Flutter
-  implementation, guarantee deposit, wallet, settlement, invoice, or launch.
+  Historical P0-Pay L2 contract package retained for audit and migration
+  comparison only. This file no longer serves as the current platform pricing
+  contracts owner after platform_pricing_contracts_master_v1.
 layer: L2 Contracts
 author_date_local: 2026-04-25
 freeze_date_local: 2026-04-26
@@ -26,6 +23,26 @@ inputs_canonical:
 ---
 
 # 展览平台任务发布与交易收费规则 P0-Pay Contracts Addendum V1.3
+
+## Supersede Note
+
+自 `2026-04-29` 起，本文件不再作为当前收费 L2 contracts 主文件使用。
+
+当前唯一收费 L2 contracts 改为：
+
+- [platform_pricing_contracts_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/01_contracts/platform_pricing_contracts_master_v1.md)
+
+本文件仅保留为历史 `P0-Pay` contracts 记录，用于：
+
+1. 审计回溯
+2. 差异对比
+3. 下游 backend / BFF / Flutter 重写时的迁移参考
+
+以下旧结论不再作为当前收费 contracts 真相继续指挥：
+
+1. `trade-tasks` 作为当前唯一收费主路径
+2. `询价报价单 200 元发单诚意金` 作为当前唯一 `200 元` 收费对象
+3. `动态 estimatedFeeAmount + 固定 3%` 作为当前唯一服务费模型
 
 ## 1. Scope
 

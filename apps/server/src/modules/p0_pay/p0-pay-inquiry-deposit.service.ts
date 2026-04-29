@@ -15,7 +15,13 @@ import {
 import { ProjectEntity } from '../project/entities/project.entity';
 import { InquiryQuoteDepositEntity } from './entities/inquiry-quote-deposit.entity';
 import { PaymentOrderEntity } from './entities/payment-order.entity';
-import { p0PayInvalid, p0PayPermissionDenied, p0PayResourceUnavailable, p0PayStateConflict } from './p0-pay.errors';
+import {
+  p0PayInvalid,
+  p0PayPermissionDenied,
+  p0PayResourceUnavailable,
+  p0PayStateConflict,
+  pricingRuleVersionMismatch
+} from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayCommandParser } from './p0-pay-command.parser';
 import { CreateInquiryDepositOrderCommand, InquiryDepositPayInitCommand } from './p0-pay.commands';
@@ -23,7 +29,14 @@ import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.servi
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
 import { P0PayPresenter } from './p0-pay.presenter';
-import { P0_PAY_INQUIRY_DEPOSIT_AMOUNT } from './p0-pay.state';
+import {
+  PLATFORM_PRICING_AUDIT_ACTIONS,
+  PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS,
+  PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES,
+  PLATFORM_PRICING_RESOURCE_TYPES,
+  P0_PAY_INQUIRY_DEPOSIT_AMOUNT,
+  P0_PAY_RULE_VERSION
+} from './p0-pay.state';
 
 @Injectable()
 export class P0PayInquiryDepositService {
@@ -53,7 +66,7 @@ export class P0PayInquiryDepositService {
     const requestHash = this.idempotencyService.hashRequest(command);
     const scopeKey = `task:${command.taskId}:publisher:${ownership.scope.organization.id}`;
     const existing = await this.idempotencyRecordService.findInquiryDeposit(
-      'inquiryDepositOrder.create',
+      PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.projectAuthenticitySincerityOrderCreate,
       scopeKey,
       idempotencyKeyHash,
       requestHash
@@ -84,20 +97,30 @@ export class P0PayInquiryDepositService {
         refundedAt: null,
         deductedAt: null,
         deductionReason: '',
+        withheldAt: null,
+        withholdReasonCode: '',
         requestId: context.requestId,
         traceId: context.traceId
       });
       await manager.getRepository(InquiryQuoteDepositEntity).save(created);
       await this.idempotencyRecordService.save(manager, {
-        operationKey: 'inquiryDepositOrder.create',
+        operationKey: PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.projectAuthenticitySincerityOrderCreate,
         scopeKey,
         idempotencyKeyHash,
         requestHash,
-        resourceType: 'inquiry_quote_deposit',
+        resourceType: PLATFORM_PRICING_RESOURCE_TYPES.projectAuthenticitySincerityOrder,
         resourceId: created.id,
         context
       });
-      await this.recordAudit(manager, created, ownership, 'InquiryDepositOrderCreated', '', created.status, context);
+      await this.recordAudit(
+        manager,
+        created,
+        ownership,
+        PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityOrderCreated,
+        '',
+        created.status,
+        context
+      );
       return created;
     });
 
@@ -111,7 +134,7 @@ export class P0PayInquiryDepositService {
     const requestHash = this.idempotencyService.hashRequest(command);
     const scopeKey = `deposit:${command.depositOrderId}`;
     const existing = await this.idempotencyRecordService.findPaymentOrder(
-      'inquiryDeposit.payInit',
+      PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.projectAuthenticitySincerityPayInit,
       scopeKey,
       idempotencyKeyHash,
       requestHash
@@ -162,7 +185,7 @@ export class P0PayInquiryDepositService {
     }
     const order = this.paymentOrderRepository.create({
       id: randomUUID(),
-      businessType: 'inquiry_deposit',
+      businessType: PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES.projectAuthenticitySincerityPayment,
       businessId: deposit.id,
       taskId: deposit.taskId,
       bidId: '',
@@ -185,7 +208,7 @@ export class P0PayInquiryDepositService {
     await manager.getRepository(PaymentOrderEntity).save(order);
     await manager.getRepository(InquiryQuoteDepositEntity).save(deposit);
     await this.idempotencyRecordService.save(manager, {
-      operationKey: 'inquiryDeposit.payInit',
+      operationKey: PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.projectAuthenticitySincerityPayInit,
       scopeKey: idempotency.scopeKey,
       idempotencyKeyHash: idempotency.idempotencyKeyHash,
       requestHash: idempotency.requestHash,
@@ -193,7 +216,15 @@ export class P0PayInquiryDepositService {
       resourceId: order.id,
       context: idempotency.context
     });
-    await this.recordAudit(manager, deposit, ownership, 'PaymentChannelInitIssued', deposit.status, deposit.status, idempotency.context);
+    await this.recordAudit(
+      manager,
+      deposit,
+      ownership,
+      PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityPayInitIssued,
+      deposit.status,
+      deposit.status,
+      idempotency.context
+    );
     return { deposit, order };
   }
 
@@ -224,6 +255,9 @@ export class P0PayInquiryDepositService {
   }
 
   private assertDepositRule(command: CreateInquiryDepositOrderCommand) {
+    if (command.ruleVersion !== P0_PAY_RULE_VERSION) {
+      throw pricingRuleVersionMismatch();
+    }
     if (command.expectedAmount !== P0_PAY_INQUIRY_DEPOSIT_AMOUNT || command.expectedCurrency !== 'CNY') {
       throw p0PayInvalid('Inquiry sincerity money must be 200.00 CNY.');
     }
@@ -235,6 +269,7 @@ export class P0PayInquiryDepositService {
         { taskId, status: 'pending_payment' },
         { taskId, status: 'paid' },
         { taskId, status: 'refund_pending' },
+        { taskId, status: 'withheld' },
         { taskId, status: 'dispute_hold' }
       ]
     });
@@ -262,7 +297,7 @@ export class P0PayInquiryDepositService {
   ) {
     await this.auditService.record(
       {
-        objectType: 'inquiry_quote_deposit',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.projectAuthenticitySincerityOrder,
         objectId: deposit.id,
         objectNo: ownership.project.projectNo,
         action,

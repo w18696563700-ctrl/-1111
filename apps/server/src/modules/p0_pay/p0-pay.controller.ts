@@ -203,6 +203,15 @@ export class P0PayController {
     return this.tradeTaskService.getP0PaySummary(taskId, this.context(headers, request));
   }
 
+  @Get('server/project/:projectId/pricing-summary')
+  getProjectPricingSummary(
+    @Param('projectId') projectId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.tradeTaskService.getP0PaySummary(projectId, this.context(headers, request));
+  }
+
   @Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/release-non-winning')
   @HttpCode(202)
   releaseNonWinning(

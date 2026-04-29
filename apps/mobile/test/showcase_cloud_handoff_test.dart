@@ -175,20 +175,17 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.widgetWithText(FilledButton, '查看详情'));
+      await _scrollTo(tester, find.text('已转订单项目'));
       expect(find.text('已转订单项目'), findsWidgets);
       expect(find.textContaining('当前项目已经转入订单链路'), findsNothing);
 
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '查看详情'));
+      await _tapVisible(tester, find.text('已转订单项目'));
 
       await _scrollTo(tester, find.textContaining('当前项目已被承接'));
       expect(find.text('公开资料边界'), findsNothing);
       expect(find.text('选择项目附件', skipOffstage: false), findsNothing);
       expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
-      expect(
-        find.textContaining('当前项目已被承接；如你属于竞标方，可继续读取最小竞标结果。'),
-        findsWidgets,
-      );
+      expect(find.textContaining('当前项目已被承接'), findsWidgets);
     },
   );
 }

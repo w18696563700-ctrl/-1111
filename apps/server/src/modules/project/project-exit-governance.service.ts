@@ -130,12 +130,16 @@ export class ProjectExitGovernanceService {
       const authorizations = await manager.getRepository(PlatformServiceFeeAuthorizationEntity).find({
         where: { taskId: project.id }
       });
+      const cancelledPendingAuthorizationIds = await this.cancelUninitializedPendingAuthorizations(
+        manager,
+        authorizations
+      );
       const blockingAuthorizations = authorizations.filter(
         (authorization) => !TERMINAL_AUTHORIZATION_STATES.has(String(authorization.status))
       );
       if (blockingAuthorizations.length > 0) {
         throw projectExitInvalidState(
-          'Current project has platform fee authorization records and must use the P0-Pay release chain first.'
+          'Current project has frozen bid service fee authorization records and must release them before withdrawal.'
         );
       }
 
@@ -160,6 +164,8 @@ export class ProjectExitGovernanceService {
         exitCaseId: exitCase.id,
         affectedBidCount: bidCount,
         affectedAuthorizationCount: authorizations.length,
+        cancelledPendingAuthorizationIds,
+        cancelledPendingAuthorizationCount: cancelledPendingAuthorizationIds.length,
         noAutomaticPenalty: true
       });
       return {
@@ -169,6 +175,7 @@ export class ProjectExitGovernanceService {
         action: 'withdraw_published_to_submitted',
         affectedBidCount: bidCount,
         affectedAuthorizationCount: authorizations.length,
+        cancelledPendingAuthorizationCount: cancelledPendingAuthorizationIds.length,
         exitCaseId: exitCase.id
       };
     });
@@ -416,6 +423,35 @@ export class ProjectExitGovernanceService {
       throw projectExitInvalidState('Only active orders may be cancelled by mutual cancellation acceptance.');
     }
     return order;
+  }
+
+  private async cancelUninitializedPendingAuthorizations(
+    manager: EntityManager,
+    authorizations: PlatformServiceFeeAuthorizationEntity[]
+  ) {
+    const cancelledIds: string[] = [];
+    const repository = manager.getRepository(PlatformServiceFeeAuthorizationEntity);
+    for (const authorization of authorizations) {
+      if (!this.canCancelUninitializedPendingAuthorization(authorization)) {
+        continue;
+      }
+      authorization.status = 'cancelled';
+      await repository.save(authorization);
+      cancelledIds.push(authorization.id);
+    }
+    return cancelledIds;
+  }
+
+  private canCancelUninitializedPendingAuthorization(authorization: PlatformServiceFeeAuthorizationEntity) {
+    return (
+      (authorization.status === 'pending_freeze' || authorization.status === 'pending_authorization') &&
+      !authorization.paymentOrderId &&
+      !authorization.authorizationOrderId &&
+      !authorization.authorizedAt &&
+      !authorization.frozenAt &&
+      !authorization.releasedAt &&
+      !authorization.chargedAt
+    );
   }
 
   private async ensureNoOpenCancellationCase(manager: EntityManager, projectId: string) {

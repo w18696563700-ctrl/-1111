@@ -303,6 +303,16 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
         return input;
       },
     },
+    { async requireApprovedForOrganization() {} },
+    {
+      async findOne() {
+        return {
+          id: 'authorization-1',
+          status: 'frozen',
+          authorizationQuotaAmount: '4000.00',
+        };
+      },
+    },
   );
 
   const result = await service.submitBid(
@@ -333,12 +343,113 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   assert.equal(savedAudit[0].objectType, 'bid');
   assert.equal(savedAudit[0].action, 'BidSubmitted');
   assert.equal(savedAudit[0].afterState, 'submitted');
+  assert.match(savedAudit[0].reason, /authorizationId=authorization-1/);
   assert.deepEqual(result, {
     bidId: savedBids[0].id,
     projectId: 'project-1',
     threadId: 'thread-1',
     seedMessageId: 'seed-1',
   });
+});
+
+test('bid submit fail-closes until approved bidder has frozen 4000 authorization', async () => {
+  const { IdentityAuditLogEntity } = require('../dist/modules/audit/identity-audit-log.entity.js');
+  const { BidWriteService } = require('../dist/modules/bid/bid-write.service.js');
+  const savedAudit = [];
+  const service = new BidWriteService(
+    { create(input) { return input; } },
+    {
+      async findOneBy() {
+        return createProject();
+      },
+    },
+    {
+      async transaction(callback) {
+        return callback({
+          getRepository(entity) {
+            if (entity === IdentityAuditLogEntity) {
+              return {
+                async save(value) {
+                  savedAudit.push(value);
+                  return value;
+                },
+              };
+            }
+            throw new Error('should not touch bid repository before pricing gate');
+          },
+        });
+      },
+    },
+    {
+      async verifyCurrentSessionContext(context) {
+        return {
+          outcome: 'verified',
+          currentSession: {
+            sessionId: 'session-1',
+            actorId: 'supplier-user',
+            userId: 'supplier-user',
+            organizationId: 'supplier-org',
+            requestId: context.requestId,
+            traceId: context.traceId,
+          },
+        };
+      },
+    },
+    {
+      async requireBidSubmitEligibilityFromContext(context, resolver, project) {
+        const verified = await resolver.verifyCurrentSessionContext(context);
+        return {
+          currentSession: verified.currentSession,
+          scope: {
+            organization: { id: 'supplier-org' },
+            membership: { roleKey: 'supplier_admin' },
+            certification: { certificationStatus: 'approved' },
+            roleKeys: ['supplier_admin'],
+          },
+          project,
+        };
+      },
+    },
+    {
+      async validateAndNormalize() {
+        throw new Error('should not validate attachments before pricing gate');
+      },
+    },
+    {
+      async createForSubmittedBid() {
+        throw new Error('should not seed bid before pricing gate');
+      },
+    },
+    {
+      toAcceptedResponse(input) {
+        return input;
+      },
+    },
+    { async requireApprovedForOrganization() {} },
+    { async findOne() { return null; } },
+  );
+
+  await assert.rejects(
+    () =>
+      service.submitBid(
+        {
+          projectId: 'project-1',
+          quoteAmount: 88888,
+          proposalSummary: '供应商最小报价与执行方案',
+          projectUnderstandingFileAssetId: 'file-understanding-1',
+          quoteSheetFileAssetId: 'file-quote-1',
+          schedulePlanFileAssetId: 'file-schedule-1',
+        },
+        createContext('bid-submit-pricing-blocked'),
+      ),
+    (error) => {
+      assert.equal(error?.response?.code, 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED');
+      return true;
+    },
+  );
+  assert.equal(savedAudit.length, 1);
+  assert.equal(savedAudit[0].action, 'bid_submit_blocked_by_pricing_gate');
+  assert.match(savedAudit[0].reason, /requiredQuotaAmount=4000.00/);
 });
 
 test('bid submit rejects same organization duplicate submission with controlled conflict', async () => {
@@ -431,6 +542,16 @@ test('bid submit rejects same organization duplicate submission with controlled 
         return input;
       },
     },
+    { async requireApprovedForOrganization() {} },
+    {
+      async findOne() {
+        return {
+          id: 'authorization-1',
+          status: 'frozen',
+          authorizationQuotaAmount: '4000.00',
+        };
+      },
+    },
   );
 
   await assert.rejects(
@@ -475,6 +596,7 @@ test('bid submit rejects malformed body and unavailable project with controlled 
     { async requireBidSubmitEligibilityFromContext() { throw new Error('should not check eligibility'); } },
     { async validateAndNormalize() { throw new Error('should not validate attachments'); } },
     { toAcceptedResponse(bidId) { return { bidId }; } },
+    { async requireApprovedForOrganization() { throw new Error('should not check participation'); } },
   );
 
   await assert.rejects(

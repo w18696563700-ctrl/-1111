@@ -29,7 +29,7 @@ export function readTradeTaskDetailReadModel(value: unknown) {
       'contractHandoff',
       'updatedAt',
     ]),
-    p0PaySummary: forceReadOnly(record.p0PaySummary),
+    pricingSummary: forceReadOnlyPricingSummary(readFirst(record.pricingSummary, record.p0PaySummary)),
   };
 }
 
@@ -61,7 +61,18 @@ export function readServiceFeeAuthorizationCreateReadModel(value: unknown) {
     quotedAmount: readFirst(record.quotedAmount, authorization?.quotedAmount),
     feeRate: readFirst(record.feeRate, authorization?.feeRate),
     ...readFeeSnapshot(record, authorization),
-    estimatedFeeAmount: readFirst(record.estimatedFeeAmount, authorization?.estimatedFeeAmount),
+    authorizationQuotaAmount: readFirst(
+      record.authorizationQuotaAmount,
+      record.quotaAmount,
+      authorization?.authorizationQuotaAmount,
+      authorization?.quotaAmount,
+    ),
+    quotaAmount: readFirst(
+      record.quotaAmount,
+      record.authorizationQuotaAmount,
+      authorization?.quotaAmount,
+      authorization?.authorizationQuotaAmount,
+    ),
     currency: readFirst(record.currency, authorization?.currency, 'CNY'),
     channelCandidates: readArray(record.channelCandidates),
     expiresAt: readFirst(record.expiresAt, authorization?.expiresAt, null),
@@ -93,7 +104,18 @@ export function readServiceFeeAuthorizationStatusReadModel(value: unknown) {
     quotedAmount: readFirst(record.quotedAmount, authorization?.quotedAmount),
     feeRate: readFirst(record.feeRate, authorization?.feeRate),
     ...readFeeSnapshot(record, authorization),
-    estimatedFeeAmount: readFirst(record.estimatedFeeAmount, authorization?.estimatedFeeAmount),
+    authorizationQuotaAmount: readFirst(
+      record.authorizationQuotaAmount,
+      record.quotaAmount,
+      authorization?.authorizationQuotaAmount,
+      authorization?.quotaAmount,
+    ),
+    quotaAmount: readFirst(
+      record.quotaAmount,
+      record.authorizationQuotaAmount,
+      authorization?.quotaAmount,
+      authorization?.authorizationQuotaAmount,
+    ),
     currency: readFirst(record.currency, authorization?.currency, order?.currency, 'CNY'),
     channelSummary: readFirst(record.channelSummary, compactOptional({
       paymentOrderId: order?.paymentOrderId,
@@ -119,11 +141,38 @@ export function readInquiryDepositOrderReadModel(value: unknown) {
   };
 }
 
+export function readProjectAuthenticitySincerityOrderReadModel(value: unknown) {
+  const record = requireRecord(value, 'Project authenticity sincerity order response must be an object.');
+  return {
+    orderId: readFirst(record.orderId, record.depositOrderId),
+    orderStatus: readFirst(record.orderStatus, record.depositStatus),
+    amount: record.amount,
+    currency: readFirst(record.currency, 'CNY'),
+    channelCandidates: readArray(record.channelCandidates),
+    expiresAt: readFirst(record.expiresAt, null),
+    updatedAt: record.updatedAt,
+  };
+}
+
 export function readInquiryDepositPayInitReadModel(value: unknown) {
   const record = requireRecord(value, 'Inquiry deposit pay-init response must be an object.');
   return {
     paymentInitStatus: record.paymentInitStatus,
     depositOrderId: record.depositOrderId,
+    paymentReferenceId: record.paymentReferenceId,
+    channelActionType: record.channelActionType,
+    channelPayload: optionalRecord(record.channelPayload) ?? null,
+    callbackAwaiting: record.callbackAwaiting === true,
+    expiresAt: readFirst(record.expiresAt, null),
+    updatedAt: record.updatedAt,
+  };
+}
+
+export function readProjectAuthenticitySincerityPayInitReadModel(value: unknown) {
+  const record = requireRecord(value, 'Project authenticity sincerity pay-init response must be an object.');
+  return {
+    paymentInitStatus: record.paymentInitStatus,
+    orderId: readFirst(record.orderId, record.depositOrderId),
     paymentReferenceId: record.paymentReferenceId,
     channelActionType: record.channelActionType,
     channelPayload: optionalRecord(record.channelPayload) ?? null,
@@ -145,6 +194,90 @@ export function readInquiryDepositStatusReadModel(value: unknown) {
     'channelSummary',
     'updatedAt',
   ]);
+}
+
+export function readProjectAuthenticitySincerityStatusReadModel(value: unknown) {
+  const record = requireRecord(value, 'Project authenticity sincerity status response must be an object.');
+  return {
+    orderId: readFirst(record.orderId, record.depositOrderId),
+    orderStatus: readFirst(record.orderStatus, record.depositStatus),
+    amount: record.amount,
+    currency: readFirst(record.currency, 'CNY'),
+    refundStatus: readFirst(record.refundStatus, 'not_refunded'),
+    withholdStatus: readFirst(record.withholdStatus, record.deductionStatus, 'not_withheld'),
+    withholdReasonCode: readFirst(record.withholdReasonCode, record.deductionReason, null),
+    channelSummary: readFirst(record.channelSummary, null),
+    updatedAt: record.updatedAt,
+  };
+}
+
+export function readBidServiceFeeAuthorizationCreateReadModel(value: unknown) {
+  const record = requireRecord(value, 'Bid service fee authorization response must be an object.');
+  const authorization = optionalRecord(record.authorization);
+  return {
+    authorizationId: readFirst(record.authorizationId, authorization?.authorizationId),
+    authorizationStatus: readFirst(record.authorizationStatus, authorization?.status),
+    authorizationQuotaAmount: readFirst(
+      record.authorizationQuotaAmount,
+      record.quotaAmount,
+      authorization?.authorizationQuotaAmount,
+      authorization?.quotaAmount,
+    ),
+    currency: readFirst(record.currency, authorization?.currency, 'CNY'),
+    channelCandidates: readArray(record.channelCandidates),
+    expiresAt: readFirst(record.expiresAt, authorization?.expiresAt, null),
+    updatedAt: readFirst(record.updatedAt, authorization?.updatedAt),
+  };
+}
+
+export function readBidServiceFeeAuthorizationFreezeInitReadModel(value: unknown) {
+  const record = requireRecord(value, 'Bid service fee freeze-init response must be an object.');
+  return {
+    freezeInitStatus: readFirst(record.freezeInitStatus, record.authorizationInitStatus),
+    authorizationId: record.authorizationId,
+    paymentReferenceId: record.paymentReferenceId,
+    channelActionType: record.channelActionType,
+    channelPayload: optionalRecord(record.channelPayload) ?? null,
+    callbackAwaiting: record.callbackAwaiting === true,
+    expiresAt: readFirst(record.expiresAt, null),
+    updatedAt: record.updatedAt,
+  };
+}
+
+export function readBidServiceFeeAuthorizationStatusReadModel(value: unknown) {
+  const record = requireRecord(value, 'Bid service fee authorization status response must be an object.');
+  const authorization = optionalRecord(record.authorization);
+  const order = optionalRecord(record.paymentOrder);
+  return {
+    authorizationId: readFirst(record.authorizationId, authorization?.authorizationId),
+    authorizationStatus: readFirst(record.authorizationStatus, authorization?.status),
+    authorizationQuotaAmount: readFirst(
+      record.authorizationQuotaAmount,
+      record.quotaAmount,
+      authorization?.authorizationQuotaAmount,
+      authorization?.quotaAmount,
+    ),
+    currency: readFirst(record.currency, authorization?.currency, order?.currency, 'CNY'),
+    chargeStatus: readFirst(record.chargeStatus, authorization?.chargeStatus, 'not_charged'),
+    releaseStatus: readFirst(record.releaseStatus, authorization?.releaseStatus, 'not_released'),
+    channelSummary: readFirst(record.channelSummary, compactOptional({
+      paymentOrderId: order?.paymentOrderId,
+      merchantOrderNo: order?.merchantOrderNo,
+      paymentChannel: order?.paymentChannel,
+      status: order?.status,
+    })),
+    updatedAt: readFirst(record.updatedAt, authorization?.updatedAt, order?.updatedAt),
+  };
+}
+
+export function readBidServiceFeeAuthorizationReleaseReadModel(value: unknown) {
+  const record = requireRecord(value, 'Bid service fee authorization release response must be an object.');
+  return {
+    authorizationId: record.authorizationId,
+    authorizationStatus: record.authorizationStatus,
+    bidSubmissionEligible: record.bidSubmissionEligible === true,
+    updatedAt: record.updatedAt,
+  };
 }
 
 export function readInquiryQuotationReadModel(value: unknown) {
@@ -180,16 +313,43 @@ export function readContractConfirmationReadModel(value: unknown) {
   ]);
 }
 
+export function readDealConfirmationAcceptedReadModel(value: unknown) {
+  const record = requireRecord(value, 'Deal confirmation response must be an object.');
+  return {
+    dealConfirmationId: readFirst(record.dealConfirmationId, record.contractConfirmationId),
+    dealStatus: readFirst(record.dealStatus, record.contractStatus),
+    selectedBidId: record.selectedBidId,
+    finalConfirmedAmount: record.finalConfirmedAmount,
+    platformServiceFeeCalculation: readFirst(record.platformServiceFeeCalculation, record.platformServiceFeeCharge),
+    serviceFeeChargeStatus: readFirst(record.serviceFeeChargeStatus, record.platformServiceFeeStatus),
+    updatedAt: record.updatedAt,
+  };
+}
+
+export function readDealConfirmationReadModel(value: unknown) {
+  const record = readDealConfirmationAcceptedReadModel(value);
+  const source = requireRecord(value, 'Deal confirmation detail response must be an object.');
+  return {
+    ...record,
+    publisherConfirmedAt: readFirst(source.publisherConfirmedAt, null),
+    factoryConfirmedAt: readFirst(source.factoryConfirmedAt, null),
+    publisherAuthenticitySincerityStatus: readFirst(source.publisherAuthenticitySincerityStatus, null),
+  };
+}
+
 export function readP0PaySummaryReadModel(value: unknown) {
+  return readPricingSummaryReadModel(value);
+}
+
+export function readPricingSummaryReadModel(value: unknown) {
   const record = requireRecord(value, 'P0-Pay summary response must be an object.');
   return {
-    taskId: record.taskId,
-    taskType: record.taskType,
-    platformServiceFee: record.platformServiceFee,
-    inquiryDeposit: record.inquiryDeposit,
-    contractConfirmation: record.contractConfirmation,
-    messageDisplaySummary: readMessageDisplaySummary(record.messageDisplaySummary),
+    projectId: readFirst(record.projectId, record.taskId),
+    publisherPricing: readPublisherPricing(record),
+    bidderPricing: readBidderPricing(record),
+    dealSummary: readDealSummary(record),
     updatedAt: record.updatedAt,
+    readOnly: true,
   };
 }
 
@@ -203,35 +363,85 @@ export function readP0PayStateActionReadModel(value: unknown) {
   ]);
 }
 
-function readMessageDisplaySummary(value: unknown) {
-  const record = optionalRecord(value) ?? {};
+function forceReadOnlyPricingSummary(value: unknown) {
+  if (!value) {
+    return { readOnly: true };
+  }
+  return readPricingSummaryReadModel(value);
+}
+
+function readPublisherPricing(record: Payload) {
+  const publisher = optionalRecord(record.publisherPricing);
+  if (publisher) {
+    return {
+      ...publisher,
+      nextAction: readFirst(publisher.nextAction, null),
+    };
+  }
+  const sincerity = optionalRecord(record.projectAuthenticitySincerity) ?? optionalRecord(record.inquiryDeposit) ?? {};
+  const status = readOptionalString(readFirst(sincerity.status, sincerity.depositStatus, sincerity.orderStatus));
   return {
-    displayAllowed: record.displayAllowed === true,
-    readOnly: true,
-    statusTextKey: readOptionalString(record.statusTextKey) ?? 'p0_pay_status_unavailable',
-    routeTarget: optionalRecord(record.routeTarget) ?? null,
+    authenticitySincerityRequired: true,
+    authenticitySincerityAmount: readFirst(sincerity.amount, '200.00'),
+    authenticitySincerityStatus: status && status !== 'not_required' ? status : null,
+    publishGateStatus: status === 'paid' ? 'satisfied' : 'required',
+    formalResultProcessingRequired: true,
+    nextAction: readPricingNextAction(
+      optionalRecord(record.messageDisplaySummary),
+      'project_authenticity_sincerity.open',
+    ),
   };
 }
 
-function forceReadOnly(value: unknown) {
-  const record = optionalRecord(value) ?? {};
+function readBidderPricing(record: Payload) {
+  const bidder = optionalRecord(record.bidderPricing);
+  if (bidder) {
+    return {
+      ...bidder,
+      nextAction: readFirst(bidder.nextAction, null),
+    };
+  }
+  const authorization =
+    optionalRecord(record.bidServiceFeeAuthorization) ?? optionalRecord(record.platformServiceFee) ?? {};
+  const status = readOptionalString(readFirst(authorization.status, authorization.authorizationStatus));
   return {
-    ...pick(record, [
-      'platformServiceFeeStatus',
-      'platformServiceFeeEstimatedAmount',
-      'platformServiceFeeFinalAmount',
-      'feeRate',
-      'feeRateLabel',
-      'feeRateSource',
-      'membershipTierSnapshot',
-      'feeRateRuleVersion',
-      'feeRateSnapshotHash',
-      'feeCalculatedAt',
-      'inquiryDepositStatus',
-      'inquiryDepositAmount',
-      'paymentChannelSummary',
-    ]),
-    readOnly: true,
+    bidParticipationRequestId: readFirst(authorization.bidParticipationRequestId, null),
+    authorizationRequired: Boolean(status && status !== 'not_required'),
+    authorizationQuotaAmount: readFirst(
+      authorization.authorizationQuotaAmount,
+      authorization.quotaAmount,
+      '4000.00',
+    ),
+    authorizationStatus: status && status !== 'not_required' ? status : null,
+    bidSubmissionEligible: status === 'frozen',
+    nextAction: readPricingNextAction(
+      optionalRecord(record.messageDisplaySummary),
+      status === 'frozen' ? 'bid_submit.open' : 'bid_service_fee_authorization.open',
+    ),
+  };
+}
+
+function readDealSummary(record: Payload) {
+  const deal = optionalRecord(record.dealSummary);
+  if (deal) {
+    return deal;
+  }
+  const confirmation = optionalRecord(record.dealConfirmation) ?? optionalRecord(record.contractConfirmation) ?? {};
+  return {
+    dealConfirmationId: readFirst(confirmation.dealConfirmationId, confirmation.contractConfirmationId, null),
+    dealStatus: readFirst(confirmation.dealStatus, confirmation.status, null),
+    selectedBidId: readFirst(confirmation.selectedBidId, null),
+    finalConfirmedAmount: readFirst(confirmation.finalConfirmedAmount, null),
+    platformServiceFeeAmount: readFirst(confirmation.platformServiceFeeAmount, confirmation.finalFeeAmount, null),
+    serviceFeeChargeStatus: readFirst(confirmation.serviceFeeChargeStatus, null),
+  };
+}
+
+function readPricingNextAction(messageDisplaySummary: Payload | undefined, fallbackActionKey: string) {
+  const routeTarget = optionalRecord(messageDisplaySummary?.routeTarget);
+  return {
+    actionKey: readFirst(routeTarget?.actionKey, fallbackActionKey),
+    routeTarget: routeTarget ?? null,
   };
 }
 

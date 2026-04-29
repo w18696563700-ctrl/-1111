@@ -18,6 +18,20 @@ inputs_canonical:
   - docs/01_contracts/openapi.yaml
 ---
 
+## Pricing Gate Note
+
+当前 `bid/submit` 的 6 字段主体 request shape、模板区和共享 file-access 规则继续沿用本文件。
+
+但自 [platform_pricing_bff_surface_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/platform_pricing_bff_surface_master_v1.md) 生效后，本文件不再拥有收费 gate authority。
+
+当前正式补充冻结如下：
+
+1. `POST /api/app/bid/submit` 的主体 shape 保持不变
+2. 当前 actor 除了已有 `approved` 的 `bidParticipationRequest`，还必须已有同一 `projectId` 下状态为 `frozen` 的 `bidServiceFeeAuthorization`
+3. 若缺少 `4000 元竞标服务费预授权额度` 冻结，`BFF` 必须 fail closed
+4. `BFF` 不得要求 Flutter 在 `bid/submit` body 内重复携带收费真相
+5. `approved` 后如仍需先冻结 `4000`，首个 CTA 必须指向 pricing gate，而不是直接指向 `bid_submit.open`
+
 # 《竞标提交页满分版 BFF surface freeze》
 
 ## 1. Scope

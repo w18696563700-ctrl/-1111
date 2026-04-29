@@ -1,4 +1,16 @@
 ---
+
+## Pricing Override Note
+
+当前 publish workbench 的页面壳、提交流程主壳和 continuation 边界继续沿用本文件。
+
+但自 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 生效后，本文件不再拥有收费 gate authority。
+
+当前正式补充冻结如下：
+
+1. `/exhibition/projects/create` 仍是当前项目发布主页壳
+2. 若当前项目需先完成 `200 元项目真实性诚意金`，Flutter 必须先走收费 gate，再显示正式发布成功
+3. 本文件不得再被误读为“发布工作台天然不含收费前置”
 owner: Codex 总控
 status: frozen
 purpose: Freeze the Flutter-side consumption, page-state, submit-feedback, and continuation-handoff boundary for the corrected full publish-workbench and extension mainline only.

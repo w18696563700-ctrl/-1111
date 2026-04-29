@@ -1,5 +1,7 @@
 import { Module } from '@nestjs/common';
 import { CoreModule } from '../../core/core.module';
+import { AppBidParticipationRequestController } from '../bid_participation_request/app-bid-participation-request.controller';
+import { BidParticipationRequestService } from '../bid_participation_request/bid-participation-request.service';
 import { AppProjectAlbumController } from './app-project-album.controller';
 import { AppProjectController } from './app-project.controller';
 import { AppProjectNameAccessController } from '../project_name_access/app-project-name-access.controller';
@@ -18,6 +20,7 @@ import { ProjectService } from './project.service';
     AppProjectController,
     AppProjectAlbumController,
     AppProjectNameAccessController,
+    AppBidParticipationRequestController,
   ],
   providers: [
     ProjectService,
@@ -26,6 +29,7 @@ import { ProjectService } from './project.service';
     ProjectPublicResourceService,
     ProjectBidMaterialService,
     ProjectNameAccessService,
+    BidParticipationRequestService,
   ],
 })
 export class ProjectModule {}

@@ -22,10 +22,13 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: ExhibitionHomeVisualTokens.cardBackground,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: ExhibitionHomeVisualTokens.borderSoft.withValues(alpha: 0.88),
+        ),
         boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -53,17 +56,25 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
                 height: 1.45,
               ),
             ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onPressed,
+                style: TextButton.styleFrom(
+                  foregroundColor: ExhibitionHomeVisualTokens.brandGoldDeep,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  textStyle: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                label: Text(actionLabel),
               ),
-              child: Text(actionLabel),
             ),
           ],
         ),

@@ -50,6 +50,12 @@ export class InquiryQuoteDepositEntity {
   @Column({ name: 'deduction_reason', type: 'text', default: '' })
   deductionReason!: string;
 
+  @Column({ name: 'withheld_at', type: 'timestamptz', nullable: true })
+  withheldAt!: Date | null;
+
+  @Column({ name: 'withhold_reason_code', type: 'varchar', length: 96, default: '' })
+  withholdReasonCode!: string;
+
   @Column({ name: 'request_id', type: 'varchar', length: 64, default: '' })
   requestId!: string;
 

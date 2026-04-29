@@ -26,140 +26,144 @@ class _HomeProjectCard extends StatelessWidget {
     final theme = Theme.of(context);
     return SizedBox(
       width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: ExhibitionHomeVisualTokens.cardBackground,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: ExhibitionHomeVisualTokens.borderSoft.withValues(
-              alpha: 0.78,
+      child: Material(
+        color: Colors.transparent,
+        borderRadius: BorderRadius.circular(18),
+        child: Ink(
+          decoration: BoxDecoration(
+            color: ExhibitionHomeVisualTokens.cardBackground,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: ExhibitionHomeVisualTokens.borderSoft.withValues(
+                alpha: 0.78,
+              ),
             ),
+            boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.035),
           ),
-          boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.035),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  final useSideCover = constraints.maxWidth >= 360;
-                  final coverWidth = useSideCover ? 96.0 : double.infinity;
-                  final coverHeight = useSideCover ? 78.0 : 96.0;
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                LayoutBuilder(
+                  builder: (BuildContext context, BoxConstraints constraints) {
+                    final useSideCover = constraints.maxWidth >= 360;
+                    final coverWidth = useSideCover ? 96.0 : double.infinity;
+                    final coverHeight = useSideCover ? 78.0 : 96.0;
 
-                  final information = Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Expanded(
-                            child: Text(
-                              title,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                              style: theme.textTheme.titleLarge?.copyWith(
-                                color: ExhibitionHomeVisualTokens.textPrimary,
-                                fontSize: 16,
-                                fontWeight: FontWeight.w800,
-                                height: 1.12,
+                    final information = Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  color: ExhibitionHomeVisualTokens.textPrimary,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.12,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 8),
-                          _HomePill(
-                            label: stateLabel,
-                            backgroundColor: ExhibitionHomeVisualTokens
-                                .brandGoldLight
-                                .withValues(alpha: 0.72),
-                            foregroundColor:
-                                ExhibitionHomeVisualTokens.brandGoldDeep,
-                            dense: true,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 7),
-                      LayoutBuilder(
-                        builder:
-                            (
-                              BuildContext context,
-                              BoxConstraints infoConstraints,
-                            ) {
-                              final infoTileWidth =
-                                  (infoConstraints.maxWidth - 6) / 2;
-                              return Wrap(
-                                spacing: 6,
-                                runSpacing: 6,
-                                children: <Widget>[
-                                  _HomeProjectInfoTile(
-                                    width: infoTileWidth,
-                                    icon: Icons.calendar_month_outlined,
-                                    label: '进场',
-                                    value: entryTimeLabel,
-                                    compact: useSideCover,
-                                  ),
-                                  _HomeProjectInfoTile(
-                                    width: infoTileWidth,
-                                    icon: Icons.location_on_outlined,
-                                    label: '搭建地',
-                                    value: cityLabel,
-                                    compact: useSideCover,
-                                  ),
-                                  _HomeProjectInfoTile(
-                                    width: infoTileWidth,
-                                    icon: Icons.crop_square_outlined,
-                                    label: '面积',
-                                    value: areaLabel,
-                                    compact: useSideCover,
-                                  ),
-                                  _HomeProjectInfoTile(
-                                    width: infoTileWidth,
-                                    icon: Icons.payments_outlined,
-                                    label: '预算',
-                                    value: budgetLabel,
-                                    compact: useSideCover,
-                                  ),
-                                ],
-                              );
-                            },
-                      ),
-                    ],
-                  );
+                            const SizedBox(width: 8),
+                            _HomePill(
+                              label: stateLabel,
+                              backgroundColor: ExhibitionHomeVisualTokens
+                                  .brandGoldLight
+                                  .withValues(alpha: 0.72),
+                              foregroundColor:
+                                  ExhibitionHomeVisualTokens.brandGoldDeep,
+                              dense: true,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 7),
+                        LayoutBuilder(
+                          builder:
+                              (
+                                BuildContext context,
+                                BoxConstraints infoConstraints,
+                              ) {
+                                final infoTileWidth =
+                                    (infoConstraints.maxWidth - 6) / 2;
+                                return Wrap(
+                                  spacing: 6,
+                                  runSpacing: 6,
+                                  children: <Widget>[
+                                    _HomeProjectInfoTile(
+                                      width: infoTileWidth,
+                                      icon: Icons.calendar_month_outlined,
+                                      label: '进场',
+                                      value: entryTimeLabel,
+                                      compact: useSideCover,
+                                    ),
+                                    _HomeProjectInfoTile(
+                                      width: infoTileWidth,
+                                      icon: Icons.location_on_outlined,
+                                      label: '搭建地',
+                                      value: cityLabel,
+                                      compact: useSideCover,
+                                    ),
+                                    _HomeProjectInfoTile(
+                                      width: infoTileWidth,
+                                      icon: Icons.crop_square_outlined,
+                                      label: '面积',
+                                      value: areaLabel,
+                                      compact: useSideCover,
+                                    ),
+                                    _HomeProjectInfoTile(
+                                      width: infoTileWidth,
+                                      icon: Icons.payments_outlined,
+                                      label: '预算',
+                                      value: budgetLabel,
+                                      compact: useSideCover,
+                                    ),
+                                  ],
+                                );
+                              },
+                        ),
+                      ],
+                    );
 
-                  if (!useSideCover) {
-                    return Column(
+                    if (!useSideCover) {
+                      return Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          _HomeDefaultProjectCover(
+                            width: coverWidth,
+                            height: coverHeight,
+                          ),
+                          const SizedBox(height: 9),
+                          information,
+                        ],
+                      );
+                    }
+
+                    return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
                         _HomeDefaultProjectCover(
                           width: coverWidth,
                           height: coverHeight,
                         ),
-                        const SizedBox(height: 9),
-                        information,
+                        const SizedBox(width: 10),
+                        Expanded(child: information),
                       ],
                     );
-                  }
-
-                  return Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      _HomeDefaultProjectCover(
-                        width: coverWidth,
-                        height: coverHeight,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(child: information),
-                    ],
-                  );
-                },
-              ),
-              const SizedBox(height: 8),
-              _HomeProjectPrimaryAction(
-                label: actionLabel,
-                onPressed: onPressed,
-              ),
-            ],
+                  },
+                ),
+                const SizedBox(height: 6),
+                _HomeProjectPrimaryAction(
+                  label: actionLabel,
+                  onPressed: onPressed,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -451,17 +455,17 @@ class _HomeProjectInfoTile extends StatelessWidget {
 
     return SizedBox(
       width: width,
-      height: compact ? 36 : 38,
+      height: compact ? 34 : 36,
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: const Color(0xFFF8F9FB),
-          borderRadius: BorderRadius.circular(11),
-          border: Border.all(color: const Color(0xFFF0F1F4)),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: const Color(0xFFF1F3F6)),
         ),
         child: Padding(
           padding: EdgeInsets.symmetric(
             horizontal: compact ? 7 : 8,
-            vertical: compact ? 6 : 7,
+            vertical: compact ? 5 : 6,
           ),
           child: Row(
             children: <Widget>[
@@ -506,59 +510,31 @@ class _HomeProjectPrimaryAction extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(13),
-        child: InkWell(
-          onTap: onPressed,
-          borderRadius: BorderRadius.circular(13),
-          child: Ink(
-            height: 38,
-            decoration: BoxDecoration(
-              gradient: enabled
-                  ? const LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: <Color>[Color(0xFFE2A047), Color(0xFFC27A28)],
-                    )
-                  : const LinearGradient(
-                      colors: <Color>[Color(0xFFE6E2DA), Color(0xFFD8D3CA)],
-                    ),
-              borderRadius: BorderRadius.circular(13),
-              boxShadow: enabled
-                  ? <BoxShadow>[
-                      BoxShadow(
-                        color: ExhibitionHomeVisualTokens.brandGold.withValues(
-                          alpha: 0.12,
-                        ),
-                        blurRadius: 10,
-                        offset: const Offset(0, 5),
-                      ),
-                    ]
-                  : const <BoxShadow>[],
+      child: Align(
+        alignment: Alignment.centerRight,
+        child: TextButton.icon(
+          onPressed: onPressed,
+          style: TextButton.styleFrom(
+            foregroundColor: enabled
+                ? ExhibitionHomeVisualTokens.brandGoldDeep
+                : ExhibitionHomeVisualTokens.textSecondary,
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            visualDensity: VisualDensity.compact,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(999),
             ),
-            child: Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Text(
-                    label,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w900,
-                      height: 1,
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  const Icon(
-                    Icons.arrow_forward_rounded,
-                    size: 17,
-                    color: Colors.white,
-                  ),
-                ],
-              ),
+            textStyle: theme.textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w900,
             ),
           ),
+          icon: Icon(
+            Icons.arrow_forward_rounded,
+            size: 17,
+            color: enabled
+                ? ExhibitionHomeVisualTokens.brandGoldDeep
+                : ExhibitionHomeVisualTokens.textSecondary,
+          ),
+          label: Text(label),
         ),
       ),
     );
@@ -584,21 +560,45 @@ class _HomeStateNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: ExhibitionHomeVisualTokens.cardBackground,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: ExhibitionHomeVisualTokens.borderSoft.withValues(alpha: 0.88),
+        ),
         boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: ExhibitionHomeVisualTokens.textPrimary,
-                fontWeight: FontWeight.w900,
-              ),
+            Row(
+              children: <Widget>[
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: ExhibitionHomeVisualTokens.brandGoldLight,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: const Padding(
+                    padding: EdgeInsets.all(7),
+                    child: Icon(
+                      Icons.info_outline_rounded,
+                      size: 16,
+                      color: ExhibitionHomeVisualTokens.brandGoldDeep,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      color: ExhibitionHomeVisualTokens.textPrimary,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Text(
               message,
               style: theme.textTheme.bodyMedium?.copyWith(
@@ -628,15 +628,28 @@ class _HomeLoadingNotice extends StatelessWidget {
       decoration: BoxDecoration(
         color: ExhibitionHomeVisualTokens.cardBackground,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: ExhibitionHomeVisualTokens.borderSoft.withValues(alpha: 0.88),
+        ),
         boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
         child: Row(
           children: <Widget>[
-            const Icon(
-              Icons.hourglass_empty_rounded,
-              color: ExhibitionHomeVisualTokens.brandGold,
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: ExhibitionHomeVisualTokens.brandGoldLight,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(7),
+                child: Icon(
+                  Icons.hourglass_empty_rounded,
+                  size: 16,
+                  color: ExhibitionHomeVisualTokens.brandGoldDeep,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -679,10 +692,13 @@ class _HomeForumFeedCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: ExhibitionHomeVisualTokens.cardBackground,
         borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: ExhibitionHomeVisualTokens.borderSoft.withValues(alpha: 0.88),
+        ),
         boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -730,17 +746,25 @@ class _HomeForumFeedCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 12),
-            OutlinedButton(
-              onPressed: onPressed,
-              style: OutlinedButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 14,
-                  vertical: 10,
+            const SizedBox(height: 8),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton.icon(
+                onPressed: onPressed,
+                style: TextButton.styleFrom(
+                  foregroundColor: ExhibitionHomeVisualTokens.brandGoldDeep,
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 8,
+                  ),
+                  textStyle: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
                 ),
+                icon: const Icon(Icons.arrow_forward_rounded, size: 17),
+                label: const Text('查看帖子'),
               ),
-              child: const Text('查看帖子'),
             ),
           ],
         ),

@@ -55,6 +55,112 @@ extension ExhibitionP0PayConsumerActions on ExhibitionConsumerLayer {
     );
   }
 
+  Future<ExhibitionLoadResult> loadProjectPricingSummary({
+    required String projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectPricingSummary(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionActionResult> createProjectAuthenticitySincerityOrder({
+    required String projectId,
+    required ProjectAuthenticitySincerityOrderCommand command,
+  }) {
+    return _actionService.createProjectAuthenticitySincerityOrder(
+      projectId: projectId,
+      command: command,
+    );
+  }
+
+  Future<ExhibitionActionResult> initProjectAuthenticitySincerityPayment({
+    required String projectId,
+    required String orderId,
+    required ProjectPricingPayInitCommand command,
+  }) {
+    return _actionService.initProjectAuthenticitySincerityPayment(
+      projectId: projectId,
+      orderId: orderId,
+      command: command,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectAuthenticitySincerityOrderStatus({
+    required String projectId,
+    required String orderId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectAuthenticitySincerityOrderStatus(
+      projectId: projectId,
+      orderId: orderId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<P0PayPaymentPollResult> pollProjectAuthenticitySincerityOrderStatus({
+    required String projectId,
+    required String orderId,
+    int maxAttempts = 6,
+    Duration interval = const Duration(seconds: 2),
+  }) {
+    return _loadService.pollProjectAuthenticitySincerityOrderStatus(
+      projectId: projectId,
+      orderId: orderId,
+      maxAttempts: maxAttempts,
+      interval: interval,
+    );
+  }
+
+  Future<ExhibitionActionResult> createProjectBidServiceFeeAuthorization({
+    required String projectId,
+    required BidServiceFeeAuthorizationCommand command,
+  }) {
+    return _actionService.createProjectBidServiceFeeAuthorization(
+      projectId: projectId,
+      command: command,
+    );
+  }
+
+  Future<ExhibitionActionResult> initProjectBidServiceFeeAuthorizationFreeze({
+    required String projectId,
+    required String authorizationId,
+    required ProjectPricingPayInitCommand command,
+  }) {
+    return _actionService.initProjectBidServiceFeeAuthorizationFreeze(
+      projectId: projectId,
+      authorizationId: authorizationId,
+      command: command,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectBidServiceFeeAuthorizationStatus({
+    required String projectId,
+    required String authorizationId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectBidServiceFeeAuthorizationStatus(
+      projectId: projectId,
+      authorizationId: authorizationId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<P0PayPaymentPollResult> pollProjectBidServiceFeeAuthorizationStatus({
+    required String projectId,
+    required String authorizationId,
+    int maxAttempts = 6,
+    Duration interval = const Duration(seconds: 2),
+  }) {
+    return _loadService.pollProjectBidServiceFeeAuthorizationStatus(
+      projectId: projectId,
+      authorizationId: authorizationId,
+      maxAttempts: maxAttempts,
+      interval: interval,
+    );
+  }
+
   Future<ExhibitionActionResult> submitP0PayFixedPriceBid({
     required String taskId,
     required P0PayFixedPriceBidCommand command,
@@ -166,6 +272,54 @@ extension _ExhibitionP0PayActionService on _ExhibitionActionService {
     );
   }
 
+  Future<ExhibitionActionResult> createProjectAuthenticitySincerityOrder({
+    required String projectId,
+    required ProjectAuthenticitySincerityOrderCommand command,
+  }) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(projectId),
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> initProjectAuthenticitySincerityPayment({
+    required String projectId,
+    required String orderId,
+    required ProjectPricingPayInitCommand command,
+  }) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
+        projectId,
+        orderId,
+      ),
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> createProjectBidServiceFeeAuthorization({
+    required String projectId,
+    required BidServiceFeeAuthorizationCommand command,
+  }) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizations(projectId),
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> initProjectBidServiceFeeAuthorizationFreeze({
+    required String projectId,
+    required String authorizationId,
+    required ProjectPricingPayInitCommand command,
+  }) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit(
+        projectId,
+        authorizationId,
+      ),
+      body: command.toJson(),
+    );
+  }
+
   Future<ExhibitionActionResult> submitP0PayFixedPriceBid({
     required String taskId,
     required P0PayFixedPriceBidCommand command,
@@ -205,6 +359,80 @@ extension _ExhibitionP0PayActionService on _ExhibitionActionService {
 }
 
 extension _ExhibitionP0PayLoadService on _ExhibitionLoadService {
+  Future<ExhibitionLoadResult> loadProjectPricingSummary({
+    required String projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectPricingSummary(projectId),
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectAuthenticitySincerityOrderStatus({
+    required String projectId,
+    required String orderId,
+    bool forceRefresh = false,
+  }) {
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
+        projectId,
+        orderId,
+      ),
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<P0PayPaymentPollResult> pollProjectAuthenticitySincerityOrderStatus({
+    required String projectId,
+    required String orderId,
+    int maxAttempts = 6,
+    Duration interval = const Duration(seconds: 2),
+  }) {
+    return _pollP0PayStatus(
+      kind: P0PayPaymentKind.projectAuthenticitySincerity,
+      maxAttempts: maxAttempts,
+      interval: interval,
+      loadStatus: () => loadProjectAuthenticitySincerityOrderStatus(
+        projectId: projectId,
+        orderId: orderId,
+        forceRefresh: true,
+      ),
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectBidServiceFeeAuthorizationStatus({
+    required String projectId,
+    required String authorizationId,
+    bool forceRefresh = false,
+  }) {
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationStatus(
+        projectId,
+        authorizationId,
+      ),
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<P0PayPaymentPollResult> pollProjectBidServiceFeeAuthorizationStatus({
+    required String projectId,
+    required String authorizationId,
+    int maxAttempts = 6,
+    Duration interval = const Duration(seconds: 2),
+  }) {
+    return _pollP0PayStatus(
+      kind: P0PayPaymentKind.serviceFeeAuthorization,
+      maxAttempts: maxAttempts,
+      interval: interval,
+      loadStatus: () => loadProjectBidServiceFeeAuthorizationStatus(
+        projectId: projectId,
+        authorizationId: authorizationId,
+        forceRefresh: true,
+      ),
+    );
+  }
+
   Future<ExhibitionLoadResult> loadP0PayInquiryDepositStatus({
     required String taskId,
     required String depositOrderId,
@@ -353,6 +581,13 @@ String? _p0PayStatusFromLoadResult(
           _p0PayReadText(
             _p0PayPayloadMap(payload['channelSummary'])?['status'],
           ),
+    P0PayPaymentKind.projectAuthenticitySincerity =>
+      _p0PayReadText(payload['orderStatus']) ??
+          _p0PayReadText(payload['depositStatus']) ??
+          _p0PayReadText(payload['status']) ??
+          _p0PayReadText(
+            _p0PayPayloadMap(payload['channelSummary'])?['status'],
+          ),
     P0PayPaymentKind.serviceFeeAuthorization =>
       _p0PayReadText(payload['authorizationStatus']) ??
           _p0PayReadText(payload['status']) ??
@@ -377,7 +612,9 @@ P0PayPaymentOutcome _p0PayOutcomeForStatus(
   }
 
   return switch (kind) {
-    P0PayPaymentKind.inquiryDeposit => _p0PayInquiryDepositOutcome(normalized),
+    P0PayPaymentKind.inquiryDeposit ||
+    P0PayPaymentKind.projectAuthenticitySincerity =>
+      _p0PayInquiryDepositOutcome(normalized),
     P0PayPaymentKind.serviceFeeAuthorization =>
       _p0PayServiceFeeAuthorizationOutcome(normalized),
   };
@@ -387,7 +624,7 @@ P0PayPaymentOutcome _p0PayInquiryDepositOutcome(String status) {
   return switch (status) {
     'pending_payment' || 'pending_user_confirm' => P0PayPaymentOutcome.pending,
     'refund_pending' => P0PayPaymentOutcome.processing,
-    'paid' || 'succeeded' => P0PayPaymentOutcome.success,
+    'paid' || 'frozen' || 'succeeded' => P0PayPaymentOutcome.success,
     'refunded' => P0PayPaymentOutcome.refunded,
     'deducted' => P0PayPaymentOutcome.deducted,
     'dispute_hold' => P0PayPaymentOutcome.held,
@@ -404,6 +641,7 @@ P0PayPaymentOutcome _p0PayServiceFeeAuthorizationOutcome(String status) {
     'pending_user_confirm' => P0PayPaymentOutcome.pending,
     'refund_pending' || 'release_pending' => P0PayPaymentOutcome.processing,
     'authorized' ||
+    'frozen' ||
     'pending_contract_confirm' ||
     'succeeded' => P0PayPaymentOutcome.success,
     'charged' => P0PayPaymentOutcome.charged,
@@ -420,6 +658,8 @@ P0PayPaymentOutcome _p0PayServiceFeeAuthorizationOutcome(String status) {
 String _p0PayUnavailableErrorCode(P0PayPaymentKind kind) {
   return switch (kind) {
     P0PayPaymentKind.inquiryDeposit => 'INQUIRY_DEPOSIT_RESULT_UNAVAILABLE',
+    P0PayPaymentKind.projectAuthenticitySincerity =>
+      'PROJECT_AUTHENTICITY_SINCERITY_RESULT_UNAVAILABLE',
     P0PayPaymentKind.serviceFeeAuthorization =>
       'SERVICE_FEE_AUTHORIZATION_RESULT_UNAVAILABLE',
   };

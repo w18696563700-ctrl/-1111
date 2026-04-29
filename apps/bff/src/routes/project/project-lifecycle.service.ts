@@ -261,7 +261,7 @@ export class ProjectLifecycleService {
     }
     if (action === 'withdrawPublished') {
       return message.includes('authorization')
-        ? '当前项目已有平台服务费授权记录，需先走安全释放链路后再撤回。'
+        ? '当前项目存在竞标服务费预授权额度记录，需先完成释放或平台处理后再撤回。'
         : '当前项目状态暂不支持撤回到预发布列表。';
     }
     if (action === 'archive') {

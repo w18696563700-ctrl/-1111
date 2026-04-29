@@ -1,7 +1,7 @@
 ---
 owner: Codex 总控
-status: frozen
-purpose: Freeze the bounded scope ruling for the current `payment MVP` planning object, deciding only what belongs to the MVP object, what stays outside, and how channel constraints must be treated, without unlocking implementation or rewriting current profile-side bounded packages.
+status: superseded
+purpose: Historical `payment MVP` planning scope ruling retained for audit only; no longer the current platform pricing scope owner after platform_pricing_rules_master_v1.
 layer: L0 SSOT
 freeze_date_local: 2026-04-14
 inputs_canonical:
@@ -16,6 +16,25 @@ inputs_canonical:
 ---
 
 # 《payment MVP 范围裁决单 V1》
+
+## Supersede Note
+
+自 `2026-04-29` 起，本文件不再作为当前收费范围总裁决使用。
+
+当前唯一收费母文件改为：
+
+- [platform_pricing_rules_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/platform_pricing_rules_master_v1.md)
+
+本文件现在只保留为历史 `payment MVP` planning 记录，供以下用途使用：
+
+1. 回看 `会员直购 / 履约保证金预授权` 的早期 planning 边界
+2. 对比旧 `payment MVP` 与新收费主线之间的差异
+3. 审计为什么旧 scope 已不再适合当前收费施工
+
+以下旧结论不再作为当前收费施工真相继续指挥：
+
+1. `payment MVP` 当前只允许纳入 `会员直购 + 履约保证金预授权`
+2. `project payment / order payment` 当前整体排除在收费主线之外
 
 ## 1. Scope
 

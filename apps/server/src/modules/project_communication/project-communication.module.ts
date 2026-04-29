@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectEntity } from '../project/entities/project.entity';
@@ -25,6 +26,7 @@ import { ProjectCommunicationRealtimeEventService } from './project-communicatio
     TypeOrmModule.forFeature([
       ProjectEntity,
       BidEntity,
+      BidParticipationRequestEntity,
       ProjectNameAccessRequestEntity,
       ProjectClarificationEntity,
       ProjectCommunicationThreadEntity,

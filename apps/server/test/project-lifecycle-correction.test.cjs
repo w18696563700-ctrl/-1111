@@ -355,6 +355,38 @@ test('project exit governance withdraws published project back to submitted with
   assert.equal(harness.auditLogs.at(-1)?.eventType, 'project_published_withdrawn_to_submitted');
 });
 
+test('project exit governance cancels uninitialized pending authorization on published withdrawal', async () => {
+  const harness = createHarness();
+  harness.projects.push(
+    createProject('project-withdraw-pending-auth', {
+      state: 'published',
+      publishedAt: new Date('2026-04-13T09:00:00.000Z')
+    })
+  );
+  harness.authorizations.push({
+    id: 'auth-pending-1',
+    taskId: 'project-withdraw-pending-auth',
+    bidId: 'bid-1',
+    status: 'pending_authorization',
+    paymentOrderId: null,
+    authorizationOrderId: null,
+    authorizedAt: null,
+    releasedAt: null,
+    chargedAt: null
+  });
+
+  const accepted = await harness.exitGovernanceService.withdrawPublishedProject(
+    { projectId: 'project-withdraw-pending-auth', reasonCode: 'content_needs_revision' },
+    createContext('project-withdraw-pending-auth')
+  );
+
+  assert.equal(accepted.state, 'submitted');
+  assert.equal(accepted.cancelledPendingAuthorizationCount, 1);
+  assert.equal(harness.projects[0].state, 'submitted');
+  assert.equal(harness.authorizations[0].status, 'cancelled');
+  assert.deepEqual(harness.auditLogs.at(-1)?.payload.cancelledPendingAuthorizationIds, ['auth-pending-1']);
+});
+
 test('project exit governance fail-closes active and authorized projects on published withdrawal', async () => {
   const activeHarness = createHarness();
   activeHarness.projects.push(

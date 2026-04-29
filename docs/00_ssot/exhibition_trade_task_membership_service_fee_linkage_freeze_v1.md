@@ -1,10 +1,10 @@
 ---
 title: exhibition_trade_task_membership_service_fee_linkage_freeze_v1
 owner: Codex 总控
-status: frozen
+status: superseded
 layer: L0 SSOT
 updated_at: 2026-04-28
-purpose: Freeze the L0 rules for future P0-Pay membership-tier service-fee linkage, without enabling tiered service fees or unlocking implementation.
+purpose: Historical membership-tier service-fee linkage freeze retained for audit and migration comparison only; no longer the current fee-rule owner after platform_pricing_rules_master_v1.
 inputs_canonical:
   - docs/00_ssot/exhibition_trade_task_payment_mainline_p0_pay_freeze_v1_3.md
   - docs/02_backend/exhibition_trade_task_p0_pay_server_truth_addendum_v1_3.md
@@ -15,6 +15,26 @@ inputs_canonical:
 ---
 
 # P0-Pay 会员分层服务费率联动 L0 规则冻结单 V1
+
+## Supersede Note
+
+自 `2026-04-29` 起，本文件不再作为当前费率总裁决使用。
+
+当前唯一收费母文件改为：
+
+- [platform_pricing_rules_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/platform_pricing_rules_master_v1.md)
+
+本文件保留为历史记录，仅用于：
+
+1. 回看旧 `固定 3% -> 会员分层费率联动` 的演进方案
+2. 对比旧 `No-Go` 逻辑与新收费母文件之间的差异
+3. 后续 contracts / backend / BFF / Flutter 重写时的迁移参考
+
+以下旧结论不再作为当前收费施工真相继续指挥：
+
+1. `当前正式费率仍固定 3%`
+2. `2.5% / 2.0% / 1.5%` 当前只能作为 future linkage 候选
+3. `会员分层费率正式启用 = No-Go`
 
 ## 0. 总裁决
 

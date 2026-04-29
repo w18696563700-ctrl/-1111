@@ -459,7 +459,8 @@ class _ProjectNameAccessThreadPageState
       await _handlePrimaryReview(data);
       return;
     }
-    if (actionKey == 'bid_submit.open') {
+    if (actionKey == 'bid_submit.open' ||
+        actionKey == 'bid_service_fee_authorization.open') {
       final projectId =
           _normalizeId(item.action?.params['projectId']) ??
           _normalizeId(data.projectId);
@@ -470,9 +471,18 @@ class _ProjectNameAccessThreadPageState
       if (!mounted) {
         return;
       }
-      await Navigator.of(
-        context,
-      ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(projectId));
+      final requestId =
+          _normalizeId(item.action?.params['bidParticipationRequestId']) ??
+          _normalizeId(data.requestId);
+      await Navigator.of(context).pushNamed(
+        ExhibitionRoutes.bidSubmitWithProjectId(
+          projectId,
+          bidParticipationRequestId:
+              actionKey == 'bid_service_fee_authorization.open'
+              ? requestId
+              : null,
+        ),
+      );
       return;
     }
     await _load();

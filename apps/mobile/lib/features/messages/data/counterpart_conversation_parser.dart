@@ -150,6 +150,11 @@ CounterpartConversationProjectGroupView _parseProjectGroup(Object? payload) {
       const <String>{'masked', 'visible'},
       'titleVisibility',
     ),
+    projectRelation: _enumValue(
+      _nullableString(map['projectRelation']) ?? 'unknown',
+      const <String>{'my_published', 'my_bid', 'unknown'},
+      'projectRelation',
+    ),
     projectState: _nullableString(map['projectState']),
     latestActivityAt: _requiredString(map, 'latestActivityAt'),
     orderSummary: _parseOrderSummary(
@@ -220,6 +225,7 @@ CounterpartConversationBusinessCardView _parseBusinessCard(Object? payload) {
   final map = _requiredMap(payload, 'counterpart conversation business card');
   final cardType = _enumValue(_requiredString(map, 'cardType'), const <String>{
     'project_name_access_request',
+    'bid_participation_request',
     'bid_thread',
     'project_clarification',
     'project_order',
@@ -277,8 +283,36 @@ MessageInteractionCounterpartView _parseCounterpart(Object? payload) {
   return MessageInteractionCounterpartView(
     organizationId: _requiredString(map, 'organizationId'),
     displayName: _requiredString(map, 'displayName'),
+    nickname: _nullableString(map['nickname']),
+    companyName:
+        _nullableString(map['companyName']) ??
+        _requiredString(map, 'displayName'),
     avatarUrl: _nullableString(map['avatarUrl']),
     role: _requiredString(map, 'role'),
+    certificationSummary: _parseCertificationSummary(
+      map['certificationSummary'],
+    ),
+  );
+}
+
+CounterpartCertificationSummaryView? _parseCertificationSummary(
+  Object? payload,
+) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(
+    payload,
+    'counterpart conversation certificationSummary',
+  );
+  return CounterpartCertificationSummaryView(
+    certificationStatus: _requiredString(map, 'certificationStatus'),
+    legalName: _requiredString(map, 'legalName'),
+    usccMasked: _nullableString(map['usccMasked']),
+    businessType: _nullableString(map['businessType']),
+    address: _nullableString(map['address']),
+    establishedAt: _nullableString(map['establishedAt']),
+    reviewedAt: _nullableString(map['reviewedAt']),
   );
 }
 
@@ -298,6 +332,7 @@ CounterpartConversationTruthAnchorView _parseTruthAnchor(Object? payload) {
   return CounterpartConversationTruthAnchorView(
     truthType: _enumValue(_requiredString(map, 'truthType'), const <String>{
       'project_name_access_request',
+      'bid_participation_request',
       'bid_thread',
       'project_clarification',
       'project_order',

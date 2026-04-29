@@ -207,12 +207,45 @@ codes:
   - code: PROJECT_CLARIFICATION_FORBIDDEN
     owner: Server
     meaning: The current actor or organization scope is not allowed to view or create project public clarification under the targeted project.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_REQUIRED
+    owner: Server
+    meaning: Project publish is blocked because the current project requires a bounded `200 元项目真实性诚意金` truth that is not yet in an admitted paid state.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED
+    owner: Server
+    meaning: The current `项目真实性诚意金` order-create request is missing required bounded fields, violates the frozen amount or currency rule, or cannot be admitted under the current project boundary.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND
+    owner: Server
+    meaning: The targeted current `项目真实性诚意金` order is absent, hidden, or not available under the current project and actor boundary.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_PAY_INIT_REJECTED
+    owner: Server
+    meaning: The current `项目真实性诚意金` pay-init request cannot enter the bounded channel-preparation branch under the current order truth.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE
+    owner: Server
+    meaning: The current project or targeted `项目真实性诚意金` order is not in a state that allows the requested publish gate, order-create, or pay-init transition.
   - code: BID_SUBMIT_INVALID
     owner: Server
     meaning: Bid submit request is missing required fields or violates minimum constraints.
   - code: BID_DUPLICATE_SUBMISSION
     owner: Server
     meaning: The same bid command was submitted more than once.
+  - code: BID_SERVICE_FEE_AUTHORIZATION_REQUIRED
+    owner: Server
+    meaning: Bid submit is blocked because the current actor does not yet have an admitted `approved` participation truth plus a `frozen` bounded `4000 元竞标服务费预授权额度`.
+  - code: BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED
+    owner: Server
+    meaning: The current `竞标服务费预授权额度` create request is missing required bounded fields, violates the frozen amount or currency rule, or cannot be admitted under the current project-bidder boundary.
+  - code: BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND
+    owner: Server
+    meaning: The targeted current `竞标服务费预授权额度` object is absent, hidden, or not available under the current project and bidder boundary.
+  - code: BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED
+    owner: Server
+    meaning: The current `竞标服务费预授权额度` freeze-init request cannot enter the bounded channel-preparation branch under the current authorization truth.
+  - code: BID_SERVICE_FEE_AUTHORIZATION_RELEASE_REJECTED
+    owner: Server
+    meaning: The current `竞标服务费预授权额度` release request is missing required bounded fields or cannot enter the bounded release branch under the current authorization truth.
+  - code: BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE
+    owner: Server
+    meaning: The current project-bidder relation or targeted `竞标服务费预授权额度` object is not in a state that allows the requested create, freeze-init, release, or bid-submit continuation.
   - code: BID_SEAT_INVALID
     owner: Server
     meaning: Seat lock, release, or status request is missing required fields or targets a bid seat object outside the bounded Package A contract truth.
@@ -237,6 +270,18 @@ codes:
   - code: BID_THREAD_FORBIDDEN
     owner: Server
     meaning: The current actor or organization scope is not an admitted participant for the targeted project-bid private thread.
+  - code: DEAL_CONFIRMATION_INVALID
+    owner: Server
+    meaning: The current deal-confirmation request body is missing one or more required bounded fields, uses unsupported confirmation role truth, or references confirmation material outside the current project-deal boundary.
+  - code: DEAL_CONFIRMATION_INVALID_STATE
+    owner: Server
+    meaning: The current bounded deal-confirmation object is not in a state that allows the requested create, advance, confirmation, or downstream charge transition.
+  - code: DEAL_CONFIRMATION_COUNTERPARTY_PENDING
+    owner: Server
+    meaning: The current bounded deal-confirmation object has not yet received the required counterparty confirmation and therefore cannot enter the next current requested transition.
+  - code: PRICING_RULE_VERSION_MISMATCH
+    owner: Server
+    meaning: The submitted pricing rule version, snapshot hash, amount, or bounded pricing object request does not match the current frozen pricing-rule truth.
   - code: THREAD_MESSAGE_INVALID
     owner: Server
     meaning: Thread message send request is missing required fields, violates the bounded Round A input contract, or targets a thread that cannot accept messages.

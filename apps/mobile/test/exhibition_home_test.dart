@@ -569,6 +569,36 @@ void main() {
   });
 
   testWidgets(
+    'exhibition home preserves visited tab state when switching back',
+    (WidgetTester tester) async {
+      final homeClient = FakeExhibitionHomeAggregationClient(
+        onLoad: (_) => contentHomeResult(),
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          initialRoute: '/',
+          exhibitionConsumerLayer: _projectListConsumer(),
+          exhibitionHomeAggregationClient: homeClient,
+          forumConsumerLayer: _forumConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('本省').first);
+      await tester.pumpAndSettle();
+      expect(find.text('当前还没拿到本省定位'), findsOneWidget);
+
+      await _selectHomeTab(tester, 'forum');
+      expect(find.text('重庆进场材料怎么提前锁仓'), findsOneWidget);
+
+      await _selectHomeTab(tester, 'project');
+      expect(find.text('当前还没拿到本省定位'), findsOneWidget);
+      expect(find.text('重新定位并刷新'), findsWidgets);
+    },
+  );
+
+  testWidgets(
     'exhibition home factory tab renders truthful list items from enterprise surface',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
@@ -901,10 +931,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('当前还没拿到本省定位'), findsOneWidget);
 
-      final relocateButton = find.widgetWithText(OutlinedButton, '重新定位并刷新');
+      final relocateButton = find.text('重新定位并刷新').last;
       await tester.ensureVisible(relocateButton);
       await tester.pumpAndSettle();
-      tester.widget<OutlinedButton>(relocateButton).onPressed!();
+      await tester.tap(relocateButton);
       await tester.pumpAndSettle();
 
       expect(resolveCount, 2);
@@ -934,7 +964,7 @@ void main() {
       await tester.tap(find.text('优选').last);
       await tester.pumpAndSettle();
       await _scrollTo(tester, find.text('工厂优选样本'));
-      expect(find.widgetWithText(OutlinedButton, '查看工厂详情'), findsOneWidget);
+      expect(find.text('查看工厂详情'), findsOneWidget);
     },
   );
 

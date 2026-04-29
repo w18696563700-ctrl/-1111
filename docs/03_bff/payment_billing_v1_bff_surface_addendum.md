@@ -17,6 +17,18 @@ inputs_canonical:
   - docs/00_ssot/my_building_v22_payment_billing_bff_surface_judgment_addendum.md
 ---
 
+## Pricing Mainline Override Note
+
+本文件继续保留 `我的楼 V2.2 支付 / 账单` 的只读 `status / explanation / handoff / dependency-reference` BFF 边界。
+
+但自 [platform_pricing_bff_surface_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/platform_pricing_bff_surface_master_v1.md) 生效后，本文件不得再被误读为当前展览收费执行主线的 `BFF` authority。
+
+当前正式解释固定如下：
+
+1. 本文件只承接 profile 读态 package
+2. 本文件不是当前 `200 / 4000 / deal confirmation` 收费主线 owner
+3. 当前平台收费执行主线的 `BFF` authority 仅以 `platform_pricing_bff_surface_master_v1.md` 为准
+
 # 我的楼 V2.2 支付 / 账单 BFF Surface Addendum
 
 ## A. Current Object

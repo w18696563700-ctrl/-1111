@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { CoreModule } from './core/core.module';
 import { RuntimeConfigService } from './core/runtime-config.service';
 import { BidModule } from './modules/bid/bid.module';
+import { BidParticipationRequestModule } from './modules/bid_participation_request/bid-participation-request.module';
 import { BidAwardModule } from './modules/bid_award/bid-award.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { AuditAdminModule } from './modules/audit/audit-admin.module';
@@ -56,6 +57,7 @@ import { UploadModule } from './modules/upload/upload.module';
     AuthModule,
     AuditAdminModule,
     BidModule,
+    BidParticipationRequestModule,
     BidAwardModule,
     ContentSafetyAdminModule,
     CreditConstraintsModule,

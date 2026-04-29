@@ -14,6 +14,8 @@ final class ExhibitionRoutes {
   static const String projectAlbum = '/exhibition/projects/album';
   static const String projectNameAccessThread =
       '/exhibition/projects/name-access-thread';
+  static const String bidParticipationThread =
+      '/exhibition/projects/bid-participation-thread';
   static const String counterpartConversation =
       '/exhibition/messages/counterpart-conversation';
   static const String bidThread = '/exhibition/bids/thread';
@@ -112,6 +114,18 @@ final class ExhibitionRoutes {
     required String requestId,
   }) {
     return _withQuery(projectNameAccessThread, <String, String>{
+      'threadId': threadId,
+      'projectId': projectId,
+      'requestId': requestId,
+    });
+  }
+
+  static String bidParticipationThreadWithIds({
+    required String threadId,
+    required String projectId,
+    required String requestId,
+  }) {
+    return _withQuery(bidParticipationThread, <String, String>{
       'threadId': threadId,
       'projectId': projectId,
       'requestId': requestId,
@@ -305,10 +319,17 @@ final class ExhibitionRoutes {
         path == supplierDisplayStatus;
   }
 
-  static String bidSubmitWithProjectId(String projectId, {String? mode}) {
+  static String bidSubmitWithProjectId(
+    String projectId, {
+    String? mode,
+    String? bidParticipationRequestId,
+  }) {
     return _withQuery(bidSubmit, <String, String>{
       'projectId': projectId,
       if (mode != null && mode.trim().isNotEmpty) 'mode': mode,
+      if (bidParticipationRequestId != null &&
+          bidParticipationRequestId.trim().isNotEmpty)
+        'bidParticipationRequestId': bidParticipationRequestId,
     });
   }
 

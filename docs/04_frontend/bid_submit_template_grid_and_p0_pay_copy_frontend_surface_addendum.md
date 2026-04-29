@@ -13,6 +13,18 @@ inputs_canonical:
   - docs/04_frontend/exhibition_trade_task_p0_pay_frontend_consumption_freeze_addendum_v1_3.md
 ---
 
+## Pricing Override Note
+
+本文件继续保留竞标提交页模板下载区、只读材料卡片和用户可读文案的页面结构价值。
+
+但自 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 生效后，本文件不再拥有收费真源 authority。
+
+当前正式补充冻结如下：
+
+1. 用户文案即使不再显示 `P0-Pay`，也不得继续以内层旧 `P0-Pay` 真源驱动当前收费主链
+2. 当前不得再把 `平台服务费率 / 预计服务费 / 旧预授权语义` 写成现行收费文案
+3. 当前收费主线的文案与 CTA 只以 `platform_pricing_frontend_consumption_master_v1.md` 为准
+
 # 《竞标提交页模板九宫格与平台服务费人话说明 frontend surface》
 
 ## 1. Scope

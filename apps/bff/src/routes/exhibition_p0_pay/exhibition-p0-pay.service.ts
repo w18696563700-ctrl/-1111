@@ -6,14 +6,23 @@ import { ExhibitionP0PayErrorService } from './exhibition-p0-pay-error.service';
 import { ExhibitionP0PayPayloadService } from './exhibition-p0-pay-payload.service';
 import {
   readAuthenticityMaterialsReadModel,
+  readBidServiceFeeAuthorizationCreateReadModel,
+  readBidServiceFeeAuthorizationFreezeInitReadModel,
+  readBidServiceFeeAuthorizationReleaseReadModel,
+  readBidServiceFeeAuthorizationStatusReadModel,
   readContractConfirmationReadModel,
+  readDealConfirmationAcceptedReadModel,
+  readDealConfirmationReadModel,
   readFixedPriceBidReadModel,
   readInquiryDepositOrderReadModel,
   readInquiryDepositPayInitReadModel,
   readInquiryDepositStatusReadModel,
   readInquiryQuotationReadModel,
   readInquiryResultReadModel,
-  readP0PaySummaryReadModel,
+  readPricingSummaryReadModel,
+  readProjectAuthenticitySincerityOrderReadModel,
+  readProjectAuthenticitySincerityPayInitReadModel,
+  readProjectAuthenticitySincerityStatusReadModel,
   readP0PayStateActionReadModel,
   readServiceFeeAuthorizationCreateReadModel,
   readServiceFeeAuthorizationStatusReadModel,
@@ -111,6 +120,23 @@ export class ExhibitionP0PayService {
     return this.post(path, body, headers, 'inquiry_deposit_create', readInquiryDepositOrderReadModel);
   }
 
+  createProjectAuthenticitySincerityOrder(
+    projectId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = this.inquiryDepositPath(projectId);
+    const body = this.payloads.toInquiryDepositOrderPayload(payload, idempotencyKey);
+    return this.post(
+      path,
+      body,
+      headers,
+      'project_authenticity_sincerity_create',
+      readProjectAuthenticitySincerityOrderReadModel,
+    );
+  }
+
   initInquiryDepositPay(
     taskId: string | undefined,
     depositOrderId: string | undefined,
@@ -123,6 +149,24 @@ export class ExhibitionP0PayService {
     return this.post(path, body, headers, 'inquiry_deposit_pay_init', readInquiryDepositPayInitReadModel);
   }
 
+  initProjectAuthenticitySincerityPayment(
+    projectId: string | undefined,
+    orderId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = `${this.inquiryDepositPath(projectId)}/${this.id(orderId, 'orderId')}/pay-init`;
+    const body = this.payloads.toPayInitPayload(payload, idempotencyKey);
+    return this.post(
+      path,
+      body,
+      headers,
+      'project_authenticity_sincerity_pay_init',
+      readProjectAuthenticitySincerityPayInitReadModel,
+    );
+  }
+
   getInquiryDepositOrder(
     taskId: string | undefined,
     depositOrderId: string | undefined,
@@ -130,6 +174,87 @@ export class ExhibitionP0PayService {
   ) {
     const path = `${this.inquiryDepositPath(taskId)}/${this.id(depositOrderId, 'depositOrderId')}`;
     return this.get(path, headers, 'inquiry_deposit_status', readInquiryDepositStatusReadModel);
+  }
+
+  getProjectAuthenticitySincerityOrder(
+    projectId: string | undefined,
+    orderId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    const path = `${this.inquiryDepositPath(projectId)}/${this.id(orderId, 'orderId')}`;
+    return this.get(
+      path,
+      headers,
+      'project_authenticity_sincerity_status',
+      readProjectAuthenticitySincerityStatusReadModel,
+    );
+  }
+
+  createBidServiceFeeAuthorization(
+    projectId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = this.bidServiceFeeAuthorizationPath(projectId);
+    const body = this.payloads.toBidServiceFeeAuthorizationPayload(payload, idempotencyKey);
+    return this.post(
+      path,
+      body,
+      headers,
+      'bid_service_fee_authorization_create',
+      readBidServiceFeeAuthorizationCreateReadModel,
+    );
+  }
+
+  initBidServiceFeeAuthorizationFreeze(
+    projectId: string | undefined,
+    authorizationId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = `${this.bidServiceFeeAuthorizationPath(projectId)}/${this.id(authorizationId, 'authorizationId')}/freeze-init`;
+    const body = this.payloads.toPayInitPayload(payload, idempotencyKey);
+    return this.post(
+      path,
+      body,
+      headers,
+      'bid_service_fee_authorization_freeze_init',
+      readBidServiceFeeAuthorizationFreezeInitReadModel,
+    );
+  }
+
+  getBidServiceFeeAuthorization(
+    projectId: string | undefined,
+    authorizationId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    const path = `${this.bidServiceFeeAuthorizationPath(projectId)}/${this.id(authorizationId, 'authorizationId')}`;
+    return this.get(
+      path,
+      headers,
+      'bid_service_fee_authorization_status',
+      readBidServiceFeeAuthorizationStatusReadModel,
+    );
+  }
+
+  releaseBidServiceFeeAuthorization(
+    projectId: string | undefined,
+    authorizationId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = `${this.bidServiceFeeAuthorizationPath(projectId)}/${this.id(authorizationId, 'authorizationId')}/release`;
+    const body = this.payloads.toBidServiceFeeAuthorizationReleasePayload(payload, idempotencyKey);
+    return this.post(
+      path,
+      body,
+      headers,
+      'bid_service_fee_authorization_release',
+      readBidServiceFeeAuthorizationReleaseReadModel,
+    );
   }
 
   submitInquiryQuotation(
@@ -165,9 +290,36 @@ export class ExhibitionP0PayService {
     return this.post(path, body, headers, 'contract_confirmation', readContractConfirmationReadModel);
   }
 
+  createDealConfirmation(
+    projectId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = `/server/projects/${this.id(projectId, 'projectId')}/deal-confirmations`;
+    const body = this.payloads.toDealConfirmationPayload(payload, idempotencyKey);
+    return this.post(path, body, headers, 'deal_confirmation', readDealConfirmationAcceptedReadModel);
+  }
+
+  getDealConfirmation(
+    projectId: string | undefined,
+    dealConfirmationId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    const path = `/server/projects/${this.id(projectId, 'projectId')}/deal-confirmations/${this.id(
+      dealConfirmationId,
+      'dealConfirmationId',
+    )}`;
+    return this.get(path, headers, 'deal_confirmation_detail', readDealConfirmationReadModel);
+  }
+
   getP0PaySummary(taskId: string | undefined, headers: IncomingHttpHeaders) {
-    const path = `/server/exhibition/trade-tasks/${this.id(taskId, 'taskId')}/p0-pay-summary`;
-    return this.get(path, headers, 'p0_pay_summary', readP0PaySummaryReadModel);
+    return this.getProjectPricingSummary(taskId, headers);
+  }
+
+  getProjectPricingSummary(projectId: string | undefined, headers: IncomingHttpHeaders) {
+    const path = `/server/project/${this.id(projectId, 'projectId')}/pricing-summary`;
+    return this.get(path, headers, 'pricing_summary', readPricingSummaryReadModel);
   }
 
   releaseNonWinning(
@@ -245,6 +397,10 @@ export class ExhibitionP0PayService {
 
   private inquiryDepositPath(taskId: string | undefined) {
     return `/server/exhibition/trade-tasks/${this.id(taskId, 'taskId')}/inquiry-deposit/orders`;
+  }
+
+  private bidServiceFeeAuthorizationPath(projectId: string | undefined) {
+    return `/server/projects/${this.id(projectId, 'projectId')}/bid-service-fee-authorizations`;
   }
 
   private stateActionPath(taskId: string | undefined) {

@@ -16,6 +16,16 @@ type Operation =
   | 'inquiry_result'
   | 'contract_confirmation'
   | 'p0_pay_summary'
+  | 'pricing_summary'
+  | 'project_authenticity_sincerity_create'
+  | 'project_authenticity_sincerity_pay_init'
+  | 'project_authenticity_sincerity_status'
+  | 'bid_service_fee_authorization_create'
+  | 'bid_service_fee_authorization_freeze_init'
+  | 'bid_service_fee_authorization_status'
+  | 'bid_service_fee_authorization_release'
+  | 'deal_confirmation'
+  | 'deal_confirmation_detail'
   | 'release_non_winning'
   | 'publisher_breach_release'
   | 'factory_refusal_breach_hold';
@@ -35,6 +45,16 @@ const OPERATION_CODES: Record<Operation, string> = {
   inquiry_result: 'INQUIRY_RESULT_PROCESSING_REJECTED',
   contract_confirmation: 'CONTRACT_CONFIRMATION_REJECTED',
   p0_pay_summary: 'P0_PAY_SUMMARY_UNAVAILABLE',
+  pricing_summary: 'PROJECT_PRICING_SUMMARY_UNAVAILABLE',
+  project_authenticity_sincerity_create: 'PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED',
+  project_authenticity_sincerity_pay_init: 'PROJECT_AUTHENTICITY_SINCERITY_PAY_INIT_REJECTED',
+  project_authenticity_sincerity_status: 'PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND',
+  bid_service_fee_authorization_create: 'BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED',
+  bid_service_fee_authorization_freeze_init: 'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED',
+  bid_service_fee_authorization_status: 'BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND',
+  bid_service_fee_authorization_release: 'BID_SERVICE_FEE_AUTHORIZATION_RELEASE_REJECTED',
+  deal_confirmation: 'DEAL_CONFIRMATION_INVALID',
+  deal_confirmation_detail: 'DEAL_CONFIRMATION_INVALID',
   release_non_winning: 'SERVICE_FEE_AUTHORIZATION_RESULT_UNAVAILABLE',
   publisher_breach_release: 'SERVICE_FEE_AUTHORIZATION_RESULT_UNAVAILABLE',
   factory_refusal_breach_hold: 'TRADE_TASK_INVALID_STATE',
@@ -114,12 +134,27 @@ export class ExhibitionP0PayErrorService {
       operation === 'service_fee_authorization_init' ||
       operation === 'inquiry_deposit_create' ||
       operation === 'inquiry_deposit_pay_init' ||
+      operation === 'project_authenticity_sincerity_create' ||
+      operation === 'project_authenticity_sincerity_pay_init' ||
+      operation === 'bid_service_fee_authorization_create' ||
+      operation === 'bid_service_fee_authorization_freeze_init' ||
+      operation === 'bid_service_fee_authorization_release' ||
       operation === 'contract_confirmation' ||
+      operation === 'deal_confirmation' ||
       operation === 'release_non_winning' ||
       operation === 'publisher_breach_release' ||
       operation === 'factory_refusal_breach_hold'
     ) {
       return 'IDEMPOTENCY_KEY_CONFLICT';
+    }
+    if (operation === 'project_authenticity_sincerity_status') {
+      return 'PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE';
+    }
+    if (operation === 'bid_service_fee_authorization_status') {
+      return 'BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE';
+    }
+    if (operation === 'deal_confirmation_detail') {
+      return 'DEAL_CONFIRMATION_INVALID_STATE';
     }
     return 'TRADE_TASK_INVALID_STATE';
   }
@@ -133,7 +168,25 @@ export class ExhibitionP0PayErrorService {
       case 'task_detail':
         return '当前交易任务详情暂不可用，请稍后再试。';
       case 'p0_pay_summary':
+      case 'pricing_summary':
         return '当前交易资金状态暂不可用，请稍后再试。';
+      case 'project_authenticity_sincerity_create':
+        return '当前项目真实性诚意金订单暂不可创建，请稍后再试。';
+      case 'project_authenticity_sincerity_pay_init':
+        return '当前项目真实性诚意金支付暂不可拉起，请稍后再试。';
+      case 'project_authenticity_sincerity_status':
+        return '当前项目真实性诚意金状态暂不可用，请稍后再试。';
+      case 'bid_service_fee_authorization_create':
+        return '当前竞标服务费预授权额度暂不可创建，请稍后再试。';
+      case 'bid_service_fee_authorization_freeze_init':
+        return '当前竞标服务费预授权额度冻结暂不可拉起，请稍后再试。';
+      case 'bid_service_fee_authorization_status':
+        return '当前竞标服务费预授权额度状态暂不可用，请稍后再试。';
+      case 'bid_service_fee_authorization_release':
+        return '当前竞标服务费预授权额度暂不可释放，请稍后再试。';
+      case 'deal_confirmation':
+      case 'deal_confirmation_detail':
+        return '当前成交确认暂不可用，请稍后再试。';
       case 'service_fee_authorization_status':
         return '当前平台服务费预授权状态暂不可用，请稍后再试。';
       case 'inquiry_deposit_status':

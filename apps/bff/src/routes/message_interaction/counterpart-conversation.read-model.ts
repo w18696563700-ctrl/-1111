@@ -5,8 +5,11 @@ export type CounterpartConversationDetailReadModel = {
   counterpart: {
     organizationId: string;
     displayName: string;
+    nickname: string | null;
+    companyName: string;
     avatarUrl: string | null;
     role: string;
+    certificationSummary: CounterpartCertificationSummary | null;
   };
   summary: {
     focusProjectId: string;
@@ -21,8 +24,10 @@ export type CounterpartConversationDetailReadModel = {
     projectId: string;
     projectDisplayTitle: string;
     titleVisibility: "masked" | "visible";
+    projectRelation: "my_published" | "my_bid" | "unknown";
     projectState: string | null;
     latestActivityAt: string;
+    pricingSummary?: Record<string, unknown>;
     orderSummary: {
       orderId: string;
       projectId: string | null;
@@ -65,9 +70,21 @@ export type CounterpartConversationDetailReadModel = {
   }>;
 };
 
+type CounterpartCertificationSummary = {
+  certificationStatus: string;
+  legalName: string;
+  usccMasked: string | null;
+  businessType: string | null;
+  address: string | null;
+  establishedAt: string | null;
+  reviewedAt: string | null;
+};
+
 const TITLE_VISIBILITY = new Set(["masked", "visible"]);
+const PROJECT_RELATIONS = new Set(["my_published", "my_bid", "unknown"]);
 const CARD_TYPES = new Set([
   "project_name_access_request",
+  "bid_participation_request",
   "bid_thread",
   "project_clarification",
   "project_order",
@@ -75,6 +92,7 @@ const CARD_TYPES = new Set([
 ]);
 const TRUTH_TYPES = new Set([
   "project_name_access_request",
+  "bid_participation_request",
   "bid_thread",
   "project_clarification",
   "project_order",
@@ -82,6 +100,9 @@ const TRUTH_TYPES = new Set([
 ]);
 const DETAIL_ACTION_KEYS = new Set([
   "project_name_access_thread.open",
+  "bid_participation_request.open",
+  "bid_service_fee_authorization.open",
+  "bid_submit.open",
   "bid_thread.open",
   "project_clarification.open",
   "order_detail.open",
@@ -139,7 +160,8 @@ function readProjectGroup(value: unknown) {
   );
   const cards = readRequiredArray(record.cards, "projectGroup.cards").map(
     readCard,
-  );
+  ).filter((card) => card.cardType !== "project_name_access_request");
+  const pricingSummary = readOptionalPricingSummary(record.pricingSummary);
   return {
     projectId,
     projectDisplayTitle: readRequiredString(
@@ -147,8 +169,10 @@ function readProjectGroup(value: unknown) {
       "projectGroup.projectDisplayTitle",
     ),
     titleVisibility: titleVisibility as "masked" | "visible",
+    projectRelation: readProjectRelation(record.projectRelation),
     projectState: readNullableString(record.projectState),
     latestActivityAt,
+    ...(pricingSummary ? { pricingSummary } : {}),
     orderSummary,
     ratingEntry: readRatingEntry(record.ratingEntry),
     cards: withOrderBusinessCard(cards, orderSummary, latestActivityAt),
@@ -263,7 +287,13 @@ function readCard(value: unknown) {
     );
   }
   const truthAnchor = readTruthAnchor(record.truthAnchor);
-  const detailRouteTarget = readDetailRouteTarget(record.detailRouteTarget);
+  const detailRouteTarget = normalizePricingGateRouteTarget({
+    cardType,
+    status: readNullableString(record.status),
+    truthAnchor,
+    detailRouteTarget: readDetailRouteTarget(record.detailRouteTarget),
+    pricingGateRequired: record.pricingGateRequired,
+  });
   validateBusinessCardTruth({
     cardType,
     truthAnchor,
@@ -279,6 +309,59 @@ function readCard(value: unknown) {
     truthAnchor,
     detailRouteTarget,
     decisionAvailability: readDecisionAvailability(record.decisionAvailability),
+  };
+}
+
+function readOptionalPricingSummary(value: unknown) {
+  if (value == null) {
+    return undefined;
+  }
+  const record = requireRecord(
+    value,
+    "Counterpart conversation pricingSummary must be an object.",
+  );
+  const messageDisplaySummary = record.messageDisplaySummary == null
+    ? null
+    : requireRecord(
+        record.messageDisplaySummary,
+        "Counterpart conversation pricingSummary.messageDisplaySummary must be an object.",
+      );
+  const readOnly = record.readOnly ?? messageDisplaySummary?.readOnly;
+  if (readOnly !== true) {
+    throw new Error("Counterpart conversation pricingSummary must be read-only.");
+  }
+  return record;
+}
+
+function normalizePricingGateRouteTarget(input: {
+  cardType: string;
+  status: string | null;
+  truthAnchor: ReturnType<typeof readTruthAnchor>;
+  detailRouteTarget: MessageInteractionRouteTarget | null;
+  pricingGateRequired: unknown;
+}) {
+  const shouldGate =
+    input.cardType === "bid_participation_request" &&
+    input.status === "approved" &&
+    input.detailRouteTarget?.actionKey === "bid_submit.open" &&
+    input.pricingGateRequired !== false;
+  if (!shouldGate) {
+    return input.detailRouteTarget;
+  }
+  const requestId = input.truthAnchor.requestId;
+  if (!requestId) {
+    throw new Error(
+      "Counterpart conversation bid participation pricing gate requires requestId.",
+    );
+  }
+  return {
+    objectType: "bid_service_fee_authorization",
+    actionKey: "bid_service_fee_authorization.open",
+    canonicalPath: `/api/app/project/${input.truthAnchor.projectId}/bid-service-fee-authorizations`,
+    params: {
+      projectId: input.truthAnchor.projectId,
+      bidParticipationRequestId: requestId,
+    },
   };
 }
 
@@ -432,8 +515,48 @@ function readCounterpart(value: unknown) {
       record.displayName,
       "counterpart.displayName",
     ),
+    nickname: readNullableString(record.nickname),
+    companyName:
+      readNullableString(record.companyName) ??
+      readRequiredString(record.displayName, "counterpart.displayName"),
     avatarUrl: readNullableString(record.avatarUrl),
     role: readRequiredString(record.role, "counterpart.role"),
+    certificationSummary: readCertificationSummary(record.certificationSummary),
+  };
+}
+
+function readProjectRelation(value: unknown) {
+  const relation = readNullableString(value) ?? "unknown";
+  if (!PROJECT_RELATIONS.has(relation)) {
+    throw new Error(
+      "Counterpart conversation project group returned an unsupported projectRelation.",
+    );
+  }
+  return relation as "my_published" | "my_bid" | "unknown";
+}
+
+function readCertificationSummary(value: unknown): CounterpartCertificationSummary | null {
+  if (value == null) {
+    return null;
+  }
+  const record = requireRecord(
+    value,
+    "Counterpart conversation counterpart.certificationSummary must be an object.",
+  );
+  return {
+    certificationStatus: readRequiredString(
+      record.certificationStatus,
+      "counterpart.certificationSummary.certificationStatus",
+    ),
+    legalName: readRequiredString(
+      record.legalName,
+      "counterpart.certificationSummary.legalName",
+    ),
+    usccMasked: readNullableString(record.usccMasked),
+    businessType: readNullableString(record.businessType),
+    address: readNullableString(record.address),
+    establishedAt: readNullableString(record.establishedAt),
+    reviewedAt: readNullableString(record.reviewedAt),
   };
 }
 

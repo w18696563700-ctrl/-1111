@@ -339,15 +339,14 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
 
 void main() {
   testWidgets(
-    'showcase list submits bid participation request and refreshes status',
+    'showcase list keeps name access compact and routes request through detail',
     (WidgetTester tester) async {
-      var listLoadCount = 0;
+      var detailLoadCount = 0;
       var requestCount = 0;
       final transport = FakeAppApiTransport(
         handlers:
             <String, Future<AppApiResponse> Function(AppApiRequest request)>{
               'GET /api/app/project/list': (AppApiRequest request) async {
-                listLoadCount += 1;
                 return AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
@@ -355,16 +354,30 @@ void main() {
                     'items': <Object?>[
                       _projectPayload(
                         projectId: 'project-1',
-                        nameAccess: <String, Object?>{
-                          'status': listLoadCount == 1
-                              ? 'requestable'
-                              : 'pending',
-                          'canRequest': listLoadCount == 1,
-                          if (listLoadCount > 1) 'requestId': 'request-1',
+                        nameAccess: const <String, Object?>{
+                          'status': 'requestable',
+                          'canRequest': true,
                         },
                       ),
                     ],
                   },
+                );
+              },
+              'GET /api/app/project/detail': (AppApiRequest request) async {
+                detailLoadCount += 1;
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectPayload(
+                    projectId: 'project-1',
+                    nameAccess: <String, Object?>{
+                      'status': detailLoadCount == 1
+                          ? 'requestable'
+                          : 'pending',
+                      'canRequest': detailLoadCount == 1,
+                      if (detailLoadCount > 1) 'requestId': 'request-1',
+                    },
+                  ),
                 );
               },
               'POST /api/app/project/bid-participation/request':
@@ -399,13 +412,20 @@ void main() {
       expect(find.text('项目名称需申请查看'), findsWidgets);
       expect(find.text('搭建地：重庆市'), findsOneWidget);
       expect(find.text('面积：200 ㎡'), findsOneWidget);
-      expect(find.text('申请参与竞标'), findsOneWidget);
+      expect(find.text('可申请参与'), findsOneWidget);
+      expect(find.widgetWithText(OutlinedButton, '申请参与竞标'), findsNothing);
+      expect(find.textContaining('当前项目需先申请参与竞标'), findsNothing);
 
-      await _tapVisible(tester, find.widgetWithText(OutlinedButton, '申请参与竞标'));
+      await _tapVisible(tester, find.text('项目名称需申请查看').first);
+
+      expect(find.text('项目详情'), findsWidgets);
+      await _tapVisible(tester, find.text('项目名称需申请查看').first);
+      await _tapVisible(
+        tester,
+        find.widgetWithText(FilledButton, '申请参与竞标', skipOffstage: false).last,
+      );
 
       expect(requestCount, 1);
-      expect(find.text('待审批'), findsOneWidget);
-      expect(find.text('等待审批中'), findsOneWidget);
     },
   );
 
@@ -437,6 +457,9 @@ void main() {
               'POST /api/app/project/bid-participation/request':
                   (AppApiRequest request) async {
                     requestCount += 1;
+                    expect(request.body, <String, Object?>{
+                      'projectId': 'project-1',
+                    });
                     return AppApiResponse(
                       statusCode: 202,
                       uri: request.uri,

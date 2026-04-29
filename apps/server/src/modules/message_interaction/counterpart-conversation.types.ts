@@ -1,11 +1,13 @@
 export type CounterpartConversationCardType =
   | 'project_name_access_request'
+  | 'bid_participation_request'
   | 'bid_thread'
   | 'project_clarification'
   | 'system_notice';
 
 export type CounterpartConversationTruthType =
   | 'project_name_access_request'
+  | 'bid_participation_request'
   | 'bid_thread'
   | 'project_clarification'
   | 'project_notice_event';
@@ -23,6 +25,26 @@ export type CounterpartConversationSummaryProjection = {
   text: string;
   projectCount: number;
   latestCardType: CounterpartConversationCardType;
+};
+
+export type CounterpartConversationCertificationSummaryProjection = {
+  certificationStatus: 'approved';
+  legalName: string;
+  usccMasked: string | null;
+  businessType: string | null;
+  address: string | null;
+  establishedAt: string | null;
+  reviewedAt: string | null;
+};
+
+export type CounterpartConversationCounterpartProjection = {
+  organizationId: string;
+  displayName: string;
+  nickname: string | null;
+  companyName: string;
+  avatarUrl: string | null;
+  role: 'counterpart';
+  certificationSummary: CounterpartConversationCertificationSummaryProjection | null;
 };
 
 export type CounterpartConversationTruthAnchorProjection = {
@@ -56,9 +78,10 @@ export type CounterpartConversationProjectGroupProjection = {
   projectId: string;
   projectDisplayTitle: string;
   titleVisibility: 'masked' | 'visible';
+  projectRelation: 'my_published' | 'my_bid' | 'unknown';
   projectState: string | null;
   latestActivityAt: string;
-  p0PaySummary?: Record<string, unknown>;
+  pricingSummary?: Record<string, unknown>;
   ratingEntry: CounterpartConversationRatingEntryProjection | null;
   cards: CounterpartConversationBusinessCardProjection[];
 };
@@ -77,26 +100,16 @@ export type CounterpartConversationListItemProjection = {
   interactionType: 'counterpart_conversation';
   conversationId: string;
   projectId: string;
-  counterpart: {
-    organizationId: string;
-    displayName: string;
-    avatarUrl: string | null;
-    role: 'counterpart';
-  };
+  counterpart: CounterpartConversationCounterpartProjection;
   summary: CounterpartConversationSummaryProjection;
-  p0PaySummary?: Record<string, unknown>;
+  pricingSummary?: Record<string, unknown>;
   updatedAt: string;
   routeTarget: CounterpartConversationRouteTarget;
 };
 
 export type CounterpartConversationDetailProjection = {
   conversationId: string;
-  counterpart: {
-    organizationId: string;
-    displayName: string;
-    avatarUrl: string | null;
-    role: 'counterpart';
-  };
+  counterpart: CounterpartConversationCounterpartProjection;
   summary: CounterpartConversationSummaryProjection;
   focusProjectId: string;
   latestActivityAt: string;

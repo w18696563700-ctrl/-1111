@@ -18,6 +18,18 @@ inputs_canonical:
 
 # 《项目发布对象簇｜预发布列表命名与发布确认重排 L3 backend truth freeze》
 
+## Pricing Override Note
+
+自 `2026-04-29` 起，若项目已接入
+[platform_pricing_backend_truth_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/02_backend/platform_pricing_backend_truth_master_v1.md)
+定义的收费主线，则本文件中关于 `publishProject = submitted -> published` 的旧 backend no-delta 结论只保留为历史最小闭环参考。
+
+当前收费主线下：
+
+1. `publishProject` 仍是 canonical path
+2. 但它不再是裸 `submitted -> published`
+3. 若当前项目要求 `200 元项目真实性诚意金` 且未满足 `paid`，则 `publishProject` 必须 fail closed
+
 ## 1. Truth Ownership
 
 - `Server` 继续是唯一 project lifecycle truth owner。
@@ -38,7 +50,7 @@ inputs_canonical:
 - `submitProject`
   继续只是：
   - `draft -> submitted`
-- `publishProject`
+- 历史最小闭环下，`publishProject`
   继续只是：
   - `submitted -> published`
 

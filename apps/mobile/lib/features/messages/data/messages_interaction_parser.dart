@@ -5,6 +5,7 @@ import 'package:mobile/features/messages/data/messages_registered_entry_registry
 
 const Set<String> _counterpartCardTypes = <String>{
   'project_name_access_request',
+  'bid_participation_request',
   'bid_thread',
   'project_clarification',
   'project_order',
@@ -175,8 +176,36 @@ Object _parseCounterpart(Object? raw) {
   return MessageInteractionCounterpartView(
     organizationId: organizationId,
     displayName: displayName,
+    nickname: _readNullableString(raw['nickname']),
+    companyName: _readNullableString(raw['companyName']) ?? displayName,
     avatarUrl: avatarUrl,
     role: role,
+    certificationSummary: _parseCertificationSummary(
+      raw['certificationSummary'],
+    ),
+  );
+}
+
+CounterpartCertificationSummaryView? _parseCertificationSummary(Object? raw) {
+  if (raw == null) {
+    return null;
+  }
+  if (raw is! Map) {
+    return null;
+  }
+  final legalName = _readRequiredString(raw, 'legalName');
+  final certificationStatus = _readRequiredString(raw, 'certificationStatus');
+  if (legalName == null || certificationStatus == null) {
+    return null;
+  }
+  return CounterpartCertificationSummaryView(
+    certificationStatus: certificationStatus,
+    legalName: legalName,
+    usccMasked: _readNullableString(raw['usccMasked']),
+    businessType: _readNullableString(raw['businessType']),
+    address: _readNullableString(raw['address']),
+    establishedAt: _readNullableString(raw['establishedAt']),
+    reviewedAt: _readNullableString(raw['reviewedAt']),
   );
 }
 

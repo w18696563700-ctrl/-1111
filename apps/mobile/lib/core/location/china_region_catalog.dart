@@ -278,16 +278,14 @@ class ChinaRegionCatalogLoader {
 
   static Future<String> _readRawCatalogJson() async {
     const assetPath = 'assets/location/china_province_city.json';
+    final bundled = await _readFromFlutterAssetBundleFile(assetPath);
+    if (bundled != null) {
+      return bundled;
+    }
+
     try {
       return await rootBundle.loadString(assetPath);
     } catch (error) {
-      final fallback = await _readFromFlutterAssetBundleFile(assetPath);
-      if (fallback != null) {
-        debugPrint(
-          'ChinaRegionCatalogLoader: fallback to app bundle file for $assetPath ($error)',
-        );
-        return fallback;
-      }
       final localFallback = await _readFromLocalFile(assetPath);
       if (localFallback != null) {
         debugPrint(

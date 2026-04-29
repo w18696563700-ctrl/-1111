@@ -5,7 +5,11 @@ import { DataSource, Repository } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
+import { BidParticipationRequestAccessService } from '../bid_participation_request/bid-participation-request-access.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
+import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
+import { bidServiceFeeAuthorizationRequired } from '../p0_pay/p0-pay.errors';
+import { BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT, PLATFORM_PRICING_AUDIT_ACTIONS } from '../p0_pay/p0-pay.state';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { BidSubmittedSeedService } from '../trading_im/bid-submitted-seed.service';
 import { BidSubmissionAttachmentTruthService } from './bid-submission-attachment-truth.service';
@@ -38,7 +42,10 @@ export class BidWriteService {
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly bidSubmissionAttachmentTruthService: BidSubmissionAttachmentTruthService,
     private readonly bidSubmittedSeedService: BidSubmittedSeedService,
-    private readonly presenter: BidPresenter
+    private readonly presenter: BidPresenter,
+    private readonly bidParticipationAccessService: BidParticipationRequestAccessService,
+    @InjectRepository(PlatformServiceFeeAuthorizationEntity)
+    private readonly authorizationRepository?: Repository<PlatformServiceFeeAuthorizationEntity>
   ) {}
 
   async submitBid(payload: Record<string, unknown>, context: RequestContext) {
@@ -54,6 +61,17 @@ export class BidWriteService {
         this.currentSessionVerificationService,
         project
       );
+    await this.bidParticipationAccessService.requireApprovedForOrganization(
+      project,
+      scope.organization.id,
+    );
+    const authorization = await this.requireFrozenPricingGate(
+      project,
+      scope.organization.id,
+      currentSession.userId,
+      scope.membership.roleKey,
+      context
+    );
     const bidId = randomUUID();
     const submittedAt = new Date();
     const submittedBy = this.resolveSubmittedBy(currentSession.actorId, currentSession.userId);
@@ -116,7 +134,7 @@ export class BidWriteService {
           actorRole: scope.membership.roleKey,
           beforeState: '',
           afterState: bid.state,
-          reason: `projectId=${project.id}; quoteAmount=${bid.quoteAmount}`,
+          reason: `projectId=${project.id}; quoteAmount=${bid.quoteAmount}; authorizationId=${authorization.id}; quotaAmount=${authorization.authorizationQuotaAmount}`,
           requestId: context.requestId,
           traceId: context.traceId,
           occurredAt: new Date()
@@ -208,5 +226,84 @@ export class BidWriteService {
 
   private isUniqueViolation(error: unknown) {
     return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505';
+  }
+
+  private async requireFrozenPricingGate(
+    project: ProjectEntity,
+    bidderOrganizationId: string,
+    actorUserId: string,
+    actorRole: string,
+    context: RequestContext
+  ) {
+    const authorization = await this.authorizationRepository?.findOne({
+      where: [
+        {
+          taskId: project.id,
+          bidderOrganizationId,
+          status: 'frozen',
+        },
+        {
+          taskId: project.id,
+          factoryOrganizationId: bidderOrganizationId,
+          status: 'frozen',
+        },
+      ],
+      order: { updatedAt: 'DESC' },
+    });
+    if (authorization && this.isFixedQuotaFrozen(authorization)) {
+      return authorization;
+    }
+
+    await this.recordBidSubmitBlockedByPricingGate(
+      project,
+      bidderOrganizationId,
+      actorUserId,
+      actorRole,
+      authorization?.status ?? 'missing',
+      context
+    );
+    throw bidServiceFeeAuthorizationRequired();
+  }
+
+  private isFixedQuotaFrozen(authorization: PlatformServiceFeeAuthorizationEntity) {
+    return (
+      authorization.status === 'frozen' &&
+      this.normalizeMoney(authorization.authorizationQuotaAmount) === BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT
+    );
+  }
+
+  private async recordBidSubmitBlockedByPricingGate(
+    project: ProjectEntity,
+    bidderOrganizationId: string,
+    actorUserId: string,
+    actorRole: string,
+    actualAuthorizationStatus: string,
+    context: RequestContext
+  ) {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.getRepository(IdentityAuditLogEntity).save({
+        id: randomUUID(),
+        objectType: 'bid_service_fee_authorization',
+        objectId: project.id,
+        objectNo: project.projectNo,
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.bidSubmitBlockedByPricingGate,
+        actorId: actorUserId,
+        actorRole,
+        beforeState: actualAuthorizationStatus,
+        afterState: 'blocked',
+        reason: `projectId=${project.id}; bidderOrganizationId=${bidderOrganizationId}; requiredAuthorizationStatus=frozen; requiredQuotaAmount=${BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT}; pricingErrorCode=BID_SERVICE_FEE_AUTHORIZATION_REQUIRED`,
+        requestId: context.requestId,
+        traceId: context.traceId,
+        occurredAt: new Date()
+      });
+    });
+  }
+
+  private normalizeMoney(value: string | number | null) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount.toFixed(2) : '';
   }
 }

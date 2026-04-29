@@ -19,11 +19,13 @@ export class P0PayPresenter {
     order: PaymentOrderEntity | null
   ) {
     const feeSnapshot = this.toAuthorizationFeeSnapshot(authorization);
+    const quotaAmount = authorization.authorizationQuotaAmount ?? '4000.00';
     return {
       authorizationId: authorization.id,
       authorizationStatus: authorization.status,
       quotedAmount: authorization.quotedAmount,
-      estimatedFeeAmount: authorization.estimatedFeeAmount,
+      authorizationQuotaAmount: quotaAmount,
+      quotaAmount,
       currency: 'CNY',
       ...feeSnapshot,
       authorization: {
@@ -33,7 +35,11 @@ export class P0PayPresenter {
         factoryOrganizationId: authorization.factoryOrganizationId,
         publisherOrganizationId: authorization.publisherOrganizationId,
         quotedAmount: authorization.quotedAmount,
-        estimatedFeeAmount: authorization.estimatedFeeAmount,
+        authorizationQuotaAmount: quotaAmount,
+        quotaAmount,
+        chargedAmountUsed: authorization.chargedAmountUsed,
+        releasedAmount: authorization.releasedAmount,
+        finalFeeAmount: authorization.finalFeeAmount,
         ...feeSnapshot,
         paymentChannel: authorization.paymentChannel,
         paymentOrderId: authorization.paymentOrderId,
@@ -152,7 +158,7 @@ export class P0PayPresenter {
       platformServiceFeeStatus: input.charge?.chargeStatus ?? input.authorization?.status ?? 'not_required',
       platformServiceFeeCharge: input.charge ? this.toChargeFeeSnapshot(input.charge) : null,
       nextAction:
-        input.confirmation.contractStatus === 'confirmed'
+        input.confirmation.contractStatus === 'confirmed_deal' || input.confirmation.contractStatus === 'confirmed'
           ? 'enter_fulfillment'
           : 'wait_counterparty_confirmation',
       updatedAt: input.confirmation.updatedAt
@@ -175,6 +181,9 @@ export class P0PayPresenter {
     return {
       finalConfirmedAmount: charge.finalConfirmedAmount,
       feeRate: charge.feeRate,
+      baseFeeAmount: charge.baseFeeAmount,
+      membershipDiscountRate: charge.membershipDiscountRate,
+      capAmount: charge.capAmount,
       feeRateLabel: charge.feeRateLabel || '默认费率 3.0%',
       feeRateSource: charge.feeRateSource || 'legacy_fixed_default',
       membershipTierSnapshot: charge.membershipTierSnapshot || 'none',
@@ -182,6 +191,7 @@ export class P0PayPresenter {
       feeRateSnapshotHash: charge.feeRateSnapshotHash,
       feeCalculatedAt: charge.feeCalculatedAt ?? charge.createdAt,
       finalFeeAmount: charge.finalFeeAmount,
+      releasedRemainderAmount: charge.releasedRemainderAmount,
       currency: 'CNY',
       chargeStatus: charge.chargeStatus,
       chargedAt: charge.chargedAt,

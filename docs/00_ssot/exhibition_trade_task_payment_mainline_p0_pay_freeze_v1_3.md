@@ -1,12 +1,10 @@
 ---
 owner: Codex 总控
-status: frozen
+status: superseded
 purpose: >
-  Freeze the exhibition trade task publishing and payment charging mainline for
-  P0-Pay, covering fixed-price bid task, inquiry quote task, platform service fee
-  preauthorization, inquiry sincerity money, post-deal platform service fee,
-  project authenticity, message-building handoff boundaries, payment channel
-  boundaries, stage gates, and day-level execution schedule.
+  Historical P0-Pay freeze retained for audit and migration comparison only.
+  This file no longer serves as the current platform pricing master after
+  platform_pricing_rules_master_v1.
 layer: L0 SSOT
 freeze_date_local: 2026-04-24
 version: V1.3
@@ -22,6 +20,26 @@ inputs_canonical:
 ---
 
 # 展览平台任务发布与交易收费规则母资料 V1.3｜P0-Pay 冻结版
+
+## Supersede Note
+
+自 `2026-04-29` 起，本文件不再作为当前收费母文件使用。
+
+当前唯一收费母文件改为：
+
+- [platform_pricing_rules_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/platform_pricing_rules_master_v1.md)
+
+本文件仅保留为历史 `P0-Pay` 冻结记录，用于：
+
+1. 审计回溯
+2. 差异对比
+3. 后续 contracts / backend / BFF / Flutter 重基线时的迁移参考
+
+以下旧结论不再作为当前收费施工真相继续指挥：
+
+1. `询价报价单 200 元发单诚意金` 作为唯一 `200 元` 收费对象
+2. `固定 3%` 作为当前唯一平台服务费规则
+3. `按报价金额动态预授权` 作为当前唯一预授权额度模型
 
 ## 0. 总裁决
 

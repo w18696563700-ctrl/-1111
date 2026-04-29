@@ -69,6 +69,46 @@ final class ExhibitionCanonicalPaths {
   static const String uploadConfirm = '/api/app/file/upload/confirm';
   static const String p0PayTradeTaskCreate = '/api/app/exhibition/trade-tasks';
 
+  static String projectPricingSummary(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/pricing-summary';
+  }
+
+  static String projectAuthenticitySincerityOrders(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/authenticity-sincerity/orders';
+  }
+
+  static String projectAuthenticitySincerityPayInit(
+    String projectId,
+    String orderId,
+  ) {
+    return '${projectAuthenticitySincerityOrders(projectId)}/${Uri.encodeComponent(orderId)}/pay-init';
+  }
+
+  static String projectAuthenticitySincerityOrderStatus(
+    String projectId,
+    String orderId,
+  ) {
+    return '${projectAuthenticitySincerityOrders(projectId)}/${Uri.encodeComponent(orderId)}';
+  }
+
+  static String projectBidServiceFeeAuthorizations(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/bid-service-fee-authorizations';
+  }
+
+  static String projectBidServiceFeeAuthorizationFreezeInit(
+    String projectId,
+    String authorizationId,
+  ) {
+    return '${projectBidServiceFeeAuthorizations(projectId)}/${Uri.encodeComponent(authorizationId)}/freeze-init';
+  }
+
+  static String projectBidServiceFeeAuthorizationStatus(
+    String projectId,
+    String authorizationId,
+  ) {
+    return '${projectBidServiceFeeAuthorizations(projectId)}/${Uri.encodeComponent(authorizationId)}';
+  }
+
   static String myProjectDetail(String projectId) {
     return '$myProjectList/${Uri.encodeComponent(projectId)}';
   }

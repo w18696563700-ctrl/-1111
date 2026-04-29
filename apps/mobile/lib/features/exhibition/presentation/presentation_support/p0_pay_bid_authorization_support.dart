@@ -8,19 +8,22 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
   List<Widget> _buildP0PayFixedPriceBidAuthorizationFields() {
     return <Widget>[
       Text(
-        '平台成交服务费确认',
+        '竞标服务费预授权确认',
         style: Theme.of(
           context,
         ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
       ),
       const SizedBox(height: 8),
-      const _DetailLine(label: '服务费确认', value: '平台成交服务费确认', highlight: true),
-      const _DetailLine(label: '平台服务费率', value: '待平台返回'),
+      const _DetailLine(
+        label: '预授权额度',
+        value: '固定 4000 元竞标服务费预授权额度',
+        highlight: true,
+      ),
       _DetailLine(label: '预计服务费', value: _p0PayEstimatedFeeText()),
       const _StateMessage(
         title: '你需要做什么',
         body:
-            '选择报价有效期，核对平台服务费说明，并勾选规则确认。提交报价后，平台会返回本次费率、费率来源和预计服务费；本页不本地计算正式金额。',
+            '选择报价有效期，核对 4000 元竞标服务费预授权额度，并勾选规则确认。Flutter 不计算服务费，提交前只确认 Server/BFF 返回的冻结状态。',
       ),
       const SizedBox(height: 12),
       _buildP0PayQuoteValiditySelector(),
@@ -103,7 +106,11 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
   }
 
   String _p0PayEstimatedFeeText() {
-    return '待平台返回，正式金额以平台返回为准';
+    final quoteAmount = double.tryParse(_quoteAmountController.text.trim());
+    if (quoteAmount == null || quoteAmount <= 0) {
+      return '固定 4000 元；成交后按平台规则扣取服务费，剩余额度原路释放';
+    }
+    return '固定 4000 元；当前报价仅用于竞标材料，Flutter 不本地计算服务费';
   }
 }
 
@@ -128,8 +135,11 @@ String _p0PayServiceFeeRequirementSummary(Object? payload) {
   );
   final quotedAmount =
       _p0PayRequirementText(requirement, 'quotedAmount') ?? '未提供';
-  final estimatedFeeAmount =
-      _p0PayRequirementText(requirement, 'estimatedFeeAmount') ?? '待平台返回';
+  final quotaAmount =
+      _p0PayRequirementText(requirement, 'quotaAmount') ??
+      _p0PayRequirementText(requirement, 'authorizationQuotaAmount') ??
+      _p0PayRequirementText(requirement, 'estimatedFeeAmount') ??
+      '4000.00';
   final currency = _p0PayRequirementText(requirement, 'currency') ?? 'CNY';
   final authorizationStatus =
       _p0PayRequirementText(requirement, 'authorizationStatus') ?? '待预授权';
@@ -139,7 +149,7 @@ String _p0PayServiceFeeRequirementSummary(Object? payload) {
     '费率 ${_p0PayFeeRateDisplay(label: feeRateLabel, rate: feeRate)}',
     if (membershipTier != null) '会员等级 $membershipTier',
     if (feeRateSource != null) '来源 $feeRateSource',
-    '预计服务费 $estimatedFeeAmount $currency',
+    '预授权额度 $quotaAmount $currency',
     '状态 $authorizationStatus',
     if (ruleVersion != null) '规则 $ruleVersion',
   ].join('；');
@@ -163,9 +173,10 @@ String _p0PayAuthorizationStatusText(ExhibitionLoadResult? result) {
     _normalizeDynamicText(payload?['membershipTierSnapshot']) ??
         _normalizeDynamicText(payload?['membershipTierAtAuthorization']),
   );
-  final estimatedFeeAmount = _normalizeDynamicText(
-    payload?['estimatedFeeAmount'],
-  );
+  final quotaAmount =
+      _normalizeDynamicText(payload?['quotaAmount']) ??
+      _normalizeDynamicText(payload?['authorizationQuotaAmount']) ??
+      _normalizeDynamicText(payload?['estimatedFeeAmount']);
   final currency = _normalizeDynamicText(payload?['currency']) ?? 'CNY';
   final suffix = status == 'authorized' ? '；已预授权，不是已扣款' : '';
   return <String>[
@@ -173,7 +184,7 @@ String _p0PayAuthorizationStatusText(ExhibitionLoadResult? result) {
     if (feeRate != null || feeRateLabel != null)
       '费率：${_p0PayFeeRateDisplay(label: feeRateLabel, rate: feeRate)}',
     if (membershipTier != null) '会员等级：$membershipTier',
-    if (estimatedFeeAmount != null) '预计服务费：$estimatedFeeAmount $currency',
+    if (quotaAmount != null) '预授权额度：$quotaAmount $currency',
   ].join('；');
 }
 

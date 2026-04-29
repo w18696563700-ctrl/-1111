@@ -37,6 +37,18 @@ inputs_canonical:
 
 # 《项目发布对象簇 L3 backend truth 一致性刷新补充单》
 
+## Pricing Boundary Note
+
+自 `2026-04-29` 起，若当前项目已接入
+[platform_pricing_backend_truth_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/02_backend/platform_pricing_backend_truth_master_v1.md)
+定义的收费主线，则本文件中对 `payment / billing` 的 generic excluded 结论，不得被误读成自动否掉该收费子主线。
+
+当前正式解释固定为：
+
+1. generic `payment / billing center` 仍然 excluded
+2. 但 `project publish -> bid participation request -> bid submit` 上的收费子主线，已由 `platform_pricing_backend_truth_master_v1` 单独取得 authority
+3. 本对象簇继续持有 `project publish / bid submit` 主锚点，但收费专属聚合归 `platform_pricing` 子主线持有
+
 ## 1. Scope
 
 - 本冻结单只覆盖：

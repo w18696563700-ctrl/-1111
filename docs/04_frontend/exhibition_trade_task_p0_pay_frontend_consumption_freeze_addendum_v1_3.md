@@ -1,6 +1,6 @@
 ---
 owner: Codex 总控
-status: frozen
+status: superseded
 purpose: >
   Freeze the L5 Flutter consumption boundary for `exhibition_trade_task_p0_pay`,
   covering task-publish type selection, authenticity materials, fixed-price bid
@@ -27,6 +27,25 @@ inputs_canonical:
   - docs/04_frontend/frontend_ssot.md
   - docs/04_frontend/flutter_screen_map.md
 ---
+
+## Supersede Note
+
+本文件已被 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 正式覆盖。
+
+自 `2026-04-29` 起，本文件不再作为当前收费 `L5 Flutter consumption` authority。
+
+以下旧 Flutter 收费消费语义当前只保留为历史迁移参考，不得继续指挥现行收费施工：
+
+1. 以 `trade-task` 作为当前收费 Flutter 主对象
+2. 以 `询价发单诚意金` 作为当前唯一 `200` 对象
+3. 以 `3% + 预计平台服务费 + service-fee preauthorization` 作为当前 `4000` 主消费面
+4. 以 `p0-pay-summary` 作为当前唯一收费只读摘要
+
+本文件当前只保留三类用途：
+
+1. 审计回溯
+2. 差异比对
+3. 旧实现迁移参考
 
 # 展览平台任务发布与交易收费规则 P0-Pay Flutter Consumption Freeze V1.3
 

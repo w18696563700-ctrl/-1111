@@ -313,20 +313,31 @@ void main() {
     WidgetTester tester,
   ) async {
     final transport = FakeAppApiTransport(
-      handlers:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/project/detail': (AppApiRequest request) async {
-              expect(request.uri.queryParameters['projectId'], 'project-1');
+      handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+        'GET /api/app/project/detail': (AppApiRequest request) async {
+          expect(request.uri.queryParameters['projectId'], 'project-1');
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _projectDetailPayload(
+              projectId: 'project-1',
+              state: 'published',
+            ),
+          );
+        },
+        'GET ${ExhibitionCanonicalPaths.projectPricingSummary('project-1')}':
+            (AppApiRequest request) async {
               return AppApiResponse(
                 statusCode: 200,
                 uri: request.uri,
-                body: _projectDetailPayload(
-                  projectId: 'project-1',
-                  state: 'published',
-                ),
+                body: const <String, Object?>{
+                  'projectId': 'project-1',
+                  'readOnly': true,
+                  'updatedAt': '2026-05-15T00:00:00Z',
+                },
               );
             },
-          },
+      },
     );
     ExhibitionConsumerLayer.install(
       ExhibitionConsumerLayer(client: _client(transport)),
@@ -338,7 +349,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '继续提交竞标'), findsOneWidget);
     expect(find.text('先参与竞标'), findsNothing);
     expect(find.text('项目沟通'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '项目澄清'), findsNothing);
@@ -367,32 +378,32 @@ void main() {
             ),
           );
         },
-        'GET ${ExhibitionCanonicalPaths.p0PaySummary('task-1')}':
+        'GET ${ExhibitionCanonicalPaths.projectPricingSummary('project-1')}':
             (AppApiRequest request) async {
               return AppApiResponse(
                 statusCode: 200,
                 uri: request.uri,
                 body: const <String, Object?>{
-                  'taskId': 'task-1',
-                  'taskType': 'fixed_price_bid',
-                  'platformServiceFee': <String, Object?>{
-                    'status': 'authorized',
-                    'estimatedFeeAmount': '2400.00',
+                  'projectId': 'project-1',
+                  'bidderPricing': <String, Object?>{
+                    'bidServiceFeeAuthorizationStatus': 'frozen',
+                    'quotaAmount': '4000.00',
+                    'nextAction': <String, Object?>{
+                      'objectType': 'bid_service_fee_authorization',
+                      'actionKey': 'bid_service_fee_authorization.open',
+                      'canonicalPath':
+                          '/api/app/project/project-1/bid-service-fee-authorizations',
+                    },
                   },
-                  'inquiryDeposit': null,
-                  'contractConfirmation': <String, Object?>{
-                    'contractStatus': 'pending',
+                  'projectAuthenticitySincerity': <String, Object?>{
+                    'status': 'paid',
+                    'amount': '200.00',
                   },
+                  'dealSummary': <String, Object?>{'dealStatus': 'pending'},
                   'messageDisplaySummary': <String, Object?>{
                     'displayAllowed': true,
                     'readOnly': true,
-                    'statusTextKey': 'platform_service_fee_authorized',
-                    'routeTarget': <String, Object?>{
-                      'objectType': 'trade_task',
-                      'actionKey': 'p0_pay_summary.read',
-                      'canonicalPath':
-                          '/api/app/exhibition/trade-tasks/task-1/p0-pay-summary',
-                    },
+                    'statusTextKey': 'bid_service_fee_authorization_frozen',
                   },
                   'updatedAt': '2026-05-15T00:00:00Z',
                 },
@@ -415,11 +426,12 @@ void main() {
     expect(requestedPaths, contains(ExhibitionCanonicalPaths.projectDetail));
     expect(
       requestedPaths,
-      contains(ExhibitionCanonicalPaths.p0PaySummary('task-1')),
+      contains(ExhibitionCanonicalPaths.projectPricingSummary('project-1')),
     );
 
-    expect(find.text('P0-Pay 只读状态'), findsOneWidget);
-    expect(find.textContaining('平台服务费：已预授权'), findsOneWidget);
+    expect(find.text('平台收费只读状态'), findsOneWidget);
+    expect(find.textContaining('竞标服务费预授权：已冻结'), findsOneWidget);
+    expect(find.textContaining('预授权额度：4000.00'), findsOneWidget);
     expect(find.textContaining('合同确认：待处理'), findsOneWidget);
     expect(find.textContaining('不执行支付'), findsOneWidget);
     expect(find.textContaining('只读 routeTarget'), findsOneWidget);

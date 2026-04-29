@@ -87,8 +87,11 @@ test("message interactions route is materialized and no longer router 404 locall
         counterpart: {
           organizationId: "org-1",
           displayName: "重庆海川展览工厂",
+          nickname: null,
+          companyName: "重庆海川展览工厂",
           avatarUrl: null,
           role: "counterpart",
+          certificationSummary: null,
         },
         summary: {
           focusProjectId: projectId,
@@ -329,14 +332,13 @@ test("message interactions service forwards frozen server path and hides raw rou
                 latestCardType: "project_order",
               },
               updatedAt: "2026-04-29T10:00:00.000Z",
-              p0PaySummary: {
-                taskId: "project-1",
-                taskType: "fixed_price_bid",
-                platformServiceFee: {
+              pricingSummary: {
+                projectId: "project-1",
+                bidServiceFeeAuthorization: {
                   status: "charged",
                   finalFeeAmount: "2700.00",
                 },
-                contractConfirmation: { status: "confirmed" },
+                dealConfirmation: { status: "confirmed_deal" },
                 messageDisplaySummary: {
                   displayAllowed: true,
                   readOnly: true,
@@ -383,8 +385,11 @@ test("message interactions service forwards frozen server path and hides raw rou
         counterpart: {
           organizationId: "org-1",
           displayName: "重庆海川展览工厂",
+          nickname: null,
+          companyName: "重庆海川展览工厂",
           avatarUrl: null,
           role: "counterpart",
+          certificationSummary: null,
         },
         summary: {
           focusProjectId: "project-1",
@@ -393,14 +398,13 @@ test("message interactions service forwards frozen server path and hides raw rou
           projectCount: 1,
           latestCardType: "project_order",
         },
-        p0PaySummary: {
-          taskId: "project-1",
-          taskType: "fixed_price_bid",
-          platformServiceFee: {
+        pricingSummary: {
+          projectId: "project-1",
+          bidServiceFeeAuthorization: {
             status: "charged",
             finalFeeAmount: "2700.00",
           },
-          contractConfirmation: { status: "confirmed" },
+          dealConfirmation: { status: "confirmed_deal" },
           messageDisplaySummary: {
             displayAllowed: true,
             readOnly: true,
@@ -454,7 +458,7 @@ test("message interactions service forwards frozen server path and hides raw rou
   );
 });
 
-test("message interactions service preserves counterpart displayName shape without name ownership", async () => {
+test("message interactions service preserves server-owned counterpart identity without name ownership", async () => {
   const service = new MessageInteractionService(
     {
       async get(pathName, options) {
@@ -473,9 +477,19 @@ test("message interactions service preserves counterpart displayName shape witho
                 displayName: "重庆海川展览展示有限公司",
                 legalName: "BFF 不应读取这个字段",
                 certifiedCompanyName: "BFF 不应新增这个字段",
-                nickname: "BFF 不应回退到昵称",
+                nickname: "海川小张",
+                companyName: "重庆海川展览展示有限公司",
                 avatarUrl: null,
                 role: "counterpart",
+                certificationSummary: {
+                  certificationStatus: "approved",
+                  legalName: "重庆海川展览展示有限公司",
+                  usccMasked: "9150****1234",
+                  businessType: "有限责任公司",
+                  address: "重庆市",
+                  establishedAt: "2020-01-01",
+                  reviewedAt: "2026-04-29T09:00:00.000Z",
+                },
               },
               summary: {
                 focusProjectId: "project-1",
@@ -515,15 +529,29 @@ test("message interactions service preserves counterpart displayName shape witho
   const result = await service.getInteractions(undefined, {});
   assert.deepEqual(Object.keys(result.items[0].counterpart).sort(), [
     "avatarUrl",
+    "certificationSummary",
+    "companyName",
     "displayName",
+    "nickname",
     "organizationId",
     "role",
   ]);
   assert.deepEqual(result.items[0].counterpart, {
     organizationId: "org-certified",
     displayName: "重庆海川展览展示有限公司",
+    nickname: "海川小张",
+    companyName: "重庆海川展览展示有限公司",
     avatarUrl: null,
     role: "counterpart",
+    certificationSummary: {
+      certificationStatus: "approved",
+      legalName: "重庆海川展览展示有限公司",
+      usccMasked: "9150****1234",
+      businessType: "有限责任公司",
+      address: "重庆市",
+      establishedAt: "2020-01-01",
+      reviewedAt: "2026-04-29T09:00:00.000Z",
+    },
   });
 });
 
@@ -561,6 +589,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
               projectId: "project-1",
               projectDisplayTitle: "西洽会 - 泸州",
               titleVisibility: "visible",
+              projectRelation: "my_published",
               projectState: "published",
               latestActivityAt: "2026-04-29T10:00:00.000Z",
               orderSummary: {
@@ -631,6 +660,29 @@ test("counterpart conversation detail service forwards frozen server path and hi
                   },
                   decisionAvailability: null,
                 },
+                {
+                  cardId: "bid-participation:request-2",
+                  cardType: "bid_participation_request",
+                  title: "竞标申请已通过",
+                  summary: "供应商已获得竞标资格。",
+                  status: "approved",
+                  updatedAt: "2026-04-29T10:02:00.000Z",
+                  truthAnchor: {
+                    truthType: "bid_participation_request",
+                    projectId: "project-1",
+                    requestId: "request-2",
+                    threadId: "request-2",
+                  },
+                  detailRouteTarget: {
+                    objectType: "bid_submit",
+                    actionKey: "bid_submit.open",
+                    canonicalPath: "/api/app/bid/submit",
+                    params: {
+                      projectId: "project-1",
+                    },
+                  },
+                  decisionAvailability: null,
+                },
               ],
             },
           ],
@@ -660,6 +712,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
   );
   assert.equal(result.projectGroups[0].projectDisplayTitle, "西洽会 - 泸州");
   assert.equal(result.projectGroups[0].titleVisibility, "visible");
+  assert.equal(result.projectGroups[0].projectRelation, "my_published");
   assert.deepEqual(result.projectGroups[0].orderSummary, {
     orderId: "order-1",
     projectId: "project-1",
@@ -675,6 +728,18 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.deepEqual(orderCard.detailRouteTarget.params, {
     projectId: "project-1",
     orderId: "order-1",
+  });
+  const bidParticipationCard = result.projectGroups[0].cards.find(
+    (card) => card.cardType === "bid_participation_request",
+  );
+  assert.deepEqual(bidParticipationCard.detailRouteTarget, {
+    objectType: "bid_service_fee_authorization",
+    actionKey: "bid_service_fee_authorization.open",
+    canonicalPath: "/api/app/project/project-1/bid-service-fee-authorizations",
+    params: {
+      projectId: "project-1",
+      bidParticipationRequestId: "request-2",
+    },
   });
   assert.deepEqual(result.projectGroups[0].ratingEntry, {
     orderId: "order-1",

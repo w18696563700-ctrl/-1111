@@ -277,8 +277,10 @@ test('forum interaction inbox replies projects comments and comment replies', as
     ['forum-reply:comment-on-comment', 'forum-reply:comment-on-post']
   );
   assert.equal(result.items[0].tab, 'replies');
-  assert.equal(result.items[0].targetType, 'forum_comment');
+  assert.equal(result.items[0].targetType, 'forum_post');
+  assert.equal(result.items[0].targetId, 'post-other-1');
   assert.equal(result.items[1].targetType, 'forum_post');
+  assert.equal(result.items[1].targetId, 'post-owner-1');
   assert.equal(result.page.hasMore, false);
 });
 

@@ -15,6 +15,18 @@ inputs_canonical:
   - docs/03_bff/membership_entitlement_v1_bff_surface_addendum.md
 ---
 
+## Pricing Mainline Override Note
+
+本文件继续保留 `payment MVP / 会员直购` 的独立保留位意义。
+
+但自 [platform_pricing_bff_surface_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/platform_pricing_bff_surface_master_v1.md) 生效后，本文件不得再被误读为当前展览收费执行主线的 `BFF` authority。
+
+当前正式解释固定如下：
+
+1. 会员直购不是当前展览收费最小闭环的一部分
+2. 本文件不是当前 `200 / 4000 / deal confirmation` 收费主线 owner
+3. 当前会员相关收费仍属于保留但暂不开通 package
+
 # `payment MVP / 会员直购` BFF Surface Addendum V1
 
 ## A. Current Object

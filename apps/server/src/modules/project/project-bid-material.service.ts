@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { BidParticipationRequestAccessService } from '../bid_participation_request/bid-participation-request-access.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ProjectAttachmentEntity } from './entities/project-attachment.entity';
 import { ProjectEntity } from './entities/project.entity';
@@ -26,15 +27,20 @@ export class ProjectBidMaterialService {
     private readonly projectRepository: Repository<ProjectEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
-    private readonly presenter: ProjectBidMaterialPresenter
+    private readonly presenter: ProjectBidMaterialPresenter,
+    private readonly bidParticipationAccessService: BidParticipationRequestAccessService
   ) {}
 
   async list(projectId: string, context: RequestContext) {
     const project = await this.requireBidMaterialProject(projectId);
-    await this.eligibilityService.requireBidSubmitEligibilityFromContext(
+    const { scope } = await this.eligibilityService.requireBidSubmitEligibilityFromContext(
       context,
       this.currentSessionVerificationService,
       project
+    );
+    await this.bidParticipationAccessService.requireApprovedForOrganization(
+      project,
+      scope.organization.id,
     );
     const attachments = await this.attachmentRepository.find({
       where: {

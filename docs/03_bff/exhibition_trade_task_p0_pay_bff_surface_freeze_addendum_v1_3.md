@@ -1,6 +1,6 @@
 ---
 owner: Codex 总控
-status: frozen
+status: superseded
 purpose: >
   Freeze the L4 BFF app-facing surface for `exhibition_trade_task_p0_pay`,
   covering app-facing route exposure, Server mapping, auth consolidation,
@@ -26,6 +26,25 @@ inputs_canonical:
   - docs/03_bff/bff_ssot.md
   - docs/03_bff/bff_routes.md
 ---
+
+## Supersede Note
+
+本文件已被 [platform_pricing_bff_surface_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/platform_pricing_bff_surface_master_v1.md) 正式覆盖。
+
+自 `2026-04-29` 起，本文件不再作为当前收费 `L4 BFF surface` authority。
+
+以下旧 `P0-Pay` BFF 语义当前只保留为历史迁移参考，不得继续指挥现行收费施工：
+
+1. 以 `/api/app/exhibition/trade-tasks/*` 作为当前收费 app-facing 主骨架
+2. 以 `inquiry-deposit/orders` 作为当前唯一 `200` 资金对象
+3. 以旧 `service-fee-authorizations + 3% / quotedAmount dynamic authorization` 作为当前 `4000` 收费主线
+4. 以 `p0-pay-summary` 作为当前唯一收费只读摘要
+
+本文件当前只保留三类用途：
+
+1. 审计回溯
+2. 差异比对
+3. 旧实现迁移参考
 
 # 展览平台任务发布与交易收费规则 P0-Pay BFF Surface Freeze V1.3
 

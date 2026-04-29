@@ -460,6 +460,7 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
   String? failingLifecyclePath,
   String? failingLifecycleCode,
   String? failingLifecycleMessage,
+  List<String>? pricingCalls,
   void Function(String projectId)? onDelete,
 }) {
   Future<AppApiResponse> lifecycleSuccess(
@@ -728,7 +729,9 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
         };
     handlers['GET /api/app/my/projects/$projectId/attachments'] =
         (AppApiRequest request) async {
-          final attachments = projectId == 'project-publish-flow'
+          final attachments =
+              projectId == 'project-publish-flow' ||
+                  projectId == 'project-sincerity-pending'
               ? <Map<String, Object?>>[
                   <String, Object?>{
                     'attachmentId': 'attachment-effect-1',
@@ -747,6 +750,73 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
             statusCode: 200,
             uri: request.uri,
             body: _attachmentListResponse(projectId, attachments),
+          );
+        };
+    handlers['GET ${ExhibitionCanonicalPaths.projectPricingSummary(projectId)}'] =
+        (AppApiRequest request) async {
+          pricingCalls?.add(request.canonicalPath);
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'projectId': projectId,
+              'publisherPricing': <String, Object?>{
+                'authenticitySincerityRequired': true,
+                'authenticitySincerityAmount': '200.00',
+                'authenticitySincerityStatus': null,
+                'publishGateStatus': 'required',
+              },
+              'readOnly': true,
+              'updatedAt': '2026-04-26T09:00:00Z',
+            },
+          );
+        };
+    handlers['POST ${ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(projectId)}'] =
+        (AppApiRequest request) async {
+          pricingCalls?.add(request.canonicalPath);
+          return AppApiResponse(
+            statusCode: 201,
+            uri: request.uri,
+            body: <String, Object?>{
+              'orderId': 'sincerity-$projectId',
+              'orderStatus': 'pending_payment',
+              'amount': '200.00',
+              'currency': 'CNY',
+              'channelCandidates': const <Object?>['alipay_candidate'],
+              'updatedAt': '2026-04-26T09:01:00Z',
+            },
+          );
+        };
+    handlers['POST ${ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(projectId, 'sincerity-$projectId')}'] =
+        (AppApiRequest request) async {
+          pricingCalls?.add(request.canonicalPath);
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'paymentInitStatus': 'started',
+              'orderId': 'sincerity-$projectId',
+              'paymentReferenceId': 'pay-$projectId',
+              'callbackAwaiting': true,
+              'updatedAt': '2026-04-26T09:02:00Z',
+            },
+          );
+        };
+    handlers['GET ${ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(projectId, 'sincerity-$projectId')}'] =
+        (AppApiRequest request) async {
+          pricingCalls?.add(request.canonicalPath);
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'orderId': 'sincerity-$projectId',
+              'orderStatus': projectId == 'project-sincerity-pending'
+                  ? 'pending_payment'
+                  : 'paid',
+              'amount': '200.00',
+              'currency': 'CNY',
+              'updatedAt': '2026-04-26T09:03:00Z',
+            },
           );
         };
     handlers['DELETE /api/app/my/projects/$projectId'] =
@@ -987,6 +1057,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    expect(find.textContaining('已发布页', findRichText: true), findsOneWidget);
     expect(find.text('项目沟通'), findsNothing);
     expect(find.text('项目澄清'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '展开项目基础信息'), findsOneWidget);
@@ -1097,7 +1168,11 @@ void main() {
       'project-draft-1': 'draft',
       'project-publish-flow': 'submitted',
     };
-    final handlers = _mutableMyProjectHandlers(projectStates: projectStates);
+    final pricingCalls = <String>[];
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: projectStates,
+      pricingCalls: pricingCalls,
+    );
 
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
@@ -1118,7 +1193,67 @@ void main() {
 
     expect(find.text('已正式发布'), findsOneWidget);
     expect(projectStates['project-publish-flow'], 'published');
+    expect(pricingCalls, <String>[
+      ExhibitionCanonicalPaths.projectPricingSummary('project-publish-flow'),
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
+        'project-publish-flow',
+      ),
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
+        'project-publish-flow',
+        'sincerity-project-publish-flow',
+      ),
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
+        'project-publish-flow',
+        'sincerity-project-publish-flow',
+      ),
+    ]);
     expect(find.textContaining('竞标中', skipOffstage: false), findsWidgets);
+  });
+
+  testWidgets('预发布详情未完成 200 诚意金时不执行正式发布', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-sincerity-pending': 'submitted',
+    };
+    final pricingCalls = <String>[];
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: projectStates,
+      pricingCalls: pricingCalls,
+    );
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-sincerity-pending',
+      actionLabel: '补资料后确认发布',
+    );
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('项目真实性诚意金尚未完成冻结'), findsOneWidget);
+    expect(projectStates['project-sincerity-pending'], 'submitted');
+    expect(pricingCalls, <String>[
+      ExhibitionCanonicalPaths.projectPricingSummary(
+        'project-sincerity-pending',
+      ),
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
+        'project-sincerity-pending',
+      ),
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
+        'project-sincerity-pending',
+        'sincerity-project-sincerity-pending',
+      ),
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
+        'project-sincerity-pending',
+        'sincerity-project-sincerity-pending',
+      ),
+    ]);
   });
 
   testWidgets('预发布详情缺少必传效果图时拦截正式发布', (WidgetTester tester) async {

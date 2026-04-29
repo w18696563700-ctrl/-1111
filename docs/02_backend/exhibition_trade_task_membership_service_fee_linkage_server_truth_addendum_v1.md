@@ -1,10 +1,10 @@
 ---
 title: exhibition_trade_task_membership_service_fee_linkage_server_truth_addendum_v1
 owner: Codex 总控
-status: frozen
+status: superseded
 layer: L3 Server Truth
 updated_at: 2026-04-28
-purpose: Freeze the Server truth design for future P0-Pay membership-tier service-fee linkage, without enabling tiered service fees or unlocking implementation.
+purpose: Historical membership-tier fee-rate linkage backend truth retained for audit and migration comparison only; no longer the current pricing discount-truth owner after platform_pricing_backend_truth_master_v1.
 inputs_canonical:
   - docs/00_ssot/exhibition_trade_task_membership_service_fee_linkage_freeze_v1.md
   - docs/01_contracts/exhibition_trade_task_membership_service_fee_linkage_contracts_addendum_v1.md
@@ -17,6 +17,26 @@ inputs_canonical:
 ---
 
 # P0-Pay 会员分层服务费率联动 L3 Server Truth Addendum V1
+
+## Supersede Note
+
+自 `2026-04-29` 起，本文件不再作为当前收费折扣 `L3 backend truth` 主文件使用。
+
+当前唯一收费 `L3 backend truth` 改为：
+
+- [platform_pricing_backend_truth_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/02_backend/platform_pricing_backend_truth_master_v1.md)
+
+本文件仅保留为历史 `P0-Pay feeRate linkage` 记录，用于：
+
+1. 回看旧 `feeRate 2.5% / 2.0% / 1.5%` 方案
+2. 对比旧 `authorization 创建时锁定 feeRate` 与新 `deal confirmation 时生成 final fee` 的差异
+3. 后续实现迁移参考
+
+以下旧结论不再作为当前收费 backend truth 真相继续指挥：
+
+1. `feeRate = 3.0% / 2.5% / 2.0% / 1.5%` 是当前正式服务费模型
+2. `authorization create` 是当前唯一 fee snapshot 锁定时点
+3. `membership tier -> feeRate` 是当前唯一会员优惠表达方式
 
 ## 0. 总裁决
 

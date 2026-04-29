@@ -16,6 +16,9 @@ const {
   AppExhibitionP0PayController,
 } = require('../src/routes/exhibition_p0_pay/app-exhibition-p0-pay.controller.ts');
 const {
+  AppProjectPricingController,
+} = require('../src/routes/exhibition_p0_pay/app-project-pricing.controller.ts');
+const {
   ExhibitionP0PayService,
 } = require('../src/routes/exhibition_p0_pay/exhibition-p0-pay.service.ts');
 const {
@@ -44,11 +47,27 @@ const p0PayPostRoutes = [
   '/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/factory-refusal-breach-hold',
 ];
 
+const projectPricingPostRoutes = [
+  '/api/app/project/project-1/authenticity-sincerity/orders',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1/pay-init',
+  '/api/app/project/project-1/bid-service-fee-authorizations',
+  '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/freeze-init',
+  '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/release',
+  '/api/app/project/project-1/deal-confirmations',
+];
+
 const p0PayGetRoutes = [
   '/api/app/exhibition/trade-tasks/task-1',
   '/api/app/exhibition/trade-tasks/task-1/fixed-price-bids/bid-1/service-fee-authorizations/auth-1',
   '/api/app/exhibition/trade-tasks/task-1/inquiry-deposit/orders/deposit-1',
   '/api/app/exhibition/trade-tasks/task-1/p0-pay-summary',
+];
+
+const projectPricingGetRoutes = [
+  '/api/app/project/project-1/pricing-summary',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1',
+  '/api/app/project/project-1/bid-service-fee-authorizations/auth-1',
+  '/api/app/project/project-1/deal-confirmations/deal-1',
 ];
 
 function createAxiosResponseError(status, data, message = `Request failed with status code ${status}`) {
@@ -81,7 +100,7 @@ function createService(serverClient) {
 async function createRealRouteApp(serverClient) {
   class TestModule {}
   Module({
-    controllers: [AppExhibitionP0PayController],
+    controllers: [AppExhibitionP0PayController, AppProjectPricingController],
     providers: [
       ExhibitionP0PayService,
       ExhibitionP0PayPayloadService,
@@ -97,7 +116,7 @@ async function createRealRouteApp(serverClient) {
   return app;
 }
 
-test('P0-Pay app-facing routes are materialized under exhibition trade-tasks only', async () => {
+test('pricing app-facing routes expose project family and keep legacy trade-task aliases bounded', async () => {
   const calls = [];
   const service = {
     createTradeTask(payload, headers, idempotencyKey) {
@@ -106,7 +125,7 @@ test('P0-Pay app-facing routes are materialized under exhibition trade-tasks onl
     },
     getTradeTaskDetail(taskId) {
       calls.push(['detail', taskId]);
-      return { taskId, p0PaySummary: { readOnly: true } };
+      return { taskId, pricingSummary: { readOnly: true } };
     },
     bindAuthenticityMaterials(taskId) {
       calls.push(['materials', taskId]);
@@ -153,11 +172,57 @@ test('P0-Pay app-facing routes are materialized under exhibition trade-tasks onl
       return { contractConfirmationId: 'contract-1' };
     },
     getP0PaySummary(taskId) {
-      calls.push(['summary', taskId]);
+      calls.push(['legacySummary', taskId]);
       return {
-        taskId,
-        messageDisplaySummary: { readOnly: true },
+        projectId: taskId,
+        readOnly: true,
       };
+    },
+    getProjectPricingSummary(projectId) {
+      calls.push(['pricingSummary', projectId]);
+      return {
+        projectId,
+        readOnly: true,
+      };
+    },
+    createProjectAuthenticitySincerityOrder(projectId) {
+      calls.push(['sincerityCreate', projectId]);
+      return { orderId: 'order-1' };
+    },
+    initProjectAuthenticitySincerityPayment(projectId, orderId) {
+      calls.push(['sincerityPay', projectId, orderId]);
+      return { orderId };
+    },
+    getProjectAuthenticitySincerityOrder(projectId, orderId) {
+      calls.push(['sincerityStatus', projectId, orderId]);
+      return {
+        orderId,
+        orderStatus: 'paid',
+      };
+    },
+    createBidServiceFeeAuthorization(projectId) {
+      calls.push(['bidAuthCreate', projectId]);
+      return { authorizationId: 'auth-1' };
+    },
+    initBidServiceFeeAuthorizationFreeze(projectId, authorizationId) {
+      calls.push(['bidAuthFreeze', projectId, authorizationId]);
+      return { authorizationId };
+    },
+    getBidServiceFeeAuthorization(projectId, authorizationId) {
+      calls.push(['bidAuthStatus', projectId, authorizationId]);
+      return { authorizationId, authorizationStatus: 'frozen' };
+    },
+    releaseBidServiceFeeAuthorization(projectId, authorizationId) {
+      calls.push(['bidAuthRelease', projectId, authorizationId]);
+      return { authorizationId, authorizationStatus: 'released' };
+    },
+    createDealConfirmation(projectId) {
+      calls.push(['dealCreate', projectId]);
+      return { dealConfirmationId: 'deal-1' };
+    },
+    getDealConfirmation(projectId, dealConfirmationId) {
+      calls.push(['dealDetail', projectId, dealConfirmationId]);
+      return { dealConfirmationId, dealStatus: 'confirmed_deal' };
     },
     releaseNonWinning(taskId) {
       calls.push(['releaseNonWinning', taskId]);
@@ -175,7 +240,7 @@ test('P0-Pay app-facing routes are materialized under exhibition trade-tasks onl
 
   class TestModule {}
   Module({
-    controllers: [AppExhibitionP0PayController],
+    controllers: [AppExhibitionP0PayController, AppProjectPricingController],
     providers: [{ provide: ExhibitionP0PayService, useValue: service }],
   })(TestModule);
 
@@ -189,7 +254,11 @@ test('P0-Pay app-facing routes are materialized under exhibition trade-tasks onl
       'api/app/exhibition/trade-tasks',
     );
     assert.equal(
-      Reflect.getMetadata(METHOD_METADATA, AppExhibitionP0PayController.prototype.getP0PaySummary),
+      Reflect.getMetadata(PATH_METADATA, AppProjectPricingController),
+      'api/app/project',
+    );
+    assert.equal(
+      Reflect.getMetadata(METHOD_METADATA, AppProjectPricingController.prototype.getProjectPricingSummary),
       RequestMethod.GET,
     );
 
@@ -211,10 +280,29 @@ test('P0-Pay app-facing routes are materialized under exhibition trade-tasks onl
     assert.equal(authResponse.status, 202);
 
     const summaryResponse = await fetch(
-      `${url}/api/app/exhibition/trade-tasks/task-1/p0-pay-summary`,
+      `${url}/api/app/project/project-1/pricing-summary`,
     );
     assert.equal(summaryResponse.status, 200);
-    assert.equal((await summaryResponse.json()).messageDisplaySummary.readOnly, true);
+    assert.equal((await summaryResponse.json()).readOnly, true);
+
+    const sincerityResponse = await fetch(
+      `${url}/api/app/project/project-1/authenticity-sincerity/orders/order-1`,
+    );
+    assert.equal(sincerityResponse.status, 200);
+    assert.equal((await sincerityResponse.json()).orderStatus, 'paid');
+
+    const bidAuthorizationResponse = await fetch(
+      `${url}/api/app/project/project-1/bid-service-fee-authorizations`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
+    );
+    assert.equal(bidAuthorizationResponse.status, 202);
+    assert.equal((await bidAuthorizationResponse.json()).authorizationId, 'auth-1');
+
+    const dealResponse = await fetch(
+      `${url}/api/app/project/project-1/deal-confirmations/deal-1`,
+    );
+    assert.equal(dealResponse.status, 200);
+    assert.equal((await dealResponse.json()).dealStatus, 'confirmed_deal');
 
     const releaseResponse = await fetch(
       `${url}/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/release-non-winning`,
@@ -229,7 +317,10 @@ test('P0-Pay app-facing routes are materialized under exhibition trade-tasks onl
   assert.deepEqual(calls, [
     ['createTradeTask', 'inquiry_quote', 'idem-create'],
     ['authInit', 'task-1', 'bid-1', 'auth-1'],
-    ['summary', 'task-1'],
+    ['pricingSummary', 'project-1'],
+    ['sincerityStatus', 'project-1', 'order-1'],
+    ['bidAuthCreate', 'project-1'],
+    ['dealDetail', 'project-1', 'deal-1'],
     ['releaseNonWinning', 'task-1'],
   ]);
 });
@@ -246,7 +337,7 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
       assert.deepEqual(body, {
         expectedQuotedAmount: '80000',
         expectedFeeRate: '0.025',
-        expectedAuthorizationAmount: '2000',
+        expectedAuthorizationAmount: '4000',
         currency: 'CNY',
         idempotencyKey: 'idem-auth',
       });
@@ -263,7 +354,8 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
           feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
           feeRateSnapshotHash: 'snapshot-hash',
           feeCalculatedAt: '2026-05-10T09:59:00.000Z',
-          estimatedFeeAmount: '2000.00',
+          authorizationQuotaAmount: '4000.00',
+          quotaAmount: '4000.00',
           currency: 'CNY',
           updatedAt: '2026-05-10T10:00:00.000Z',
         },
@@ -279,7 +371,7 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
     {
       expectedQuotedAmount: 80000,
       expectedFeeRate: '0.025',
-      expectedAuthorizationAmount: '2000',
+      expectedAuthorizationAmount: '4000',
       currency: 'CNY',
       idempotencyKey: 'idem-auth',
       objectKey: 'must-not-forward',
@@ -299,7 +391,8 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
     feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
     feeRateSnapshotHash: 'snapshot-hash',
     feeCalculatedAt: '2026-05-10T09:59:00.000Z',
-    estimatedFeeAmount: '2000.00',
+    authorizationQuotaAmount: '4000.00',
+    quotaAmount: '4000.00',
     currency: 'CNY',
     channelCandidates: ['alipay_candidate', 'wechat_candidate'],
     expiresAt: null,
@@ -381,7 +474,19 @@ test('P0-Pay app routes resolve to controlled 400 or 401 instead of Nest route 4
       assert.equal(body.source, 'bff', route);
     }
 
-    for (const route of p0PayGetRoutes) {
+    for (const route of projectPricingPostRoutes) {
+      const response = await fetch(`${url}${route}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      const body = await response.json();
+      assert.equal(response.status, 400, route);
+      assert.equal(body.code, 'P0_PAY_REQUEST_INVALID', route);
+      assert.equal(body.source, 'bff', route);
+    }
+
+    for (const route of [...p0PayGetRoutes, ...projectPricingGetRoutes]) {
       const response = await fetch(`${url}${route}`);
       const body = await response.json();
       assert.equal(response.status, 401, route);
@@ -448,30 +553,32 @@ test('P0-Pay idempotent command conflicts are normalized to controlled 409', asy
   }
 });
 
-test('P0-Pay summary is read-only for task detail and message-building display', async () => {
+test('pricing summary is read-only and no longer exposes old P0-Pay authority shape', async () => {
   const service = createService({
     async get(pathName) {
-      assert.equal(pathName, '/server/exhibition/trade-tasks/task-1/p0-pay-summary');
+      assert.equal(pathName, '/server/project/task-1/pricing-summary');
       return {
-        taskId: 'task-1',
-        taskType: 'fixed_price_bid',
-        platformServiceFee: {
-          status: 'authorized',
-          feeRate: '0.025000',
-          feeRateLabel: '标准会员 2.5%',
-          feeRateSource: 'paid_membership_tier',
-          membershipTierSnapshot: 'standard',
-          feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
-          feeRateSnapshotHash: 'snapshot-hash',
-          feeCalculatedAt: '2026-05-10T09:59:00.000Z',
+        projectId: 'task-1',
+        pricingRuleVersion: 'platform_pricing_rules_master_v1',
+        projectAuthenticitySincerity: {
+          status: 'paid',
+          amount: '200.00',
         },
-        inquiryDeposit: null,
-        contractConfirmation: { status: 'pending' },
+        bidServiceFeeAuthorization: {
+          status: 'frozen',
+          quotaAmount: '4000.00',
+        },
+        dealConfirmation: { status: 'not_confirmed' },
         messageDisplaySummary: {
           displayAllowed: true,
           readOnly: false,
-          statusTextKey: 'service_fee_authorized',
-          routeTarget: { objectType: 'trade_task', taskId: 'task-1' },
+          statusTextKey: 'frozen',
+          routeTarget: {
+            objectType: 'project_pricing',
+            actionKey: 'pricing_summary.read',
+            canonicalPath: '/api/app/project/task-1/pricing-summary',
+            params: { projectId: 'task-1' },
+          },
           payNowAction: { forbidden: true },
         },
         updatedAt: '2026-05-11T10:00:00.000Z',
@@ -480,14 +587,200 @@ test('P0-Pay summary is read-only for task detail and message-building display',
   });
 
   const result = await service.getP0PaySummary('task-1', {});
-  assert.deepEqual(result.messageDisplaySummary, {
-    displayAllowed: true,
+  assert.deepEqual(result, {
+    projectId: 'task-1',
+    publisherPricing: {
+      authenticitySincerityRequired: true,
+      authenticitySincerityAmount: '200.00',
+      authenticitySincerityStatus: 'paid',
+      publishGateStatus: 'satisfied',
+      formalResultProcessingRequired: true,
+      nextAction: {
+        actionKey: 'pricing_summary.read',
+        routeTarget: {
+          objectType: 'project_pricing',
+          actionKey: 'pricing_summary.read',
+          canonicalPath: '/api/app/project/task-1/pricing-summary',
+          params: { projectId: 'task-1' },
+        },
+      },
+    },
+    bidderPricing: {
+      bidParticipationRequestId: null,
+      authorizationRequired: true,
+      authorizationQuotaAmount: '4000.00',
+      authorizationStatus: 'frozen',
+      bidSubmissionEligible: true,
+      nextAction: {
+        actionKey: 'pricing_summary.read',
+        routeTarget: {
+          objectType: 'project_pricing',
+          actionKey: 'pricing_summary.read',
+          canonicalPath: '/api/app/project/task-1/pricing-summary',
+          params: { projectId: 'task-1' },
+        },
+      },
+    },
+    dealSummary: {
+      dealConfirmationId: null,
+      dealStatus: 'not_confirmed',
+      selectedBidId: null,
+      finalConfirmedAmount: null,
+      platformServiceFeeAmount: null,
+      serviceFeeChargeStatus: null,
+    },
+    updatedAt: '2026-05-11T10:00:00.000Z',
     readOnly: true,
-    statusTextKey: 'service_fee_authorized',
-    routeTarget: { objectType: 'trade_task', taskId: 'task-1' },
   });
-  assert.equal(result.platformServiceFee.feeRate, '0.025000');
-  assert.equal(result.platformServiceFee.membershipTierSnapshot, 'standard');
+  assert.equal(result.platformServiceFee, undefined);
+  assert.equal(result.inquiryDeposit, undefined);
+});
+
+test('project pricing canonical routes forward 4000 authorization and deal confirmation without local fee truth', async () => {
+  const calls = [];
+  const service = createService({
+    async post(pathName, body, options) {
+      calls.push({ method: 'POST', pathName, body, headers: options.headers });
+      if (pathName.endsWith('/bid-service-fee-authorizations')) {
+        assert.deepEqual(body, {
+          bidParticipationRequestId: 'request-1',
+          expectedAmount: '4000',
+          expectedCurrency: 'CNY',
+          ruleVersion: 'platform_pricing_rules_master_v1',
+          ruleSnapshotHash: 'hash-1',
+          idempotencyKey: 'idem-auth',
+        });
+        return {
+          authorizationId: 'auth-1',
+          authorizationStatus: 'pending_freeze',
+          authorizationQuotaAmount: '4000.00',
+          currency: 'CNY',
+          channelCandidates: ['alipay_candidate'],
+          updatedAt: '2026-06-01T10:00:00.000Z',
+        };
+      }
+      if (pathName.endsWith('/freeze-init')) {
+        return {
+          freezeInitStatus: 'pending_user_confirm',
+          authorizationId: 'auth-1',
+          paymentReferenceId: 'P0PAY_AUTH_1',
+          channelActionType: 'sdk_payload',
+          channelPayload: { opaque: true },
+          callbackAwaiting: true,
+          updatedAt: '2026-06-01T10:01:00.000Z',
+        };
+      }
+      if (pathName.endsWith('/release')) {
+        return {
+          authorizationId: 'auth-1',
+          authorizationStatus: 'released',
+          bidSubmissionEligible: false,
+          updatedAt: '2026-06-01T10:02:00.000Z',
+        };
+      }
+      if (pathName.endsWith('/deal-confirmations')) {
+        return {
+          dealConfirmationId: 'deal-1',
+          dealStatus: 'confirmed_deal',
+          selectedBidId: 'bid-1',
+          finalConfirmedAmount: '40000.00',
+          platformServiceFeeCalculation: {
+            ruleVersion: 'platform_pricing_rules_master_v1',
+            baseFeeAmount: '750.00',
+            finalFeeAmount: '675.00',
+          },
+          serviceFeeChargeStatus: 'charged',
+          updatedAt: '2026-06-01T10:03:00.000Z',
+        };
+      }
+      throw new Error(`Unexpected post path ${pathName}`);
+    },
+    async get(pathName, options) {
+      calls.push({ method: 'GET', pathName, headers: options.headers });
+      if (pathName.includes('/bid-service-fee-authorizations/')) {
+        return {
+          authorizationId: 'auth-1',
+          authorizationStatus: 'frozen',
+          authorizationQuotaAmount: '4000.00',
+          currency: 'CNY',
+          chargeStatus: 'not_charged',
+          releaseStatus: 'not_released',
+          updatedAt: '2026-06-01T10:04:00.000Z',
+        };
+      }
+      return {
+        dealConfirmationId: 'deal-1',
+        dealStatus: 'confirmed_deal',
+        selectedBidId: 'bid-1',
+        finalConfirmedAmount: '40000.00',
+        platformServiceFeeCalculation: { finalFeeAmount: '675.00' },
+        serviceFeeChargeStatus: 'charged',
+        publisherConfirmedAt: null,
+        factoryConfirmedAt: null,
+        publisherAuthenticitySincerityStatus: 'refunded',
+        updatedAt: '2026-06-01T10:05:00.000Z',
+      };
+    },
+  });
+
+  const created = await service.createBidServiceFeeAuthorization(
+    'project-1',
+    {
+      bidParticipationRequestId: 'request-1',
+      expectedAmount: 4000,
+      expectedCurrency: 'CNY',
+      ruleVersion: 'platform_pricing_rules_master_v1',
+      ruleSnapshotHash: 'hash-1',
+      idempotencyKey: 'idem-auth',
+      estimatedFeeAmount: 'must-not-forward',
+    },
+    {},
+  );
+  const freeze = await service.initBidServiceFeeAuthorizationFreeze(
+    'project-1',
+    'auth-1',
+    { payChannel: 'alipay_candidate', clientPlatform: 'flutter', idempotencyKey: 'idem-freeze' },
+    {},
+  );
+  const status = await service.getBidServiceFeeAuthorization('project-1', 'auth-1', {});
+  const released = await service.releaseBidServiceFeeAuthorization(
+    'project-1',
+    'auth-1',
+    {
+      releaseReasonCode: 'bidder_withdraw',
+      releaseReasonText: '主动退出竞标',
+      idempotencyKey: 'idem-release',
+    },
+    {},
+  );
+  const deal = await service.createDealConfirmation(
+    'project-1',
+    {
+      selectedBidId: 'bid-1',
+      finalConfirmedAmount: '40000.00',
+      currency: 'CNY',
+      contractFileAssetIds: ['file-1'],
+      confirmationRole: 'publisher',
+      idempotencyKey: 'idem-deal',
+    },
+    {},
+  );
+  const detail = await service.getDealConfirmation('project-1', 'deal-1', {});
+
+  assert.equal(created.authorizationQuotaAmount, '4000.00');
+  assert.equal(freeze.freezeInitStatus, 'pending_user_confirm');
+  assert.equal(status.authorizationStatus, 'frozen');
+  assert.equal(released.bidSubmissionEligible, false);
+  assert.equal(deal.platformServiceFeeCalculation.finalFeeAmount, '675.00');
+  assert.equal(detail.publisherAuthenticitySincerityStatus, 'refunded');
+  assert.deepEqual(calls.map((item) => [item.method, item.pathName]), [
+    ['POST', '/server/projects/project-1/bid-service-fee-authorizations'],
+    ['POST', '/server/projects/project-1/bid-service-fee-authorizations/auth-1/freeze-init'],
+    ['GET', '/server/projects/project-1/bid-service-fee-authorizations/auth-1'],
+    ['POST', '/server/projects/project-1/bid-service-fee-authorizations/auth-1/release'],
+    ['POST', '/server/projects/project-1/deal-confirmations'],
+    ['GET', '/server/projects/project-1/deal-confirmations/deal-1'],
+  ]);
 });
 
 test('P0-Pay state actions forward as controlled BFF operations', async () => {
@@ -623,7 +916,7 @@ test('P0-Pay service maps upstream route drift to controlled BFF error without e
     async get() {
       throw createAxiosResponseError(404, {
         statusCode: 404,
-        message: 'Cannot GET /server/exhibition/trade-tasks/task-1/p0-pay-summary',
+        message: 'Cannot GET /server/project/task-1/pricing-summary',
         source: 'server',
       });
     },
@@ -635,7 +928,7 @@ test('P0-Pay service maps upstream route drift to controlled BFF error without e
       assert.equal(error.getStatus(), 404);
       assert.deepEqual(error.getResponse(), {
         statusCode: 404,
-        code: 'P0_PAY_SUMMARY_UNAVAILABLE',
+        code: 'PROJECT_PRICING_SUMMARY_UNAVAILABLE',
         message: '当前交易资金状态暂不可用，请稍后再试。',
         source: 'server',
       });

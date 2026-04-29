@@ -14,7 +14,9 @@ export const PROJECT_CONVERTED_TO_ORDER_STATE = 'converted_to_order';
 export const PROJECT_ARCHIVED_STATE = 'archived';
 
 export const TERMINAL_AUTHORIZATION_STATES = new Set([
+  'released',
   'authorization_released',
+  'refunded',
   'cancelled',
   'failed',
   'expired'

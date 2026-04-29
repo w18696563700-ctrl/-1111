@@ -315,6 +315,14 @@ export class BidService {
       return '当前项目已提交过投标，请勿重复提交。';
     }
 
+    if (statusCode === 409 && code === 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED') {
+      return '竞标申请已通过后需先冻结 4000 元竞标服务费预授权额度，冻结成功后才能提交竞标。';
+    }
+
+    if (statusCode === 409 && code === 'BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE') {
+      return '当前竞标服务费预授权额度状态暂不允许提交竞标，请先完成冻结或刷新后重试。';
+    }
+
     if (statusCode === 400 && code === 'BID_SUBMIT_INVALID') {
       return this.rewriteInvalidMessage(message);
     }

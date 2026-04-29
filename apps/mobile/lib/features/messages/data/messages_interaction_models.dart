@@ -46,14 +46,40 @@ final class MessageInteractionCounterpartView {
   const MessageInteractionCounterpartView({
     required this.organizationId,
     required this.displayName,
+    required this.nickname,
+    required this.companyName,
     required this.avatarUrl,
     required this.role,
+    required this.certificationSummary,
   });
 
   final String organizationId;
   final String displayName;
+  final String? nickname;
+  final String companyName;
   final String? avatarUrl;
   final String role;
+  final CounterpartCertificationSummaryView? certificationSummary;
+}
+
+final class CounterpartCertificationSummaryView {
+  const CounterpartCertificationSummaryView({
+    required this.certificationStatus,
+    required this.legalName,
+    required this.usccMasked,
+    required this.businessType,
+    required this.address,
+    required this.establishedAt,
+    required this.reviewedAt,
+  });
+
+  final String certificationStatus;
+  final String legalName;
+  final String? usccMasked;
+  final String? businessType;
+  final String? address;
+  final String? establishedAt;
+  final String? reviewedAt;
 }
 
 final class MessageInteractionSummaryView {

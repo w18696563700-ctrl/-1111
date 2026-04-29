@@ -60,8 +60,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
     required bool forceRefresh,
   }) async {
     final result = snapshot.result;
-    final taskId = _p0PayTaskIdFromProjectPayload(result.payload);
-    if (result.state != AppPageState.content || taskId == null) {
+    final projectId = _projectIdFromPayload(result.payload);
+    if (result.state != AppPageState.content || projectId == null) {
       setState(() {
         _p0PaySummaryResult = null;
         _p0PaySummaryLoading = false;
@@ -75,10 +75,11 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       _p0PaySummaryResult = null;
     });
 
-    final summary = await ExhibitionConsumerLayer.instance.loadP0PaySummary(
-      taskId: taskId,
-      forceRefresh: forceRefresh,
-    );
+    final summary = await ExhibitionConsumerLayer.instance
+        .loadProjectPricingSummary(
+          projectId: projectId,
+          forceRefresh: forceRefresh,
+        );
     if (!mounted || loadToken != _p0PaySummaryLoadToken) {
       return;
     }
@@ -93,9 +94,8 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       return false;
     }
     setState(() => _requestingNameAccess = true);
-    final result = await ProjectNameAccessConsumerLayer.instance.requestAccess(
-      projectId: projectId,
-    );
+    final result = await ProjectNameAccessConsumerLayer.instance
+        .requestBidParticipation(projectId: projectId);
     if (!mounted) {
       return false;
     }
@@ -106,7 +106,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
       SnackBar(
         content: Text(
           result.isSuccess
-              ? '已提交项目名称查看申请，等待发布方审批。'
+              ? '已提交参与竞标申请，等待发布方审批。'
               : (result.message ?? '当前申请未完成，请稍后再试。'),
         ),
       ),
@@ -142,7 +142,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
             }
             Navigator.of(sheetContext).maybePop();
             Navigator.of(context).pushNamed(
-              ExhibitionRoutes.projectNameAccessThreadWithIds(
+              ExhibitionRoutes.bidParticipationThreadWithIds(
                 threadId: requestId,
                 projectId: projectId,
                 requestId: requestId,
@@ -187,7 +187,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
         final projectNo = _normalizeId(payload?['projectNo'] as String?);
         final projectMap = payload ?? const <String, Object?>{};
         final embeddedP0PaySummary = parseP0PayReadOnlySummary(
-          projectMap['p0PaySummary'],
+          projectMap['pricingSummary'] ?? projectMap['p0PaySummary'],
         );
         final p0PaySummary =
             parseP0PayReadOnlySummary(_p0PaySummaryResult?.payload) ??
@@ -314,13 +314,6 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }
 }
 
-String? _p0PayTaskIdFromProjectPayload(Object? payload) {
-  final map = _payloadMap(payload);
-  return _normalizeDynamicText(map?['taskId']) ??
-      _normalizeDynamicText(map?['tradeTaskId']) ??
-      _normalizeDynamicText(_payloadMap(map?['p0PaySummary'])?['taskId']);
-}
-
 bool _shouldShowP0PayReadOnlySummary(
   P0PayReadOnlySummaryView? summary,
   ExhibitionLoadResult? result,
@@ -343,14 +336,14 @@ Widget _buildProjectDetailP0PayReadOnlyCard({
   final failureText = _projectDetailP0PayFailureText(result);
   final routeTarget = summary?.routeTarget;
   return _ActionCard(
-    title: 'P0-Pay 只读状态',
-    summary: '这里只展示 BFF/Server 聚合后的交易资金状态，不执行支付、不修改资金状态、不裁定扣费。',
+    title: '平台收费只读状态',
+    summary: '这里只展示 BFF/Server 聚合后的收费与预授权状态，不执行支付、不修改资金状态、不裁定扣费。',
     tone: _ActionCardTone.muted,
     children: <Widget>[
       const _StateMessage(
         title: '只读边界',
         body:
-            '项目详情只承接平台服务费预授权、发单诚意金、合同确认 handoff 的只读摘要；Flutter 不接收支付回调，也不生成资金真相。',
+            '项目详情只承接 200 元项目真实性诚意金、4000 元竞标服务费预授权额度、成交确认 handoff 的只读摘要；Flutter 不接收支付回调，也不生成资金真相。',
       ),
       if (loading) ...<Widget>[
         const SizedBox(height: 12),

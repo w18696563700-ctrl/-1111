@@ -1,4 +1,16 @@
 ---
+
+## Pricing Mainline Override Note
+
+本文件继续保留 `payment MVP / 履约保证金预授权` 的独立保留位意义。
+
+但自 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 生效后，本文件不得再被误读为当前展览收费执行主线的 Flutter authority。
+
+当前正式解释固定如下：
+
+1. 履约保证金不是当前展览收费最小闭环的一部分
+2. 本文件不是当前 `200 / 4000 / deal confirmation` 收费主线 owner
+3. 当前如需施工履约保证金，必须走独立 reopen，不得借当前展览收费主线顺带解锁
 owner: Codex 总控
 status: frozen
 purpose: Freeze the first execution-oriented L3 frontend surface for `payment MVP / 履约保证金预授权`, including only bounded current-offer, order-create, freeze-init, order-status, appeal, and controlled-failure consumption under `我的信用与约束`, without unlocking implementation, integration, release-prep, or launch.

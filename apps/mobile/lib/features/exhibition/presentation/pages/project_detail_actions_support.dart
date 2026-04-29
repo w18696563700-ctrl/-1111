@@ -56,6 +56,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
         const SizedBox(height: 12),
         _buildProjectPrimaryActionSection(
           projectId: projectId,
+          projectMap: projectMap,
           currentViewerBidId: _currentViewerBidIdFromPayload(projectMap),
           currentViewerBidState: _currentViewerBidStateFromPayload(projectMap),
           state: state,
@@ -166,6 +167,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
 
   Widget _buildProjectPrimaryActionSection({
     required String projectId,
+    required Map<String, Object?> projectMap,
     required String? currentViewerBidId,
     required String? currentViewerBidState,
     required String? state,
@@ -174,6 +176,10 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
     final ownerSurface = _isOwnerSurface(viewerProjectRelation);
     final hasCurrentViewerBid = currentViewerBidId != null;
     final canContinueBid = !ownerSurface && _canContinueBidFromState(state);
+    final nameAccessStatus = _projectNameAccessStatus(projectMap);
+    final canRequestParticipation = _projectCanRequestNameAccess(projectMap);
+    final participationApproved =
+        nameAccessStatus == null || nameAccessStatus == 'visible';
     final canReadBidResult =
         !ownerSurface &&
         !hasCurrentViewerBid &&
@@ -188,7 +194,9 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
               : hasCurrentViewerBid
               ? '已提交竞标'
               : canContinueBid
-              ? '参与竞标'
+              ? participationApproved
+                    ? '参与竞标'
+                    : '申请参与竞标'
               : canReadBidResult
               ? '竞标结果'
               : '当前状态',
@@ -203,6 +211,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
             ownerSurface: ownerSurface,
             currentViewerBidId: currentViewerBidId,
             currentViewerBidState: currentViewerBidState,
+            projectMap: projectMap,
           ),
         ),
         const SizedBox(height: 12),
@@ -224,10 +233,36 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
             icon: const Icon(Icons.handshake_rounded),
             label: const Text('沟通与投标'),
           )
-        else if (canContinueBid)
+        else if (canContinueBid && participationApproved)
           FilledButton(
             onPressed: () => _continueBidWithGuard(projectId),
-            child: const Text('立即参与竞标'),
+            child: const Text('继续提交竞标'),
+          )
+        else if (canContinueBid && canRequestParticipation)
+          FilledButton(
+            onPressed: _requestingNameAccess
+                ? null
+                : () => _requestProjectNameAccess(projectId),
+            child: Text(
+              _requestingNameAccess
+                  ? '提交中...'
+                  : _projectNameAccessActionLabel(projectMap),
+            ),
+          )
+        else if (canContinueBid && nameAccessStatus == 'pending')
+          FilledButton.tonal(
+            onPressed: () => _showProjectNameAccessSheet(
+              projectId: projectId,
+              projectMap: projectMap,
+            ),
+            child: const Text('参与申请审核中'),
+          )
+        else if (canContinueBid && nameAccessStatus == 'rejected')
+          OutlinedButton(
+            onPressed: canRequestParticipation
+                ? () => _requestProjectNameAccess(projectId)
+                : null,
+            child: const Text('参与申请已拒绝'),
           )
         else if (canReadBidResult)
           OutlinedButton(
@@ -243,6 +278,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
     required bool ownerSurface,
     required String? currentViewerBidId,
     required String? currentViewerBidState,
+    required Map<String, Object?> projectMap,
   }) {
     if (ownerSurface) {
       return '你是当前项目发布方，可进入我的项目继续处理。';
@@ -255,8 +291,14 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
           ? '当前账号已对该项目提交竞标，本页不再开放重复提交。'
           : '当前账号已对该项目提交竞标，竞标状态：$stateLabel。';
     }
+    final nameAccessStatus = _projectNameAccessStatus(projectMap);
+    if (state == 'published' &&
+        nameAccessStatus != null &&
+        nameAccessStatus != 'visible') {
+      return _projectNameAccessStatusBody(projectMap);
+    }
     return switch (state) {
-      'published' => '当前项目正在竞标中。',
+      'published' => '当前项目正在竞标中，可继续提交竞标资料。',
       'bidding_closed' => '当前项目投标已结束。',
       'awarded' => '当前项目已授标。',
       'converted_to_order' => '当前项目已被承接。',

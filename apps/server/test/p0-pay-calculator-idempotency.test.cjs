@@ -23,6 +23,8 @@ test('P0-Pay membership service fee policy maps organization tier snapshots', as
     ['org-free', 'free_certified'],
     ['org-standard', 'standard'],
     ['org-professional', 'professional'],
+    ['org-ka', 'ka'],
+    ['org-flagship', 'flagship'],
     ['org-expired', null],
   ]);
   const policy = new P0PayServiceFeeRatePolicy({
@@ -51,7 +53,21 @@ test('P0-Pay membership service fee policy maps organization tier snapshots', as
 
   const professional = await policy.buildRequirement({ factoryOrganizationId: 'org-professional', quotedAmount: '100000.00' });
   assert.equal(professional.feeRate, '0.020000');
+  assert.equal(professional.feeRateSource, 'paid_membership_tier');
+  assert.equal(professional.membershipTierSnapshot, 'professional');
   assert.equal(professional.estimatedFeeAmount, '2000.00');
+
+  const ka = await policy.buildRequirement({ factoryOrganizationId: 'org-ka', quotedAmount: '100000.00' });
+  assert.equal(ka.feeRate, '0.015000');
+  assert.equal(ka.feeRateSource, 'paid_membership_tier');
+  assert.equal(ka.membershipTierSnapshot, 'ka');
+  assert.equal(ka.estimatedFeeAmount, '1500.00');
+
+  const flagship = await policy.buildRequirement({ factoryOrganizationId: 'org-flagship', quotedAmount: '100000.00' });
+  assert.equal(flagship.feeRate, '0.015000');
+  assert.equal(flagship.feeRateSource, 'paid_membership_tier');
+  assert.equal(flagship.membershipTierSnapshot, 'flagship');
+  assert.equal(flagship.estimatedFeeAmount, '1500.00');
 
   const expired = await policy.buildRequirement({ factoryOrganizationId: 'org-expired', quotedAmount: '100000.00' });
   assert.equal(expired.feeRate, '0.030000');
@@ -78,6 +94,59 @@ test('P0-Pay membership service fee policy maps organization tier snapshots', as
   );
 });
 
+test('platform pricing deal fee policy uses tiered base fee, membership discount and cap', () => {
+  const {
+    P0PayServiceFeeRatePolicy,
+  } = require('../dist/modules/p0_pay/p0-pay-service-fee-rate.policy.js');
+  const policy = new P0PayServiceFeeRatePolicy(null);
+
+  assert.deepEqual(
+    policy.calculateDealServiceFee({
+      finalConfirmedAmount: '11000.00',
+      membershipTierSnapshot: 'none',
+      authorizationQuotaAmount: '4000.00',
+    }),
+    {
+      finalConfirmedAmount: '11000.00',
+      baseFeeAmount: '220.00',
+      membershipDiscountRate: '1.0000',
+      capAmount: '4000.00',
+      finalFeeAmount: '220.00',
+      releasedRemainderAmount: '3780.00',
+    },
+  );
+  assert.deepEqual(
+    policy.calculateDealServiceFee({
+      finalConfirmedAmount: '40000.00',
+      membershipTierSnapshot: 'standard',
+      authorizationQuotaAmount: '4000.00',
+    }),
+    {
+      finalConfirmedAmount: '40000.00',
+      baseFeeAmount: '750.00',
+      membershipDiscountRate: '0.9000',
+      capAmount: '3600.00',
+      finalFeeAmount: '675.00',
+      releasedRemainderAmount: '3325.00',
+    },
+  );
+  assert.deepEqual(
+    policy.calculateDealServiceFee({
+      finalConfirmedAmount: '1000000.00',
+      membershipTierSnapshot: 'professional',
+      authorizationQuotaAmount: '4000.00',
+    }),
+    {
+      finalConfirmedAmount: '1000000.00',
+      baseFeeAmount: '4000.00',
+      membershipDiscountRate: '0.8000',
+      capAmount: '3200.00',
+      finalFeeAmount: '3200.00',
+      releasedRemainderAmount: '800.00',
+    },
+  );
+});
+
 test('P0-Pay authorization factory writes the Server fee snapshot into authorization truth', async () => {
   const {
     P0PayServiceFeeFactory,
@@ -95,7 +164,7 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
     estimatedFeeAmount: '4722.00',
     currency: 'CNY',
     authorizationRequired: true,
-    authorizationStatus: 'pending_authorization',
+    authorizationStatus: 'pending_freeze',
   };
   const factory = new P0PayServiceFeeFactory(
     { create: (value) => value },
@@ -113,7 +182,7 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
     {
       expectedQuotedAmount: '188880.00',
       expectedFeeRate: '0.025000',
-      expectedAuthorizationAmount: '4722.00',
+      expectedAuthorizationAmount: '4000.00',
       currency: 'CNY',
     },
     bid,
@@ -141,6 +210,8 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
 
   assert.equal(authorization.feeRate, '0.025000');
   assert.equal(authorization.estimatedFeeAmount, '4722.00');
+  assert.equal(authorization.authorizationQuotaAmount, '4000.00');
+  assert.equal(authorization.status, 'pending_freeze');
   assert.equal(authorization.feeRateLabel, '标准会员 2.5%');
   assert.equal(authorization.feeRateSource, 'paid_membership_tier');
   assert.equal(authorization.membershipTierSnapshot, 'standard');

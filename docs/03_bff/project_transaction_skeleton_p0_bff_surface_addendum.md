@@ -20,6 +20,18 @@ inputs_canonical:
   - apps/bff/src/routes/profile/app-profile-read.controller.ts
 ---
 
+## Pricing Rebaseline Note
+
+本文件继续保留 `项目交易骨架 P0` 的总体 `BFF` 边界意义。
+
+但自 [platform_pricing_bff_surface_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/platform_pricing_bff_surface_master_v1.md) 生效后，本文件中把 `payment / deposit` 一并排除出当前对象的旧阶段性条款，不再裁决现行收费 `L4 BFF surface`。
+
+当前正式解释固定如下：
+
+1. `BFF` 仍不得本地判断最终收费真相
+2. `BFF` 仍不得自建第二收费状态机
+3. 但 `200 元项目真实性诚意金`、`4000 元竞标服务费预授权额度`、`deal confirmation` 已有独立的当前收费 `L4` authority，不再受本文件旧排除口径限制
+
 # 项目交易骨架 P0 BFF Surface Addendum
 
 ## 1. Scope
@@ -184,4 +196,3 @@ inputs_canonical:
   配套的最小 shaping
 - `rating / dispute / payment / deposit / guarantee / credit / membership`
   全部不进入当前 `P0 BFF` 解锁范围
-

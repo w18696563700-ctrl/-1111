@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { AuthModule } from '../auth/auth.module';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
@@ -17,6 +18,7 @@ import { ProjectClarificationEntity } from '../trading_im/entities/project-clari
 import { UploadModule } from '../upload/upload.module';
 import { CounterpartConversationAvatarService } from './counterpart-conversation-avatar.service';
 import { CounterpartConversationDisplayNameService } from './counterpart-conversation-display-name.service';
+import { CounterpartConversationBidParticipationSource } from './counterpart-conversation.bid-participation-source';
 import { CounterpartConversationBidThreadSource } from './counterpart-conversation.bid-thread-source';
 import { CounterpartConversationClarificationSource } from './counterpart-conversation.clarification-source';
 import { CounterpartConversationProjectionService } from './counterpart-conversation.projection.service';
@@ -32,6 +34,7 @@ import { MessageInteractionQueryService } from './message-interaction.query.serv
       BidThreadMessageEntity,
       BidEntity,
       ProjectEntity,
+      BidParticipationRequestEntity,
       PlatformServiceFeeAuthorizationEntity,
       InquiryQuoteDepositEntity,
       ProjectNameAccessRequestEntity,
@@ -49,6 +52,7 @@ import { MessageInteractionQueryService } from './message-interaction.query.serv
   providers: [
     CounterpartConversationAvatarService,
     CounterpartConversationDisplayNameService,
+    CounterpartConversationBidParticipationSource,
     CounterpartConversationBidThreadSource,
     CounterpartConversationClarificationSource,
     CounterpartConversationProjectionService,

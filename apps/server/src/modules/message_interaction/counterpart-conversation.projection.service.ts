@@ -5,9 +5,9 @@ import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
+import { CounterpartConversationBidParticipationSource } from './counterpart-conversation.bid-participation-source';
 import { CounterpartConversationBidThreadSource } from './counterpart-conversation.bid-thread-source';
 import { CounterpartConversationClarificationSource } from './counterpart-conversation.clarification-source';
-import { CounterpartConversationProjectNameAccessSource } from './counterpart-conversation.project-name-access-source';
 import {
   CounterpartConversationCardSeed,
   CounterpartConversationCardSource,
@@ -26,7 +26,7 @@ type ConversationAggregate = {
   counterpart: CounterpartConversationDetailProjection['counterpart'];
   summary: CounterpartConversationDetailProjection['summary'];
   focusProjectId: string;
-  p0PaySummary?: Record<string, unknown>;
+  pricingSummary?: Record<string, unknown>;
   latestActivityAt: string;
   projectGroups: CounterpartConversationProjectGroupProjection[];
 };
@@ -42,7 +42,7 @@ type RatingOrderRow = {
 
 type ProjectGroupAggregate = {
   latestActivityAt: string;
-  p0PaySummary?: Record<string, unknown>;
+  pricingSummary?: Record<string, unknown>;
   cards: CounterpartConversationBusinessCardProjection[];
 };
 
@@ -61,12 +61,12 @@ export class CounterpartConversationProjectionService {
     private readonly projectRepository: Repository<ProjectEntity>,
     private readonly projectNameAccessProjectionService: ProjectNameAccessProjectionService,
     bidThreadSource: CounterpartConversationBidThreadSource,
-    projectNameAccessSource: CounterpartConversationProjectNameAccessSource,
+    bidParticipationSource: CounterpartConversationBidParticipationSource,
     clarificationSource: CounterpartConversationClarificationSource,
   ) {
     this.cardSources = [
       bidThreadSource,
-      projectNameAccessSource,
+      bidParticipationSource,
       clarificationSource,
     ];
   }
@@ -82,7 +82,7 @@ export class CounterpartConversationProjectionService {
       projectId: conversation.focusProjectId,
       counterpart: conversation.counterpart,
       summary: conversation.summary,
-      ...(conversation.p0PaySummary ? { p0PaySummary: conversation.p0PaySummary } : {}),
+      ...(conversation.pricingSummary ? { pricingSummary: conversation.pricingSummary } : {}),
       updatedAt: conversation.latestActivityAt,
       routeTarget: buildCounterpartConversationRouteTarget({
         conversationId: conversation.conversationId,
@@ -168,7 +168,7 @@ export class CounterpartConversationProjectionService {
             latestCardType: latestCard.cardType,
           },
           focusProjectId: focusProject.projectId,
-          ...(focusProject.p0PaySummary ? { p0PaySummary: focusProject.p0PaySummary } : {}),
+          ...(focusProject.pricingSummary ? { pricingSummary: focusProject.pricingSummary } : {}),
           latestActivityAt: aggregate.latestActivityAt,
           projectGroups,
         };
@@ -228,7 +228,10 @@ export class CounterpartConversationProjectionService {
       counterpart: {
         organizationId: seed.counterpartOrganizationId,
         displayName: seed.counterpartDisplayName,
+        nickname: seed.counterpartNickname,
+        companyName: seed.counterpartCompanyName,
         avatarUrl: seed.counterpartAvatarUrl,
+        certificationSummary: seed.counterpartCertificationSummary,
         role: 'counterpart' as const,
       },
       latestActivityAt: seed.updatedAt,
@@ -237,7 +240,7 @@ export class CounterpartConversationProjectionService {
           seed.projectId,
           {
             latestActivityAt: seed.updatedAt,
-            p0PaySummary: seed.p0PaySummary,
+            pricingSummary: seed.pricingSummary,
             cards: [seed.card],
           },
         ],
@@ -254,7 +257,10 @@ export class CounterpartConversationProjectionService {
       aggregate.counterpart = {
         organizationId: seed.counterpartOrganizationId,
         displayName: seed.counterpartDisplayName,
+        nickname: seed.counterpartNickname,
+        companyName: seed.counterpartCompanyName,
         avatarUrl: seed.counterpartAvatarUrl,
+        certificationSummary: seed.counterpartCertificationSummary,
         role: 'counterpart',
       };
     }
@@ -263,14 +269,14 @@ export class CounterpartConversationProjectionService {
     if (!group) {
       aggregate.projectGroups.set(seed.projectId, {
         latestActivityAt: seed.updatedAt,
-        p0PaySummary: seed.p0PaySummary,
+        pricingSummary: seed.pricingSummary,
         cards: [seed.card],
       });
       return;
     }
     if (seed.updatedAt > group.latestActivityAt) {
       group.latestActivityAt = seed.updatedAt;
-      group.p0PaySummary = seed.p0PaySummary;
+      group.pricingSummary = seed.pricingSummary;
     }
     group.cards.push(seed.card);
   }
@@ -298,9 +304,13 @@ export class CounterpartConversationProjectionService {
             titleVisibility,
           }),
           titleVisibility,
+          projectRelation: this.resolveProjectRelation({
+            project,
+            viewerOrganizationId: input.viewerOrganizationId,
+          }),
           projectState: project?.state ?? null,
           latestActivityAt: group.latestActivityAt,
-          ...(group.p0PaySummary ? { p0PaySummary: group.p0PaySummary } : {}),
+          ...(group.pricingSummary ? { pricingSummary: group.pricingSummary } : {}),
           ratingEntry:
             input.ratingEntryMap.get(
               this.ratingEntryKey(projectId, input.aggregate.counterpart.organizationId),
@@ -355,6 +365,18 @@ export class CounterpartConversationProjectionService {
   private normalizeTitle(value: string | null | undefined) {
     const normalized = value?.trim() ?? '';
     return normalized || null;
+  }
+
+  private resolveProjectRelation(input: {
+    project: ProjectEntity | undefined;
+    viewerOrganizationId: string;
+  }): CounterpartConversationProjectGroupProjection['projectRelation'] {
+    if (!input.project) {
+      return 'unknown';
+    }
+    return input.project.organizationId === input.viewerOrganizationId
+      ? 'my_published'
+      : 'my_bid';
   }
 
   private sortProjectGroups(

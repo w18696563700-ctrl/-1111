@@ -1,11 +1,17 @@
-import { CounterpartConversationBusinessCardProjection } from './counterpart-conversation.types';
+import {
+  CounterpartConversationBusinessCardProjection,
+  CounterpartConversationCertificationSummaryProjection,
+} from './counterpart-conversation.types';
 
 export type CounterpartConversationCardSeed = {
   counterpartOrganizationId: string;
   counterpartDisplayName: string;
+  counterpartNickname: string | null;
+  counterpartCompanyName: string;
   counterpartAvatarUrl: string | null;
+  counterpartCertificationSummary: CounterpartConversationCertificationSummaryProjection | null;
   projectId: string;
-  p0PaySummary?: Record<string, unknown>;
+  pricingSummary?: Record<string, unknown>;
   updatedAt: string;
   card: CounterpartConversationBusinessCardProjection;
 };

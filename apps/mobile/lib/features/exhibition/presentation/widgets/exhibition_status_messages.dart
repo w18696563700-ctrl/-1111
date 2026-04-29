@@ -285,7 +285,28 @@ String? _controlledBusinessFailureMessage({required String? errorCode}) {
     'PROJECT_CANCELLATION_REQUEST_INVALID' => '取消申请参数无效，请检查后再试。',
     'PROJECT_CANCELLATION_RESPONSE_INVALID' => '取消响应参数无效，请检查后再试。',
     'PROJECT_BREACH_RECORD_INVALID' => '违约记录参数无效，请检查后再试。',
+    'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED' => '发布项目需先完成 200 元项目真实性诚意金冻结。',
+    'PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED' =>
+      '当前暂不能创建项目真实性诚意金订单，请刷新项目状态后再试。',
+    'PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND' =>
+      '当前项目真实性诚意金订单暂不可用，请重新拉起后再试。',
+    'PROJECT_AUTHENTICITY_SINCERITY_PAY_INIT_REJECTED' =>
+      '当前暂不能拉起项目真实性诚意金支付，请刷新后再试。',
+    'PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE' =>
+      '当前项目真实性诚意金状态暂不允许继续发布，请完成冻结后再试。',
+    'PROJECT_AUTHENTICITY_SINCERITY_RESULT_UNAVAILABLE' =>
+      '项目真实性诚意金结果暂不可用，请稍后刷新。',
+    'PRICING_RULE_VERSION_MISMATCH' => '当前收费规则版本已更新，请刷新页面后再继续。',
     'BID_DUPLICATE_SUBMISSION' => '当前项目已提交过竞标，本页不再重复提交。请回到项目详情查看最新竞标状态。',
+    'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED' =>
+      '竞标申请审核通过后需先冻结 4000 元竞标服务费预授权额度，冻结成功后才能提交竞标。',
+    'BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED' =>
+      '当前暂不能创建竞标服务费预授权额度，请刷新项目状态后再试。',
+    'BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND' => '当前竞标服务费预授权记录暂不可用，请重新拉起后再试。',
+    'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED' =>
+      '当前暂不能拉起竞标服务费预授权冻结，请稍后再试。',
+    'BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE' =>
+      '当前竞标服务费预授权状态暂不允许提交竞标，请完成冻结后再试。',
     'BID_AWARD_INVALID' => '当前定标参数未通过校验。请回到我的项目详情确认中标投标 ID 与定标原因后再试。',
     'BID_AWARD_INVALID_STATE' => '当前项目状态暂时不能继续定标。请先回到我的项目详情确认项目是否已进入后续链路。',
     'BID_AWARD_DUPLICATE' => '当前项目已经处理过定标，本页不再重复提交。你可以先查看项目详情或我的项目中的最新状态。',

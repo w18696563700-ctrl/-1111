@@ -358,6 +358,9 @@ function createFileAccessService(harness, overrides = {}) {
     {
       uploadSignedUrlExpiresSeconds: overrides.expiresSeconds ?? 900,
     },
+    overrides.bidParticipationAccessService ?? {
+      async requireApprovedForOrganization() {},
+    },
   );
 }
 
@@ -1200,6 +1203,7 @@ test('bid-material projection filters to quote-basis V1 kinds only', async () =>
     verificationService,
     eligibilityService,
     new ProjectBidMaterialPresenter(),
+    { async requireApprovedForOrganization() {} },
   );
 
   const result = await service.list('project-1', createContext('bid-material-list-success'));

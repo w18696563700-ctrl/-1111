@@ -5,6 +5,7 @@ import { requireVerifiedCurrentSessionContext, VerifiedCurrentSessionContext } f
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { BidEntity } from '../bid/entities/bid.entity';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectNameAccessRequestEntity } from '../project_name_access/entities/project-name-access-request.entity';
@@ -38,6 +39,8 @@ export class ProjectCommunicationAccessService {
     private readonly projectRepository: Repository<ProjectEntity>,
     @InjectRepository(BidEntity)
     private readonly bidRepository: Repository<BidEntity>,
+    @InjectRepository(BidParticipationRequestEntity)
+    private readonly bidParticipationRepository: Repository<BidParticipationRequestEntity>,
     @InjectRepository(ProjectNameAccessRequestEntity)
     private readonly nameAccessRepository: Repository<ProjectNameAccessRequestEntity>,
     @InjectRepository(ProjectClarificationEntity)
@@ -185,6 +188,13 @@ export class ProjectCommunicationAccessService {
     if (bidCount > 0) {
       return true;
     }
+    const bidParticipationCount = await this.bidParticipationRepo(manager).countBy({
+      projectId,
+      requesterOrganizationId: counterpartOrganizationId
+    });
+    if (bidParticipationCount > 0) {
+      return true;
+    }
     const nameAccessCount = await this.nameAccessRepo(manager).countBy({
       projectId,
       requesterOrganizationId: counterpartOrganizationId
@@ -205,6 +215,10 @@ export class ProjectCommunicationAccessService {
 
   private bidRepo(manager?: EntityManager) {
     return manager?.getRepository(BidEntity) ?? this.bidRepository;
+  }
+
+  private bidParticipationRepo(manager?: EntityManager) {
+    return manager?.getRepository(BidParticipationRequestEntity) ?? this.bidParticipationRepository;
   }
 
   private nameAccessRepo(manager?: EntityManager) {

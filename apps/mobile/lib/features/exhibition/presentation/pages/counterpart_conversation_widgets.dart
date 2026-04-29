@@ -16,8 +16,16 @@ class _CounterpartConversationHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final avatarUrl = data.counterpart.avatarUrl?.trim();
-    final nickname = data.counterpart.displayName.trim();
-    final displayName = nickname.isEmpty ? '未命名对方' : nickname;
+    final nickname = data.counterpart.nickname?.trim() ?? '';
+    final companyName = data.counterpart.companyName.trim().isNotEmpty
+        ? data.counterpart.companyName.trim()
+        : data.counterpart.displayName.trim();
+    final primaryLabel = nickname.isNotEmpty
+        ? nickname
+        : (companyName.isNotEmpty ? companyName : '未命名对方');
+    final secondaryLabel = nickname.isNotEmpty && companyName.isNotEmpty
+        ? companyName
+        : '企业主体';
     return _ActionCard(
       title: title,
       tone: _ActionCardTone.emphasis,
@@ -34,7 +42,7 @@ class _CounterpartConversationHeader extends StatelessWidget {
                     ? null
                     : NetworkImage(avatarUrl),
                 child: avatarUrl == null || avatarUrl.isEmpty
-                    ? Text(displayName.characters.first)
+                    ? Text(primaryLabel.characters.first)
                     : null,
               ),
             ),
@@ -44,14 +52,14 @@ class _CounterpartConversationHeader extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
-                    displayName,
+                    primaryLabel,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '昵称',
+                    secondaryLabel,
                     style: Theme.of(context).textTheme.labelLarge?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                       fontWeight: FontWeight.w800,
@@ -67,7 +75,7 @@ class _CounterpartConversationHeader extends StatelessWidget {
   }
 }
 
-class _CounterpartProjectEntryList extends StatelessWidget {
+class _CounterpartProjectEntryList extends StatefulWidget {
   const _CounterpartProjectEntryList({
     required this.groups,
     required this.onOpenProjectCommunication,
@@ -78,27 +86,85 @@ class _CounterpartProjectEntryList extends StatelessWidget {
   onOpenProjectCommunication;
 
   @override
+  State<_CounterpartProjectEntryList> createState() =>
+      _CounterpartProjectEntryListState();
+}
+
+class _CounterpartProjectEntryListState
+    extends State<_CounterpartProjectEntryList> {
+  String? _selectedRelation;
+
+  @override
   Widget build(BuildContext context) {
+    final relationGroups =
+        <String, List<CounterpartConversationProjectGroupView>>{
+          'my_published': widget.groups
+              .where((group) => group.projectRelation == 'my_published')
+              .toList(growable: false),
+          'my_bid': widget.groups
+              .where((group) => group.projectRelation == 'my_bid')
+              .toList(growable: false),
+          'unknown': widget.groups
+              .where((group) => group.projectRelation == 'unknown')
+              .toList(growable: false),
+        };
+    final availableRelations = relationGroups.entries
+        .where((entry) => entry.value.isNotEmpty)
+        .map((entry) => entry.key)
+        .toList(growable: false);
+    final selectedRelation = availableRelations.contains(_selectedRelation)
+        ? _selectedRelation!
+        : (availableRelations.isEmpty ? 'unknown' : availableRelations.first);
+    final visibleGroups =
+        relationGroups[selectedRelation] ??
+        const <CounterpartConversationProjectGroupView>[];
     return _ActionCard(
       title: '项目列表',
       summary: '选择具体项目后进入此项目竞标沟通；总框不承接聊天业务。',
       children: <Widget>[
-        if (groups.isEmpty)
+        if (widget.groups.isEmpty)
           const _EmptyNotice(
             title: '当前没有项目入口',
             message: '这个对方主体下暂时没有可展示的项目沟通事项。',
           )
-        else
-          for (final group in groups)
+        else ...<Widget>[
+          if (availableRelations.length > 1) ...<Widget>[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final relation in availableRelations)
+                  ChoiceChip(
+                    label: Text(
+                      '${_projectRelationLabel(relation)} · ${relationGroups[relation]!.length}',
+                    ),
+                    selected: relation == selectedRelation,
+                    onSelected: (_) =>
+                        setState(() => _selectedRelation = relation),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
+          for (final group in visibleGroups)
             Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _CounterpartProjectEntryTile(
                 group: group,
-                onOpen: () => onOpenProjectCommunication(group),
+                onOpen: () => widget.onOpenProjectCommunication(group),
               ),
             ),
+        ],
       ],
     );
+  }
+
+  String _projectRelationLabel(String relation) {
+    return switch (relation) {
+      'my_published' => '我的发布',
+      'my_bid' => '我的竞标',
+      _ => '其他项目',
+    };
   }
 }
 
@@ -168,7 +234,7 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               maskedTitle
-                  ? '进入后可申请查看项目名称，并继续项目聊天、订单入口和项目相册。'
+                  ? '进入后可处理参与竞标申请，并继续项目聊天、订单入口和项目相册。'
                   : '进入后可继续项目聊天、订单入口和项目相册。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
@@ -191,7 +257,7 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
 class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
   const _SelectedProjectBusinessEntrypoints({
     required this.group,
-    required this.nameAccessCard,
+    required this.participationCard,
     required this.orderId,
     required this.onBackToProjectList,
     required this.onOpenNameAccess,
@@ -200,7 +266,7 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
   });
 
   final CounterpartConversationProjectGroupView group;
-  final CounterpartConversationBusinessCardView? nameAccessCard;
+  final CounterpartConversationBusinessCardView? participationCard;
   final String? orderId;
   final VoidCallback onBackToProjectList;
   final ValueChanged<CounterpartConversationBusinessCardView> onOpenNameAccess;
@@ -224,12 +290,12 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
         const SizedBox(height: 8),
         _ProjectBusinessEntryButton(
           icon: Icons.fact_check_outlined,
-          label: '项目名称查看申请 / 审核',
-          enabled: nameAccessCard != null,
-          disabledMessage: '当前项目暂无名称查看申请或审核入口。',
-          onPressed: nameAccessCard == null
+          label: '参与竞标申请 / 审核',
+          enabled: participationCard != null,
+          disabledMessage: '当前项目暂无参与竞标申请或审核入口。',
+          onPressed: participationCard == null
               ? null
-              : () => onOpenNameAccess(nameAccessCard!),
+              : () => onOpenNameAccess(participationCard!),
         ),
         const SizedBox(height: 10),
         _ProjectBusinessEntryButton(

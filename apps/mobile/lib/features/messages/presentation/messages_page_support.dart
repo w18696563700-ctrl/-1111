@@ -326,8 +326,18 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final displayName = item.counterpart.displayName.trim();
-    final counterpartLabel = displayName.isEmpty ? '对方主体' : displayName;
+    final identity = item.counterpart;
+    final nickname = identity.nickname?.trim() ?? '';
+    final companyName = identity.companyName.trim().isNotEmpty
+        ? identity.companyName.trim()
+        : identity.displayName.trim();
+    final primaryLabel = nickname.isNotEmpty
+        ? nickname
+        : (companyName.isNotEmpty ? companyName : '对方主体');
+    final secondaryLabel = nickname.isNotEmpty && companyName.isNotEmpty
+        ? '$companyName · 项目 ${item.summary.projectCount} 个'
+        : '项目 ${item.summary.projectCount} 个';
+    final avatarUrl = identity.avatarUrl?.trim();
     return DecoratedBox(
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
@@ -341,20 +351,21 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
           children: <Widget>[
             Row(
               children: <Widget>[
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(
-                      alpha: 0.58,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.business_center_outlined,
-                    size: 18,
-                    color: theme.colorScheme.primary,
-                  ),
+                CircleAvatar(
+                  radius: 18,
+                  backgroundColor: theme.colorScheme.primaryContainer,
+                  backgroundImage: avatarUrl == null || avatarUrl.isEmpty
+                      ? null
+                      : NetworkImage(avatarUrl),
+                  child: avatarUrl == null || avatarUrl.isEmpty
+                      ? Text(
+                          primaryLabel.characters.first,
+                          style: theme.textTheme.labelLarge?.copyWith(
+                            color: theme.colorScheme.onPrimaryContainer,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        )
+                      : null,
                 ),
                 const SizedBox(width: 10),
                 Expanded(
@@ -362,7 +373,7 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       Text(
-                        counterpartLabel,
+                        primaryLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.titleSmall?.copyWith(
@@ -371,7 +382,7 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '项目 ${item.summary.projectCount} 个',
+                        secondaryLabel,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.labelMedium?.copyWith(

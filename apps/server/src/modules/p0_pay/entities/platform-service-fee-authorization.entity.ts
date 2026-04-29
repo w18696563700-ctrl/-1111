@@ -19,8 +19,14 @@ export class PlatformServiceFeeAuthorizationEntity {
   @Column({ name: 'bid_id', type: 'varchar', length: 64 })
   bidId!: string;
 
+  @Column({ name: 'bid_participation_request_id', type: 'varchar', length: 64, nullable: true })
+  bidParticipationRequestId!: string | null;
+
   @Column({ name: 'factory_organization_id', type: 'varchar', length: 64 })
   factoryOrganizationId!: string;
+
+  @Column({ name: 'bidder_organization_id', type: 'varchar', length: 64, nullable: true })
+  bidderOrganizationId!: string | null;
 
   @Column({ name: 'publisher_organization_id', type: 'varchar', length: 64 })
   publisherOrganizationId!: string;
@@ -33,6 +39,15 @@ export class PlatformServiceFeeAuthorizationEntity {
 
   @Column({ name: 'estimated_fee_amount', type: 'numeric', precision: 12, scale: 2 })
   estimatedFeeAmount!: string | number;
+
+  @Column({ name: 'authorization_quota_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  authorizationQuotaAmount!: string | number | null;
+
+  @Column({ name: 'charged_amount_used', type: 'numeric', precision: 12, scale: 2, default: 0 })
+  chargedAmountUsed!: string | number;
+
+  @Column({ name: 'released_amount', type: 'numeric', precision: 12, scale: 2, default: 0 })
+  releasedAmount!: string | number;
 
   @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '默认费率 3.0%' })
   feeRateLabel!: string;
@@ -84,6 +99,9 @@ export class PlatformServiceFeeAuthorizationEntity {
 
   @Column({ name: 'authorized_at', type: 'timestamptz', nullable: true })
   authorizedAt!: Date | null;
+
+  @Column({ name: 'frozen_at', type: 'timestamptz', nullable: true })
+  frozenAt!: Date | null;
 
   @Column({ name: 'released_at', type: 'timestamptz', nullable: true })
   releasedAt!: Date | null;

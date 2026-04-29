@@ -144,7 +144,12 @@ class MyProjectDetailHeaderTitle extends StatelessWidget {
     return ValueListenableBuilder<String?>(
       valueListenable: _projectEditHeaderStatusNotifierFor(normalizedProjectId),
       builder: (BuildContext context, String? value, Widget? child) {
-        if (value != 'submitted') {
+        final stageTitle = switch (value) {
+          'submitted' => '（预发布补齐资料并发布页）',
+          'published' => '（已发布页）',
+          _ => null,
+        };
+        if (stageTitle == null) {
           return Text('我的项目详情', style: titleStyle);
         }
 
@@ -156,7 +161,7 @@ class MyProjectDetailHeaderTitle extends StatelessWidget {
               text: '我的项目详情',
               children: <InlineSpan>[
                 TextSpan(
-                  text: '（预发布补齐资料并发布页）',
+                  text: stageTitle,
                   style: titleStyle.copyWith(
                     color: theme.colorScheme.error,
                     fontWeight: titleStyle.fontWeight ?? FontWeight.w700,
@@ -165,7 +170,7 @@ class MyProjectDetailHeaderTitle extends StatelessWidget {
               ],
             ),
             key: const ValueKey<String>(
-              'my-project-detail-prepublish-app-bar-title',
+              'my-project-detail-stage-app-bar-title',
             ),
             maxLines: 1,
             style: titleStyle,

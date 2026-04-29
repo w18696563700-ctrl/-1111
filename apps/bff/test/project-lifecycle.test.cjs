@@ -152,6 +152,31 @@ test('project lifecycle keeps invalid-state fallout stable at bff layer', async 
   );
 });
 
+test('project publish preserves 200 sincerity gate fail-closed semantics', async () => {
+  const service = createService({
+    serverClient: {
+      async post() {
+        throw createAxiosError(
+          409,
+          'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED',
+          'Project publish requires paid project authenticity sincerity order.',
+        );
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.publishProject({ projectId: 'project-1' }, {}),
+    (error) => {
+      assert.equal(error.getStatus(), 409);
+      assert.equal(error.getResponse().code, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
+      assert.equal(error.getResponse().message, '发布项目需先完成 200 元项目真实性诚意金冻结。');
+      assert.equal(error.getResponse().source, 'server');
+      return true;
+    },
+  );
+});
+
 test('project lifecycle save uses route-specific invalid code for partial dual-field payloads', async () => {
   const service = createService();
 

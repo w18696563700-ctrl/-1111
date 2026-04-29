@@ -5,6 +5,7 @@ import { AuthModule } from '../auth/auth.module';
 import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectNameAccessRequestEntity } from './entities/project-name-access-request.entity';
 import { ProjectNameAccessController } from './project-name-access.controller';
@@ -17,6 +18,7 @@ import { ProjectNameAccessWriteService } from './project-name-access.write.servi
   imports: [
     TypeOrmModule.forFeature([
       ProjectNameAccessRequestEntity,
+      BidParticipationRequestEntity,
       ProjectEntity,
       OrganizationEntity,
       UserEntity,
@@ -35,4 +37,3 @@ import { ProjectNameAccessWriteService } from './project-name-access.write.servi
   exports: [ProjectNameAccessProjectionService],
 })
 export class ProjectNameAccessModule {}
-

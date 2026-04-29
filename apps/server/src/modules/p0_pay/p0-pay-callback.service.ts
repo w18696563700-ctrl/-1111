@@ -9,11 +9,11 @@ import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity';
 import { PlatformServiceFeeChargeEntity } from './entities/platform-service-fee-charge.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
-import { ProjectEntity } from '../project/entities/project.entity';
 import { p0PayInvalid, p0PayResourceUnavailable } from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
 import { P0PayPaymentChannel } from './p0-pay.types';
+import { PLATFORM_PRICING_AUDIT_ACTIONS } from './p0-pay.state';
 
 type CallbackCommand = {
   paymentChannel: P0PayPaymentChannel;
@@ -60,14 +60,14 @@ export class P0PayCallbackService {
         callback.applyStatus = 'not_applied';
         callback.rejectedReasonCode = verification.reasonCode;
         await manager.getRepository(PaymentCallbackEventEntity).save(callback);
-        await this.recordCallbackAudit(manager, callback, 'PaymentCallbackRejected', context);
+        await this.recordCallbackAudit(manager, callback, PLATFORM_PRICING_AUDIT_ACTIONS.paymentCallbackRejected, context);
         return callback;
       }
 
       callback.verificationStatus = 'verified';
       callback.verifiedAt = new Date();
       await manager.getRepository(PaymentCallbackEventEntity).save(callback);
-      await this.recordCallbackAudit(manager, callback, 'PaymentCallbackVerified', context);
+      await this.recordCallbackAudit(manager, callback, PLATFORM_PRICING_AUDIT_ACTIONS.paymentCallbackVerified, context);
       await this.applyVerifiedCallback(manager, callback, command, context);
       return callback;
     });
@@ -179,7 +179,7 @@ export class P0PayCallbackService {
         objectType: 'payment_order',
         objectId: order.id,
         objectNo: order.merchantOrderNo,
-        action: 'PaymentCallbackRejected',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.paymentCallbackRejected,
         beforeState: beforeOrderState,
         afterState: order.status,
         reason: `businessType=${order.businessType}; eventType=${command.eventType}`
@@ -190,21 +190,31 @@ export class P0PayCallbackService {
   }
 
   private async applyBusinessSuccess(manager: EntityManager, order: PaymentOrderEntity, context: RequestContext) {
-    if (order.businessType === 'platform_service_fee_authorization') {
+    if (
+      order.businessType === 'platform_service_fee_authorization' ||
+      order.businessType === 'bid_service_fee_authorization_freeze'
+    ) {
       const auth = await manager.getRepository(PlatformServiceFeeAuthorizationEntity).findOneBy({ id: order.businessId });
-      if (auth && auth.status === 'pending_authorization') {
+      if (auth && auth.status === 'pending_freeze') {
+        auth.status = 'frozen';
+        auth.frozenAt = new Date();
+        auth.authorizedAt = auth.frozenAt;
+        await manager.getRepository(PlatformServiceFeeAuthorizationEntity).save(auth);
+      } else if (auth && auth.status === 'pending_authorization') {
         auth.status = 'authorized';
         auth.authorizedAt = new Date();
         await manager.getRepository(PlatformServiceFeeAuthorizationEntity).save(auth);
       }
     }
-    if (order.businessType === 'inquiry_deposit') {
+    if (
+      order.businessType === 'inquiry_deposit' ||
+      order.businessType === 'project_authenticity_sincerity_payment'
+    ) {
       const deposit = await manager.getRepository(InquiryQuoteDepositEntity).findOneBy({ id: order.businessId });
       if (deposit && deposit.status === 'pending_payment') {
         deposit.status = 'paid';
         deposit.paidAt = new Date();
         await manager.getRepository(InquiryQuoteDepositEntity).save(deposit);
-        await this.publishInquiryTaskAfterDepositPaid(manager, deposit, context);
       }
     }
     if (order.businessType === 'platform_service_fee_charge') {
@@ -212,43 +222,12 @@ export class P0PayCallbackService {
     }
   }
 
-  private async publishInquiryTaskAfterDepositPaid(
-    manager: EntityManager,
-    deposit: InquiryQuoteDepositEntity,
-    context: RequestContext
-  ) {
-    const project = await manager.getRepository(ProjectEntity).findOneBy({ id: deposit.taskId });
-    if (!project || this.readTaskType(project.summary) !== 'inquiry_quote') {
-      return;
-    }
-    if (project.state === 'published' && project.publishedAt) {
-      return;
-    }
-
-    const beforeState = project.state;
-    project.state = 'published';
-    project.publishedAt = project.publishedAt ?? new Date();
-    await manager.getRepository(ProjectEntity).save(project);
-    await this.auditService.record(
-      {
-        objectType: 'trade_task',
-        objectId: project.id,
-        objectNo: project.projectNo,
-        action: 'InquiryTaskPublishedAfterDepositPaid',
-        beforeState,
-        afterState: project.state,
-        reason: `inquiryDepositId=${deposit.id}; depositStatus=${deposit.status}`
-      },
-      context,
-      manager
-    );
-  }
-
   private async applyChargeSuccess(manager: EntityManager, order: PaymentOrderEntity, context: RequestContext) {
     const charge = await manager.getRepository(PlatformServiceFeeChargeEntity).findOneBy({ id: order.businessId });
     if (!charge || charge.chargeStatus === 'charged') {
       return;
     }
+    const beforeChargeState = charge.chargeStatus;
     charge.chargeStatus = 'charged';
     charge.chargedAt = new Date();
     await manager.getRepository(PlatformServiceFeeChargeEntity).save(charge);
@@ -263,8 +242,8 @@ export class P0PayCallbackService {
         objectType: 'platform_service_fee_charge',
         objectId: charge.id,
         objectNo: order.merchantOrderNo,
-        action: 'PlatformServiceFeeCharged',
-        beforeState: 'pending_charge',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.platformServiceFeeCharged,
+        beforeState: beforeChargeState,
         afterState: charge.chargeStatus,
         reason: `taskId=${charge.taskId}; finalFeeAmount=${charge.finalFeeAmount}`
       },
@@ -274,13 +253,23 @@ export class P0PayCallbackService {
   }
 
   private async applyBusinessFailure(manager: EntityManager, order: PaymentOrderEntity) {
-    if (order.businessType === 'platform_service_fee_authorization') {
+    if (
+      order.businessType === 'platform_service_fee_authorization' ||
+      order.businessType === 'bid_service_fee_authorization_freeze'
+    ) {
       await manager.getRepository(PlatformServiceFeeAuthorizationEntity).update(
         { id: order.businessId, status: 'pending_authorization' },
         { status: 'failed' }
       );
+      await manager.getRepository(PlatformServiceFeeAuthorizationEntity).update(
+        { id: order.businessId, status: 'pending_freeze' },
+        { status: 'failed' }
+      );
     }
-    if (order.businessType === 'inquiry_deposit') {
+    if (
+      order.businessType === 'inquiry_deposit' ||
+      order.businessType === 'project_authenticity_sincerity_payment'
+    ) {
       await manager.getRepository(InquiryQuoteDepositEntity).update(
         { id: order.businessId, status: 'pending_payment' },
         { status: 'failed' }
@@ -289,6 +278,10 @@ export class P0PayCallbackService {
     if (order.businessType === 'platform_service_fee_charge') {
       await manager.getRepository(PlatformServiceFeeChargeEntity).update(
         { id: order.businessId, chargeStatus: 'pending_charge' },
+        { chargeStatus: 'charge_failed' }
+      );
+      await manager.getRepository(PlatformServiceFeeChargeEntity).update(
+        { id: order.businessId, chargeStatus: 'charge_pending' },
         { chargeStatus: 'charge_failed' }
       );
     }
@@ -367,24 +360,21 @@ export class P0PayCallbackService {
 
   private businessSuccessAuditAction(order: PaymentOrderEntity) {
     if (order.businessType === 'inquiry_deposit') {
-      return 'InquiryDepositPaid';
+      return PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityPaid;
+    }
+    if (order.businessType === 'project_authenticity_sincerity_payment') {
+      return PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityPaid;
     }
     if (order.businessType === 'platform_service_fee_authorization') {
-      return 'PlatformServiceFeePreauthorizationAuthorized';
+      return PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationFrozen;
     }
-    return 'PaymentCallbackReceived';
-  }
-
-  private readTaskType(summary: unknown) {
-    if (!summary || Array.isArray(summary) || typeof summary !== 'object') {
-      return null;
+    if (order.businessType === 'bid_service_fee_authorization_freeze') {
+      return PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationFrozen;
     }
-    const p0PayTask = (summary as Record<string, unknown>).p0PayTask;
-    if (!p0PayTask || Array.isArray(p0PayTask) || typeof p0PayTask !== 'object') {
-      return null;
+    if (order.businessType === 'platform_service_fee_charge') {
+      return PLATFORM_PRICING_AUDIT_ACTIONS.platformServiceFeeCharged;
     }
-    const taskType = (p0PayTask as Record<string, unknown>).taskType;
-    return typeof taskType === 'string' && taskType.trim() ? taskType.trim() : null;
+    return PLATFORM_PRICING_AUDIT_ACTIONS.paymentCallbackReceived;
   }
 
   private toCallbackCommand(paymentChannel: string, payload: Record<string, unknown>) {

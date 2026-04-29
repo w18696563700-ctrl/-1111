@@ -1,11 +1,13 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, EntityManager, Repository } from 'typeorm';
 import { ProjectPublishAuditService } from '../audit/project-publish-audit.service';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { authPermissionInsufficient } from '../organization/organization-auth.errors';
+import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
+import { projectAuthenticitySincerityRequired } from '../p0_pay/p0-pay.errors';
 import { VerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { ProjectEntity } from './entities/project.entity';
@@ -216,6 +218,7 @@ export class ProjectWriteService {
       if (project.state !== PROJECT_SUBMITTED_STATE) {
         throw projectInvalidState('Only submitted projects may be published.');
       }
+      await this.requirePaidPricingGate(manager, project, auditContext);
 
       project.state = PROJECT_PUBLISHED_STATE;
       project.summary = this.buildProjectSummary(PROJECT_PUBLISHED_STATE);
@@ -229,6 +232,9 @@ export class ProjectWriteService {
           payload: {
             state: project.state,
             publishedAt: project.publishedAt?.toISOString() ?? null,
+            pricingGateApplied: true,
+            authenticitySincerityRequired: true,
+            authenticitySincerityStatus: 'paid',
           },
         },
         auditContext,
@@ -237,6 +243,42 @@ export class ProjectWriteService {
 
       return this.presenter.toAcceptedResponse(project.id, project.state);
     });
+  }
+
+  private async requirePaidPricingGate(
+    manager: EntityManager,
+    project: ProjectEntity,
+    auditContext: RequestContext
+  ) {
+    const order = await manager.getRepository(InquiryQuoteDepositEntity).findOne({
+      where: {
+        taskId: project.id,
+        publisherOrganizationId: project.organizationId,
+        status: 'paid',
+      },
+      order: { updatedAt: 'DESC' },
+    });
+    if (order) {
+      return order;
+    }
+
+    await this.auditService.record(
+      {
+        aggregateType: 'project',
+        aggregateId: project.id,
+        eventType: 'project_publish_blocked_by_pricing_gate',
+        payload: {
+          pricingGateApplied: true,
+          authenticitySincerityRequired: true,
+          requiredOrderStatus: 'paid',
+          actualOrderStatus: 'missing_or_unpaid',
+          pricingErrorCode: 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED',
+        },
+      },
+      auditContext,
+      manager
+    );
+    throw projectAuthenticitySincerityRequired();
   }
 
   async deleteProject(projectId: string, context: RequestContext) {

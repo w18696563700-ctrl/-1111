@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectNameAccessRequestEntity } from './entities/project-name-access-request.entity';
 import {
@@ -14,6 +15,8 @@ export class ProjectNameAccessProjectionService {
   constructor(
     @InjectRepository(ProjectNameAccessRequestEntity)
     private readonly requestRepository: Repository<ProjectNameAccessRequestEntity>,
+    @InjectRepository(BidParticipationRequestEntity)
+    private readonly bidParticipationRepository: Repository<BidParticipationRequestEntity>,
   ) {}
 
   async buildPublicProjectionMap(input: {
@@ -63,19 +66,34 @@ export class ProjectNameAccessProjectionService {
 
   private async loadLatestRequestByProjectId(projectIds: string[], viewerOrganizationId: string | null) {
     if (!viewerOrganizationId || !projectIds.length) {
-      return new Map<string, ProjectNameAccessRequestEntity>();
+      return new Map<string, ProjectNameAccessRequestEntity | BidParticipationRequestEntity>();
     }
 
-    const requests = await this.requestRepository.find({
-      where: {
-        projectId: In(projectIds),
-        requesterOrganizationId: viewerOrganizationId,
-      },
-      order: { createdAt: 'DESC' },
-    });
-    const result = new Map<string, ProjectNameAccessRequestEntity>();
-    for (const request of requests) {
-      if (!result.has(request.projectId)) {
+    const [nameAccessRequests, bidParticipationRequests] = await Promise.all([
+      this.requestRepository.find({
+        where: {
+          projectId: In(projectIds),
+          requesterOrganizationId: viewerOrganizationId,
+        },
+        order: { createdAt: 'DESC' },
+      }),
+      this.bidParticipationRepository.find({
+        where: {
+          projectId: In(projectIds),
+          requesterOrganizationId: viewerOrganizationId,
+        },
+        order: { createdAt: 'DESC' },
+      }),
+    ]);
+    const result = new Map<string, ProjectNameAccessRequestEntity | BidParticipationRequestEntity>();
+    for (const request of [...bidParticipationRequests, ...nameAccessRequests]) {
+      const current = result.get(request.projectId);
+      if (!current || this.requestSortTime(current) < this.requestSortTime(request)) {
+        result.set(request.projectId, request);
+      }
+    }
+    for (const request of [...bidParticipationRequests, ...nameAccessRequests]) {
+      if (request.state === 'approved') {
         result.set(request.projectId, request);
       }
     }
@@ -87,7 +105,7 @@ export class ProjectNameAccessProjectionService {
     input: {
       isOwnerViewer: boolean;
       viewerOrganizationId: string | null;
-      latestRequest: ProjectNameAccessRequestEntity | null;
+      latestRequest: ProjectNameAccessRequestEntity | BidParticipationRequestEntity | null;
     },
   ): ProjectNameAccessProjection {
     const visibleDisplayTitle = buildProjectDisplayTitle(project);
@@ -164,5 +182,8 @@ export class ProjectNameAccessProjectionService {
     const normalized = value?.trim() ?? '';
     return normalized ? normalized : null;
   }
-}
 
+  private requestSortTime(request: ProjectNameAccessRequestEntity | BidParticipationRequestEntity) {
+    return request.createdAt.getTime();
+  }
+}

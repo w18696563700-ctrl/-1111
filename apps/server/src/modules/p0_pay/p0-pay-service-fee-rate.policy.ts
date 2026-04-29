@@ -11,6 +11,7 @@ import {
   P0PayFeeRateSource,
   P0PayMembershipTierSnapshot
 } from './p0-pay.types';
+import { PLATFORM_SERVICE_FEE_CAP_AMOUNT } from './p0-pay.state';
 
 export const P0_PAY_MEMBERSHIP_FEE_RULE_VERSION = 'p0_pay_membership_service_fee_v1';
 
@@ -29,7 +30,16 @@ export type P0PayServiceFeeRequirement = P0PayFeeRateSnapshot & {
   estimatedFeeAmount: string;
   currency: 'CNY';
   authorizationRequired: boolean;
-  authorizationStatus: 'pending_authorization';
+  authorizationStatus: 'pending_freeze';
+};
+
+export type PlatformPricingServiceFeeCalculation = {
+  finalConfirmedAmount: string;
+  baseFeeAmount: string;
+  membershipDiscountRate: string;
+  capAmount: string;
+  finalFeeAmount: string;
+  releasedRemainderAmount: string;
 };
 
 type TierPolicy = {
@@ -98,12 +108,51 @@ export class P0PayServiceFeeRatePolicy {
       estimatedFeeAmount: calculatePlatformServiceFeeAmount(quotedAmount, snapshot.feeRate),
       currency: 'CNY',
       authorizationRequired: true,
-      authorizationStatus: 'pending_authorization'
+      authorizationStatus: 'pending_freeze'
     };
   }
 
   calculateFinalFeeAmount(finalConfirmedAmount: string | number, snapshot: Pick<P0PayFeeRateSnapshot, 'feeRate'>) {
     return calculatePlatformServiceFeeAmount(finalConfirmedAmount, snapshot.feeRate);
+  }
+
+  calculateDealServiceFee(input: {
+    finalConfirmedAmount: string | number;
+    membershipTierSnapshot: P0PayMembershipTierSnapshot;
+    authorizationQuotaAmount?: string | number | null;
+  }): PlatformPricingServiceFeeCalculation {
+    const finalConfirmedAmount = normalizePositiveMoney(input.finalConfirmedAmount, 'finalConfirmedAmount');
+    const baseFeeAmount = this.calculateBaseServiceFeeAmount(finalConfirmedAmount);
+    const discount = this.resolveMembershipDiscount(input.membershipTierSnapshot);
+    const discountedFee = this.multiplyMoney(baseFeeAmount, discount.discountRate);
+    const finalFeeAmount = this.minMoney(discountedFee, discount.capAmount);
+    const quotaAmount = normalizePositiveMoney(
+      input.authorizationQuotaAmount ?? PLATFORM_SERVICE_FEE_CAP_AMOUNT,
+      'authorizationQuotaAmount'
+    );
+    return {
+      finalConfirmedAmount,
+      baseFeeAmount,
+      membershipDiscountRate: discount.discountRate,
+      capAmount: discount.capAmount,
+      finalFeeAmount,
+      releasedRemainderAmount: this.maxMoney(this.subtractMoney(quotaAmount, finalFeeAmount), '0.00')
+    };
+  }
+
+  calculateBaseServiceFeeAmount(finalConfirmedAmount: string | number) {
+    const amount = Number(normalizePositiveMoney(finalConfirmedAmount, 'finalConfirmedAmount'));
+    let fee = 200;
+    if (amount > 10000) {
+      fee += Math.min(amount - 10000, 20000) * 0.02;
+    }
+    if (amount > 30000) {
+      fee += Math.min(amount - 30000, 70000) * 0.015;
+    }
+    if (amount > 100000) {
+      fee += (amount - 100000) * 0.01;
+    }
+    return this.minMoney(fee.toFixed(2), PLATFORM_SERVICE_FEE_CAP_AMOUNT);
   }
 
   private async buildSnapshot(input: {
@@ -152,5 +201,31 @@ export class P0PayServiceFeeRatePolicy {
 
   private hashSnapshot(value: Record<string, unknown>) {
     return createHash('sha256').update(JSON.stringify(value), 'utf8').digest('hex');
+  }
+
+  private resolveMembershipDiscount(tier: P0PayMembershipTierSnapshot) {
+    if (tier === 'standard') {
+      return { discountRate: '0.9000', capAmount: '3600.00' };
+    }
+    if (tier === 'professional') {
+      return { discountRate: '0.8000', capAmount: '3200.00' };
+    }
+    return { discountRate: '1.0000', capAmount: PLATFORM_SERVICE_FEE_CAP_AMOUNT };
+  }
+
+  private multiplyMoney(amount: string, rate: string) {
+    return (Number(amount) * Number(rate)).toFixed(2);
+  }
+
+  private subtractMoney(left: string, right: string) {
+    return (Number(left) - Number(right)).toFixed(2);
+  }
+
+  private minMoney(left: string, right: string) {
+    return Math.min(Number(left), Number(right)).toFixed(2);
+  }
+
+  private maxMoney(left: string, right: string) {
+    return Math.max(Number(left), Number(right)).toFixed(2);
   }
 }

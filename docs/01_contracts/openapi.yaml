@@ -2303,7 +2303,7 @@ paths:
   /api/app/project/publish:
     post:
       tags: [Project]
-      summary: Publish submitted project canonical path for Flutter App
+      summary: Publish submitted project canonical path for Flutter App with pre-publish pricing gate
       operationId: publishAppProject
       requestBody:
         required: true
@@ -2313,11 +2313,23 @@ paths:
               $ref: '#/components/schemas/ProjectLifecycleActionRequest'
       responses:
         "202":
-          description: Project publish accepted.
+          description: >
+            Project publish accepted only when the current submitted project has
+            either completed the required `200 元项目真实性诚意金` payment or is
+            admitted without that pricing gate. This path must not auto-create
+            a sincerity order, auto-charge, or silently treat publish success
+            as pricing consumption success.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectLifecycleAcceptedResponse'
+        "409":
+          description: >
+            Controlled publish pricing-gate or invalid-state response. Server
+            must fail closed with `PROJECT_AUTHENTICITY_SINCERITY_REQUIRED` or
+            `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the required
+            `200 元项目真实性诚意金` truth is not in an admitted paid state for
+            publish.
   /api/app/project/withdraw:
     post:
       tags: [Project]
@@ -2407,6 +2419,398 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProjectReadModel'
+  /api/app/project/{projectId}/pricing-summary:
+    get:
+      tags: [ProjectPricing]
+      summary: Project pricing summary canonical path for Flutter App
+      operationId: getAppProjectPricingSummary
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Read-only pricing summary for one current project only. This path
+            carries status summary truth for the `200 元项目真实性诚意金`,
+            `4000 元竞标服务费预授权额度`, and current deal summary, and must
+            not execute payment, freeze, release, or charge behavior.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectPricingSummaryResponse'
+  /api/app/project/{projectId}/authenticity-sincerity/orders:
+    post:
+      tags: [ProjectPricing]
+      summary: Project authenticity sincerity order create canonical path for Flutter App
+      operationId: createAppProjectAuthenticitySincerityOrder
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >
+          Create the current project's `200 元项目真实性诚意金` order only. This
+          request must not be reinterpreted as a generic payment-order create,
+          wallet top-up, deposit create, or trade-task create.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderCreateRequest'
+      responses:
+        "200":
+          description: >
+            Project authenticity sincerity order created or returned through an
+            idempotent current-order handoff. The formal name remains
+            `项目真实性诚意金`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderCreateResponse'
+        "400":
+          description: >
+            Controlled order-create rejected response. Server must return
+            `PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED` or
+            `PRICING_RULE_VERSION_MISMATCH` when the current request body or
+            pricing rule snapshot is not admitted.
+        "409":
+          description: >
+            Controlled sincerity-order invalid-state response. Server must
+            return `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the
+            targeted current project cannot enter the bounded sincerity-order
+            branch.
+  /api/app/project/{projectId}/authenticity-sincerity/orders/{orderId}/pay-init:
+    post:
+      tags: [ProjectPricing]
+      summary: Project authenticity sincerity pay-init canonical path for Flutter App
+      operationId: initAppProjectAuthenticitySincerityPayment
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >
+          Pay-init handoff for the current project's `200 元项目真实性诚意金`
+          order only. This path prepares channel execution and must not
+          materialize local payment-success truth.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectAuthenticitySincerityPayInitRequest'
+      responses:
+        "200":
+          description: >
+            Project authenticity sincerity pay-init accepted for the current
+            bounded order only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAuthenticitySincerityPayInitResponse'
+        "400":
+          description: >
+            Controlled pay-init rejected response. Server must return
+            `PROJECT_AUTHENTICITY_SINCERITY_PAY_INIT_REJECTED` when the current
+            pay-init request cannot enter channel preparation.
+        "404":
+          description: >
+            Controlled sincerity-order not-found response. Server must return
+            `PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND` when the targeted
+            current order is absent or not visible.
+        "409":
+          description: >
+            Controlled sincerity-order invalid-state response. Server must
+            return `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the
+            current order state does not admit pay-init.
+  /api/app/project/{projectId}/authenticity-sincerity/orders/{orderId}:
+    get:
+      tags: [ProjectPricing]
+      summary: Project authenticity sincerity order status canonical path for Flutter App
+      operationId: getAppProjectAuthenticitySincerityOrder
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: orderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Current bounded `项目真实性诚意金` order status read model only. This
+            path carries order status, refund progress, withhold progress, and
+            channel summary only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderStatusResponse'
+        "404":
+          description: >
+            Controlled sincerity-order not-found response. Server must return
+            `PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND` when the targeted
+            current order is absent or not visible.
+  /api/app/project/{projectId}/bid-service-fee-authorizations:
+    post:
+      tags: [ProjectPricing]
+      summary: Bid service-fee authorization create canonical path for Flutter App
+      operationId: createAppBidServiceFeeAuthorization
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >
+          Create the current project's `4000 元竞标服务费预授权额度` object only.
+          This request must not be reinterpreted as a generic payment-order
+          create, seat lock, deposit create, or trade-task authorization.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidServiceFeeAuthorizationCreateRequest'
+      responses:
+        "200":
+          description: >
+            Bid service-fee authorization object created or returned through an
+            idempotent current-authorization handoff.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidServiceFeeAuthorizationCreateResponse'
+        "400":
+          description: >
+            Controlled authorization-create rejected response. Server must
+            return `BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED` or
+            `PRICING_RULE_VERSION_MISMATCH` when the current authorization
+            request body or pricing rule snapshot is not admitted.
+        "409":
+          description: >
+            Controlled authorization invalid-state response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE` when the targeted
+            current project-bidder relation cannot enter the bounded
+            authorization branch.
+  /api/app/project/{projectId}/bid-service-fee-authorizations/{authorizationId}/freeze-init:
+    post:
+      tags: [ProjectPricing]
+      summary: Bid service-fee authorization freeze-init canonical path for Flutter App
+      operationId: initAppBidServiceFeeAuthorizationFreeze
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: authorizationId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >
+          Freeze-init handoff for the current `4000 元竞标服务费预授权额度` object
+          only. This path prepares channel execution and must not materialize
+          local frozen truth.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidServiceFeeAuthorizationFreezeInitRequest'
+      responses:
+        "200":
+          description: >
+            Bid service-fee authorization freeze-init accepted for the current
+            bounded authorization only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidServiceFeeAuthorizationFreezeInitResponse'
+        "400":
+          description: >
+            Controlled freeze-init rejected response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED` when the
+            current freeze-init request cannot enter channel preparation.
+        "404":
+          description: >
+            Controlled authorization not-found response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND` when the targeted current
+            authorization is absent or not visible.
+        "409":
+          description: >
+            Controlled authorization invalid-state response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE` when the current
+            authorization state does not admit freeze-init.
+  /api/app/project/{projectId}/bid-service-fee-authorizations/{authorizationId}:
+    get:
+      tags: [ProjectPricing]
+      summary: Bid service-fee authorization status canonical path for Flutter App
+      operationId: getAppBidServiceFeeAuthorization
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: authorizationId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Current bounded `竞标服务费预授权额度` status read model only. This
+            path carries authorization, release, and charge status only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidServiceFeeAuthorizationStatusResponse'
+        "404":
+          description: >
+            Controlled authorization not-found response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND` when the targeted current
+            authorization is absent or not visible.
+  /api/app/project/{projectId}/bid-service-fee-authorizations/{authorizationId}/release:
+    post:
+      tags: [ProjectPricing]
+      summary: Bid service-fee authorization release canonical path for Flutter App
+      operationId: releaseAppBidServiceFeeAuthorization
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: authorizationId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >
+          Manual release request for the current `4000 元竞标服务费预授权额度`
+          object only. Successful release must close the current project's bid
+          submission continuation for the current bidder.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BidServiceFeeAuthorizationReleaseRequest'
+      responses:
+        "200":
+          description: >
+            Bid service-fee authorization release accepted for the current
+            bounded authorization only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BidServiceFeeAuthorizationReleaseResponse'
+        "400":
+          description: >
+            Controlled authorization release rejected response. Server must
+            return `BID_SERVICE_FEE_AUTHORIZATION_RELEASE_REJECTED` when the
+            current release request cannot enter the bounded release branch.
+        "404":
+          description: >
+            Controlled authorization not-found response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND` when the targeted current
+            authorization is absent or not visible.
+        "409":
+          description: >
+            Controlled authorization invalid-state response. Server must return
+            `BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE` when the current
+            authorization state does not admit release.
+  /api/app/project/{projectId}/deal-confirmations:
+    post:
+      tags: [ProjectPricing]
+      summary: Deal confirmation create or advance canonical path for Flutter App
+      operationId: upsertAppDealConfirmation
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        description: >
+          Create or advance the current project's bounded deal-confirmation
+          object only. This request must not reopen compare scoring, generic
+          contract management, or a second service-fee state machine.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DealConfirmationCreateRequest'
+      responses:
+        "200":
+          description: >
+            Deal confirmation accepted for the current bounded project. The
+            response may represent first confirmation or counterparty-aligned
+            confirmation advance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DealConfirmationAcceptedResponse'
+        "400":
+          description: >
+            Controlled deal-confirmation invalid response. Server must return
+            `DEAL_CONFIRMATION_INVALID` when the current request body is
+            missing required confirmation truth.
+        "409":
+          description: >
+            Controlled deal-confirmation invalid-state response. Server must
+            return `DEAL_CONFIRMATION_INVALID_STATE` or
+            `DEAL_CONFIRMATION_COUNTERPARTY_PENDING` when the current
+            confirmation state does not admit the requested advance.
+  /api/app/project/{projectId}/deal-confirmations/{dealConfirmationId}:
+    get:
+      tags: [ProjectPricing]
+      summary: Deal confirmation detail canonical path for Flutter App
+      operationId: getAppDealConfirmation
+      parameters:
+        - in: path
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: path
+          name: dealConfirmationId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Current bounded deal-confirmation detail for one project only.
+            This path carries confirmation state, final confirmed amount,
+            platform service-fee calculation, and sincerity settlement status
+            only.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DealConfirmationReadModel'
+        "404":
+          description: >
+            Controlled deal-confirmation unavailable response. Because no
+            dedicated not-found code is frozen in this round, Server may
+            normalize missing current detail as `DEAL_CONFIRMATION_INVALID`.
   /api/app/project/clarification/list:
     get:
       tags: [Project]
@@ -2667,14 +3071,16 @@ paths:
   /api/app/bid/submit:
     post:
       tags: [Bid]
-      summary: Exhibition bid submit canonical path for Flutter App
+      summary: Exhibition bid submit canonical path for Flutter App with pricing gate
       operationId: submitAppBid
       requestBody:
         required: true
         description: >
           Minimum bid submit command request for current Flutter App
           consumption. This request freezes only the current page-submitted
-          fields.
+          fields. Pricing truth stays outside this body and must be admitted by
+          upstream `approved bidParticipationRequest + frozen 4000 元竞标服务费预授权额度`
+          gate truth before submit may succeed.
         content:
           application/json:
             schema:
@@ -2685,11 +3091,22 @@ paths:
             Minimum bid submit command success body for Flutter App. The current
             frontend success chain freezes only `bidId`; this response must not
             expand into a full bid read projection, bid compare truth,
-            shortlist or win-loss management, or order-create truth.
+            shortlist or win-loss management, or order-create truth. Success is
+            admitted only when the current actor already owns an `approved`
+            participation truth and a `frozen` bounded
+            `4000 元竞标服务费预授权额度`.
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/BidSubmitAcceptedResponse'
+        "409":
+          description: >
+            Controlled bid-submit pricing-gate or invalid-state response.
+            Server must fail closed with
+            `BID_SERVICE_FEE_AUTHORIZATION_REQUIRED` or
+            `BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE` when the required
+            current `4000 元竞标服务费预授权额度` truth is absent or not yet
+            frozen.
   /api/app/bid/seat/lock:
     post:
       tags: [Bid]
@@ -2865,8 +3282,9 @@ paths:
           description: >
             Trading-scoped IM Round A private thread detail for one project-bid
             relation only. The response may include the bounded message list and
-            confirmation cards but must not become a generic message center,
-            station inbox, order conversation, contract conversation, or dispute
+            confirmation cards plus the current bounded pricing-gate handoff
+            carrier, but must not become a generic message center, station
+            inbox, order conversation, contract conversation, or dispute
             conversation.
           content:
             application/json:
@@ -8274,6 +8692,386 @@ components:
           type: string
         state:
           $ref: '#/components/schemas/ProjectState'
+    PricingCurrencyCode:
+      type: string
+      enum:
+        - CNY
+      description: >
+        Current pricing mainline currency freeze. This companion patch admits
+        only CNY for the current `200 元项目真实性诚意金` and
+        `4000 元竞标服务费预授权额度` objects.
+    PricingNextActionToken:
+      type: string
+      description: >
+        Controlled pricing handoff token only. Consumers may use this field for
+        CTA routing but must not derive amount truth, gate truth, or local
+        payment success from it.
+    ProjectAuthenticitySincerityOrderStatus:
+      type: string
+      enum:
+        - pending_payment
+        - paid
+        - refund_pending
+        - refunded
+        - withheld
+        - cancelled
+        - failed
+      description: >
+        Canonical bounded state machine for the current project's
+        `项目真实性诚意金` object only.
+    BidServiceFeeAuthorizationStatus:
+      type: string
+      enum:
+        - pending_freeze
+        - frozen
+        - release_pending
+        - released
+        - charge_pending
+        - charged
+        - breach_hold
+        - cancelled
+        - failed
+      description: >
+        Canonical bounded state machine for the current project's
+        `竞标服务费预授权额度` object only.
+    DealConfirmationStatus:
+      type: string
+      enum:
+        - pending_counterparty_confirm
+        - confirmed_deal
+        - cancelled
+        - failed
+      description: >
+        Canonical bounded state machine for the current project's deal
+        confirmation object only. `confirmed_deal` is the sole formal current
+        deal-established state.
+    BidThreadPricingGateType:
+      type: string
+      enum:
+        - none
+        - bid_service_fee_authorization_required
+      description: >
+        Minimum pricing-gate carrier for the current admitted bid-thread
+        handoff only.
+    PricingChannelSummary:
+      type: object
+      required:
+        - payChannel
+        - paymentReferenceId
+        - lastOperationAt
+      description: >
+        Minimum channel summary carrier for the current pricing mainline only.
+        This object carries external-channel observation fields and must not
+        become business truth by itself.
+      properties:
+        payChannel:
+          type:
+            - string
+            - 'null'
+        paymentReferenceId:
+          type:
+            - string
+            - 'null'
+        lastOperationAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    PricingServiceFeeCalculation:
+      type: object
+      required:
+        - ruleVersion
+        - baseFeeAmount
+        - membershipTierApplied
+        - membershipDiscountRate
+        - capAmount
+        - finalFeeAmount
+      description: >
+        Minimum platform service-fee calculation snapshot carried by current
+        deal confirmation only. This object freezes calculation result truth
+        and must not become a generic billing ledger.
+      properties:
+        ruleVersion:
+          type: string
+        baseFeeAmount:
+          type: number
+        membershipTierApplied:
+          type:
+            - string
+            - 'null'
+        membershipDiscountRate:
+          type:
+            - number
+            - 'null'
+        capAmount:
+          type: number
+        finalFeeAmount:
+          type: number
+    ProjectPricingPublisherSummary:
+      type: object
+      required:
+        - authenticitySincerityRequired
+        - authenticitySincerityAmount
+        - authenticitySincerityStatus
+        - publishGateStatus
+        - formalResultProcessingRequired
+        - nextAction
+      description: >
+        Publisher-facing pricing summary carrier only. This object freezes the
+        current `200 元项目真实性诚意金` and publish-gate summary for one
+        current project only.
+      properties:
+        authenticitySincerityRequired:
+          type: boolean
+        authenticitySincerityAmount:
+          type: number
+        authenticitySincerityStatus:
+          oneOf:
+            - $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderStatus'
+            - type: 'null'
+        publishGateStatus:
+          type: string
+        formalResultProcessingRequired:
+          type: boolean
+        nextAction:
+          $ref: '#/components/schemas/PricingNextActionToken'
+    ProjectPricingBidderSummary:
+      type: object
+      required:
+        - bidParticipationRequestId
+        - authorizationRequired
+        - authorizationQuotaAmount
+        - authorizationStatus
+        - bidSubmissionEligible
+        - nextAction
+      description: >
+        Bidder-facing pricing summary carrier only. This object freezes the
+        current `4000 元竞标服务费预授权额度` and bid-submit gate summary for
+        one current project only.
+      properties:
+        bidParticipationRequestId:
+          type:
+            - string
+            - 'null'
+        authorizationRequired:
+          type: boolean
+        authorizationQuotaAmount:
+          type: number
+        authorizationStatus:
+          oneOf:
+            - $ref: '#/components/schemas/BidServiceFeeAuthorizationStatus'
+            - type: 'null'
+        bidSubmissionEligible:
+          type: boolean
+        nextAction:
+          $ref: '#/components/schemas/PricingNextActionToken'
+    ProjectPricingDealSummary:
+      type: object
+      required:
+        - dealConfirmationId
+        - dealStatus
+        - selectedBidId
+        - finalConfirmedAmount
+        - platformServiceFeeAmount
+        - serviceFeeChargeStatus
+      description: >
+        Current project deal-and-charge summary carrier only. This object
+        freezes current deal confirmation and current platform service-fee
+        charge summary without reopening a generic billing center.
+      properties:
+        dealConfirmationId:
+          type:
+            - string
+            - 'null'
+        dealStatus:
+          oneOf:
+            - $ref: '#/components/schemas/DealConfirmationStatus'
+            - type: 'null'
+        selectedBidId:
+          type:
+            - string
+            - 'null'
+        finalConfirmedAmount:
+          type:
+            - number
+            - 'null'
+        platformServiceFeeAmount:
+          type:
+            - number
+            - 'null'
+        serviceFeeChargeStatus:
+          type:
+            - string
+            - 'null'
+    ProjectPricingSummaryResponse:
+      type: object
+      required:
+        - projectId
+        - publisherPricing
+        - bidderPricing
+        - dealSummary
+        - updatedAt
+        - readOnly
+      description: >
+        Read-only pricing summary response for one current project only. This
+        contract carries status summary truth only and must not execute
+        payment, freeze, release, or service-fee charge behavior.
+      properties:
+        projectId:
+          type: string
+        publisherPricing:
+          $ref: '#/components/schemas/ProjectPricingPublisherSummary'
+        bidderPricing:
+          $ref: '#/components/schemas/ProjectPricingBidderSummary'
+        dealSummary:
+          $ref: '#/components/schemas/ProjectPricingDealSummary'
+        updatedAt:
+          type: string
+          format: date-time
+        readOnly:
+          type: boolean
+          description: >
+            Read-only marker for current pricing summary. This field is frozen
+            as `true`.
+    ProjectAuthenticitySincerityOrderCreateRequest:
+      type: object
+      required:
+        - expectedAmount
+        - expectedCurrency
+        - ruleVersion
+        - ruleSnapshotHash
+        - idempotencyKey
+      description: >
+        Create-order request for the current project's
+        `200 元项目真实性诚意金` object only.
+      properties:
+        expectedAmount:
+          type: number
+        expectedCurrency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        ruleVersion:
+          type: string
+        ruleSnapshotHash:
+          type: string
+        idempotencyKey:
+          type: string
+    ProjectAuthenticitySincerityOrderCreateResponse:
+      type: object
+      required:
+        - orderId
+        - orderStatus
+        - amount
+        - currency
+        - channelCandidates
+        - expiresAt
+        - updatedAt
+      description: >
+        Create-order response for the current bounded `项目真实性诚意金` object
+        only.
+      properties:
+        orderId:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderStatus'
+        amount:
+          type: number
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        channelCandidates:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProjectAuthenticitySincerityPayInitRequest:
+      type: object
+      required:
+        - payChannel
+        - clientPlatform
+        - idempotencyKey
+      description: >
+        Pay-init request for the current bounded `项目真实性诚意金` object only.
+      properties:
+        payChannel:
+          type: string
+        clientPlatform:
+          type: string
+        idempotencyKey:
+          type: string
+    ProjectAuthenticitySincerityPayInitResponse:
+      type: object
+      required:
+        - paymentInitStatus
+        - orderId
+        - paymentReferenceId
+        - channelActionType
+        - channelPayload
+        - callbackAwaiting
+        - expiresAt
+        - updatedAt
+      description: >
+        Pay-init response for the current bounded `项目真实性诚意金` object only.
+        Channel payload remains transport material only.
+      properties:
+        paymentInitStatus:
+          type: string
+        orderId:
+          type: string
+        paymentReferenceId:
+          type: string
+        channelActionType:
+          type: string
+        channelPayload:
+          type: object
+          additionalProperties: true
+        callbackAwaiting:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProjectAuthenticitySincerityOrderStatusResponse:
+      type: object
+      required:
+        - orderId
+        - orderStatus
+        - amount
+        - currency
+        - refundStatus
+        - withholdStatus
+        - withholdReasonCode
+        - channelSummary
+        - updatedAt
+      description: >
+        Status response for the current bounded `项目真实性诚意金` object only.
+      properties:
+        orderId:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderStatus'
+        amount:
+          type: number
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        refundStatus:
+          type: string
+        withholdStatus:
+          type: string
+        withholdReasonCode:
+          type:
+            - string
+            - 'null'
+        channelSummary:
+          $ref: '#/components/schemas/PricingChannelSummary'
+        updatedAt:
+          type: string
+          format: date-time
     UploadInitRequest:
       type: object
       required:
@@ -8599,6 +9397,283 @@ components:
       properties:
         bidId:
           type: string
+    BidServiceFeeAuthorizationCreateRequest:
+      type: object
+      required:
+        - bidParticipationRequestId
+        - expectedAmount
+        - expectedCurrency
+        - ruleVersion
+        - ruleSnapshotHash
+        - idempotencyKey
+      description: >
+        Create request for the current project's
+        `4000 元竞标服务费预授权额度` object only.
+      properties:
+        bidParticipationRequestId:
+          type: string
+        expectedAmount:
+          type: number
+        expectedCurrency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        ruleVersion:
+          type: string
+        ruleSnapshotHash:
+          type: string
+        idempotencyKey:
+          type: string
+    BidServiceFeeAuthorizationCreateResponse:
+      type: object
+      required:
+        - authorizationId
+        - authorizationStatus
+        - authorizationQuotaAmount
+        - currency
+        - channelCandidates
+        - expiresAt
+        - updatedAt
+      description: >
+        Create response for the current bounded `竞标服务费预授权额度` object only.
+      properties:
+        authorizationId:
+          type: string
+        authorizationStatus:
+          $ref: '#/components/schemas/BidServiceFeeAuthorizationStatus'
+        authorizationQuotaAmount:
+          type: number
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        channelCandidates:
+          type: array
+          items:
+            type: string
+        expiresAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BidServiceFeeAuthorizationFreezeInitRequest:
+      type: object
+      required:
+        - payChannel
+        - clientPlatform
+        - idempotencyKey
+      description: >
+        Freeze-init request for the current bounded `竞标服务费预授权额度` object
+        only.
+      properties:
+        payChannel:
+          type: string
+        clientPlatform:
+          type: string
+        idempotencyKey:
+          type: string
+    BidServiceFeeAuthorizationFreezeInitResponse:
+      type: object
+      required:
+        - freezeInitStatus
+        - authorizationId
+        - paymentReferenceId
+        - channelActionType
+        - channelPayload
+        - callbackAwaiting
+        - expiresAt
+        - updatedAt
+      description: >
+        Freeze-init response for the current bounded `竞标服务费预授权额度`
+        object only. Channel payload remains transport material only.
+      properties:
+        freezeInitStatus:
+          type: string
+        authorizationId:
+          type: string
+        paymentReferenceId:
+          type: string
+        channelActionType:
+          type: string
+        channelPayload:
+          type: object
+          additionalProperties: true
+        callbackAwaiting:
+          type: boolean
+        expiresAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BidServiceFeeAuthorizationStatusResponse:
+      type: object
+      required:
+        - authorizationId
+        - authorizationStatus
+        - authorizationQuotaAmount
+        - currency
+        - chargeStatus
+        - releaseStatus
+        - channelSummary
+        - updatedAt
+      description: >
+        Status response for the current bounded `竞标服务费预授权额度` object only.
+      properties:
+        authorizationId:
+          type: string
+        authorizationStatus:
+          $ref: '#/components/schemas/BidServiceFeeAuthorizationStatus'
+        authorizationQuotaAmount:
+          type: number
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        chargeStatus:
+          type: string
+        releaseStatus:
+          type: string
+        channelSummary:
+          $ref: '#/components/schemas/PricingChannelSummary'
+        updatedAt:
+          type: string
+          format: date-time
+    BidServiceFeeAuthorizationReleaseRequest:
+      type: object
+      required:
+        - releaseReasonCode
+        - releaseReasonText
+        - idempotencyKey
+      description: >
+        Manual release request for the current bounded
+        `竞标服务费预授权额度` object only.
+      properties:
+        releaseReasonCode:
+          type: string
+        releaseReasonText:
+          type: string
+        idempotencyKey:
+          type: string
+    BidServiceFeeAuthorizationReleaseResponse:
+      type: object
+      required:
+        - authorizationId
+        - authorizationStatus
+        - bidSubmissionEligible
+        - updatedAt
+      description: >
+        Manual release response for the current bounded `竞标服务费预授权额度`
+        object only.
+      properties:
+        authorizationId:
+          type: string
+        authorizationStatus:
+          $ref: '#/components/schemas/BidServiceFeeAuthorizationStatus'
+        bidSubmissionEligible:
+          type: boolean
+        updatedAt:
+          type: string
+          format: date-time
+    DealConfirmationCreateRequest:
+      type: object
+      required:
+        - selectedBidId
+        - finalConfirmedAmount
+        - currency
+        - contractFileAssetIds
+        - confirmationRole
+        - idempotencyKey
+      description: >
+        Create-or-advance request for the current bounded deal-confirmation
+        object only.
+      properties:
+        selectedBidId:
+          type: string
+        finalConfirmedAmount:
+          type: number
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        contractFileAssetIds:
+          type: array
+          items:
+            type: string
+        confirmationRole:
+          type: string
+          enum:
+            - publisher
+            - factory
+        idempotencyKey:
+          type: string
+    DealConfirmationAcceptedResponse:
+      type: object
+      required:
+        - dealConfirmationId
+        - dealStatus
+        - selectedBidId
+        - finalConfirmedAmount
+        - platformServiceFeeCalculation
+        - serviceFeeChargeStatus
+        - updatedAt
+      description: >
+        Accepted response for the current bounded deal-confirmation object
+        only.
+      properties:
+        dealConfirmationId:
+          type: string
+        dealStatus:
+          $ref: '#/components/schemas/DealConfirmationStatus'
+        selectedBidId:
+          type: string
+        finalConfirmedAmount:
+          type: number
+        platformServiceFeeCalculation:
+          $ref: '#/components/schemas/PricingServiceFeeCalculation'
+        serviceFeeChargeStatus:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    DealConfirmationReadModel:
+      type: object
+      required:
+        - dealConfirmationId
+        - dealStatus
+        - selectedBidId
+        - publisherConfirmedAt
+        - factoryConfirmedAt
+        - finalConfirmedAmount
+        - platformServiceFeeCalculation
+        - serviceFeeChargeStatus
+        - publisherAuthenticitySincerityStatus
+        - updatedAt
+      description: >
+        Detail response for the current bounded deal-confirmation object only.
+      properties:
+        dealConfirmationId:
+          type: string
+        dealStatus:
+          $ref: '#/components/schemas/DealConfirmationStatus'
+        selectedBidId:
+          type: string
+        publisherConfirmedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        factoryConfirmedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        finalConfirmedAmount:
+          type: number
+        platformServiceFeeCalculation:
+          $ref: '#/components/schemas/PricingServiceFeeCalculation'
+        serviceFeeChargeStatus:
+          type: string
+        publisherAuthenticitySincerityStatus:
+          oneOf:
+            - $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderStatus'
+            - type: 'null'
+        updatedAt:
+          type: string
+          format: date-time
     BidAwardRequest:
       type: object
       required:
@@ -8859,12 +9934,16 @@ components:
         - participants
         - state
         - availability
+        - pricingGateRequired
+        - pricingGateType
+        - detailRouteTarget
         - messages
         - confirmationCards
       description: >
         Minimum project-bid private thread detail model for Trading IM Round A.
-        It may carry messages and confirmation cards for the targeted relation
-        only and must not become a generic conversation center.
+        It may carry messages, confirmation cards, and the bounded pricing-gate
+        handoff carrier for the targeted relation only and must not become a
+        generic conversation center.
       properties:
         threadId:
           type: string
@@ -8880,6 +9959,23 @@ components:
           $ref: '#/components/schemas/BidThreadState'
         availability:
           $ref: '#/components/schemas/BidThreadAvailability'
+        pricingGateRequired:
+          type: boolean
+          description: >
+            Minimum current pricing-gate carrier for the admitted thread
+            continuation only. `true` means the current actor must complete a
+            bounded pricing gate before bid submit may open.
+        pricingGateType:
+          $ref: '#/components/schemas/BidThreadPricingGateType'
+        detailRouteTarget:
+          type:
+            - string
+            - 'null'
+          description: >
+            Controlled current route target for pricing-gate continuation only.
+            When present, this target may point to the admitted
+            `4000 元竞标服务费预授权额度` continuation and must not become a
+            generic route registry.
         messages:
           type: array
           items:

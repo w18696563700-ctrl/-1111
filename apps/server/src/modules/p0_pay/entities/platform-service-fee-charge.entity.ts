@@ -30,8 +30,20 @@ export class PlatformServiceFeeChargeEntity {
   @Column({ name: 'fee_rate', type: 'numeric', precision: 8, scale: 6 })
   feeRate!: string | number;
 
+  @Column({ name: 'base_fee_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  baseFeeAmount!: string | number | null;
+
+  @Column({ name: 'membership_discount_rate', type: 'numeric', precision: 8, scale: 4, nullable: true })
+  membershipDiscountRate!: string | number | null;
+
+  @Column({ name: 'cap_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  capAmount!: string | number | null;
+
   @Column({ name: 'final_fee_amount', type: 'numeric', precision: 12, scale: 2 })
   finalFeeAmount!: string | number;
+
+  @Column({ name: 'released_remainder_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  releasedRemainderAmount!: string | number | null;
 
   @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '默认费率 3.0%' })
   feeRateLabel!: string;

@@ -170,6 +170,7 @@ String _p0PayPaymentPollResultText(P0PayPaymentPollResult result) {
 
   final prefix = switch (result.kind) {
     P0PayPaymentKind.inquiryDeposit => '发单诚意金',
+    P0PayPaymentKind.projectAuthenticitySincerity => '项目真实性诚意金',
     P0PayPaymentKind.serviceFeeAuthorization => '平台服务费预授权',
   };
 
@@ -204,6 +205,8 @@ String _p0PayControlledFailureText({
     'AUTH_SESSION_INVALID' => '登录状态失效，请重新登录后再查看支付结果。',
     'ORGANIZATION_CERTIFICATION_REQUIRED' => '当前组织需先完成认证，不能伪装为可支付成功。',
     'TRADE_TASK_INVALID_STATE' => '当前交易任务状态不可继续支付。',
+    'PROJECT_AUTHENTICITY_SINCERITY_RESULT_UNAVAILABLE' =>
+      '项目真实性诚意金结果暂不可用，请稍后刷新。',
     'SERVICE_FEE_AUTHORIZATION_RESULT_UNAVAILABLE' => '平台服务费预授权结果暂不可用，请稍后刷新。',
     'INQUIRY_DEPOSIT_RESULT_UNAVAILABLE' => '发单诚意金结果暂不可用，请稍后刷新。',
     'PAYMENT_CHANNEL_UNAVAILABLE' => '支付通道暂不可用，请稍后重试。',
@@ -388,10 +391,10 @@ String? _projectDateRangeLabel(Map<String, Object?> item) {
 
 String _projectNameAccessStatusLabel(String? status) {
   return switch (status) {
-    'requestable' => '可申请查看',
+    'requestable' => '可申请参与',
     'pending' => '待审批',
     'rejected' => '已拒绝',
-    'visible' => '已可见',
+    'visible' => '已通过',
     _ => '状态待确认',
   };
 }
@@ -402,13 +405,13 @@ String _projectNameAccessStatusBody(Map<String, Object?> item) {
   return switch (status) {
     'requestable' =>
       canRequest
-          ? '当前项目名称仍受控展示，可提交申请，待发布方同意后可见。'
-          : '当前项目名称仍受控展示，请先登录并切换可申请主体后再试。',
-    'pending' => '你已经提交项目名称查看申请，等待发布方审批后可见。',
+          ? '当前项目需先申请参与竞标；发布方同意后可查看名称、报价依据资料并提交竞标。'
+          : '当前项目需先申请参与竞标，请先登录并切换可申请主体后再试。',
+    'pending' => '你已经提交参与竞标申请，等待发布方审批。',
     'rejected' =>
-      canRequest ? '本次申请已被拒绝；如仍需查看项目名称，可重新发起申请。' : '本次申请已被拒绝，当前暂不可重新发起申请。',
-    'visible' => '当前项目名称已经对你可见。',
-    _ => '当前项目名称仍处于受控展示状态。',
+      canRequest ? '本次参与申请已被拒绝；如仍需参与，可重新发起申请。' : '本次参与申请已被拒绝，当前暂不可重新发起申请。',
+    'visible' => '当前参与申请已通过，可以继续查看资料并提交竞标。',
+    _ => '当前项目仍处于参与申请受控状态。',
   };
 }
 
@@ -417,8 +420,8 @@ String _projectNameAccessActionLabel(Map<String, Object?> item) {
   final canRequest = _projectCanRequestNameAccess(item);
   return switch (status) {
     'pending' => '等待审批中',
-    'rejected' => canRequest ? '重新申请查看项目名称' : '当前不可重新申请',
-    _ => canRequest ? '申请查看项目名称' : '申请查看项目名称',
+    'rejected' => canRequest ? '重新申请参与竞标' : '当前不可重新申请',
+    _ => canRequest ? '申请参与竞标' : '申请参与竞标',
   };
 }
 

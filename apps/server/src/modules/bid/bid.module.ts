@@ -3,7 +3,9 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module';
 import { AuthModule } from '../auth/auth.module';
+import { BidParticipationRequestModule } from '../bid_participation_request/bid-participation-request.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { TradingImModule } from '../trading_im/trading-im.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
@@ -24,10 +26,12 @@ import { BidSeatEntity } from './entities/bid-seat.entity';
       BidEntity,
       BidSeatEntity,
       ProjectEntity,
+      PlatformServiceFeeAuthorizationEntity,
       IdentityAuditLogEntity,
       FileAssetEntity,
     ]),
     AuthModule,
+    BidParticipationRequestModule,
     OrganizationModule,
     ProjectPublishAuditModule,
     TradingImModule

@@ -502,38 +502,47 @@ class _CounterpartConversationPageState
     final result = _result;
     final data = result?.data;
     final thread = _threadResult?.data;
-    return Material(
-      color: Theme.of(context).colorScheme.surface,
-      child: Column(
-        children: <Widget>[
-          Expanded(
-            child: RefreshIndicator(
-              onRefresh: _load,
-              child: ListView(
-                controller: _scrollController,
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
-                children: <Widget>[
-                  if (_loading)
-                    const _StateMessage(title: '正在加载', body: '请稍候片刻。')
-                  else if (result == null ||
-                      result.state != AppPageState.content)
-                    _buildFailureCard(result)
-                  else
-                    ..._buildContent(data!, thread),
-                ],
+    return PopScope(
+      canPop: _selectedProjectId == null,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop || _selectedProjectId == null) {
+          return;
+        }
+        unawaited(_backToProjectList());
+      },
+      child: Material(
+        color: Theme.of(context).colorScheme.surface,
+        child: Column(
+          children: <Widget>[
+            Expanded(
+              child: RefreshIndicator(
+                onRefresh: _load,
+                child: ListView(
+                  controller: _scrollController,
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+                  children: <Widget>[
+                    if (_loading)
+                      const _StateMessage(title: '正在加载', body: '请稍候片刻。')
+                    else if (result == null ||
+                        result.state != AppPageState.content)
+                      _buildFailureCard(result)
+                    else
+                      ..._buildContent(data!, thread),
+                  ],
+                ),
               ),
             ),
-          ),
-          if (data != null && result?.state == AppPageState.content)
-            if (_selectedProjectId != null && thread != null)
-              _ProjectCommunicationComposer(
-                controller: _messageController,
-                enabled: !_loadingThread,
-                sending: _sending,
-                onSend: _sendCurrentMessage,
-              ),
-        ],
+            if (data != null && result?.state == AppPageState.content)
+              if (_selectedProjectId != null && thread != null)
+                _ProjectCommunicationComposer(
+                  controller: _messageController,
+                  enabled: !_loadingThread,
+                  sending: _sending,
+                  onSend: _sendCurrentMessage,
+                ),
+          ],
+        ),
       ),
     );
   }
@@ -574,9 +583,9 @@ class _CounterpartConversationPageState
       const SizedBox(height: 16),
       _SelectedProjectBusinessEntrypoints(
         group: selectedGroup,
-        nameAccessCard: _firstBusinessCard(
+        participationCard: _firstBusinessCard(
           selectedGroup,
-          'project_name_access_request',
+          'bid_participation_request',
         ),
         orderId: selectedOrderId,
         onBackToProjectList: _backToProjectList,
@@ -699,6 +708,7 @@ class _CounterpartConversationPageState
             projectId: group.projectId,
             projectDisplayTitle: group.projectDisplayTitle,
             titleVisibility: group.titleVisibility,
+            projectRelation: group.projectRelation,
             projectState: group.projectState,
             latestActivityAt: group.latestActivityAt,
             orderSummary: group.orderSummary,
@@ -727,11 +737,12 @@ class _CounterpartConversationPageState
 
   int _businessCardPriority(String type) {
     return switch (type) {
-      'project_name_access_request' => 0,
+      'bid_participation_request' => 0,
       'bid_thread' => 1,
       'project_order' => 2,
       'project_clarification' => 3,
       'system_notice' => 4,
+      'project_name_access_request' => 8,
       _ => 9,
     };
   }
@@ -810,6 +821,22 @@ class _CounterpartConversationPageState
   ) {
     final anchor = card.truthAnchor;
     switch (anchor.truthType) {
+      case 'bid_participation_request':
+        final requestId = anchor.requestId;
+        final threadId = anchor.threadId ?? requestId;
+        if (requestId == null || threadId == null) {
+          return null;
+        }
+        return _routeTarget(
+          objectType: 'bid_participation_request',
+          actionKey: 'bid_participation_request.open',
+          canonicalPath: '/api/app/project/bid-participation/thread/detail',
+          params: <String, String>{
+            'threadId': threadId,
+            'projectId': anchor.projectId,
+            'requestId': requestId,
+          },
+        );
       case 'project_name_access_request':
         final requestId = anchor.requestId;
         final threadId = anchor.threadId ?? requestId;

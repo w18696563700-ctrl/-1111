@@ -1693,6 +1693,36 @@ export const projectNameAccessRequestMigrations = [
   }
 ];
 
+export const bidParticipationRequestMigrations = [
+  {
+    key: '20260429_bid_participation_request_phase1_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS bid_participation_requests (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        requester_organization_id varchar(64) NOT NULL,
+        requested_by_user_id varchar(64) NOT NULL,
+        requested_by_actor_id varchar(64) NOT NULL DEFAULT '',
+        state varchar(32) NOT NULL DEFAULT 'pending',
+        reviewed_by_user_id varchar(64),
+        reviewed_by_actor_id varchar(64),
+        reviewed_at timestamptz,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_bid_participation_requests_state
+          CHECK (state IN ('pending', 'approved', 'rejected'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_bid_participation_requests_project_requester_created
+       ON bid_participation_requests (project_id, requester_organization_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_bid_participation_requests_requester_updated
+       ON bid_participation_requests (requester_organization_id, updated_at DESC)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_bid_participation_requests_one_active_pending
+       ON bid_participation_requests (project_id, requester_organization_id)
+       WHERE state = 'pending'`
+    ]
+  }
+];
+
 export const projectCommunicationAlbumMigrations = [
   {
     key: '20260428_project_communication_and_album_truth',
@@ -2190,6 +2220,129 @@ export const p0PayMigrations = [
        FROM platform_service_fee_authorizations auth
        WHERE charge.authorization_id = auth.id`
     ]
+  },
+  {
+    key: '20260604_platform_pricing_sp1_kernel_normalization',
+    statements: [
+      `ALTER TABLE inquiry_quote_deposits
+       ADD COLUMN IF NOT EXISTS withheld_at timestamptz`,
+      `ALTER TABLE inquiry_quote_deposits
+       ADD COLUMN IF NOT EXISTS withhold_reason_code varchar(96) NOT NULL DEFAULT ''`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS bid_participation_request_id varchar(64)`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS bidder_organization_id varchar(64)`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS authorization_quota_amount numeric(12,2)`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS charged_amount_used numeric(12,2) NOT NULL DEFAULT 0`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS released_amount numeric(12,2) NOT NULL DEFAULT 0`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS frozen_at timestamptz`,
+      `CREATE INDEX IF NOT EXISTS idx_platform_service_fee_auth_bid_participation_request
+       ON platform_service_fee_authorizations (bid_participation_request_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_platform_service_fee_auth_project_bidder
+       ON platform_service_fee_authorizations (task_id, bidder_organization_id)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_platform_service_fee_auth_one_active_project_bidder
+       ON platform_service_fee_authorizations (task_id, bidder_organization_id)
+       WHERE bidder_organization_id IS NOT NULL
+         AND status IN ('pending_freeze', 'frozen', 'release_pending', 'charge_pending')`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS base_fee_amount numeric(12,2)`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS membership_discount_rate numeric(8,4)`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS cap_amount numeric(12,2)`,
+      `ALTER TABLE platform_service_fee_charges
+       ADD COLUMN IF NOT EXISTS released_remainder_amount numeric(12,2)`,
+      `DO $$
+       BEGIN
+         ALTER TABLE inquiry_quote_deposits DROP CONSTRAINT IF EXISTS chk_inquiry_quote_deposits_status;
+         ALTER TABLE inquiry_quote_deposits
+           ADD CONSTRAINT chk_inquiry_quote_deposits_status
+           CHECK (status IN (
+             'pending_payment',
+             'paid',
+             'refund_pending',
+             'refunded',
+             'withheld',
+             'deducted',
+             'dispute_hold',
+             'cancelled',
+             'failed',
+             'expired'
+           ));
+       END $$`,
+      `DO $$
+       BEGIN
+         ALTER TABLE platform_service_fee_authorizations DROP CONSTRAINT IF EXISTS chk_platform_service_fee_auth_status;
+         ALTER TABLE platform_service_fee_authorizations
+           ADD CONSTRAINT chk_platform_service_fee_auth_status
+           CHECK (status IN (
+             'pending_freeze',
+             'frozen',
+             'release_pending',
+             'released',
+             'charge_pending',
+             'pending_authorization',
+             'authorized',
+             'authorization_released',
+             'pending_contract_confirm',
+             'charged',
+             'refund_pending',
+             'refunded',
+             'breach_hold',
+             'cancelled',
+             'failed',
+             'expired'
+           ));
+       END $$`,
+      `DO $$
+       BEGIN
+         ALTER TABLE contract_confirmations DROP CONSTRAINT IF EXISTS chk_contract_confirmations_status;
+         ALTER TABLE contract_confirmations
+           ADD CONSTRAINT chk_contract_confirmations_status
+           CHECK (contract_status IN (
+             'pending_counterparty_confirm',
+             'confirmed_deal',
+             'failed',
+             'pending_counterparty',
+             'confirmed',
+             'cancelled'
+           ));
+       END $$`,
+      `DO $$
+       BEGIN
+         ALTER TABLE platform_service_fee_charges DROP CONSTRAINT IF EXISTS chk_platform_service_fee_charges_status;
+         ALTER TABLE platform_service_fee_charges
+           ADD CONSTRAINT chk_platform_service_fee_charges_status
+           CHECK (charge_status IN (
+             'charge_pending',
+             'pending_charge',
+             'charged',
+             'charge_failed',
+             'refund_pending',
+             'refunded',
+             'cancelled'
+           ));
+       END $$`,
+      `DO $$
+       BEGIN
+         ALTER TABLE payment_orders DROP CONSTRAINT IF EXISTS chk_payment_orders_business_type;
+         ALTER TABLE payment_orders
+           ADD CONSTRAINT chk_payment_orders_business_type
+           CHECK (business_type IN (
+             'project_authenticity_sincerity_payment',
+             'project_authenticity_sincerity_refund',
+             'bid_service_fee_authorization_freeze',
+             'bid_service_fee_authorization_release',
+             'platform_service_fee_charge',
+             'platform_service_fee_authorization',
+             'inquiry_deposit'
+           ));
+       END $$`
+    ]
   }
 ];
 
@@ -2270,6 +2423,7 @@ export const serverMigrations = [
   ...personalCertificationDualGateMigrations,
   ...tradingImRoundAMigrations,
   ...projectNameAccessRequestMigrations,
+  ...bidParticipationRequestMigrations,
   ...projectCommunicationAlbumMigrations,
   ...projectCounterpartyRatingMigrations,
   ...projectExitGovernancePhase1Migrations,

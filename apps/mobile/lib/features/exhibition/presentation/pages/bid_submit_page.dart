@@ -1,10 +1,16 @@
 part of '../exhibition_trade_pages.dart';
 
 class BidSubmitPage extends StatefulWidget {
-  const BidSubmitPage({super.key, this.projectId, this.mode});
+  const BidSubmitPage({
+    super.key,
+    this.projectId,
+    this.mode,
+    this.bidParticipationRequestId,
+  });
 
   final String? projectId;
   final String? mode;
+  final String? bidParticipationRequestId;
 
   @override
   State<BidSubmitPage> createState() => _BidSubmitPageState();
@@ -211,6 +217,18 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       _lastResult = null;
     });
 
+    final authorizationFrozen =
+        await _ensureBidServiceFeeAuthorizationBeforeSubmit(projectId);
+    if (!mounted) {
+      return;
+    }
+    if (!authorizationFrozen) {
+      setState(() {
+        _submitting = false;
+      });
+      return;
+    }
+
     final result = await ExhibitionConsumerLayer.instance.submitBid(
       BidSubmitCommand(
         projectId: projectId,
@@ -252,12 +270,188 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   }
 
   Future<void> _submitCurrentBidFlow() async {
-    if (_p0PayTaskIdForFixedPriceBid != null) {
-      await _submitP0PayFixedPriceBidAndAuthorize();
-      return;
+    await _submit();
+  }
+
+  Future<bool> _ensureBidServiceFeeAuthorizationBeforeSubmit(
+    String projectId,
+  ) async {
+    final requestId = _bidParticipationRequestIdForAuthorizationGate();
+    if (requestId == null) {
+      setState(() {
+        _lastResult = ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.bidSubmit,
+          isSuccess: false,
+          controlledState: AppPageState.errorNonRetryable,
+          errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED',
+          message: '竞标申请审核通过后需先完成 4000 元竞标服务费预授权额度冻结。',
+        );
+      });
+      return false;
     }
 
-    await _submit();
+    final summary = await ExhibitionConsumerLayer.instance
+        .loadProjectPricingSummary(projectId: projectId, forceRefresh: true);
+    if (!mounted) {
+      return false;
+    }
+    if (summary.state == AppPageState.content &&
+        _bidServiceFeeAuthorizationFrozen(summary.payload)) {
+      return true;
+    }
+
+    final authorization = await ExhibitionConsumerLayer.instance
+        .createProjectBidServiceFeeAuthorization(
+          projectId: projectId,
+          command: BidServiceFeeAuthorizationCommand(
+            bidParticipationRequestId: requestId,
+            ruleVersion: 'platform_pricing_rules_master_v1',
+            ruleSnapshotHash: 'platform_pricing_rules_master_v1',
+          ),
+        );
+    if (!mounted) {
+      return false;
+    }
+    if (!authorization.isSuccess) {
+      setState(() => _lastResult = authorization);
+      return false;
+    }
+    if (_bidServiceFeeAuthorizationFrozen(authorization.payload)) {
+      return true;
+    }
+
+    final authorizationId = _authorizationIdFromPayload(authorization.payload);
+    if (authorizationId == null) {
+      setState(() {
+        _lastResult = ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizations(
+            projectId,
+          ),
+          isSuccess: false,
+          controlledState: AppPageState.errorNonRetryable,
+          errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND',
+          message: 'BFF 未返回竞标服务费预授权编号，暂不能提交竞标。',
+        );
+      });
+      return false;
+    }
+
+    final freezeInit = await ExhibitionConsumerLayer.instance
+        .initProjectBidServiceFeeAuthorizationFreeze(
+          projectId: projectId,
+          authorizationId: authorizationId,
+          command: ProjectPricingPayInitCommand(
+            payChannel:
+                _firstBidServiceFeeAuthorizationChannelCandidate(
+                  authorization.payload,
+                ) ??
+                _p0PayAuthorizationChannel,
+          ),
+        );
+    if (!mounted) {
+      return false;
+    }
+    if (!freezeInit.isSuccess) {
+      setState(() => _lastResult = freezeInit);
+      return false;
+    }
+
+    await _openBidServiceFeeAuthorizationChannelPayload(freezeInit.payload);
+    final poll = await ExhibitionConsumerLayer.instance
+        .pollProjectBidServiceFeeAuthorizationStatus(
+          projectId: projectId,
+          authorizationId: authorizationId,
+          maxAttempts: 1,
+          interval: Duration.zero,
+        );
+    if (!mounted) {
+      return false;
+    }
+    if (poll.isSuccess ||
+        _bidServiceFeeAuthorizationFrozen(poll.result.payload)) {
+      return true;
+    }
+
+    setState(() {
+      _lastResult = ExhibitionActionResult(
+        method: 'POST',
+        path: ExhibitionCanonicalPaths.bidSubmit,
+        isSuccess: false,
+        controlledState: AppPageState.errorNonRetryable,
+        errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED',
+        message:
+            '竞标服务费预授权额度尚未完成冻结，当前状态：${_bidServiceFeeAuthorizationStatus(poll.result.payload) ?? '未返回'}。完成冻结后再提交竞标。',
+      );
+    });
+    return false;
+  }
+
+  String? _bidParticipationRequestIdForAuthorizationGate() {
+    final projectDetail = _payloadMap(_projectDetailResult?.payload);
+    return _normalizeId(widget.bidParticipationRequestId) ??
+        _normalizeDynamicText(projectDetail?['bidParticipationRequestId']) ??
+        _normalizeDynamicText(
+          projectDetail?['currentViewerBidParticipationRequestId'],
+        ) ??
+        _normalizeDynamicText(
+          _payloadMap(
+            projectDetail?['currentViewerBidParticipationRequest'],
+          )?['requestId'],
+        );
+  }
+
+  bool _bidServiceFeeAuthorizationFrozen(Object? payload) {
+    final status = _bidServiceFeeAuthorizationStatus(payload);
+    return switch (status) {
+      'frozen' || 'authorized' || 'succeeded' || 'satisfied' => true,
+      _ => false,
+    };
+  }
+
+  String? _bidServiceFeeAuthorizationStatus(Object? payload) {
+    final payloadMap = _payloadMap(payload);
+    if (payloadMap == null) {
+      return null;
+    }
+    final bidderPricing = _payloadMap(payloadMap['bidderPricing']);
+    final authorization =
+        _payloadMap(payloadMap['bidServiceFeeAuthorization']) ??
+        _payloadMap(payloadMap['platformServiceFee']);
+    return _normalizeDynamicText(
+      bidderPricing?['bidServiceFeeAuthorizationStatus'] ??
+          bidderPricing?['authorizationStatus'] ??
+          bidderPricing?['submitGateStatus'] ??
+          authorization?['authorizationStatus'] ??
+          authorization?['status'] ??
+          payloadMap['authorizationStatus'] ??
+          payloadMap['status'],
+    );
+  }
+
+  String? _firstBidServiceFeeAuthorizationChannelCandidate(Object? payload) {
+    final candidates = _payloadMap(payload)?['channelCandidates'];
+    if (candidates is! Iterable) {
+      return null;
+    }
+    for (final candidate in candidates) {
+      final normalized = _normalizeDynamicText(candidate);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  Future<void> _openBidServiceFeeAuthorizationChannelPayload(
+    Object? payload,
+  ) async {
+    final url = _channelPayloadUrl(payload);
+    if (url == null) {
+      return;
+    }
+    await launchUrlString(url);
   }
 
   String? _bidSubmitFinalSubmitDisabledMessage() {

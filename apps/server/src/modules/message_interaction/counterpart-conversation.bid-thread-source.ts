@@ -142,15 +142,18 @@ export class CounterpartConversationBidThreadSource
         userIds.add(userId);
       }
     }
-    const [organizations, users, approvedLegalNameByOrganizationId] = await Promise.all([
+    const [organizations, users, approvedCertificationSummaryByOrganizationId] = await Promise.all([
       this.organizationRepository.findBy({ id: In([...organizationIds]) }),
       userIds.size ? this.userRepository.findBy({ id: In([...userIds]) }) : Promise.resolve([]),
-      this.displayNameService.loadApprovedLegalNameMap(organizationIds),
+      this.displayNameService.loadApprovedCertificationSummaryMap(organizationIds),
     ]);
     return {
       organizationMap: new Map(organizations.map((item) => [item.id, item])),
       userMap: new Map(users.map((item) => [item.id, item])),
-      approvedLegalNameByOrganizationId,
+      approvedCertificationSummaryByOrganizationId,
+      approvedLegalNameByOrganizationId: this.displayNameService.toApprovedLegalNameMap(
+        approvedCertificationSummaryByOrganizationId,
+      ),
     };
   }
 
@@ -175,13 +178,14 @@ export class CounterpartConversationBidThreadSource
     const counterpartUser = counterpartUserId
       ? input.counterpart.userMap.get(counterpartUserId)
       : null;
-    const counterpartDisplayName = this.displayNameService.resolveDisplayName({
+    const counterpartCompanyName = this.displayNameService.resolveCompanyName({
       organizationId: counterpartOrganizationId,
       organizationMap: input.counterpart.organizationMap,
       approvedLegalNameByOrganizationId:
         input.counterpart.approvedLegalNameByOrganizationId,
       fallback: bid.submittedBy,
     });
+    const counterpartDisplayName = counterpartCompanyName;
     const latestMessage = input.context.latestMessageByThreadId.get(input.thread.id);
     const updatedAt = (
       latestMessage?.createdAt ??
@@ -191,11 +195,17 @@ export class CounterpartConversationBidThreadSource
     return {
       counterpartOrganizationId,
       counterpartDisplayName,
+      counterpartNickname: this.displayNameService.resolveNickname(counterpartUser),
+      counterpartCompanyName,
       counterpartAvatarUrl: await this.avatarService.readAvatarUrl(
         counterpartUser?.avatarUrl ?? null,
       ),
+      counterpartCertificationSummary:
+        input.counterpart.approvedCertificationSummaryByOrganizationId.get(
+          counterpartOrganizationId,
+        ) ?? null,
       projectId: input.thread.projectId,
-      p0PaySummary: this.buildP0PaySummary(project, input.context),
+      pricingSummary: this.buildPricingSummary(project, input.context),
       updatedAt,
       card: {
         cardId: `bid-thread:${input.thread.id}`,
@@ -235,7 +245,7 @@ export class CounterpartConversationBidThreadSource
     return map;
   }
 
-  private buildP0PaySummary(
+  private buildPricingSummary(
     project: ProjectEntity,
     context: Awaited<ReturnType<CounterpartConversationBidThreadSource['loadContext']>>,
   ) {
@@ -245,45 +255,37 @@ export class CounterpartConversationBidThreadSource
       return undefined;
     }
     return {
-      taskId: project.id,
-      taskType: this.readP0TaskType(project),
+      projectId: project.id,
+      pricingRuleVersion: authorization?.ruleVersion ?? deposit?.ruleVersion ?? null,
       readOnly: true,
-      platformServiceFee: authorization
+      bidServiceFeeAuthorization: authorization
         ? {
             authorizationId: authorization.id,
             status: authorization.status,
-            estimatedFeeAmount: authorization.estimatedFeeAmount,
+            quotaAmount: authorization.authorizationQuotaAmount ?? '4000.00',
+            chargedAmountUsed: authorization.chargedAmountUsed,
+            releasedAmount: authorization.releasedAmount,
             finalFeeAmount: authorization.finalFeeAmount,
             currency: 'CNY',
           }
         : { status: 'not_required' },
-      inquiryDeposit: deposit
-        ? { depositOrderId: deposit.id, status: deposit.status, amount: deposit.amount, currency: deposit.currency }
+      projectAuthenticitySincerity: deposit
+        ? { orderId: deposit.id, status: deposit.status, amount: deposit.amount, currency: deposit.currency }
         : { status: 'not_required' },
-      contractConfirmation: { status: authorization?.status === 'charged' ? 'confirmed' : 'not_confirmed' },
+      dealConfirmation: { status: authorization?.status === 'charged' ? 'confirmed_deal' : 'not_confirmed' },
       messageDisplaySummary: {
         displayAllowed: true,
         readOnly: true,
-        statusTextKey: authorization?.status ?? deposit?.status ?? 'p0_pay_status_unavailable',
+        statusTextKey: authorization?.status ?? deposit?.status ?? 'pricing_status_unavailable',
         routeTarget: {
-          objectType: 'trade_task',
-          actionKey: 'p0_pay_summary.read',
-          canonicalPath: `/api/app/exhibition/trade-tasks/${project.id}/p0-pay-summary`,
-          params: { taskId: project.id },
+          objectType: 'project_pricing',
+          actionKey: 'pricing_summary.read',
+          canonicalPath: `/api/app/project/${project.id}/pricing-summary`,
+          params: { projectId: project.id },
         },
       },
       updatedAt: project.updatedAt.toISOString(),
     };
   }
 
-  private readP0TaskType(project: ProjectEntity) {
-    const p0Task = project.summary?.p0PayTask;
-    if (p0Task && typeof p0Task === 'object' && !Array.isArray(p0Task)) {
-      const taskType = (p0Task as Record<string, unknown>).taskType;
-      if (typeof taskType === 'string' && taskType.trim()) {
-        return taskType.trim();
-      }
-    }
-    return 'fixed_price_bid';
-  }
 }

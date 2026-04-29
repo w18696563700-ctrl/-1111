@@ -2,13 +2,22 @@ import { Injectable } from '@nestjs/common';
 import { normalizeFeeRate, normalizePositiveMoney } from './p0-pay-calculator';
 import {
   AuthorizeInitCommand,
+  BidServiceFeeAuthorizationFreezeInitCommand,
   ContractConfirmationCommand,
+  CreateBidServiceFeeAuthorizationCommand,
   CreateAuthorizationCommand,
   CreateInquiryDepositOrderCommand,
-  InquiryDepositPayInitCommand
+  CreateProjectAuthenticitySincerityOrderCommand,
+  InquiryDepositPayInitCommand,
+  ProjectAuthenticitySincerityPayInitCommand
 } from './p0-pay.commands';
-import { p0PayInvalid } from './p0-pay.errors';
+import { p0PayInvalid, pricingRuleVersionMismatch } from './p0-pay.errors';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
+import {
+  BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT,
+  PLATFORM_PRICING_RULE_VERSION,
+  PROJECT_AUTHENTICITY_SINCERITY_AMOUNT
+} from './p0-pay.state';
 import { P0PayPaymentChannel } from './p0-pay.types';
 
 @Injectable()
@@ -63,6 +72,23 @@ export class P0PayCommandParser {
     } satisfies CreateInquiryDepositOrderCommand;
   }
 
+  toCreateProjectAuthenticitySincerityOrderCommand(projectId: string, payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    const command = {
+      projectId: this.readPathId(projectId, 'projectId'),
+      expectedAmount: normalizePositiveMoney(this.readRequired(source.expectedAmount), 'expectedAmount'),
+      expectedCurrency: this.readCurrency(source.expectedCurrency),
+      ruleVersion: this.readRequiredString(source.ruleVersion, 'ruleVersion'),
+      ruleSnapshotHash: this.readRequiredString(source.ruleSnapshotHash, 'ruleSnapshotHash'),
+      idempotencyKey: this.idempotencyService.normalizeKey(source.idempotencyKey)
+    } satisfies CreateProjectAuthenticitySincerityOrderCommand;
+    this.assertRuleVersion(command.ruleVersion);
+    if (command.expectedAmount !== PROJECT_AUTHENTICITY_SINCERITY_AMOUNT) {
+      throw p0PayInvalid('Project authenticity sincerity amount must be 200.00 CNY.');
+    }
+    return command;
+  }
+
   toInquiryDepositPayInitCommand(taskId: string, depositOrderId: string, payload: Record<string, unknown>) {
     const source = this.asRecord(payload);
     return {
@@ -72,6 +98,50 @@ export class P0PayCommandParser {
       clientPlatform: this.readClientPlatform(source.clientPlatform),
       idempotencyKey: this.idempotencyService.normalizeKey(source.idempotencyKey)
     } satisfies InquiryDepositPayInitCommand;
+  }
+
+  toProjectAuthenticitySincerityPayInitCommand(projectId: string, orderId: string, payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    return {
+      projectId: this.readPathId(projectId, 'projectId'),
+      orderId: this.readPathId(orderId, 'orderId'),
+      payChannel: this.readPayChannel(source.payChannel),
+      clientPlatform: this.readClientPlatform(source.clientPlatform),
+      idempotencyKey: this.idempotencyService.normalizeKey(source.idempotencyKey)
+    } satisfies ProjectAuthenticitySincerityPayInitCommand;
+  }
+
+  toCreateBidServiceFeeAuthorizationCommand(projectId: string, payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    const command = {
+      projectId: this.readPathId(projectId, 'projectId'),
+      bidParticipationRequestId: this.readRequiredString(
+        source.bidParticipationRequestId,
+        'bidParticipationRequestId'
+      ),
+      bidId: this.readOptionalId(source.bidId),
+      expectedAmount: normalizePositiveMoney(this.readRequired(source.expectedAmount), 'expectedAmount'),
+      expectedCurrency: this.readCurrency(source.expectedCurrency),
+      ruleVersion: this.readRequiredString(source.ruleVersion, 'ruleVersion'),
+      ruleSnapshotHash: this.readRequiredString(source.ruleSnapshotHash, 'ruleSnapshotHash'),
+      idempotencyKey: this.idempotencyService.normalizeKey(source.idempotencyKey)
+    } satisfies CreateBidServiceFeeAuthorizationCommand;
+    this.assertRuleVersion(command.ruleVersion);
+    if (command.expectedAmount !== BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT) {
+      throw p0PayInvalid('Bid service fee authorization quota must be 4000.00 CNY.');
+    }
+    return command;
+  }
+
+  toBidServiceFeeAuthorizationFreezeInitCommand(projectId: string, authorizationId: string, payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    return {
+      projectId: this.readPathId(projectId, 'projectId'),
+      authorizationId: this.readPathId(authorizationId, 'authorizationId'),
+      payChannel: this.readPayChannel(source.payChannel),
+      clientPlatform: this.readClientPlatform(source.clientPlatform),
+      idempotencyKey: this.idempotencyService.normalizeKey(source.idempotencyKey)
+    } satisfies BidServiceFeeAuthorizationFreezeInitCommand;
   }
 
   toContractConfirmationCommand(taskId: string, payload: Record<string, unknown>) {
@@ -181,5 +251,11 @@ export class P0PayCommandParser {
       throw p0PayInvalid('Field `clientPlatform` is required for authorization init.');
     }
     return value.trim().slice(0, 64);
+  }
+
+  private assertRuleVersion(value: string) {
+    if (value !== PLATFORM_PRICING_RULE_VERSION) {
+      throw pricingRuleVersionMismatch();
+    }
   }
 }

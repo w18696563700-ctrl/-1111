@@ -86,6 +86,32 @@ class P0PayInquiryDepositOrderCommand {
   };
 }
 
+class ProjectAuthenticitySincerityOrderCommand {
+  ProjectAuthenticitySincerityOrderCommand({
+    this.expectedAmount = 200,
+    this.expectedCurrency = 'CNY',
+    required this.ruleVersion,
+    required this.ruleSnapshotHash,
+    String? idempotencyKey,
+  }) : idempotencyKey =
+           idempotencyKey ??
+           _p0PayIdempotencyKey('project-authenticity-sincerity');
+
+  final int expectedAmount;
+  final String expectedCurrency;
+  final String ruleVersion;
+  final String ruleSnapshotHash;
+  final String idempotencyKey;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'expectedAmount': expectedAmount,
+    'expectedCurrency': expectedCurrency,
+    'ruleVersion': ruleVersion,
+    'ruleSnapshotHash': ruleSnapshotHash,
+    'idempotencyKey': idempotencyKey,
+  };
+}
+
 class P0PayPayInitCommand {
   P0PayPayInitCommand({
     required this.payChannel,
@@ -100,6 +126,54 @@ class P0PayPayInitCommand {
   Map<String, Object?> toJson() => <String, Object?>{
     'payChannel': payChannel,
     'clientPlatform': clientPlatform,
+    'idempotencyKey': idempotencyKey,
+  };
+}
+
+class ProjectPricingPayInitCommand {
+  ProjectPricingPayInitCommand({
+    required this.payChannel,
+    this.clientPlatform = 'flutter',
+    String? idempotencyKey,
+  }) : idempotencyKey =
+           idempotencyKey ?? _p0PayIdempotencyKey('project-pricing-pay-init');
+
+  final String payChannel;
+  final String clientPlatform;
+  final String idempotencyKey;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'payChannel': payChannel,
+    'clientPlatform': clientPlatform,
+    'idempotencyKey': idempotencyKey,
+  };
+}
+
+class BidServiceFeeAuthorizationCommand {
+  BidServiceFeeAuthorizationCommand({
+    required this.bidParticipationRequestId,
+    this.expectedAmount = 4000,
+    this.expectedCurrency = 'CNY',
+    required this.ruleVersion,
+    required this.ruleSnapshotHash,
+    String? idempotencyKey,
+  }) : idempotencyKey =
+           idempotencyKey ??
+           _p0PayIdempotencyKey('bid-service-fee-authorization');
+
+  final String bidParticipationRequestId;
+  final int expectedAmount;
+  final String expectedCurrency;
+  final String ruleVersion;
+  final String ruleSnapshotHash;
+  final String idempotencyKey;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'bidParticipationRequestId': bidParticipationRequestId,
+    'expectedAmount': expectedAmount,
+    'expectedCurrency': expectedCurrency,
+    'ruleVersion': ruleVersion,
+    'ruleSnapshotHash': ruleSnapshotHash,
     'idempotencyKey': idempotencyKey,
   };
 }

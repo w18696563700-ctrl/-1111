@@ -5,6 +5,7 @@ import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { BidParticipationRequestAccessService } from '../bid_participation_request/bid-participation-request-access.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { UploadPublicUrlService } from '../upload/upload-public-url.service';
@@ -45,7 +46,8 @@ export class ProjectAttachmentFileAccessService {
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly publicUrlService: UploadPublicUrlService,
-    private readonly config: RuntimeConfigService
+    private readonly config: RuntimeConfigService,
+    private readonly bidParticipationAccessService: BidParticipationRequestAccessService
   ) {}
 
   async getAccess(query: Record<string, unknown>, context: RequestContext) {
@@ -131,9 +133,13 @@ export class ProjectAttachmentFileAccessService {
       throw fileAccessPermissionDenied('Current project attachment is not available for bid-material access.');
     }
 
-    await this.eligibilityService.requireBidSubmitEligibility(
+    const scope = await this.eligibilityService.requireBidSubmitEligibility(
       currentSession,
       project
+    );
+    await this.bidParticipationAccessService.requireApprovedForOrganization(
+      project,
+      scope.organization.id,
     );
   }
 

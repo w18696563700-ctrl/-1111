@@ -1,12 +1,10 @@
 ---
 owner: Codex 总控
-status: frozen
+status: superseded
 purpose: >
-  Freeze the L3 Server truth ownership for `exhibition_trade_task_p0_pay`,
-  covering Server-owned aggregate roots, canonical business truth, permission
-  truth, payment-channel truth, callback truth, derived-vs-canonical split, and
-  retained No-Go boundaries before persistence/state/audit freeze and before any
-  backend, BFF, Flutter, integration, or release implementation.
+  Historical P0-Pay backend truth retained for audit and migration comparison
+  only. This file no longer serves as the current platform pricing backend
+  truth owner after platform_pricing_backend_truth_master_v1.
 layer: L3 Backend
 freeze_date_local: 2026-04-27
 version: V1.3
@@ -25,6 +23,26 @@ inputs_canonical:
 ---
 
 # 展览平台任务发布与交易收费规则 P0-Pay Server Truth Addendum V1.3
+
+## Supersede Note
+
+自 `2026-04-29` 起，本文件不再作为当前收费 `L3 backend truth` 主文件使用。
+
+当前唯一收费 `L3 backend truth` 改为：
+
+- [platform_pricing_backend_truth_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/02_backend/platform_pricing_backend_truth_master_v1.md)
+
+本文件仅保留为历史 `P0-Pay` backend truth 记录，用于：
+
+1. 审计回溯
+2. 差异对比
+3. 下游实现重写时的迁移参考
+
+以下旧结论不再作为当前收费 backend truth 真相继续指挥：
+
+1. `TradeTask / InquiryQuoteTaskDeposit / FixedPriceBid authorization` 作为当前收费主骨架
+2. `发单诚意金` 作为当前唯一 `200 元` 收费对象
+3. `按报价金额动态预授权 + 固定 3%` 作为当前唯一服务费真相
 
 ## 1. Scope
 

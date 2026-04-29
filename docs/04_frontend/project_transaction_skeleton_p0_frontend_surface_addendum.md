@@ -1,4 +1,16 @@
 ---
+
+## Pricing Rebaseline Note
+
+本文件继续保留 `项目交易骨架 P0` 的总体 Flutter 边界意义。
+
+但自 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 生效后，本文件中把 `payment / deposit` 一并排除出当前对象的旧阶段性条款，不再裁决现行收费 `L5 Flutter consumption`。
+
+当前正式解释固定如下：
+
+1. Flutter 仍不得本地判断最终收费真相
+2. Flutter 仍不得自建第二收费状态机
+3. 但 `200 元项目真实性诚意金`、`4000 元竞标服务费预授权额度`、`deal confirmation` 已有独立的当前收费 `L5` authority，不再受本文件旧排除口径限制
 owner: Codex 总控
 status: frozen
 purpose: >
@@ -177,4 +189,3 @@ Flutter 在 `项目交易骨架 P0` 中的正式边界写死为：
 - 明确禁止：
   - 把 `profile/*` bounded 页面误导成交易主链能力
   - 创建第二套资格或状态机
-

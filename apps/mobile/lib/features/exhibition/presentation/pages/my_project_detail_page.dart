@@ -490,6 +490,18 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     }
 
     setState(() => _submittingLifecycleAction = kind);
+    if (kind == _MyProjectLifecycleActionKind.publish) {
+      final pricingGateSatisfied =
+          await _ensureProjectAuthenticitySincerityBeforePublish(projectId);
+      if (!mounted) {
+        return;
+      }
+      if (!pricingGateSatisfied) {
+        setState(() => _submittingLifecycleAction = null);
+        return;
+      }
+    }
+
     final result = switch (kind) {
       _MyProjectLifecycleActionKind.publish =>
         ExhibitionConsumerLayer.instance.publishProject(
@@ -539,6 +551,94 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     _showPageMessage(action.successMessage);
   }
 
+  Future<bool> _ensureProjectAuthenticitySincerityBeforePublish(
+    String projectId,
+  ) async {
+    final summary = await ExhibitionConsumerLayer.instance
+        .loadProjectPricingSummary(projectId: projectId, forceRefresh: true);
+    if (!mounted) {
+      return false;
+    }
+    if (summary.state == AppPageState.content &&
+        _projectAuthenticitySinceritySatisfied(summary.payload)) {
+      return true;
+    }
+    if (summary.state != AppPageState.content) {
+      _showPageMessage(_userFacingLoadFailureMessage(summary));
+      return false;
+    }
+
+    final orderResult = await ExhibitionConsumerLayer.instance
+        .createProjectAuthenticitySincerityOrder(
+          projectId: projectId,
+          command: ProjectAuthenticitySincerityOrderCommand(
+            ruleVersion: 'platform_pricing_rules_master_v1',
+            ruleSnapshotHash: 'platform_pricing_rules_master_v1',
+          ),
+        );
+    if (!mounted) {
+      return false;
+    }
+    if (!orderResult.isSuccess) {
+      _showPageMessage(_userFacingActionFailureMessage(orderResult));
+      return false;
+    }
+    if (_projectAuthenticitySinceritySatisfied(orderResult.payload)) {
+      return true;
+    }
+
+    final orderId = _projectAuthenticitySincerityOrderId(orderResult.payload);
+    if (orderId == null) {
+      _showPageMessage('项目真实性诚意金订单缺少订单编号，请刷新后重试。');
+      return false;
+    }
+
+    final initResult = await ExhibitionConsumerLayer.instance
+        .initProjectAuthenticitySincerityPayment(
+          projectId: projectId,
+          orderId: orderId,
+          command: ProjectPricingPayInitCommand(
+            payChannel:
+                _firstProjectPricingChannelCandidate(orderResult.payload) ??
+                'alipay_candidate',
+          ),
+        );
+    if (!mounted) {
+      return false;
+    }
+    if (!initResult.isSuccess) {
+      _showPageMessage(_userFacingActionFailureMessage(initResult));
+      return false;
+    }
+
+    await _openProjectPricingChannelPayload(initResult.payload);
+    final pollResult = await ExhibitionConsumerLayer.instance
+        .pollProjectAuthenticitySincerityOrderStatus(
+          projectId: projectId,
+          orderId: orderId,
+          maxAttempts: 1,
+          interval: Duration.zero,
+        );
+    if (!mounted) {
+      return false;
+    }
+    if (pollResult.isSuccess ||
+        _projectAuthenticitySinceritySatisfied(pollResult.result.payload)) {
+      return true;
+    }
+
+    _showPageMessage(_projectAuthenticitySincerityPendingMessage(pollResult));
+    return false;
+  }
+
+  Future<void> _openProjectPricingChannelPayload(Object? payload) async {
+    final url = _channelPayloadUrl(payload);
+    if (url == null) {
+      return;
+    }
+    await launchUrlString(url);
+  }
+
   Future<bool> _ensureRequiredEffectImageBeforePublish(String projectId) async {
     final result = await ExhibitionConsumerLayer.instance
         .loadProjectAttachments(projectId: projectId, forceRefresh: true);
@@ -563,6 +663,71 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return false;
     }
     return true;
+  }
+
+  bool _projectAuthenticitySinceritySatisfied(Object? payload) {
+    final status = _projectAuthenticitySincerityStatus(payload);
+    return switch (status) {
+      'paid' ||
+      'frozen' ||
+      'succeeded' ||
+      'satisfied' ||
+      'not_required' => true,
+      _ => false,
+    };
+  }
+
+  String? _projectAuthenticitySincerityStatus(Object? payload) {
+    final payloadMap = _payloadMap(payload);
+    if (payloadMap == null) {
+      return null;
+    }
+    final publisherPricing = _payloadMap(payloadMap['publisherPricing']);
+    final sincerity =
+        _payloadMap(payloadMap['projectAuthenticitySincerity']) ??
+        _payloadMap(payloadMap['inquiryDeposit']);
+    return _normalizeDynamicText(
+      publisherPricing?['authenticitySincerityStatus'] ??
+          publisherPricing?['publishGateStatus'] ??
+          sincerity?['orderStatus'] ??
+          sincerity?['depositStatus'] ??
+          sincerity?['status'] ??
+          payloadMap['orderStatus'] ??
+          payloadMap['depositStatus'] ??
+          payloadMap['status'],
+    );
+  }
+
+  String? _projectAuthenticitySincerityOrderId(Object? payload) {
+    return _orderIdFromPayload(payload) ?? _depositOrderIdFromPayload(payload);
+  }
+
+  String? _firstProjectPricingChannelCandidate(Object? payload) {
+    final payloadMap = _payloadMap(payload);
+    final candidates = payloadMap?['channelCandidates'];
+    if (candidates is! Iterable) {
+      return null;
+    }
+    for (final candidate in candidates) {
+      final normalized = _normalizeDynamicText(candidate);
+      if (normalized != null) {
+        return normalized;
+      }
+    }
+    return null;
+  }
+
+  String _projectAuthenticitySincerityPendingMessage(
+    P0PayPaymentPollResult result,
+  ) {
+    if (result.result.state != AppPageState.content) {
+      return _userFacingLoadFailureMessage(result.result);
+    }
+    final status = _projectAuthenticitySincerityStatus(result.result.payload);
+    if (status == null) {
+      return '项目真实性诚意金状态暂不可用，请稍后刷新后再发布。';
+    }
+    return '项目真实性诚意金尚未完成冻结，当前状态：$status。完成支付后再点击发布。';
   }
 
   Future<void> _openProjectEdit(String projectId) async {

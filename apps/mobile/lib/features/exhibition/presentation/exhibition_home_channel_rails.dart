@@ -61,12 +61,16 @@ class _HomeChannelActionRail extends StatelessWidget {
                   onPressed: action.onPressed,
                   style: TextButton.styleFrom(
                     foregroundColor: ExhibitionHomeVisualTokens.textSecondary,
+                    backgroundColor: const Color(0xFFF7F8FA),
                     visualDensity: VisualDensity.compact,
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
+                      horizontal: 10,
                       vertical: 8,
                     ),
                     shape: pillShape,
+                    side: const BorderSide(
+                      color: ExhibitionHomeVisualTokens.borderSoft,
+                    ),
                     textStyle: theme.textTheme.labelLarge?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),

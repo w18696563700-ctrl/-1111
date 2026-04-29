@@ -415,6 +415,12 @@ class AppRouter {
         projectId: routeUri.queryParameters['projectId'],
         requestId: routeUri.queryParameters['requestId'],
       ),
+      ExhibitionRoutes.bidParticipationThread => ProjectNameAccessThreadPage(
+        threadId: routeUri.queryParameters['threadId'],
+        projectId: routeUri.queryParameters['projectId'],
+        requestId: routeUri.queryParameters['requestId'],
+        bidParticipation: true,
+      ),
       ExhibitionRoutes.counterpartConversation => CounterpartConversationPage(
         conversationId: routeUri.queryParameters['conversationId'],
         projectId: routeUri.queryParameters['projectId'],
@@ -426,6 +432,8 @@ class AppRouter {
       ExhibitionRoutes.bidSubmit => BidSubmitPage(
         projectId: routeUri.queryParameters['projectId'],
         mode: routeUri.queryParameters['mode'],
+        bidParticipationRequestId:
+            routeUri.queryParameters['bidParticipationRequestId'],
       ),
       ExhibitionRoutes.orderDetail => OrderDetailPage(
         orderId: routeUri.queryParameters['orderId'],
@@ -475,6 +483,7 @@ class AppRouter {
       ExhibitionRoutes.projectClarification => '项目澄清',
       ExhibitionRoutes.projectAlbum => '项目相册',
       ExhibitionRoutes.projectNameAccessThread => '名称查看申请',
+      ExhibitionRoutes.bidParticipationThread => '参与竞标申请',
       ExhibitionRoutes.counterpartConversation => '项目沟通',
       ExhibitionRoutes.bidThread => '沟通与投标',
       ExhibitionRoutes.bidSubmit =>

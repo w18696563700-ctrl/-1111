@@ -103,6 +103,22 @@ export class ExhibitionP0PayPayloadService {
     };
   }
 
+  toBidServiceFeeAuthorizationPayload(value: unknown, idempotencyKey?: string) {
+    const source = this.requireRecord(value);
+    const expectedAmount = this.readMoney(source.expectedAmount, 'expectedAmount');
+    if (Number(expectedAmount) !== 4000) {
+      throw this.badRequest('Bid service fee authorization quota must be 4000.00 CNY.');
+    }
+    return {
+      bidParticipationRequestId: this.readString(source.bidParticipationRequestId, 'bidParticipationRequestId'),
+      expectedAmount,
+      expectedCurrency: this.readCurrency(source.expectedCurrency),
+      ruleVersion: this.readString(source.ruleVersion, 'ruleVersion'),
+      ruleSnapshotHash: this.readString(source.ruleSnapshotHash, 'ruleSnapshotHash'),
+      idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
+    };
+  }
+
   toPayInitPayload(value: unknown, idempotencyKey?: string) {
     const source = this.requireRecord(value);
     return {
@@ -191,6 +207,27 @@ export class ExhibitionP0PayPayloadService {
       bidId: this.readString(source.bidId, 'bidId'),
       reasonCode: this.readString(source.reasonCode, 'reasonCode'),
       reasonText: this.readString(source.reasonText, 'reasonText'),
+      idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
+    };
+  }
+
+  toBidServiceFeeAuthorizationReleasePayload(value: unknown, idempotencyKey?: string) {
+    const source = this.requireRecord(value);
+    return {
+      releaseReasonCode: this.readString(source.releaseReasonCode, 'releaseReasonCode'),
+      releaseReasonText: this.readString(source.releaseReasonText, 'releaseReasonText'),
+      idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
+    };
+  }
+
+  toDealConfirmationPayload(value: unknown, idempotencyKey?: string) {
+    const source = this.requireRecord(value);
+    return {
+      selectedBidId: this.readString(source.selectedBidId, 'selectedBidId'),
+      finalConfirmedAmount: this.readMoney(source.finalConfirmedAmount, 'finalConfirmedAmount'),
+      currency: this.readCurrency(source.currency),
+      contractFileAssetIds: this.readStringArray(source.contractFileAssetIds, 'contractFileAssetIds'),
+      confirmationRole: this.readEnum(source.confirmationRole, CONFIRMATION_ROLES, 'confirmationRole'),
       idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
     };
   }

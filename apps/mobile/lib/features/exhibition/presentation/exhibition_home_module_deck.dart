@@ -22,7 +22,7 @@ extension _HomeModuleTabPresentation on _HomeModuleTab {
   };
 }
 
-class _HomeModuleDeck extends StatelessWidget {
+class _HomeModuleDeck extends StatefulWidget {
   const _HomeModuleDeck({
     required this.selectedTab,
     required this.onTabSelected,
@@ -66,12 +66,32 @@ class _HomeModuleDeck extends StatelessWidget {
   final VoidCallback onOpenTeamExplanation;
 
   @override
+  State<_HomeModuleDeck> createState() => _HomeModuleDeckState();
+}
+
+class _HomeModuleDeckState extends State<_HomeModuleDeck> {
+  late final Set<_HomeModuleTab> _visitedTabs = <_HomeModuleTab>{
+    widget.selectedTab,
+  };
+
+  @override
+  void didUpdateWidget(covariant _HomeModuleDeck oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (_visitedTabs.add(widget.selectedTab)) {
+      setState(() {});
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: ExhibitionHomeVisualTokens.cardBackground,
         borderRadius: BorderRadius.circular(
           ExhibitionHomeVisualTokens.radiusLarge,
+        ),
+        border: Border.all(
+          color: ExhibitionHomeVisualTokens.borderSoft.withValues(alpha: 0.92),
         ),
         boxShadow: ExhibitionHomeVisualTokens.cardShadow(opacity: 0.04),
       ),
@@ -80,16 +100,53 @@ class _HomeModuleDeck extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            _HomeModuleTabStrip(
-              selectedTab: selectedTab,
-              onTabSelected: onTabSelected,
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF7F8FA),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: ExhibitionHomeVisualTokens.borderSoft,
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(4),
+                child: _HomeModuleTabStrip(
+                  selectedTab: widget.selectedTab,
+                  onTabSelected: widget.onTabSelected,
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 180),
-              child: KeyedSubtree(
-                key: ValueKey<String>('home-panel-${selectedTab.name}'),
-                child: _buildActivePanel(context),
+            const SizedBox(height: 10),
+            AnimatedSize(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOutCubic,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFBFBFC),
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(
+                    color: ExhibitionHomeVisualTokens.borderSoft.withValues(
+                      alpha: 0.82,
+                    ),
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
+                  child: IndexedStack(
+                    index: _HomeModuleTab.values.indexOf(widget.selectedTab),
+                    sizing: StackFit.loose,
+                    children: _HomeModuleTab.values
+                        .map(
+                          (_HomeModuleTab tab) => KeyedSubtree(
+                            key: ValueKey<String>('home-panel-${tab.name}'),
+                            child: _visitedTabs.contains(tab)
+                                ? _buildPanelForTab(tab)
+                                : const SizedBox.shrink(),
+                          ),
+                        )
+                        .toList(growable: false),
+                  ),
+                ),
               ),
             ),
           ],
@@ -98,52 +155,52 @@ class _HomeModuleDeck extends StatelessWidget {
     );
   }
 
-  Widget _buildActivePanel(BuildContext context) {
-    return switch (selectedTab) {
+  Widget _buildPanelForTab(_HomeModuleTab tab) {
+    return switch (tab) {
       _HomeModuleTab.project => _HomeProjectModulePanel(
-        loading: loading,
-        result: projectResult,
-        projectItems: projectItems,
-        provinceCode: locationSnapshot?.provinceCode,
-        provinceName: locationSnapshot?.provinceName,
-        onRefreshHome: onRefreshHome,
-        onRelocateHome: onRelocateHome,
-        onOpenProjectList: onOpenProjectList,
-        onOpenProjectCreate: onOpenProjectCreate,
-        onOpenProjectDetail: onOpenProjectDetail,
+        loading: widget.loading,
+        result: widget.projectResult,
+        projectItems: widget.projectItems,
+        provinceCode: widget.locationSnapshot?.provinceCode,
+        provinceName: widget.locationSnapshot?.provinceName,
+        onRefreshHome: widget.onRefreshHome,
+        onRelocateHome: widget.onRelocateHome,
+        onOpenProjectList: widget.onOpenProjectList,
+        onOpenProjectCreate: widget.onOpenProjectCreate,
+        onOpenProjectDetail: widget.onOpenProjectDetail,
       ),
       _HomeModuleTab.forum => _HomeForumModulePanel(
-        onOpenForum: onOpenForum,
-        onOpenForumPublish: onOpenForumPublish,
-        onOpenForumPost: onOpenForumPost,
+        onOpenForum: widget.onOpenForum,
+        onOpenForumPublish: widget.onOpenForumPublish,
+        onOpenForumPost: widget.onOpenForumPost,
       ),
       _HomeModuleTab.company => _HomeEnterpriseModulePanel(
         boardType: EnterpriseBoardType.company,
         openBoardLabel: '进入公司列表',
-        provinceCode: locationSnapshot?.provinceCode,
-        provinceName: locationSnapshot?.provinceName,
-        onRelocateHome: onRelocateHome,
-        onOpenEnterpriseItem: onOpenEnterpriseItem,
-        onOpenBoard: onOpenCompanyBoard,
+        provinceCode: widget.locationSnapshot?.provinceCode,
+        provinceName: widget.locationSnapshot?.provinceName,
+        onRelocateHome: widget.onRelocateHome,
+        onOpenEnterpriseItem: widget.onOpenEnterpriseItem,
+        onOpenBoard: widget.onOpenCompanyBoard,
       ),
       _HomeModuleTab.factory => _HomeEnterpriseModulePanel(
         boardType: EnterpriseBoardType.factory,
         openBoardLabel: '进入工厂列表',
-        provinceCode: locationSnapshot?.provinceCode,
-        provinceName: locationSnapshot?.provinceName,
-        onRelocateHome: onRelocateHome,
-        onOpenEnterpriseItem: onOpenEnterpriseItem,
-        onOpenBoard: onOpenFactoryBoard,
+        provinceCode: widget.locationSnapshot?.provinceCode,
+        provinceName: widget.locationSnapshot?.provinceName,
+        onRelocateHome: widget.onRelocateHome,
+        onOpenEnterpriseItem: widget.onOpenEnterpriseItem,
+        onOpenBoard: widget.onOpenFactoryBoard,
       ),
       _HomeModuleTab.supplier => _HomeSupplierModulePanel(
-        provinceCode: locationSnapshot?.provinceCode,
-        provinceName: locationSnapshot?.provinceName,
-        onRelocateHome: onRelocateHome,
-        onOpenSupplierBoard: onOpenSupplierBoard,
-        onOpenEnterpriseItem: onOpenEnterpriseItem,
+        provinceCode: widget.locationSnapshot?.provinceCode,
+        provinceName: widget.locationSnapshot?.provinceName,
+        onRelocateHome: widget.onRelocateHome,
+        onOpenSupplierBoard: widget.onOpenSupplierBoard,
+        onOpenEnterpriseItem: widget.onOpenEnterpriseItem,
       ),
       _HomeModuleTab.team => _HomeTeamModulePanel(
-        onOpenTeamExplanation: onOpenTeamExplanation,
+        onOpenTeamExplanation: widget.onOpenTeamExplanation,
       ),
     };
   }
@@ -227,15 +284,18 @@ class _HomeModuleTabChip extends StatelessWidget {
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          constraints: const BoxConstraints(minHeight: 34),
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
           decoration: BoxDecoration(
             color: selected
                 ? ExhibitionHomeVisualTokens.brandGoldLight
-                : Colors.transparent,
+                : ExhibitionHomeVisualTokens.cardBackground,
             border: Border.all(
               color: selected
                   ? ExhibitionHomeVisualTokens.brandGold.withValues(alpha: 0.3)
-                  : ExhibitionHomeVisualTokens.borderSoft,
+                  : ExhibitionHomeVisualTokens.borderSoft.withValues(
+                      alpha: 0.92,
+                    ),
             ),
             borderRadius: BorderRadius.circular(18),
           ),

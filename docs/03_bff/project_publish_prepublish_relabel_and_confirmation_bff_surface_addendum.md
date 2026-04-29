@@ -16,6 +16,19 @@ inputs_canonical:
   - apps/bff/src/routes/project/project-lifecycle.service.ts
 ---
 
+## Pricing Override Note
+
+当前 `publish` 的 app-facing path、命名与主体 request shape 继续沿用本文件。
+
+但自 [platform_pricing_bff_surface_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/03_bff/platform_pricing_bff_surface_master_v1.md) 生效后，本文件不再拥有收费 gate authority。
+
+当前正式补充冻结如下：
+
+1. `POST /api/app/project/publish` 仍是 canonical publish path
+2. 若 `Server` 判定当前项目必须先完成 `200 元项目真实性诚意金`，`BFF` 必须 fail closed
+3. `BFF` 不得把收费 gate 错误伪装成普通 publish 成功或普通文案切换问题
+4. publish 前的收费前置动作由 `pricing-summary + authenticity-sincerity orders` 家族承接，不在本文件内另起第二条 publish 语义
+
 # 《项目发布对象簇｜预发布列表命名与发布确认重排 L4 BFF surface freeze》
 
 ## 1. Surface Conclusion

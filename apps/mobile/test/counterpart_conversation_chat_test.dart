@@ -210,8 +210,8 @@ Map<String, Object?> _detailPayload({
   Map<String, Object?>? ratingEntry,
   bool includeOrderCard = false,
 }) {
-  final nameAccessDefinition =
-      messagesRegisteredEntryByActionKey['project_name_access_thread.open']!;
+  final participationDefinition =
+      messagesRegisteredEntryByActionKey['bid_participation_request.open']!;
   final bidThreadDefinition =
       messagesRegisteredEntryByActionKey['bid_thread.open']!;
   final orderDetailDefinition =
@@ -221,17 +221,28 @@ Map<String, Object?> _detailPayload({
     'counterpart': const <String, Object?>{
       'organizationId': 'org-counterpart',
       'displayName': '重庆涪川展览工厂',
+      'nickname': '江北嘴嘴帅',
+      'companyName': '重庆涪川展览工厂',
       'avatarUrl': null,
       'role': 'counterpart',
+      'certificationSummary': <String, Object?>{
+        'certificationStatus': 'approved',
+        'legalName': '重庆涪川展览工厂',
+        'usccMasked': '9150****1234',
+        'businessType': '有限责任公司',
+        'address': '重庆市',
+        'establishedAt': '2020-01-01',
+        'reviewedAt': '2026-04-29T09:00:00Z',
+      },
     },
     'summary': <String, Object?>{
       'focusProjectId': 'project-1',
       'title': includeOrderCard ? '订单状态已更新' : '项目沟通',
-      'text': includeOrderCard ? '当前项目订单已有新状态。' : '当前申请组织申请查看当前项目名称。',
+      'text': includeOrderCard ? '当前项目订单已有新状态。' : '当前申请组织申请参与当前项目竞标。',
       'projectCount': 1,
       'latestCardType': includeOrderCard
           ? 'project_order'
-          : 'project_name_access_request',
+          : 'bid_participation_request',
     },
     'focusProjectId': 'project-1',
     'latestActivityAt': '2026-05-04T10:00:00Z',
@@ -240,28 +251,29 @@ Map<String, Object?> _detailPayload({
         'projectId': 'project-1',
         'projectDisplayTitle': '项目名称需申请查看',
         'titleVisibility': 'masked',
+        'projectRelation': 'my_published',
         'projectState': projectState,
         'latestActivityAt': '2026-05-04T10:00:00Z',
         'orderSummary': orderSummary,
         'ratingEntry': ratingEntry,
         'cards': <Object?>[
           <String, Object?>{
-            'cardId': 'name-access-card',
-            'cardType': 'project_name_access_request',
-            'title': '项目名称查看申请',
-            'summary': '当前申请组织 申请查看当前项目名称。',
+            'cardId': 'bid-participation-card',
+            'cardType': 'bid_participation_request',
+            'title': '参与竞标申请',
+            'summary': '当前申请组织申请参与当前项目竞标。',
             'status': 'pending',
             'updatedAt': '2026-05-04T10:00:00Z',
             'truthAnchor': const <String, Object?>{
-              'truthType': 'project_name_access_request',
+              'truthType': 'bid_participation_request',
               'projectId': 'project-1',
               'requestId': 'request-1',
               'threadId': 'thread-name-access-1',
             },
             'detailRouteTarget': <String, Object?>{
-              'objectType': nameAccessDefinition.objectType,
-              'actionKey': nameAccessDefinition.actionKey,
-              'canonicalPath': nameAccessDefinition.canonicalPath,
+              'objectType': participationDefinition.objectType,
+              'actionKey': participationDefinition.actionKey,
+              'canonicalPath': participationDefinition.canonicalPath,
               'params': const <String, Object?>{
                 'threadId': 'thread-name-access-1',
                 'projectId': 'project-1',
@@ -327,8 +339,8 @@ Map<String, Object?> _detailPayload({
 }
 
 Map<String, Object?> _twoProjectDetailPayload() {
-  final nameAccessDefinition =
-      messagesRegisteredEntryByActionKey['project_name_access_thread.open']!;
+  final participationDefinition =
+      messagesRegisteredEntryByActionKey['bid_participation_request.open']!;
   final bidThreadDefinition =
       messagesRegisteredEntryByActionKey['bid_thread.open']!;
 
@@ -349,22 +361,22 @@ Map<String, Object?> _twoProjectDetailPayload() {
       'ratingEntry': null,
       'cards': <Object?>[
         <String, Object?>{
-          'cardId': '$projectId-name-access-card',
-          'cardType': 'project_name_access_request',
-          'title': '项目名称查看申请',
-          'summary': '当前申请组织 申请查看当前项目名称。',
+          'cardId': '$projectId-bid-participation-card',
+          'cardType': 'bid_participation_request',
+          'title': '参与竞标申请',
+          'summary': '当前申请组织申请参与当前项目竞标。',
           'status': 'pending',
           'updatedAt': latestActivityAt,
           'truthAnchor': <String, Object?>{
-            'truthType': 'project_name_access_request',
+            'truthType': 'bid_participation_request',
             'projectId': projectId,
             'requestId': requestId,
             'threadId': 'thread-name-access-$projectId',
           },
           'detailRouteTarget': <String, Object?>{
-            'objectType': nameAccessDefinition.objectType,
-            'actionKey': nameAccessDefinition.actionKey,
-            'canonicalPath': nameAccessDefinition.canonicalPath,
+            'objectType': participationDefinition.objectType,
+            'actionKey': participationDefinition.actionKey,
+            'canonicalPath': participationDefinition.canonicalPath,
             'params': <String, Object?>{
               'threadId': 'thread-name-access-$projectId',
               'projectId': projectId,
@@ -413,7 +425,7 @@ Map<String, Object?> _twoProjectDetailPayload() {
       'title': '项目沟通',
       'text': '当前对方主体有多个项目沟通入口。',
       'projectCount': 2,
-      'latestCardType': 'project_name_access_request',
+      'latestCardType': 'bid_participation_request',
     },
     'focusProjectId': 'project-luzhou',
     'latestActivityAt': '2026-05-04T10:00:00Z',
@@ -1131,8 +1143,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('项目沟通'), findsOneWidget);
+      expect(find.text('江北嘴嘴帅'), findsOneWidget);
       expect(find.text('重庆涪川展览工厂'), findsOneWidget);
-      expect(find.text('昵称'), findsOneWidget);
+      expect(find.text('昵称'), findsNothing);
       expect(find.text('对方主体'), findsNothing);
       expect(find.text('1 个项目'), findsNothing);
       expect(find.text('项目列表'), findsOneWidget);
@@ -1142,7 +1155,7 @@ void main() {
 
       await _enterFirstProjectCommunication(tester);
       expect(find.text('竞标沟通'), findsOneWidget);
-      expect(find.text('项目名称查看申请 / 审核'), findsOneWidget);
+      expect(find.text('参与竞标申请 / 审核'), findsOneWidget);
       expect(find.text('订单状态'), findsOneWidget);
       expect(find.text('项目相册'), findsOneWidget);
       expect(find.text('想跟TA说点什么...'), findsOneWidget);
@@ -1151,6 +1164,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('对方主体'), findsOneWidget);
+      expect(find.textContaining('认证主体'), findsOneWidget);
+      expect(find.textContaining('统一社会信用代码'), findsOneWidget);
       expect(find.text('评价对方'), findsOneWidget);
       expect(find.text('当前项目尚未结束，评价入口不会开放。'), findsOneWidget);
     },
@@ -1182,7 +1197,7 @@ void main() {
       expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
       final maskedTitle = tester.widget<Text>(find.text('项目名称需申请查看').first);
       expect(maskedTitle.style?.color, const Color(0xFF1F7A3A));
-      expect(find.text('进入后可申请查看项目名称，并继续项目聊天、订单入口和项目相册。'), findsOneWidget);
+      expect(find.text('进入后可处理参与竞标申请，并继续项目聊天、订单入口和项目相册。'), findsOneWidget);
       expect(find.text('进入后才加载此项目聊天、订单入口和项目相册入口。'), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
     },

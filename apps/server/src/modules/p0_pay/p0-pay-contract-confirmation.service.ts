@@ -20,7 +20,6 @@ import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity';
 import { PlatformServiceFeeChargeEntity } from './entities/platform-service-fee-charge.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
-import { calculatePlatformServiceFeeAmount } from './p0-pay-calculator';
 import { ContractConfirmationCommand } from './p0-pay.commands';
 import { p0PayInvalid, p0PayPermissionDenied, p0PayResourceUnavailable, p0PayStateConflict } from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
@@ -28,6 +27,12 @@ import { P0PayCommandParser } from './p0-pay-command.parser';
 import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayPresenter } from './p0-pay.presenter';
+import { P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
+import {
+  PLATFORM_PRICING_AUDIT_ACTIONS,
+  PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS,
+  PLATFORM_PRICING_RESOURCE_TYPES
+} from './p0-pay.state';
 
 @Injectable()
 export class P0PayContractConfirmationService {
@@ -49,7 +54,8 @@ export class P0PayContractConfirmationService {
     private readonly idempotencyService: P0PayIdempotencyService,
     private readonly idempotencyRecordService: P0PayIdempotencyRecordService,
     private readonly auditService: P0PayAuditService,
-    private readonly presenter: P0PayPresenter
+    private readonly presenter: P0PayPresenter,
+    private readonly feeRatePolicy?: P0PayServiceFeeRatePolicy
   ) {}
 
   async createConfirmation(taskId: string, payload: Record<string, unknown>, context: RequestContext) {
@@ -60,7 +66,7 @@ export class P0PayContractConfirmationService {
     const requestHash = this.idempotencyService.hashRequest(command);
     const scopeKey = `task:${command.taskId}:organization:${ownership.scope.organization.id}`;
     const existing = await this.idempotencyRecordService.findContractConfirmation(
-      'contractConfirmation.create',
+      PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.dealConfirmationUpsert,
       scopeKey,
       idempotencyKeyHash,
       requestHash
@@ -98,7 +104,7 @@ export class P0PayContractConfirmationService {
   ) {
     const record = await this.idempotencyRecordService.findRecordInTransaction(
       manager,
-      'contractConfirmation.create',
+      PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.dealConfirmationUpsert,
       idempotency.scopeKey,
       idempotency.idempotencyKeyHash
     );
@@ -112,16 +118,16 @@ export class P0PayContractConfirmationService {
 
     const confirmation = await this.resolveConfirmation(manager, ownership, command, idempotency.context);
     await this.idempotencyRecordService.save(manager, {
-      operationKey: 'contractConfirmation.create',
+      operationKey: PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.dealConfirmationUpsert,
       scopeKey: idempotency.scopeKey,
       idempotencyKeyHash: idempotency.idempotencyKeyHash,
       requestHash: idempotency.requestHash,
-      resourceType: 'contract_confirmation',
+      resourceType: PLATFORM_PRICING_RESOURCE_TYPES.dealConfirmation,
       resourceId: confirmation.id,
       context: idempotency.context
     });
     await this.recordConfirmationAudit(manager, confirmation, ownership, idempotency.context);
-    if (confirmation.contractStatus !== 'confirmed') {
+    if (confirmation.contractStatus !== 'confirmed_deal') {
       return this.loadConfirmationResult(manager, confirmation, ownership.authorization);
     }
     const charge = await this.ensureCharge(manager, confirmation, ownership, idempotency.context);
@@ -143,7 +149,9 @@ export class P0PayContractConfirmationService {
     this.assertConfirmationCompatible(confirmation, command, ownership);
     this.applyRoleConfirmation(confirmation, command.confirmationRole);
     confirmation.contractStatus =
-      confirmation.publisherConfirmedAt && confirmation.factoryConfirmedAt ? 'confirmed' : 'pending_counterparty';
+      confirmation.publisherConfirmedAt && confirmation.factoryConfirmedAt
+        ? 'confirmed_deal'
+        : 'pending_counterparty_confirm';
     await repository.save(confirmation);
     await this.moveAuthorizationToContractPending(manager, ownership, context);
     return confirmation;
@@ -160,13 +168,27 @@ export class P0PayContractConfirmationService {
     if (existing) {
       return existing;
     }
+    if (!['confirmed_deal', 'confirmed'].includes(confirmation.contractStatus)) {
+      throw p0PayStateConflict('Current deal is not confirmed and cannot trigger platform service fee charge.');
+    }
     if (!ownership.authorization.paymentChannel) {
       throw p0PayStateConflict('Current service fee authorization has no payment channel to charge.');
     }
     const lockedFeeRate = ownership.authorization.feeRate;
-    const finalFeeAmount = calculatePlatformServiceFeeAmount(confirmation.finalConfirmedAmount, lockedFeeRate);
+    const feeCalculation = this.requireFeeRatePolicy().calculateDealServiceFee({
+      finalConfirmedAmount: confirmation.finalConfirmedAmount,
+      membershipTierSnapshot: ownership.authorization.membershipTierSnapshot,
+      authorizationQuotaAmount: ownership.authorization.authorizationQuotaAmount
+    });
     const chargeId = randomUUID();
-    const order = await this.createChargePaymentOrder(manager, confirmation, ownership, chargeId, finalFeeAmount, context);
+    const order = await this.createChargePaymentOrder(
+      manager,
+      confirmation,
+      ownership,
+      chargeId,
+      feeCalculation.finalFeeAmount,
+      context
+    );
     const charge = this.chargeRepository.create({
       id: chargeId,
       taskId: confirmation.taskId,
@@ -175,7 +197,11 @@ export class P0PayContractConfirmationService {
       factoryOrganizationId: ownership.bid.bidderOrganizationId,
       finalConfirmedAmount: confirmation.finalConfirmedAmount,
       feeRate: lockedFeeRate,
-      finalFeeAmount,
+      baseFeeAmount: feeCalculation.baseFeeAmount,
+      membershipDiscountRate: feeCalculation.membershipDiscountRate,
+      capAmount: feeCalculation.capAmount,
+      finalFeeAmount: feeCalculation.finalFeeAmount,
+      releasedRemainderAmount: feeCalculation.releasedRemainderAmount,
       feeRateLabel: ownership.authorization.feeRateLabel,
       feeRateSource: ownership.authorization.feeRateSource,
       membershipTierSnapshot: ownership.authorization.membershipTierSnapshot,
@@ -193,7 +219,7 @@ export class P0PayContractConfirmationService {
     await this.saveChargeTransaction(manager, order, charge);
     confirmation.platformServiceFeeChargeId = charge.id;
     await manager.getRepository(ContractConfirmationEntity).save(confirmation);
-    await this.markAuthorizationCharged(manager, ownership.authorization, confirmation, finalFeeAmount, charge.chargedAt);
+    await this.markAuthorizationCharged(manager, ownership.authorization, confirmation, feeCalculation, charge.chargedAt);
     await this.recordChargeAudit(manager, charge, ownership, context);
     return charge;
   }
@@ -246,7 +272,7 @@ export class P0PayContractConfirmationService {
       where: { taskId: command.taskId, bidId: bid.id },
       order: { updatedAt: 'DESC' }
     });
-    if (!authorization || !['authorized', 'pending_contract_confirm'].includes(authorization.status)) {
+    if (!authorization || !['frozen', 'charge_pending', 'authorized', 'pending_contract_confirm'].includes(authorization.status)) {
       throw p0PayStateConflict('Current service fee authorization cannot enter contract confirmation.');
     }
     const currentSession = await requireVerifiedCurrentSessionContext(context, this.currentSessionVerificationService);
@@ -291,7 +317,7 @@ export class P0PayContractConfirmationService {
       currency: 'CNY',
       publisherConfirmedAt: null,
       factoryConfirmedAt: null,
-      contractStatus: 'pending_counterparty',
+      contractStatus: 'pending_counterparty_confirm',
       contractFileAssetIds: command.contractFileAssetIds,
       platformServiceFeeChargeId: null,
       requestId: context.requestId,
@@ -305,7 +331,7 @@ export class P0PayContractConfirmationService {
     ownership: ContractOwnership
   ) {
     if (
-      confirmation.contractStatus === 'confirmed' ||
+      ['confirmed_deal', 'confirmed'].includes(confirmation.contractStatus) ||
       String(confirmation.finalConfirmedAmount) !== command.finalConfirmedAmount ||
       confirmation.factoryOrganizationId !== ownership.bid.bidderOrganizationId
     ) {
@@ -327,22 +353,23 @@ export class P0PayContractConfirmationService {
     ownership: ContractOwnership,
     context: RequestContext
   ) {
-    if (ownership.authorization.status !== 'authorized') {
+    if (!['frozen', 'authorized'].includes(ownership.authorization.status)) {
       return;
     }
-    ownership.authorization.status = 'pending_contract_confirm';
+    const beforeState = ownership.authorization.status;
+    ownership.authorization.status = 'charge_pending';
     await manager.getRepository(PlatformServiceFeeAuthorizationEntity).save(ownership.authorization);
     await this.auditService.record(
       {
-        objectType: 'platform_service_fee_authorization',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.bidServiceFeeAuthorization,
         objectId: ownership.authorization.id,
         objectNo: ownership.project.projectNo,
-        action: 'PlatformServiceFeeAuthorizationMovedToContractPending',
-        beforeState: 'authorized',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.dealConfirmationSubmitted,
+        beforeState,
         afterState: ownership.authorization.status,
         actorId: ownership.currentSession.userId,
         actorRole: ownership.scope.membership.roleKey,
-        reason: `taskId=${ownership.project.id}; bidId=${ownership.bid.id}`
+        reason: `projectId=${ownership.project.id}; bidId=${ownership.bid.id}; organizationScope=${ownership.scope.organization.id}`
       },
       context,
       manager
@@ -353,11 +380,16 @@ export class P0PayContractConfirmationService {
     manager: EntityManager,
     authorization: PlatformServiceFeeAuthorizationEntity,
     confirmation: ContractConfirmationEntity,
-    finalFeeAmount: string,
+    feeCalculation: {
+      finalFeeAmount: string;
+      releasedRemainderAmount: string;
+    },
     chargedAt: Date | null
   ) {
     authorization.finalConfirmedAmount = confirmation.finalConfirmedAmount;
-    authorization.finalFeeAmount = finalFeeAmount;
+    authorization.finalFeeAmount = feeCalculation.finalFeeAmount;
+    authorization.chargedAmountUsed = feeCalculation.finalFeeAmount;
+    authorization.releasedAmount = feeCalculation.releasedRemainderAmount;
     authorization.status = 'charged';
     authorization.chargedAt = chargedAt;
     await manager.getRepository(PlatformServiceFeeAuthorizationEntity).save(authorization);
@@ -404,15 +436,18 @@ export class P0PayContractConfirmationService {
   ) {
     await this.auditService.record(
       {
-        objectType: 'contract_confirmation',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.dealConfirmation,
         objectId: confirmation.id,
         objectNo: ownership.project.projectNo,
-        action: 'ContractConfirmationSubmitted',
+        action:
+          confirmation.contractStatus === 'confirmed_deal'
+            ? PLATFORM_PRICING_AUDIT_ACTIONS.dealConfirmationConfirmed
+            : PLATFORM_PRICING_AUDIT_ACTIONS.dealConfirmationSubmitted,
         beforeState: '',
         afterState: confirmation.contractStatus,
         actorId: ownership.currentSession.userId,
         actorRole: ownership.scope.membership.roleKey,
-        reason: `taskId=${confirmation.taskId}; selectedBidId=${confirmation.selectedBidId}; finalConfirmedAmount=${confirmation.finalConfirmedAmount}`
+        reason: `projectId=${confirmation.taskId}; selectedBidId=${confirmation.selectedBidId}; finalConfirmedAmount=${confirmation.finalConfirmedAmount}; organizationScope=${ownership.scope.organization.id}`
       },
       context,
       manager
@@ -430,16 +465,23 @@ export class P0PayContractConfirmationService {
         objectType: 'platform_service_fee_charge',
         objectId: charge.id,
         objectNo: ownership.project.projectNo,
-        action: 'PlatformServiceFeeCharged',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.platformServiceFeeCharged,
         beforeState: 'pending_charge',
         afterState: charge.chargeStatus,
         actorId: ownership.currentSession.userId,
         actorRole: ownership.scope.membership.roleKey,
-        reason: `taskId=${charge.taskId}; contractConfirmationId=${charge.contractConfirmationId}; finalFeeAmount=${charge.finalFeeAmount}`
+        reason: `projectId=${charge.taskId}; contractConfirmationId=${charge.contractConfirmationId}; baseFeeAmount=${charge.baseFeeAmount}; membershipDiscountRate=${charge.membershipDiscountRate}; capAmount=${charge.capAmount}; finalFeeAmount=${charge.finalFeeAmount}; releasedRemainderAmount=${charge.releasedRemainderAmount}; organizationScope=${ownership.scope.organization.id}`
       },
       context,
       manager
     );
+  }
+
+  private requireFeeRatePolicy() {
+    if (!this.feeRatePolicy) {
+      throw p0PayResourceUnavailable('Current platform pricing fee policy is unavailable.');
+    }
+    return this.feeRatePolicy;
   }
 }
 

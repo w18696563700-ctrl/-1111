@@ -1,6 +1,10 @@
 part of '../exhibition_consumer_layer.dart';
 
-enum P0PayPaymentKind { inquiryDeposit, serviceFeeAuthorization }
+enum P0PayPaymentKind {
+  inquiryDeposit,
+  projectAuthenticitySincerity,
+  serviceFeeAuthorization,
+}
 
 enum P0PayPaymentOutcome {
   pending,

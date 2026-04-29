@@ -1,4 +1,17 @@
 ---
+
+## Pricing Override Note
+
+当前五步页面结构、材料区位置和最终单一主按钮规则继续沿用本文件。
+
+但自 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 生效后，本文件不再拥有收费 gate authority。
+
+当前正式补充冻结如下：
+
+1. 五步页仍可保留为当前竞标页壳
+2. 若 `4000 元竞标服务费预授权额度` 未完成冻结，Flutter 必须先进入 pricing gate，不得直接提交
+3. 当前不得再把 `3% / 预计平台服务费 / trade-task fixed-price-bids` 写成现行收费提交链
+4. 当前实际竞标提交的唯一 authority 仍是 `POST /api/app/bid/submit`
 owner: Codex 总控
 status: frozen
 purpose: >

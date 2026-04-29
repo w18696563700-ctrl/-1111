@@ -68,12 +68,12 @@ final class P0PayReadOnlySummaryView {
         ),
       if (platformServiceFeeStatus != null)
         P0PayReadOnlyStatusLine(
-          label: '平台服务费',
+          label: '竞标服务费预授权',
           value: p0PayStatusLabel(platformServiceFeeStatus),
         ),
       if (platformServiceFeeEstimatedAmount != null)
         P0PayReadOnlyStatusLine(
-          label: '预计服务费',
+          label: '预授权额度',
           value: platformServiceFeeEstimatedAmount!,
         ),
       if (platformServiceFeeFinalAmount != null)
@@ -83,7 +83,7 @@ final class P0PayReadOnlySummaryView {
         ),
       if (inquiryDepositStatus != null)
         P0PayReadOnlyStatusLine(
-          label: '发单诚意金',
+          label: '项目真实性诚意金',
           value: p0PayStatusLabel(inquiryDepositStatus),
         ),
       if (inquiryDepositAmount != null)
@@ -110,11 +110,23 @@ P0PayReadOnlySummaryView? parseP0PayReadOnlySummary(Object? payload) {
   }
 
   final platformServiceFee = _asMap(record['platformServiceFee']);
+  final bidServiceFeeAuthorization = _asMap(
+    record['bidServiceFeeAuthorization'],
+  );
   final inquiryDeposit = _asMap(record['inquiryDeposit']);
+  final projectAuthenticitySincerity = _asMap(
+    record['projectAuthenticitySincerity'],
+  );
+  final publisherPricing = _asMap(record['publisherPricing']);
+  final bidderPricing = _asMap(record['bidderPricing']);
   final contractConfirmation = _asMap(record['contractConfirmation']);
+  final dealSummary = _asMap(record['dealSummary']);
   final messageDisplaySummary = _asMap(record['messageDisplaySummary']);
   final routeTarget = _parseReadOnlyRouteTarget(
-    messageDisplaySummary?['routeTarget'] ?? record['routeTarget'],
+    messageDisplaySummary?['routeTarget'] ??
+        _asMap(publisherPricing?['nextAction']) ??
+        _asMap(bidderPricing?['nextAction']) ??
+        record['routeTarget'],
   );
 
   final summary = P0PayReadOnlySummaryView(
@@ -126,16 +138,27 @@ P0PayReadOnlySummaryView? parseP0PayReadOnlySummary(Object? payload) {
         _readBool(messageDisplaySummary?['displayAllowed']) ??
         _readBool(record['displayAllowed']) ??
         true,
-    taskId: _readText(record['taskId']),
+    taskId: _readText(record['taskId']) ?? _readText(record['projectId']),
     taskType: _readText(record['taskType']),
     platformServiceFeeStatus:
         _readText(record['platformServiceFeeStatus']) ??
+        _readText(record['bidServiceFeeAuthorizationStatus']) ??
         _readText(record['authorizationStatus']) ??
+        _readText(bidderPricing?['bidServiceFeeAuthorizationStatus']) ??
+        _readText(bidderPricing?['authorizationStatus']) ??
+        _readText(bidServiceFeeAuthorization?['authorizationStatus']) ??
+        _readText(bidServiceFeeAuthorization?['status']) ??
         _readText(platformServiceFee?['platformServiceFeeStatus']) ??
         _readText(platformServiceFee?['authorizationStatus']) ??
         _readText(platformServiceFee?['status']),
     platformServiceFeeEstimatedAmount:
         _readText(record['platformServiceFeeEstimatedAmount']) ??
+        _readText(record['quotaAmount']) ??
+        _readText(record['authorizationQuotaAmount']) ??
+        _readText(bidderPricing?['quotaAmount']) ??
+        _readText(bidderPricing?['authorizationQuotaAmount']) ??
+        _readText(bidServiceFeeAuthorization?['quotaAmount']) ??
+        _readText(bidServiceFeeAuthorization?['authorizationQuotaAmount']) ??
         _readText(platformServiceFee?['estimatedFeeAmount']) ??
         _readText(platformServiceFee?['estimatedAmount']),
     platformServiceFeeFinalAmount:
@@ -145,13 +168,23 @@ P0PayReadOnlySummaryView? parseP0PayReadOnlySummary(Object? payload) {
         _readText(platformServiceFee?['finalAmount']),
     inquiryDepositStatus:
         _readText(record['inquiryDepositStatus']) ??
+        _readText(record['authenticitySincerityStatus']) ??
+        _readText(projectAuthenticitySincerity?['orderStatus']) ??
+        _readText(projectAuthenticitySincerity?['depositStatus']) ??
+        _readText(projectAuthenticitySincerity?['status']) ??
+        _readText(publisherPricing?['authenticitySincerityStatus']) ??
         _readText(inquiryDeposit?['depositStatus']) ??
         _readText(inquiryDeposit?['status']),
     inquiryDepositAmount:
         _readText(record['inquiryDepositAmount']) ??
+        _readText(projectAuthenticitySincerity?['amount']) ??
+        _readText(publisherPricing?['authenticitySincerityAmount']) ??
         _readText(inquiryDeposit?['amount']),
     contractConfirmationStatus:
         _readText(record['contractConfirmationStatus']) ??
+        _readText(record['dealStatus']) ??
+        _readText(dealSummary?['dealStatus']) ??
+        _readText(dealSummary?['status']) ??
         _readText(contractConfirmation?['contractStatus']) ??
         _readText(contractConfirmation?['status']),
     statusTextKey:
@@ -186,6 +219,7 @@ String p0PayStatusLabel(String? value) {
     'pending_authorization' => '待预授权',
     'pending_user_confirm' => '等待用户确认',
     'paid' => '已支付',
+    'frozen' => '已冻结',
     'authorized' => '已预授权',
     'authorization_released' || 'released' => '已释放',
     'pending_contract_confirm' => '待合同确认',
@@ -208,6 +242,8 @@ String p0PayStatusTextKeyLabel(String? value) {
   return switch (value) {
     'p0_pay_status_unavailable' => '状态暂不可用',
     'platform_service_fee_authorized' => '平台服务费已预授权',
+    'bid_service_fee_authorization_frozen' => '竞标服务费预授权额度已冻结',
+    'project_authenticity_sincerity_paid' => '项目真实性诚意金已完成',
     'inquiry_deposit_paid' => '发单诚意金已支付',
     'contract_confirmation_pending' => '合同确认待处理',
     'charged' => '已扣取',

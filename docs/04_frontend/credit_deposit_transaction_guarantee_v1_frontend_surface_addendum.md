@@ -16,6 +16,18 @@ inputs_canonical:
   - docs/01_contracts/credit_deposit_transaction_guarantee_v1_contracts_addendum.md
 ---
 
+## Pricing Mainline Override Note
+
+本文件继续保留 `我的楼 V2.1 信用 / 保证金 / 交易保障` 的 profile 只读 frontend package 意义。
+
+但自 [platform_pricing_frontend_consumption_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/04_frontend/platform_pricing_frontend_consumption_master_v1.md) 生效后，本文件不得再被误读为当前展览收费执行主线的 Flutter authority。
+
+当前正式解释固定如下：
+
+1. 本文件只承接信用 / 保证金 / 交易保障读态 package
+2. 本文件不是当前 `200 / 4000 / deal confirmation` 收费主线 owner
+3. 当前展览收费执行主线的 Flutter authority 仅以 `platform_pricing_frontend_consumption_master_v1.md` 为准
+
 # 我的楼 V2.1 信用 / 保证金 / 交易保障 Frontend Surface Addendum
 
 ## Scope

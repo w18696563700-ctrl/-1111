@@ -80,6 +80,7 @@ final class CounterpartConversationProjectGroupView {
     required this.projectId,
     required this.projectDisplayTitle,
     required this.titleVisibility,
+    required this.projectRelation,
     required this.projectState,
     required this.latestActivityAt,
     required this.orderSummary,
@@ -90,6 +91,7 @@ final class CounterpartConversationProjectGroupView {
   final String projectId;
   final String projectDisplayTitle;
   final String titleVisibility;
+  final String projectRelation;
   final String? projectState;
   final String latestActivityAt;
   final CounterpartConversationOrderSummaryView? orderSummary;

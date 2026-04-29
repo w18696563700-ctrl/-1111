@@ -764,7 +764,7 @@ void main() {
     expect(find.text('讲解建议'), findsNothing);
     expect(find.text('项目编号：PROJ-LIST-1'), findsOneWidget);
     expect(find.text('下一步动作'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '查看详情'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '查看详情'), findsNothing);
   });
 
   testWidgets(
@@ -1045,10 +1045,10 @@ void main() {
       await _tapVisible(tester, find.widgetWithText(FilledButton, '进入项目列表'));
 
       expect(find.text('项目展示'), findsWidgets);
-      await _tapVisible(tester, find.widgetWithText(OutlinedButton, '查看详情'));
+      await _tapVisible(tester, find.text('首发项目'));
 
       expect(find.text('项目详情'), findsWidgets);
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
+      await _tapVisible(tester, find.widgetWithText(FilledButton, '继续提交竞标'));
 
       expect(find.text('竞标提交'), findsWidgets);
       await _enterVisibleBidTextField(tester, label: '竞标报价', value: '1200');

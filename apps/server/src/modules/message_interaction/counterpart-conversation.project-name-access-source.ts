@@ -100,15 +100,18 @@ export class CounterpartConversationProjectNameAccessSource
         userIds.add(userId);
       }
     }
-    const [organizations, users, approvedLegalNameByOrganizationId] = await Promise.all([
+    const [organizations, users, approvedCertificationSummaryByOrganizationId] = await Promise.all([
       this.organizationRepository.findBy({ id: In([...organizationIds]) }),
       userIds.size ? this.userRepository.findBy({ id: In([...userIds]) }) : Promise.resolve([]),
-      this.displayNameService.loadApprovedLegalNameMap(organizationIds),
+      this.displayNameService.loadApprovedCertificationSummaryMap(organizationIds),
     ]);
     return {
       organizationMap: new Map(organizations.map((item) => [item.id, item])),
       userMap: new Map(users.map((item) => [item.id, item])),
-      approvedLegalNameByOrganizationId,
+      approvedCertificationSummaryByOrganizationId,
+      approvedLegalNameByOrganizationId: this.displayNameService.toApprovedLegalNameMap(
+        approvedCertificationSummaryByOrganizationId,
+      ),
     };
   }
 
@@ -132,12 +135,13 @@ export class CounterpartConversationProjectNameAccessSource
     const counterpartUser = counterpartUserId
       ? input.counterpart.userMap.get(counterpartUserId)
       : null;
-    const counterpartDisplayName = this.displayNameService.resolveDisplayName({
+    const counterpartCompanyName = this.displayNameService.resolveCompanyName({
       organizationId: counterpartOrganizationId,
       organizationMap: input.counterpart.organizationMap,
       approvedLegalNameByOrganizationId:
         input.counterpart.approvedLegalNameByOrganizationId,
     });
+    const counterpartDisplayName = counterpartCompanyName;
     const requesterOrganizationName =
       input.request.requesterOrganizationId === counterpartOrganizationId
         ? counterpartDisplayName
@@ -150,9 +154,15 @@ export class CounterpartConversationProjectNameAccessSource
     return {
       counterpartOrganizationId,
       counterpartDisplayName,
+      counterpartNickname: this.displayNameService.resolveNickname(counterpartUser),
+      counterpartCompanyName,
       counterpartAvatarUrl: await this.avatarService.readAvatarUrl(
         counterpartUser?.avatarUrl ?? null,
       ),
+      counterpartCertificationSummary:
+        input.counterpart.approvedCertificationSummaryByOrganizationId.get(
+          counterpartOrganizationId,
+        ) ?? null,
       projectId: input.request.projectId,
       updatedAt,
       card: {

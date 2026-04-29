@@ -13,8 +13,11 @@ export type MessageInteractionReadModel = {
   counterpart: {
     organizationId: string;
     displayName: string;
+    nickname: string | null;
+    companyName: string;
     avatarUrl: string | null;
     role: string;
+    certificationSummary: CounterpartCertificationSummary | null;
   };
   summary: {
     focusProjectId: string;
@@ -23,9 +26,19 @@ export type MessageInteractionReadModel = {
     projectCount: number;
     latestCardType: string;
   };
-  p0PaySummary?: Record<string, unknown>;
+  pricingSummary?: Record<string, unknown>;
   updatedAt: string;
   routeTarget: MessageInteractionRouteTarget;
+};
+
+type CounterpartCertificationSummary = {
+  certificationStatus: string;
+  legalName: string;
+  usccMasked: string | null;
+  businessType: string | null;
+  address: string | null;
+  establishedAt: string | null;
+  reviewedAt: string | null;
 };
 
 export type MessageInteractionListReadModel = {
@@ -38,6 +51,7 @@ const INTERACTION_TYPES = new Set(["counterpart_conversation"]);
 const ROUTE_ACTION_KEYS = new Set(["counterpart_conversation.open"]);
 const CARD_TYPES = new Set([
   "project_name_access_request",
+  "bid_participation_request",
   "bid_thread",
   "project_clarification",
   "project_order",
@@ -81,9 +95,7 @@ function readMessageInteractionItem(
   }
   const routeTarget = readRouteTarget(record.routeTarget);
   const summary = readSummary(record.summary);
-  const p0PaySummary = readOptionalP0PaySummary(
-    record.p0PaySummary ?? record.paymentStatusSummary,
-  );
+  const pricingSummary = readOptionalPricingSummary(record.pricingSummary);
   if (routeTarget.actionKey !== "counterpart_conversation.open") {
     throw new Error(
       "Message interaction counterpart_conversation item returned an unsupported routeTarget.actionKey.",
@@ -97,30 +109,30 @@ function readMessageInteractionItem(
     projectId: readRequiredString(record.projectId, "projectId"),
     counterpart: readCounterpart(record.counterpart),
     summary,
-    ...(p0PaySummary ? { p0PaySummary } : {}),
+    ...(pricingSummary ? { pricingSummary } : {}),
     updatedAt: readRequiredString(record.updatedAt, "updatedAt"),
     routeTarget,
   };
 }
 
-function readOptionalP0PaySummary(value: unknown) {
+function readOptionalPricingSummary(value: unknown) {
   if (value == null) {
     return undefined;
   }
   const record = requireRecord(
     value,
-    "Message interaction p0PaySummary must be an object.",
+    "Message interaction pricingSummary must be an object.",
   );
   const messageDisplaySummary = record.messageDisplaySummary == null
     ? null
     : requireRecord(
         record.messageDisplaySummary,
-        "Message interaction p0PaySummary.messageDisplaySummary must be an object.",
+        "Message interaction pricingSummary.messageDisplaySummary must be an object.",
       );
   const readOnly = record.readOnly ?? messageDisplaySummary?.readOnly;
   if (readOnly !== true) {
     throw new Error(
-      "Message interaction p0PaySummary must be read-only.",
+      "Message interaction pricingSummary must be read-only.",
     );
   }
   return record;
@@ -140,8 +152,38 @@ function readCounterpart(value: unknown) {
       record.displayName,
       "counterpart.displayName",
     ),
+    nickname: readNullableString(record.nickname),
+    companyName:
+      readNullableString(record.companyName) ??
+      readRequiredString(record.displayName, "counterpart.displayName"),
     avatarUrl: readNullableString(record.avatarUrl),
     role: readRequiredString(record.role, "counterpart.role"),
+    certificationSummary: readCertificationSummary(record.certificationSummary),
+  };
+}
+
+function readCertificationSummary(value: unknown): CounterpartCertificationSummary | null {
+  if (value == null) {
+    return null;
+  }
+  const record = requireRecord(
+    value,
+    "Message interaction counterpart.certificationSummary must be an object.",
+  );
+  return {
+    certificationStatus: readRequiredString(
+      record.certificationStatus,
+      "counterpart.certificationSummary.certificationStatus",
+    ),
+    legalName: readRequiredString(
+      record.legalName,
+      "counterpart.certificationSummary.legalName",
+    ),
+    usccMasked: readNullableString(record.usccMasked),
+    businessType: readNullableString(record.businessType),
+    address: readNullableString(record.address),
+    establishedAt: readNullableString(record.establishedAt),
+    reviewedAt: readNullableString(record.reviewedAt),
   };
 }
 

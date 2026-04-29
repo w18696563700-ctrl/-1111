@@ -22,6 +22,7 @@ function createHarness() {
 
   const projects = [];
   const auditLogs = [];
+  const sincerityOrders = [];
   const repository = {
     items: projects,
     create(input) {
@@ -87,6 +88,24 @@ function createHarness() {
         return true;
       });
     },
+    async query() {
+      return [];
+    },
+  };
+  const sincerityRepository = {
+    async findOne(options) {
+      const where = options?.where ?? {};
+      return (
+        sincerityOrders.find((order) => {
+          if (where.taskId && order.taskId !== where.taskId) return false;
+          if (where.publisherOrganizationId && order.publisherOrganizationId !== where.publisherOrganizationId) {
+            return false;
+          }
+          if (where.status && order.status !== where.status) return false;
+          return true;
+        }) ?? null
+      );
+    },
   };
 
   const eligibilityService = {
@@ -130,13 +149,26 @@ function createHarness() {
 
   return {
     projects,
+    sincerityOrders,
+    markSincerityPaid(projectId) {
+      sincerityOrders.push({
+        id: `sincerity-${projectId}`,
+        taskId: projectId,
+        publisherOrganizationId: 'buyer-org',
+        status: 'paid',
+        updatedAt: new Date('2026-04-29T00:00:00.000Z'),
+      });
+    },
     auditLogs,
     writeService: new ProjectWriteService(
       repository,
       {
         async transaction(callback) {
           return callback({
-            getRepository() {
+            getRepository(entity) {
+              if (entity?.name === 'InquiryQuoteDepositEntity') {
+                return sincerityRepository;
+              }
               return repository;
             },
           });
@@ -155,6 +187,14 @@ function createHarness() {
       repository,
       verificationService,
       eligibilityService,
+      {
+        async buildPublicProjectionMap() {
+          return new Map();
+        },
+        async buildSingleProjectProjection() {
+          return null;
+        },
+      },
       new ProjectPresenter(),
     ),
   };
@@ -205,6 +245,7 @@ test('project lifecycle closes create -> save -> submit -> publish with real ser
   assert.equal(harness.projects[0].state, 'submitted');
   assert.equal(harness.projects[0].publishedAt, null);
 
+  harness.markSincerityPaid(created.projectId);
   const published = await harness.writeService.publishProject(
     { projectId: created.projectId },
     createContext('project-publish'),
@@ -212,6 +253,35 @@ test('project lifecycle closes create -> save -> submit -> publish with real ser
   assert.equal(published.state, 'published');
   assert.equal(harness.projects[0].state, 'published');
   assert.ok(harness.projects[0].publishedAt instanceof Date);
+});
+
+test('project publish fail-closes until 200 project authenticity sincerity is paid', async () => {
+  const harness = createHarness();
+  const created = await harness.writeService.createProject(
+    createPayload(),
+    createContext('project-create-pricing-blocked'),
+  );
+  await harness.writeService.submitProject(
+    { projectId: created.projectId },
+    createContext('project-submit-pricing-blocked'),
+  );
+
+  await assert.rejects(
+    () => harness.writeService.publishProject(
+      { projectId: created.projectId },
+      createContext('project-publish-pricing-blocked'),
+    ),
+    (error) => {
+      assert.equal(error?.response?.code, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
+      return true;
+    },
+  );
+
+  assert.equal(harness.projects[0].state, 'submitted');
+  assert.equal(harness.projects[0].publishedAt, null);
+  assert.equal(harness.auditLogs.at(-1)?.eventType, 'project_publish_blocked_by_pricing_gate');
+  assert.equal(harness.auditLogs.at(-1)?.payload.requiredOrderStatus, 'paid');
+  assert.equal(harness.auditLogs.at(-1)?.payload.pricingErrorCode, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
 });
 
 test('project lifecycle allows owner to delete draft project only and records audit', async () => {
@@ -281,6 +351,7 @@ test('project editable detail can read draft while public detail stays closed un
     { projectId: created.projectId },
     createContext('project-submit-visible'),
   );
+  harness.markSincerityPaid(created.projectId);
   await harness.writeService.publishProject(
     { projectId: created.projectId },
     createContext('project-publish-visible'),

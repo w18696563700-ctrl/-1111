@@ -23,6 +23,11 @@ import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.servi
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayPresenter } from './p0-pay.presenter';
 import { P0PayServiceFeeFactory } from './p0-pay-service-fee.factory';
+import {
+  PLATFORM_PRICING_AUDIT_ACTIONS,
+  PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS,
+  PLATFORM_PRICING_RESOURCE_TYPES
+} from './p0-pay.state';
 import { P0PayPaymentChannel } from './p0-pay.types';
 
 @Injectable()
@@ -61,7 +66,7 @@ export class P0PayServiceFeeAuthorizationService {
 
     const scopeKey = this.buildCreateScopeKey(command.taskId, command.bidId, scope.organization.id);
     const existing = await this.idempotencyRecordService.findAuthorization(
-      'serviceFeeAuthorization.create',
+      PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.bidServiceFeeAuthorizationCreate,
       scopeKey,
       idempotencyKeyHash,
       requestHash
@@ -73,7 +78,7 @@ export class P0PayServiceFeeAuthorizationService {
     const created = await this.dataSource.transaction(async (manager) => {
       const record = await this.idempotencyRecordService.findRecordInTransaction(
         manager,
-        'serviceFeeAuthorization.create',
+        PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.bidServiceFeeAuthorizationCreate,
         scopeKey,
         idempotencyKeyHash
       );
@@ -109,7 +114,7 @@ export class P0PayServiceFeeAuthorizationService {
     const requestHash = this.idempotencyService.hashRequest(command);
     const scopeKey = `authorization:${ownership.authorization.id}`;
     const existing = await this.idempotencyRecordService.findPaymentOrder(
-      'serviceFeeAuthorization.authorizeInit',
+      PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.bidServiceFeeAuthorizationFreezeInit,
       scopeKey,
       idempotencyKeyHash,
       requestHash
@@ -152,7 +157,7 @@ export class P0PayServiceFeeAuthorizationService {
     const auth = await manager.getRepository(PlatformServiceFeeAuthorizationEntity).findOneBy({
       id: ownership.authorization.id
     });
-    if (!auth || auth.status !== 'pending_authorization') {
+    if (!auth || auth.status !== 'pending_freeze') {
       throw p0PayStateConflict('Current service fee authorization cannot be initialized.');
     }
     const existingOrder = await this.resolveExistingOrderForAuthorization(auth, command.payChannel, manager);
@@ -278,11 +283,11 @@ export class P0PayServiceFeeAuthorizationService {
     context: RequestContext
   ) {
     await this.idempotencyRecordService.save(manager, {
-      operationKey: 'serviceFeeAuthorization.create',
+      operationKey: PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.bidServiceFeeAuthorizationCreate,
       scopeKey,
       idempotencyKeyHash,
       requestHash,
-      resourceType: 'platform_service_fee_authorization',
+      resourceType: PLATFORM_PRICING_RESOURCE_TYPES.bidServiceFeeAuthorization,
       resourceId: authorizationId,
       context
     });
@@ -299,11 +304,11 @@ export class P0PayServiceFeeAuthorizationService {
     orderId: string
   ) {
     await this.idempotencyRecordService.save(manager, {
-      operationKey: 'serviceFeeAuthorization.authorizeInit',
+      operationKey: PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS.bidServiceFeeAuthorizationFreezeInit,
       scopeKey: input.scopeKey,
       idempotencyKeyHash: input.idempotencyKeyHash,
       requestHash: input.requestHash,
-      resourceType: 'payment_order',
+      resourceType: PLATFORM_PRICING_RESOURCE_TYPES.paymentOrder,
       resourceId: orderId,
       context: input.context
     });
@@ -320,15 +325,15 @@ export class P0PayServiceFeeAuthorizationService {
   ) {
     await this.auditService.record(
       {
-        objectType: 'platform_service_fee_authorization',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.bidServiceFeeAuthorization,
         objectId: authorization.id,
         objectNo: project.projectNo,
-        action: 'PlatformServiceFeePreauthorizationCreated',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationCreated,
         beforeState: '',
         afterState: authorization.status,
         actorId: actorUserId,
         actorRole: scope.membership.roleKey,
-        reason: `taskId=${project.id}; bidId=${bid.id}; estimatedFeeAmount=${authorization.estimatedFeeAmount}`
+        reason: `projectId=${project.id}; bidId=${bid.id}; quotaAmount=${authorization.authorizationQuotaAmount}; organizationScope=${scope.organization.id}`
       },
       context,
       manager
@@ -344,15 +349,15 @@ export class P0PayServiceFeeAuthorizationService {
   ) {
     await this.auditService.record(
       {
-        objectType: 'platform_service_fee_authorization',
+        objectType: PLATFORM_PRICING_RESOURCE_TYPES.bidServiceFeeAuthorization,
         objectId: authorization.id,
         objectNo: ownership.project.projectNo,
-        action: 'PlatformServiceFeePreauthorizationInit',
-        beforeState: 'pending_authorization',
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationFreezeInitIssued,
+        beforeState: 'pending_freeze',
         afterState: authorization.status,
         actorId: ownership.currentSession.userId,
         actorRole: ownership.scope.membership.roleKey,
-        reason: `taskId=${ownership.project.id}; bidId=${ownership.bid.id}; paymentOrderId=${order.id}; channel=${order.paymentChannel}`
+        reason: `projectId=${ownership.project.id}; bidId=${ownership.bid.id}; paymentOrderId=${order.id}; quotaAmount=${order.amount}; organizationScope=${ownership.scope.organization.id}; channel=${order.paymentChannel}`
       },
       context,
       manager

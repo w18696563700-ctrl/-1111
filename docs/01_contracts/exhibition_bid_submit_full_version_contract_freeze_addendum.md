@@ -19,6 +19,16 @@ inputs_canonical:
 
 # 《竞标提交页满分版 contract freeze》
 
+## Pricing Gate Note
+
+自 `2026-04-29` 起，若项目已接入
+[platform_pricing_contracts_master_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/01_contracts/platform_pricing_contracts_master_v1.md)
+定义的收费主线，则本文件保留 `POST /api/app/bid/submit` 的既有 request/response shape，但新增收费准入硬门禁：
+
+1. 当前 actor 必须已有 `approved` 的 `bidParticipationRequest`
+2. 当前 actor 必须已有同一 `projectId` 下状态为 `frozen` 的 `bidServiceFeeAuthorization`
+3. 若缺任一条件，`bid/submit` 必须 fail closed，不得伪成功
+
 ## 1. Scope
 
 - 本文件只覆盖：
@@ -112,6 +122,8 @@ inputs_canonical:
   - 必须进入 controlled invalid state
 - 模板目录不可用：
   - 必须进入 controlled unavailable state
+- 缺少 `4000 元竞标服务费预授权额度` 冻结：
+  - 必须进入 controlled pricing-gate state
 - 任何情况下都不得把这些状态伪装成 success。
 
 ## 6. Formal Conclusion
