@@ -324,12 +324,15 @@ List<Map<String, Object?>> _myProjectArchivedItemsFromPayload(Object? payload) {
 }
 
 _MyProjectStageBucket _myProjectPreferredStageFromPayload(Object? payload) {
-  for (final option in _myProjectPrimaryStageOptions) {
+  for (final option in _myProjectPrimaryStageOptions.where(
+    (_MyProjectStageOption option) =>
+        option.value != _MyProjectStageBucket.draft,
+  )) {
     if (_myProjectItemsForStage(payload, option.value).isNotEmpty) {
       return option.value;
     }
   }
-  return _MyProjectStageBucket.draft;
+  return _MyProjectStageBucket.submitted;
 }
 
 bool _myProjectCanDelete(String? state) {

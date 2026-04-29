@@ -249,6 +249,12 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
+  await _scrollTo(tester, finder.first);
+  await tester.tap(finder.first);
+  await tester.pumpAndSettle();
+}
+
 Future<void> _tapChoiceChipLabel(WidgetTester tester, String label) async {
   final chipFinder = find.widgetWithText(ChoiceChip, label);
   await _scrollTo(tester, chipFinder.first);
@@ -849,12 +855,15 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    expect(find.text('草稿 · 1'), findsOneWidget);
+    expect(find.text('草稿 · 1 个'), findsOneWidget);
+    expect(find.text('已归档 · 1 个'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '草稿 · 1'), findsNothing);
     expect(find.text('预发布列表 · 1'), findsOneWidget);
     expect(find.text('竞标中 · 1'), findsOneWidget);
     expect(find.text('进行中 · 1'), findsOneWidget);
-    expect(find.textContaining('当前只显示所选阶段'), findsOneWidget);
-    await _tapChoiceChipLabel(tester, '草稿 · 1');
+    expect(find.textContaining('当前只显示预发布列表阶段'), findsOneWidget);
+    await _tapVisible(tester, find.text('草稿 · 1 个'));
+    expect(find.text('草稿列表'), findsOneWidget);
     expect(find.textContaining('当前只显示草稿阶段'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
 
@@ -870,7 +879,8 @@ void main() {
     expect(find.text('进行中项目'), findsOneWidget);
     expect(find.text('当前阶段：竞标中'), findsNothing);
 
-    await _scrollTo(tester, find.text('已归档项目'));
+    await _tapVisible(tester, find.text('已归档 · 1 个'));
+    expect(find.text('已归档列表'), findsOneWidget);
     expect(find.text('已归档项目'), findsOneWidget);
   });
 
@@ -901,7 +911,7 @@ void main() {
 
     expect(find.widgetWithText(ChoiceChip, '我的发布'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '我的竞标'), findsOneWidget);
-    expect(find.text('草稿 · 1'), findsOneWidget);
+    expect(find.text('草稿 · 1 个'), findsOneWidget);
 
     await tester.tap(find.widgetWithText(ChoiceChip, '我的竞标'));
     await tester.pumpAndSettle();
@@ -909,12 +919,12 @@ void main() {
     expect(find.text('当前竞标列表暂未接通'), findsNothing);
     expect(find.text('供应商竞标记录'), findsOneWidget);
     expect(find.text('沟通与投标'), findsOneWidget);
-    expect(find.text('草稿 · 1'), findsNothing);
+    expect(find.text('草稿 · 1 个'), findsNothing);
 
     await tester.tap(find.widgetWithText(ChoiceChip, '我的发布'));
     await tester.pumpAndSettle();
 
-    expect(find.text('草稿 · 1'), findsOneWidget);
+    expect(find.text('草稿 · 1 个'), findsOneWidget);
   });
 
   testWidgets('我的项目路由可以直接钉到我的竞标 workspace', (WidgetTester tester) async {
@@ -946,7 +956,7 @@ void main() {
 
     expect(find.text('供应商竞标记录'), findsOneWidget);
     expect(find.text('沟通与投标'), findsOneWidget);
-    expect(find.text('草稿 · 1'), findsNothing);
+    expect(find.text('草稿 · 1 个'), findsNothing);
   });
 
   testWidgets('我的项目列表卡片显示阶段、下一步和归档只读说明', (WidgetTester tester) async {
@@ -963,7 +973,8 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    await _tapChoiceChipLabel(tester, '草稿 · 1');
+    await _tapVisible(tester, find.text('草稿 · 1 个'));
+    expect(find.text('草稿列表'), findsOneWidget);
     expect(find.text('当前阶段：草稿'), findsOneWidget);
     expect(find.text('当前下一步：继续编辑 / 删除此项目'), findsOneWidget);
 
@@ -983,7 +994,8 @@ void main() {
     expect(find.text('当前阶段：进行中'), findsOneWidget);
     expect(find.text('当前下一步：查看详情 / 发起取消 / 记录违约'), findsOneWidget);
 
-    await _scrollTo(tester, find.text('已归档项目'));
+    await _tapVisible(tester, find.text('已归档 · 1 个'));
+    expect(find.text('已归档列表'), findsOneWidget);
     expect(find.text('当前阶段：已归档'), findsOneWidget);
     expect(find.text('当前下一步：查看详情 / 当前只读'), findsOneWidget);
   });
@@ -1401,7 +1413,7 @@ void main() {
 
     expect(deleteCalls, 1);
     expect(find.text('我的项目'), findsWidgets);
-    await _tapChoiceChipLabel(tester, '草稿 · 0');
+    await _tapVisible(tester, find.text('草稿 · 0 个'));
     expect(find.text('当前没有草稿项目'), findsOneWidget);
   });
 }
