@@ -176,7 +176,7 @@ test('approved bid participation thread points to 4000 authorization gate before
   assert.deepEqual(result.pricingGateRouteTarget, {
     actionKey: 'bid_service_fee_authorization.open',
     objectType: 'bid_service_fee_authorization',
-    canonicalPath: '/api/app/project/project-1/bid-service-fee-authorizations',
+    canonicalPath: '/api/app/project/{projectId}/bid-service-fee-authorizations',
     label: '冻结竞标服务费预授权额度',
     params: {
       projectId: 'project-1',

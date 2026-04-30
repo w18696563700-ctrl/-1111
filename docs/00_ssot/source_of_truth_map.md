@@ -15,6 +15,11 @@ layer: L0 SSOT
 
 ## Current Round Registrations
 
+### 2026-04-30 Counterpart Conversation RouteTarget CanonicalPath Repair
+
+- [counterpart_conversation_route_target_canonicalpath_repair_truth_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/counterpart_conversation_route_target_canonicalpath_repair_truth_addendum.md) is the formal `L0` repair truth for the project communication `detailRouteTarget canonicalPath mismatch`, freezing that `bid_service_fee_authorization.open` must use the template canonical path `/api/app/project/{projectId}/bid-service-fee-authorizations` and place the actual `projectId` only in `params`.
+- [counterpart_conversation_route_target_canonicalpath_day2_runtime_receipt_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/counterpart_conversation_route_target_canonicalpath_day2_runtime_receipt_addendum.md) is the formal `L0` Day1-Day2 execution and runtime receipt, recording BFF targeted tests, Aliyun BFF current alignment, 8080 health and auth smoke, dual-account API UAT, Computer Use observations, evidence screenshots, cleanup, and retained release risks.
+
 ### 2026-04-29 App Visual System V1
 
 - [app_visual_system_v1_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/app_visual_system_v1_freeze_addendum.md) is the formal `L0` ruling for App Visual System V1, freezing the first-release visible buildings, hidden-building exclusion, Flutter-only visual-token/component/page-template scope, first migration batch, and the veto on BFF / Server / OpenAPI / database / state-machine / route changes.

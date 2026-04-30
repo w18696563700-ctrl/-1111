@@ -735,7 +735,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.deepEqual(bidParticipationCard.detailRouteTarget, {
     objectType: "bid_service_fee_authorization",
     actionKey: "bid_service_fee_authorization.open",
-    canonicalPath: "/api/app/project/project-1/bid-service-fee-authorizations",
+    canonicalPath: "/api/app/project/{projectId}/bid-service-fee-authorizations",
     params: {
       projectId: "project-1",
       bidParticipationRequestId: "request-2",

@@ -357,7 +357,7 @@ function normalizePricingGateRouteTarget(input: {
   return {
     objectType: "bid_service_fee_authorization",
     actionKey: "bid_service_fee_authorization.open",
-    canonicalPath: `/api/app/project/${input.truthAnchor.projectId}/bid-service-fee-authorizations`,
+    canonicalPath: "/api/app/project/{projectId}/bid-service-fee-authorizations",
     params: {
       projectId: input.truthAnchor.projectId,
       bidParticipationRequestId: requestId,

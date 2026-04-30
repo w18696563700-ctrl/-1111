@@ -278,7 +278,7 @@ function buildBidServiceFeeAuthorizationRouteTarget(projectId: string, requestId
   return {
     actionKey: "bid_service_fee_authorization.open" as const,
     objectType: "bid_service_fee_authorization" as const,
-    canonicalPath: `/api/app/project/${projectId}/bid-service-fee-authorizations`,
+    canonicalPath: "/api/app/project/{projectId}/bid-service-fee-authorizations",
     label: "冻结竞标服务费预授权额度",
     params: {
       projectId,
