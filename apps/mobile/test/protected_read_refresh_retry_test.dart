@@ -3,8 +3,10 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/auth_consumer_layer.dart';
+import 'package:mobile/core/auth/protected_app_request.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
+import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 
 void main() {
@@ -192,6 +194,219 @@ void main() {
       expect(result.state, AppPageState.content);
       expect(result.data?.userId, 'user-1');
       expect(refreshRequests, 1);
+      expect(shellRequests, 2);
+    },
+  );
+
+  test('message interactions refresh before loading list', () async {
+    _installSession(expired: true);
+    var refreshRequests = 0;
+    var interactionRequests = 0;
+    _installAuthConsumer(
+      FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                return _refreshSuccess(
+                  request,
+                  accessToken: 'message-interactions-token',
+                );
+              },
+            },
+      ),
+    );
+
+    final consumer = MessagesConsumerLayer(
+      client: AppApiClient(
+        config: _config(),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/message/interactions':
+                    (AppApiRequest request) async {
+                      interactionRequests += 1;
+                      expect(
+                        request.headers['authorization'],
+                        'Bearer message-interactions-token',
+                      );
+                      expect(
+                        request.uri.queryParameters['lane'],
+                        'project_communication',
+                      );
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'lane': 'project_communication',
+                          'items': <Object?>[],
+                        },
+                      );
+                    },
+              },
+        ),
+      ),
+    );
+
+    final result = await consumer.loadInteractions();
+
+    expect(result.state, AppPageState.empty);
+    expect(refreshRequests, 1);
+    expect(interactionRequests, 1);
+  });
+
+  test('parallel protected reads share one refresh request', () async {
+    _installSession(expired: true);
+    var refreshRequests = 0;
+    var shellRequests = 0;
+    _installAuthConsumer(
+      FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                refreshRequests += 1;
+                await Future<void>.delayed(Duration.zero);
+                return _refreshSuccess(
+                  request,
+                  accessToken: 'shared-refreshed-token',
+                );
+              },
+            },
+      ),
+    );
+
+    final client = AppApiClient(
+      config: _config(),
+      transport: FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/shell/context': (AppApiRequest request) async {
+                shellRequests += 1;
+                expect(
+                  request.headers['authorization'],
+                  'Bearer shared-refreshed-token',
+                );
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _shellContextPayload(),
+                );
+              },
+            },
+      ),
+    );
+
+    final results = await Future.wait(<Future<AppApiResponse>>[
+      runProtectedAppRequest(
+        () => client.getEndpoint(AppShellContextCanonicalPaths.shellContext),
+      ),
+      runProtectedAppRequest(
+        () => client.getEndpoint(AppShellContextCanonicalPaths.shellContext),
+      ),
+    ]);
+
+    expect(results.map((AppApiResponse response) => response.statusCode), [
+      200,
+      200,
+    ]);
+    expect(refreshRequests, 1);
+    expect(shellRequests, 2);
+  });
+
+  test(
+    'stale unauthorized refresh does not clear newer local session',
+    () async {
+      _installSession(expired: true);
+      var refreshRequests = 0;
+      _installAuthConsumer(
+        FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                  refreshRequests += 1;
+                  AppSessionStore.instance.establishSession(
+                    accessToken: 'newer-access-token',
+                    refreshToken: 'newer-refresh-token',
+                    expiresInSeconds: 3600,
+                    deviceId: 'device-1',
+                  );
+                  return _unauthorized(request, path: '/api/app/auth/refresh');
+                },
+              },
+        ),
+      );
+
+      final result = await AuthConsumerLayer.instance.refreshSession();
+
+      expect(result.state, AppPageState.unauthorized);
+      expect(refreshRequests, 1);
+      expect(AppSessionStore.instance.refreshToken, 'newer-refresh-token');
+      expect(AppSessionStore.instance.authorizationHeaders, <String, String>{
+        'authorization': 'Bearer newer-access-token',
+      });
+    },
+  );
+
+  test(
+    'protected read retries current token before starting refresh',
+    () async {
+      _installSession(expired: false);
+      var refreshRequests = 0;
+      var shellRequests = 0;
+      _installAuthConsumer(
+        FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/auth/refresh': (AppApiRequest request) async {
+                  refreshRequests += 1;
+                  return _refreshSuccess(
+                    request,
+                    accessToken: 'unexpected-refresh-token',
+                  );
+                },
+              },
+        ),
+      );
+
+      final client = AppApiClient(
+        config: _config(),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/shell/context': (AppApiRequest request) async {
+                  shellRequests += 1;
+                  if (shellRequests == 1) {
+                    AppSessionStore.instance.establishSession(
+                      accessToken: 'already-refreshed-token',
+                      refreshToken: 'refresh-token-2',
+                      expiresInSeconds: 3600,
+                      deviceId: 'device-1',
+                    );
+                    return _unauthorized(
+                      request,
+                      path: AppShellContextCanonicalPaths.shellContext,
+                    );
+                  }
+                  expect(
+                    request.headers['authorization'],
+                    'Bearer already-refreshed-token',
+                  );
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _shellContextPayload(),
+                  );
+                },
+              },
+        ),
+      );
+
+      final response = await runProtectedAppRequest(
+        () => client.getEndpoint(AppShellContextCanonicalPaths.shellContext),
+      );
+
+      expect(response.statusCode, 200);
+      expect(refreshRequests, 0);
       expect(shellRequests, 2);
     },
   );

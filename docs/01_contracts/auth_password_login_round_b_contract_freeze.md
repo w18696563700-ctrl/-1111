@@ -18,6 +18,7 @@
 - 用户名 / 邮箱登录 contract
 - 多 provider identity contract
 - 完整账号中心 contract
+- Admin password login contract；Admin 继续只消费 Server Auth 签发的 `server_session_carrier_only` 管理员会话载体
 - backend / BFF / frontend 实现
 
 ## 2. 当前真相约束

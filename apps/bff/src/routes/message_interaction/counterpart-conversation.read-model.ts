@@ -26,7 +26,11 @@ export type CounterpartConversationDetailReadModel = {
     titleVisibility: "masked" | "visible";
     projectRelation: "my_published" | "my_bid" | "unknown";
     projectState: string | null;
+    projectPublishedAt: string | null;
+    projectUpdatedAt: string | null;
     latestActivityAt: string;
+    projectUnreadCount: number;
+    hasProjectUnread: boolean;
     pricingSummary?: Record<string, unknown>;
     orderSummary: {
       orderId: string;
@@ -51,6 +55,8 @@ export type CounterpartConversationDetailReadModel = {
       summary: string;
       status: string | null;
       updatedAt: string;
+      requesterCompanyName: string | null;
+      requesterOrganizationId: string | null;
       truthAnchor: {
         truthType: string;
         projectId: string;
@@ -171,7 +177,17 @@ function readProjectGroup(value: unknown) {
     titleVisibility: titleVisibility as "masked" | "visible",
     projectRelation: readProjectRelation(record.projectRelation),
     projectState: readNullableString(record.projectState),
+    projectPublishedAt: readNullableString(record.projectPublishedAt),
+    projectUpdatedAt: readNullableString(record.projectUpdatedAt),
     latestActivityAt,
+    projectUnreadCount: readRequiredNumber(
+      record.projectUnreadCount,
+      "projectGroup.projectUnreadCount",
+    ),
+    hasProjectUnread: readRequiredBoolean(
+      record.hasProjectUnread,
+      "projectGroup.hasProjectUnread",
+    ),
     ...(pricingSummary ? { pricingSummary } : {}),
     orderSummary,
     ratingEntry: readRatingEntry(record.ratingEntry),
@@ -230,6 +246,8 @@ function withOrderBusinessCard(
       summary: "当前项目已生成订单，点击查看订单详情与完工动作。",
       status,
       updatedAt,
+      requesterCompanyName: null,
+      requesterOrganizationId: null,
       truthAnchor: {
         truthType: "project_order",
         projectId,
@@ -306,6 +324,8 @@ function readCard(value: unknown) {
     summary: readRequiredString(record.summary, "card.summary"),
     status: readNullableString(record.status),
     updatedAt: readRequiredString(record.updatedAt, "card.updatedAt"),
+    requesterCompanyName: readNullableString(record.requesterCompanyName),
+    requesterOrganizationId: readNullableString(record.requesterOrganizationId),
     truthAnchor,
     detailRouteTarget,
     decisionAvailability: readDecisionAvailability(record.decisionAvailability),

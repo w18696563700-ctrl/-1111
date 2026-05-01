@@ -22,6 +22,7 @@ tags:
   - name: Forum
   - name: Profile
   - name: Message
+  - name: Notification
   - name: Upload
   - name: Project
   - name: Bid
@@ -156,6 +157,77 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SessionEstablishResponse'
+  /api/app/auth/password/login:
+    post:
+      tags: [Auth]
+      summary: Password login canonical path for Flutter App
+      operationId: postAppAuthPasswordLogin
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordLoginRequest'
+      responses:
+        "200":
+          description: >
+            Minimum password-login session establish response for Flutter App.
+            This is an app-facing bounded auth path and must not be reused by
+            Admin password login.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SessionEstablishResponse'
+        "400":
+          description: >
+            Controlled invalid request response, including consent-required
+            requests.
+        "401":
+          description: Controlled invalid mobile/password response.
+  /api/app/auth/password/set:
+    post:
+      tags: [Auth]
+      summary: Password set canonical path for authenticated Flutter App actor
+      operationId: postAppAuthPasswordSet
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordSetRequest'
+      responses:
+        "200":
+          description: Minimum password-set acknowledgment for Flutter App.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionAckResponse'
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled password-set forbidden response.
+  /api/app/auth/password/reset:
+    post:
+      tags: [Auth]
+      summary: Password reset canonical path for Flutter App
+      operationId: postAppAuthPasswordReset
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PasswordResetRequest'
+      responses:
+        "200":
+          description: Minimum password-reset acknowledgment for Flutter App.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ActionAckResponse'
+        "400":
+          description: Controlled invalid reset request response.
+        "401":
+          description: Controlled invalid or expired OTP response.
   /api/app/auth/refresh:
     post:
       tags: [Auth]
@@ -246,6 +318,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AppShellContextResponse'
+  /api/app/profile/organization/current/leave:
+    post:
+      tags: [Profile]
+      summary: Leave current organization canonical path for Flutter App
+      operationId: postAppProfileOrganizationCurrentLeave
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/OrganizationLeaveRequest'
+      responses:
+        "200":
+          description: Current membership was removed and the shell bootstrap state was recalculated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrganizationLeaveResponse'
   /api/app/profile/organization/mine:
     get:
       tags: [Profile]
@@ -468,6 +558,116 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MembershipUpgradeGuideResponse'
+  /api/app/profile/membership/purchase-offers:
+    get:
+      tags: [Profile]
+      summary: Paid membership purchase-offers canonical path for Flutter App
+      operationId: getAppProfileMembershipPurchaseOffers
+      responses:
+        "200":
+          description: >
+            Minimum paid-membership purchase-offer projection for Flutter App.
+            This path returns Server-owned SKU and disclosure truth only; it must
+            not be treated as payment success, entitlement activation, renewal,
+            refund, invoice, KA, or flagship launch approval.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPurchaseOffersResponse'
+        "404":
+          description: >
+            Controlled unavailable response. Server or BFF must return
+            `MEMBERSHIP_PURCHASE_OFFERS_UNAVAILABLE` when membership purchase is
+            still closed or the current scope cannot see purchase offers.
+  /api/app/profile/membership/orders:
+    post:
+      tags: [Profile]
+      summary: Paid membership order-create canonical path for Flutter App
+      operationId: postAppProfileMembershipOrderCreate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipOrderCreateRequest'
+      responses:
+        "200":
+          description: >
+            Minimum membership order-create response. `orderStatus=active` is
+            not allowed from this create response; entitlement activation must
+            be confirmed by order-result readback after Server payment callback
+            and entitlement writeback.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipOrderCreateResponse'
+        "400":
+          description: >
+            Controlled order-create rejected response. Server must return
+            `MEMBERSHIP_ORDER_CREATE_REJECTED` when the request, SKU, price echo,
+            organization scope, or idempotency boundary is invalid.
+  /api/app/profile/membership/orders/{membershipOrderId}/pay-init:
+    post:
+      tags: [Profile]
+      summary: Paid membership pay-init canonical path for Flutter App
+      operationId: postAppProfileMembershipOrderPayInit
+      parameters:
+        - in: path
+          name: membershipOrderId
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MembershipPayInitRequest'
+      responses:
+        "200":
+          description: >
+            Membership pay-init handoff. Channel payload remains transport
+            material only and must not be interpreted by Flutter as payment or
+            entitlement truth.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipPayInitResponse'
+        "400":
+          description: >
+            Controlled pay-init rejected response. Server must return
+            `MEMBERSHIP_PAY_INIT_REJECTED` when the order cannot enter channel
+            initialization.
+        "404":
+          description: >
+            Controlled order not-found response. Server must return
+            `MEMBERSHIP_ORDER_NOT_FOUND` when the target order is absent or not
+            visible to the current organization scope.
+  /api/app/profile/membership/orders/{membershipOrderId}:
+    get:
+      tags: [Profile]
+      summary: Paid membership order-result canonical path for Flutter App
+      operationId: getAppProfileMembershipOrderResult
+      parameters:
+        - in: path
+          name: membershipOrderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Minimum membership order-result readback. This is the app-facing
+            source for order, payment, and entitlement status separation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MembershipOrderResultResponse'
+        "404":
+          description: >
+            Controlled order-result unavailable response. Server or BFF must
+            return `MEMBERSHIP_ORDER_RESULT_UNAVAILABLE` or
+            `MEMBERSHIP_ORDER_NOT_FOUND` when the result cannot be read.
   /api/app/profile/governance/status:
     get:
       tags: [Profile]
@@ -489,36 +689,6 @@ paths:
             hidden or not materialized for the current actor scope, the server or
             BFF must return `GOVERNANCE_STATUS_UNAVAILABLE`.
   /api/app/profile/governance/appeals:
-    post:
-      tags: [Profile]
-      summary: Profile governance appeal-submit canonical path for Flutter App
-      operationId: postAppProfileGovernanceAppealSubmit
-      requestBody:
-        required: true
-        content:
-          application/json:
-            schema:
-              $ref: '#/components/schemas/GovernanceAppealSubmitRequest'
-      responses:
-        "200":
-          description: >
-            Minimum governance appeal-submit acknowledgment only. This path does
-            not reopen appeal list, appeal detail, or user-side adjudication
-            surfaces.
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/GovernanceAppealSubmitResponse'
-        "400":
-          description: >
-            Controlled invalid appeal-submit response. If the request body is
-            malformed or missing the minimum required fields, the server must
-            return `GOVERNANCE_APPEAL_SUBMIT_INVALID`.
-        "404":
-          description: >
-            Controlled unavailable response. If the targeted penalty truth is not
-            available to the current actor scope, the server must return
-            `GOVERNANCE_PENALTY_RESOURCE_UNAVAILABLE`.
     get:
       tags: [Profile]
       summary: Profile my-appeal-history list canonical path for Flutter App
@@ -583,27 +753,36 @@ paths:
             Controlled unavailable response. If the appeal case is unavailable
             or hidden for the current actor scope, the server must return
             `GOVERNANCE_APPEAL_RESOURCE_UNAVAILABLE`.
-  /api/app/message/index:
+  /api/app/message/interactions:
     get:
       tags: [Message]
-      summary: Instance todo index canonical path for Flutter App messages building
-      operationId: getAppMessageIndex
+      summary: Message interactions canonical path for Flutter App messages building
+      operationId: getAppMessageInteractions
+      parameters:
+        - in: query
+          name: lane
+          required: false
+          schema:
+            type: string
+            enum:
+              - project_communication
       responses:
         "200":
           description: >
-            The current app-facing canonical path for `instance_todo` list/items
-            consumption in the `messages` building. This path carries only the
-            frozen `instance_todo` item skeleton and the frozen unified
-            registered-entry `routeTarget` projection. This path is a controlled
-            projection carrier only; it is not a full
-            `RegisteredInstanceEntryItem` exposure surface, not a
-            general-purpose message center, not a station inbox, not a
-            workbench, not a governance console, and not a new path expansion
-            surface.
+            Current bounded message interaction list for project communication.
+            This path is the only active messages-building P0 app-facing list
+            mainline and must not become a generic DM, group chat, payment,
+            order, fulfillment, settlement, or Admin governance truth owner.
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/InstanceTodoIndexResponse'
+                $ref: '#/components/schemas/MessageInteractionListResponse'
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden message interaction response.
+        "404":
+          description: Controlled unavailable response for hidden or unavailable interaction surface.
   /api/app/exhibition/home:
     get:
       tags: [Exhibition]
@@ -2156,6 +2335,125 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForumInteractionInboxResponse'
+  /api/app/notifications/device-token/register:
+    post:
+      tags: [Notification]
+      summary: Register a device push token for the bounded notification package
+      operationId: registerAppNotificationDeviceToken
+      requestBody:
+        required: true
+        description: >
+          Minimum device-token register request. This route registers delivery
+          channel material only; push token existence is not business truth.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevicePushTokenRegisterRequest'
+      responses:
+        "200":
+          description: Device push token registered or refreshed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DevicePushTokenRegisterResponse'
+        "400":
+          description: Controlled `PUSH_TOKEN_INVALID` response.
+        "503":
+          description: Controlled `PUSH_TOKEN_UNAVAILABLE` response.
+  /api/app/notifications/list:
+    get:
+      tags: [Notification]
+      summary: Bounded messages-building notification center list
+      operationId: listAppNotifications
+      parameters:
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: pageSize
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: >
+            Minimal notification-center list. It may aggregate only project
+            communication notifications, forum interaction reminders, and
+            system reminders.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppNotificationListResponse'
+        "403":
+          description: Controlled `NOTIFICATION_FORBIDDEN` response.
+        "503":
+          description: Controlled `NOTIFICATION_UNAVAILABLE` response.
+  /api/app/notifications/read:
+    post:
+      tags: [Notification]
+      summary: Mark bounded notification-center items as read
+      operationId: readAppNotifications
+      requestBody:
+        required: true
+        description: >
+          Mark-read request for notification-center items only. This route does
+          not replace project communication read-cursor.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppNotificationReadRequest'
+      responses:
+        "200":
+          description: Notification items marked read.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppNotificationReadResponse'
+        "400":
+          description: Controlled `NOTIFICATION_READ_INVALID` response.
+        "403":
+          description: Controlled `NOTIFICATION_FORBIDDEN` response.
+        "503":
+          description: Controlled `NOTIFICATION_UNAVAILABLE` response.
+  /api/app/confirmation/softlink/detail:
+    get:
+      tags: [Message]
+      summary: Resolve a project communication confirmation-card softLink
+      operationId: getAppConfirmationSoftLinkDetail
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: threadId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: messageId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Confirmation-card softLink read projection. This route may return a
+            routeTarget only and must not mutate confirmation or business state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConfirmationSoftLinkReadModel'
+        "400":
+          description: Controlled `CONFIRMATION_SOFTLINK_INVALID` response.
+        "403":
+          description: Controlled `NOTIFICATION_FORBIDDEN` or project communication forbidden response.
   /api/app/project/list:
     get:
       tags: [Project]
@@ -3982,6 +4280,42 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/FileAccessResponse'
+  /api/app/file/preview/access:
+    get:
+      tags: [Upload]
+      summary: Controlled project communication file preview access
+      operationId: getAppFilePreviewAccess
+      parameters:
+        - in: query
+          name: fileAssetId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: threadId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Time-bounded preview access for a project communication attachment.
+            The response must not expose objectKey.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilePreviewAccessReadModel'
+        "403":
+          description: Controlled `FILE_PREVIEW_FORBIDDEN` response.
+        "404":
+          description: Controlled `FILE_PREVIEW_UNAVAILABLE` response.
+        "503":
+          description: Controlled `FILE_PREVIEW_UNAVAILABLE` response.
   /server/projects:
     get:
       tags: [Project]
@@ -4943,6 +5277,100 @@ paths:
             Controlled invalid-state response. If the current appeal case may not
             be decided in the current state, the server must return
             `GOVERNANCE_INVALID_STATE`.
+  /server/admin/membership/orders:
+    get:
+      tags: [Admin]
+      summary: Admin paid-membership order list canonical path
+      operationId: getAdminMembershipOrders
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: pageSize
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+        - in: query
+          name: organizationId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: orderStatus
+          required: false
+          schema:
+            $ref: '#/components/schemas/MembershipOrderStatus'
+      responses:
+        "200":
+          description: >
+            Minimum read-only paid-membership order list for Server Admin. This
+            path must not open manual activation, manual refund, payment-state
+            mutation, or entitlement mutation.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMembershipOrderListResponse'
+        "404":
+          description: >
+            Controlled unavailable response. Server must return
+            `MEMBERSHIP_ADMIN_QUERY_UNAVAILABLE` when the admin membership order
+            projection is not available.
+  /server/admin/membership/orders/{membershipOrderId}:
+    get:
+      tags: [Admin]
+      summary: Admin paid-membership order detail canonical path
+      operationId: getAdminMembershipOrderDetail
+      parameters:
+        - in: path
+          name: membershipOrderId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Minimum read-only paid-membership order detail for Server Admin.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMembershipOrderDetailResponse'
+        "404":
+          description: >
+            Controlled not-found response. Server must return
+            `MEMBERSHIP_ADMIN_ORDER_NOT_FOUND` when the target membership order
+            does not exist or is not visible to the current admin scope.
+  /server/admin/membership/organizations/{organizationId}/status:
+    get:
+      tags: [Admin]
+      summary: Admin paid-membership organization-status canonical path
+      operationId: getAdminMembershipOrganizationStatus
+      parameters:
+        - in: path
+          name: organizationId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Minimum read-only paid-membership status for one organization. This
+            path must not mutate paid-membership tier, expiry, quota, or payment
+            state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminMembershipOrganizationStatusResponse'
+        "404":
+          description: >
+            Controlled unavailable response. Server must return
+            `MEMBERSHIP_ADMIN_QUERY_UNAVAILABLE` when the target organization
+            paid-membership status projection is unavailable.
   /server/admin/governance/whitelist-memberships:
     post:
       tags: [Admin]
@@ -5748,6 +6176,7 @@ components:
       required:
         - organizationId
         - paidMembershipTier
+        - serviceFeeDiscountSummary
         - entitlementsSummary
         - quotaSummary
       properties:
@@ -5759,10 +6188,22 @@ components:
           type:
             - string
             - 'null'
+        serviceFeeDiscountSummary:
+          type:
+            - string
+            - 'null'
+          description: >
+            Current formal paid-membership service-fee discount display. This
+            describes standard/professional discounts against platform-pricing
+            baseFeeAmount, not a fixed transaction percentage.
         rateBand:
           type:
             - string
             - 'null'
+          description: >
+            Legacy nullable compatibility field only. Must not carry deprecated
+            fixed fee-rate values such as 3.0%, 2.5%, 2.0%, or 1.5% as current
+            formal truth.
         entitlementsSummary:
           type: array
           items:
@@ -5887,14 +6328,407 @@ components:
           type: string
         title:
           type: string
+        serviceFeeDiscountSummary:
+          type:
+            - string
+            - 'null'
+          description: >
+            Non-transactional service-fee discount guidance for this tier,
+            expressed against platform-pricing baseFeeAmount.
         candidateDisplayPrice:
           type:
             - string
             - 'null'
+          description: >
+            Nullable legacy compatibility field only. This is not a purchase
+            offer.
         candidateDisplayRateBand:
           type:
             - string
             - 'null'
+          description: >
+            Nullable legacy compatibility field only. Must not carry deprecated
+            fixed fee-rate values as current formal truth.
+    MembershipTierCode:
+      type: string
+      enum:
+        - none
+        - free_certified
+        - standard
+        - professional
+        - ka
+        - flagship
+        - unknown
+      description: >
+        Paid-membership tier carrier. `ka` and `flagship` are reserved only and
+        must not be treated as currently enabled purchase or discount tiers.
+    MembershipOrderStatus:
+      type: string
+      enum:
+        - created
+        - pending_pay
+        - paying
+        - paid
+        - granting
+        - active
+        - closed
+        - failed
+      description: >
+        Minimum membership direct-purchase order state. `paid` only means
+        payment success; `active` is required before entitlement is considered
+        written and effective.
+    MembershipPaymentStatus:
+      type: string
+      enum:
+        - not_started
+        - pending
+        - succeeded
+        - failed
+        - closed
+        - unknown
+    MembershipEntitlementStatus:
+      type: string
+      enum:
+        - not_granted
+        - granting
+        - active
+        - grant_failed
+        - expired
+    MembershipPayChannel:
+      type: string
+      enum:
+        - alipay_candidate
+        - wechat_candidate
+      description: >
+        Membership direct-purchase channel candidate. `alipay_candidate` is the
+        first-round priority channel after the SKU/channel precondition freeze;
+        `wechat_candidate` is retained for gray/compatibility only. The enum
+        still does not prove production merchant eligibility or runtime payment
+        availability.
+    MembershipPurchaseContext:
+      type: object
+      required:
+        - organizationId
+        - paidMembershipTier
+        - purchaseEligible
+      properties:
+        organizationId:
+          type:
+            - string
+            - 'null'
+        paidMembershipTier:
+          oneOf:
+            - $ref: '#/components/schemas/MembershipTierCode'
+            - type: 'null'
+        purchaseEligible:
+          type: boolean
+        ineligibleReasonCode:
+          type:
+            - string
+            - 'null'
+    MembershipPurchaseOfferItem:
+      type: object
+      required:
+        - skuCode
+        - skuName
+        - membershipTier
+        - durationMonths
+        - priceAmount
+        - currency
+        - entitlementSummary
+        - serviceFeeDiscountSummary
+        - status
+      properties:
+        skuCode:
+          type: string
+          enum:
+            - membership_standard_year_v1
+            - membership_professional_year_v1
+          description: >
+            Current first-round formal paid-membership SKU code. Standard yearly
+            membership is `membership_standard_year_v1`; professional yearly
+            membership is `membership_professional_year_v1`. Other SKU codes are
+            reserved or unavailable.
+        skuName:
+          type: string
+        membershipTier:
+          $ref: '#/components/schemas/MembershipTierCode'
+        durationMonths:
+          type: integer
+          minimum: 1
+        priceAmount:
+          type: number
+          minimum: 0
+          description: >
+            Server-owned formal annual price. Current first-round prices are
+            2599 CNY for `membership_standard_year_v1` and 4599 CNY for
+            `membership_professional_year_v1`; legacy planning prices 2999/6999
+            are superseded and must not be used as current truth.
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        entitlementSummary:
+          type: array
+          items:
+            type: string
+        serviceFeeDiscountSummary:
+          type:
+            - string
+            - 'null'
+          description: >
+            Current formal discount summary against platform-pricing
+            baseFeeAmount, not a fixed transaction fee percentage.
+        isRenewable:
+          type: boolean
+        isUpgradable:
+          type: boolean
+        status:
+          type: string
+          enum:
+            - available
+            - unavailable
+            - reserved
+    MembershipPurchaseOffersResponse:
+      type: object
+      required:
+        - offers
+        - currentOrganizationMembershipContext
+        - channelCandidates
+        - commercialDisclosure
+        - updatedAt
+      properties:
+        offers:
+          type: array
+          items:
+            $ref: '#/components/schemas/MembershipPurchaseOfferItem'
+        currentOrganizationMembershipContext:
+          $ref: '#/components/schemas/MembershipPurchaseContext'
+        channelCandidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/MembershipPayChannel'
+          uniqueItems: true
+          description: >
+            Ordered by current channel priority. `alipay_candidate` should be
+            returned before `wechat_candidate` for first-round purchase flows
+            unless a later runtime gate explicitly changes the order.
+        commercialDisclosure:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+    MembershipOrderCreateRequest:
+      type: object
+      required:
+        - skuCode
+        - purchaseIntentType
+        - expectedAmount
+        - expectedCurrency
+        - idempotencyKey
+      properties:
+        skuCode:
+          type: string
+        purchaseIntentType:
+          type: string
+          enum:
+            - new_purchase
+        expectedAmount:
+          type: number
+          minimum: 0
+          description: >
+            Client echo of the Server-owned SKU price. Server must reject order
+            creation when this value does not match the current SKU truth.
+        expectedCurrency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        idempotencyKey:
+          type: string
+    MembershipSkuSnapshot:
+      type: object
+      required:
+        - skuCode
+        - skuName
+        - membershipTier
+        - durationMonths
+        - serviceFeeDiscountSummary
+      properties:
+        skuCode:
+          type: string
+          enum:
+            - membership_standard_year_v1
+            - membership_professional_year_v1
+          description: >
+            Current first-round formal paid-membership SKU code captured in the
+            order entitlement snapshot.
+        skuName:
+          type: string
+        membershipTier:
+          $ref: '#/components/schemas/MembershipTierCode'
+        durationMonths:
+          type: integer
+          minimum: 1
+        serviceFeeDiscountSummary:
+          type:
+            - string
+            - 'null'
+    MembershipAmountSummary:
+      type: object
+      required:
+        - payableAmount
+        - currency
+      properties:
+        payableAmount:
+          type: number
+          minimum: 0
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+    MembershipChannelSummary:
+      type: object
+      required:
+        - payChannel
+        - paymentReferenceId
+        - callbackAwaiting
+      properties:
+        payChannel:
+          oneOf:
+            - $ref: '#/components/schemas/MembershipPayChannel'
+            - type: 'null'
+        paymentReferenceId:
+          type:
+            - string
+            - 'null'
+        callbackAwaiting:
+          type: boolean
+    MembershipOrderCreateResponse:
+      type: object
+      required:
+        - membershipOrderId
+        - orderStatus
+        - payableAmount
+        - currency
+        - entitlementPreview
+        - channelCandidates
+        - expiresAt
+        - updatedAt
+      properties:
+        membershipOrderId:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/MembershipOrderStatus'
+        payableAmount:
+          type: number
+          minimum: 0
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        entitlementPreview:
+          $ref: '#/components/schemas/MembershipSkuSnapshot'
+        channelCandidates:
+          type: array
+          items:
+            $ref: '#/components/schemas/MembershipPayChannel'
+          uniqueItems: true
+        expiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MembershipPayInitRequest:
+      type: object
+      required:
+        - payChannel
+        - clientPlatform
+        - idempotencyKey
+      properties:
+        payChannel:
+          $ref: '#/components/schemas/MembershipPayChannel'
+          description: >
+            `alipay_candidate` is the first-round priority channel.
+            `wechat_candidate` is retained/gray and may be rejected until a
+            later runtime gate opens it.
+        clientPlatform:
+          type: string
+        idempotencyKey:
+          type: string
+    MembershipPayInitResponse:
+      type: object
+      required:
+        - paymentInitStatus
+        - membershipOrderId
+        - paymentReferenceId
+        - channelActionType
+        - channelPayload
+        - callbackAwaiting
+        - expiresAt
+        - updatedAt
+      properties:
+        paymentInitStatus:
+          type: string
+        membershipOrderId:
+          type: string
+        paymentReferenceId:
+          type: string
+        channelActionType:
+          type: string
+        channelPayload:
+          type: object
+          additionalProperties: true
+        callbackAwaiting:
+          type: boolean
+        expiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MembershipOrderResultResponse:
+      type: object
+      required:
+        - membershipOrderId
+        - organizationId
+        - orderStatus
+        - paymentStatus
+        - entitlementStatus
+        - skuSnapshot
+        - amountSummary
+        - channelSummary
+        - updatedAt
+      properties:
+        membershipOrderId:
+          type: string
+        organizationId:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/MembershipOrderStatus'
+        paymentStatus:
+          $ref: '#/components/schemas/MembershipPaymentStatus'
+        entitlementStatus:
+          $ref: '#/components/schemas/MembershipEntitlementStatus'
+        skuSnapshot:
+          $ref: '#/components/schemas/MembershipSkuSnapshot'
+        amountSummary:
+          $ref: '#/components/schemas/MembershipAmountSummary'
+        channelSummary:
+          $ref: '#/components/schemas/MembershipChannelSummary'
+        effectiveAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        expiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        failureReasonCode:
+          type:
+            - string
+            - 'null'
+        updatedAt:
+          type: string
+          format: date-time
     ProfileSettingsEntry:
       type: object
       required:
@@ -6008,6 +6842,56 @@ components:
           type:
             - string
             - 'null'
+    PasswordLoginRequest:
+      type: object
+      required:
+        - mobile
+        - password
+        - consentAccepted
+      properties:
+        mobile:
+          type: string
+        password:
+          type: string
+          minLength: 1
+        consentAccepted:
+          type: boolean
+          enum:
+            - true
+        deviceId:
+          type:
+            - string
+            - 'null'
+        deviceName:
+          type:
+            - string
+            - 'null'
+        osType:
+          type:
+            - string
+            - 'null'
+    PasswordSetRequest:
+      type: object
+      required:
+        - newPassword
+      properties:
+        newPassword:
+          type: string
+          minLength: 1
+    PasswordResetRequest:
+      type: object
+      required:
+        - mobile
+        - otpCode
+        - newPassword
+      properties:
+        mobile:
+          type: string
+        otpCode:
+          type: string
+        newPassword:
+          type: string
+          minLength: 1
     SessionEstablishResponse:
       type: object
       required:
@@ -6151,6 +7035,34 @@ components:
         - organizationId
       properties:
         organizationId:
+          type: string
+    OrganizationLeaveRequest:
+      type: object
+      properties:
+        reason:
+          type:
+            - string
+            - 'null'
+    OrganizationLeaveResponse:
+      type: object
+      required:
+        - leftOrganizationId
+        - nextOrganizationId
+        - shellBootstrapState
+        - traceId
+      properties:
+        leftOrganizationId:
+          type: string
+        nextOrganizationId:
+          type:
+            - string
+            - 'null'
+        shellBootstrapState:
+          type: string
+          enum:
+            - authenticated
+            - no_organization
+        traceId:
           type: string
     MyOrganizationsResponse:
       type: object
@@ -7058,6 +7970,110 @@ components:
           type:
             - string
             - 'null'
+    AdminMembershipOrderListItem:
+      type: object
+      required:
+        - membershipOrderId
+        - organizationId
+        - orderStatus
+        - paymentStatus
+        - entitlementStatus
+        - membershipTier
+        - payableAmount
+        - currency
+        - updatedAt
+      properties:
+        membershipOrderId:
+          type: string
+        organizationId:
+          type: string
+        orderStatus:
+          $ref: '#/components/schemas/MembershipOrderStatus'
+        paymentStatus:
+          $ref: '#/components/schemas/MembershipPaymentStatus'
+        entitlementStatus:
+          $ref: '#/components/schemas/MembershipEntitlementStatus'
+        membershipTier:
+          $ref: '#/components/schemas/MembershipTierCode'
+        payableAmount:
+          type: number
+          minimum: 0
+        currency:
+          $ref: '#/components/schemas/PricingCurrencyCode'
+        createdAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminMembershipOrderListResponse:
+      type: object
+      required:
+        - items
+        - pagination
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminMembershipOrderListItem'
+        pagination:
+          $ref: '#/components/schemas/AdminPagination'
+    AdminMembershipOrderDetailResponse:
+      type: object
+      required:
+        - order
+        - auditSummary
+      properties:
+        order:
+          $ref: '#/components/schemas/MembershipOrderResultResponse'
+        auditSummary:
+          type: array
+          items:
+            type: string
+        traceId:
+          type:
+            - string
+            - 'null'
+    AdminMembershipOrganizationStatusResponse:
+      type: object
+      required:
+        - organizationId
+        - paidMembershipTier
+        - entitlementStatus
+        - serviceFeeDiscountSummary
+        - updatedAt
+      properties:
+        organizationId:
+          type: string
+        paidMembershipTier:
+          oneOf:
+            - $ref: '#/components/schemas/MembershipTierCode'
+            - type: 'null'
+        entitlementStatus:
+          $ref: '#/components/schemas/MembershipEntitlementStatus'
+        serviceFeeDiscountSummary:
+          type:
+            - string
+            - 'null'
+        effectiveAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        expiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        sourceMembershipOrderId:
+          type:
+            - string
+            - 'null'
+        updatedAt:
+          type: string
+          format: date-time
     AdminWhitelistGrantRequest:
       type: object
       required:
@@ -8337,6 +9353,326 @@ components:
             $ref: '#/components/schemas/ForumInteractionInboxItem'
         page:
           $ref: '#/components/schemas/ForumCursorPageInfo'
+    DevicePushPlatform:
+      type: string
+      enum:
+        - ios
+        - android
+      description: Minimum mobile platform family for push token registration.
+    DevicePushProvider:
+      type: string
+      enum:
+        - apns
+        - fcm
+      description: Minimum push provider family for V1.
+    DevicePushTokenRegisterRequest:
+      type: object
+      required:
+        - platform
+        - provider
+        - deviceToken
+        - appInstallationId
+      description: >
+        Device push token registration request. This carries delivery-channel
+        material only and must not become business truth.
+      properties:
+        platform:
+          $ref: '#/components/schemas/DevicePushPlatform'
+        provider:
+          $ref: '#/components/schemas/DevicePushProvider'
+        deviceToken:
+          type: string
+        appInstallationId:
+          type: string
+        appVersion:
+          type:
+            - string
+            - 'null'
+        deviceLabel:
+          type:
+            - string
+            - 'null'
+    DevicePushTokenRegisterResponse:
+      type: object
+      required:
+        - registered
+        - platform
+        - provider
+      properties:
+        registered:
+          type: boolean
+        tokenId:
+          type:
+            - string
+            - 'null'
+        platform:
+          $ref: '#/components/schemas/DevicePushPlatform'
+        provider:
+          $ref: '#/components/schemas/DevicePushProvider'
+    AppNotificationType:
+      type: string
+      enum:
+        - project_communication_message
+        - project_clarification
+        - project_key_reminder
+        - forum_interaction
+        - system_reminder
+      description: Bounded notification type family for V1.
+    AppNotificationSource:
+      type: string
+      enum:
+        - project_communication
+        - forum_interaction
+        - system
+      description: Bounded source lane for messages-building notification center aggregation.
+    AppNotificationRouteTarget:
+      type: object
+      required:
+        - canonicalPath
+        - localEntryKey
+        - requiredParams
+        - routeParams
+        - state
+      description: >
+        Controlled app-facing jump target. This is not a local Flutter route
+        name and not a general route registry.
+      properties:
+        canonicalPath:
+          type: string
+          enum:
+            - /api/app/message/project-communication/messages
+            - /api/app/message/project-communication/thread
+            - /api/app/forum/interaction/inbox
+            - /api/app/project/clarification/list
+            - /api/app/confirmation/softlink/detail
+        localEntryKey:
+          type: string
+        requiredParams:
+          type: array
+          items:
+            type: string
+        routeParams:
+          type: object
+          additionalProperties:
+            type: string
+        state:
+          type: string
+          enum:
+            - enabled
+            - unavailable
+    AppNotificationReadModel:
+      type: object
+      required:
+        - notificationId
+        - type
+        - source
+        - title
+        - createdAt
+        - unread
+      description: >
+        Bounded notification-center item. Server owns notification and unread
+        truth; BFF only shapes and Flutter only renders.
+      properties:
+        notificationId:
+          type: string
+        type:
+          $ref: '#/components/schemas/AppNotificationType'
+        source:
+          $ref: '#/components/schemas/AppNotificationSource'
+        title:
+          type: string
+        body:
+          type:
+            - string
+            - 'null'
+        projectId:
+          type:
+            - string
+            - 'null'
+        threadId:
+          type:
+            - string
+            - 'null'
+        routeTarget:
+          anyOf:
+            - $ref: '#/components/schemas/AppNotificationRouteTarget'
+            - type: 'null'
+        createdAt:
+          type: string
+          format: date-time
+        readAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        unread:
+          type: boolean
+    AppNotificationUnreadProjection:
+      type: object
+      required:
+        - total
+        - projectCommunication
+        - forumInteraction
+        - system
+      description: Server-owned notification-center unread projection.
+      properties:
+        total:
+          type: integer
+          minimum: 0
+        projectCommunication:
+          type: integer
+          minimum: 0
+        forumInteraction:
+          type: integer
+          minimum: 0
+        system:
+          type: integer
+          minimum: 0
+    AppNotificationListResponse:
+      type: object
+      required:
+        - items
+        - page
+        - unread
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/AppNotificationReadModel'
+        page:
+          $ref: '#/components/schemas/ForumCursorPageInfo'
+        unread:
+          $ref: '#/components/schemas/AppNotificationUnreadProjection'
+    AppNotificationReadRequest:
+      type: object
+      required:
+        - notificationIds
+      properties:
+        notificationIds:
+          type: array
+          minItems: 1
+          maxItems: 100
+          items:
+            type: string
+    AppNotificationReadResponse:
+      type: object
+      required:
+        - readNotificationIds
+        - unread
+      properties:
+        readNotificationIds:
+          type: array
+          items:
+            type: string
+        unread:
+          $ref: '#/components/schemas/AppNotificationUnreadProjection'
+    FilePreviewType:
+      type: string
+      enum:
+        - image
+        - pdf
+        - text
+        - unsupported
+      description: Minimum project communication preview type family.
+    FilePreviewAccessReadModel:
+      type: object
+      required:
+        - fileAssetId
+        - projectId
+        - threadId
+        - previewType
+        - canPreview
+        - fileName
+        - mimeType
+        - accessUrl
+        - expiresAt
+        - downloadAvailable
+      description: >
+        Controlled preview access for project communication attachments only.
+        accessUrl is time-bounded and objectKey is forbidden.
+      properties:
+        fileAssetId:
+          type: string
+        projectId:
+          type: string
+        threadId:
+          type: string
+        previewType:
+          $ref: '#/components/schemas/FilePreviewType'
+        canPreview:
+          type: boolean
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        accessUrl:
+          type:
+            - string
+            - 'null'
+        expiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        contentLengthBytes:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+        downloadAvailable:
+          type: boolean
+        fallbackReason:
+          type:
+            - string
+            - 'null'
+    ConfirmationSoftLinkKind:
+      type: string
+      enum:
+        - quote
+        - material
+        - schedule
+      description: >
+        Confirmation-card softLink kind. `material` is the user-facing
+        material/process lane and does not create a new state machine.
+    ConfirmationSoftLinkStatus:
+      type: string
+      enum:
+        - pending
+        - recorded
+        - unavailable
+      description: Soft display state only.
+    ConfirmationSoftLinkReadModel:
+      type: object
+      required:
+        - projectId
+        - threadId
+        - messageId
+        - confirmationType
+        - status
+        - title
+        - summary
+      description: >
+        Confirmation-card softLink read projection. This model only carries
+        jump/display information and must not mutate any business state.
+      properties:
+        projectId:
+          type: string
+        threadId:
+          type: string
+        messageId:
+          type: string
+        confirmationType:
+          $ref: '#/components/schemas/ConfirmationSoftLinkKind'
+        status:
+          $ref: '#/components/schemas/ConfirmationSoftLinkStatus'
+        title:
+          type: string
+        summary:
+          type: string
+        routeTarget:
+          anyOf:
+            - $ref: '#/components/schemas/AppNotificationRouteTarget'
+            - type: 'null'
     TradingImActorRole:
       type: string
       enum:
@@ -8785,7 +10121,10 @@ components:
         - membershipTierApplied
         - membershipDiscountRate
         - capAmount
+        - discountedFeeAmount
         - finalFeeAmount
+        - pricingSnapshotHash
+        - feeCalculatedAt
       description: >
         Minimum platform service-fee calculation snapshot carried by current
         deal confirmation only. This object freezes calculation result truth
@@ -8805,8 +10144,61 @@ components:
             - 'null'
         capAmount:
           type: number
+        discountedFeeAmount:
+          type: number
         finalFeeAmount:
           type: number
+        pricingSnapshotHash:
+          type: string
+        feeCalculatedAt:
+          type: string
+          format: date-time
+    P0PayMembershipDiscountSnapshot:
+      type: object
+      required:
+        - calculationBasis
+        - calculationAmount
+        - ruleVersion
+        - membershipTierSnapshot
+        - baseFeeAmount
+        - membershipDiscountRate
+        - capAmount
+        - discountedFeeAmount
+        - finalFeeAmount
+        - pricingSnapshotHash
+        - feeCalculatedAt
+      description: >
+        Server-owned P0-Pay membership service-fee discount snapshot. This
+        object uses platform-pricing `baseFeeAmount × membershipDiscountRate`
+        and replaces the old membership fixed-fee-rate display model for new
+        membership-discount calculations.
+      properties:
+        calculationBasis:
+          type: string
+          enum:
+            - estimated_authorization
+            - final_charge
+        calculationAmount:
+          type: number
+        ruleVersion:
+          type: string
+        membershipTierSnapshot:
+          $ref: '#/components/schemas/MembershipTierCode'
+        baseFeeAmount:
+          type: number
+        membershipDiscountRate:
+          type: number
+        capAmount:
+          type: number
+        discountedFeeAmount:
+          type: number
+        finalFeeAmount:
+          type: number
+        pricingSnapshotHash:
+          type: string
+        feeCalculatedAt:
+          type: string
+          format: date-time
     ProjectPricingPublisherSummary:
       type: object
       required:
@@ -8829,6 +10221,24 @@ components:
           oneOf:
             - $ref: '#/components/schemas/ProjectAuthenticitySincerityOrderStatus'
             - type: 'null'
+        authenticitySincerityOrderId:
+          type:
+            - string
+            - 'null'
+        authenticitySincerityCurrency:
+          oneOf:
+            - $ref: '#/components/schemas/PricingCurrencyCode'
+            - type: 'null'
+        authenticitySincerityChannelCandidates:
+          type: array
+          items:
+            type: string
+          default: []
+        authenticitySincerityExpiresAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
         publishGateStatus:
           type: string
         formalResultProcessingRequired:
@@ -9428,6 +10838,7 @@ components:
         - authorizationId
         - authorizationStatus
         - authorizationQuotaAmount
+        - platformServiceFeeDiscountSnapshot
         - currency
         - channelCandidates
         - expiresAt
@@ -9441,6 +10852,8 @@ components:
           $ref: '#/components/schemas/BidServiceFeeAuthorizationStatus'
         authorizationQuotaAmount:
           type: number
+        platformServiceFeeDiscountSnapshot:
+          $ref: '#/components/schemas/P0PayMembershipDiscountSnapshot'
         currency:
           $ref: '#/components/schemas/PricingCurrencyCode'
         channelCandidates:
@@ -9509,6 +10922,7 @@ components:
         - authorizationId
         - authorizationStatus
         - authorizationQuotaAmount
+        - platformServiceFeeDiscountSnapshot
         - currency
         - chargeStatus
         - releaseStatus
@@ -9523,6 +10937,8 @@ components:
           $ref: '#/components/schemas/BidServiceFeeAuthorizationStatus'
         authorizationQuotaAmount:
           type: number
+        platformServiceFeeDiscountSnapshot:
+          $ref: '#/components/schemas/P0PayMembershipDiscountSnapshot'
         currency:
           $ref: '#/components/schemas/PricingCurrencyCode'
         chargeStatus:
@@ -11110,6 +12526,166 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/InstanceTodoItem'
+    MessageInteractionListResponse:
+      type: object
+      required:
+        - lane
+        - items
+      properties:
+        lane:
+          type: string
+          enum:
+            - project_communication
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageInteractionItem'
+    MessageInteractionItem:
+      type: object
+      required:
+        - interactionId
+        - interactionType
+        - conversationId
+        - projectId
+        - counterpart
+        - summary
+        - updatedAt
+        - routeTarget
+      properties:
+        interactionId:
+          type: string
+        interactionType:
+          type: string
+          enum:
+            - counterpart_conversation
+        conversationId:
+          type: string
+        projectId:
+          type: string
+        counterpart:
+          $ref: '#/components/schemas/MessageInteractionCounterpart'
+        summary:
+          $ref: '#/components/schemas/MessageInteractionSummary'
+        pricingSummary:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+          description: >
+            Read-only pricing or authorization display projection only. This
+            field must not become payment, settlement, order, or fulfillment
+            truth.
+        updatedAt:
+          type: string
+          format: date-time
+        routeTarget:
+          $ref: '#/components/schemas/MessageInteractionRouteTarget'
+    MessageInteractionCounterpart:
+      type: object
+      required:
+        - organizationId
+        - displayName
+        - companyName
+        - role
+        - certificationSummary
+      properties:
+        organizationId:
+          type: string
+        displayName:
+          type: string
+        nickname:
+          type:
+            - string
+            - 'null'
+        companyName:
+          type: string
+        avatarUrl:
+          type:
+            - string
+            - 'null'
+        role:
+          type: string
+        certificationSummary:
+          oneOf:
+            - $ref: '#/components/schemas/MessageInteractionCounterpartCertificationSummary'
+            - type: 'null'
+    MessageInteractionCounterpartCertificationSummary:
+      type: object
+      required:
+        - certificationStatus
+        - legalName
+      properties:
+        certificationStatus:
+          type: string
+        legalName:
+          type: string
+        usccMasked:
+          type:
+            - string
+            - 'null'
+        businessType:
+          type:
+            - string
+            - 'null'
+        address:
+          type:
+            - string
+            - 'null'
+        establishedAt:
+          type:
+            - string
+            - 'null'
+        reviewedAt:
+          type:
+            - string
+            - 'null'
+    MessageInteractionSummary:
+      type: object
+      required:
+        - focusProjectId
+        - title
+        - text
+        - projectCount
+        - latestCardType
+      properties:
+        focusProjectId:
+          type: string
+        title:
+          type: string
+        text:
+          type: string
+        projectCount:
+          type: integer
+          minimum: 0
+        latestCardType:
+          type: string
+          enum:
+            - project_name_access_request
+            - bid_participation_request
+            - bid_thread
+            - project_clarification
+            - project_order
+            - system_notice
+    MessageInteractionRouteTarget:
+      type: object
+      required:
+        - objectType
+        - actionKey
+        - canonicalPath
+        - params
+      properties:
+        objectType:
+          type: string
+        actionKey:
+          type: string
+          enum:
+            - counterpart_conversation.open
+        canonicalPath:
+          type: string
+        params:
+          type: object
+          additionalProperties:
+            type: string
     RatingEntryReadModel:
       type: object
       required:

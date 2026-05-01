@@ -11,6 +11,7 @@ import { ProfilePersonalCertificationWriteService } from './profile-personal-cer
 import { ProfilePersonalWriteService } from './profile-personal.write.service';
 import { ProfileOrganizationMembersQueryService } from './profile-organization-members.query.service';
 import { ProfileOrganizationMembersWriteService } from './profile-organization-members.write.service';
+import { ProfileOrganizationSelfLeaveService } from './profile-organization-self-leave.service';
 import { ProfileBlockService } from './profile-block.service';
 import { ProfileQueryService } from './profile-query.service';
 import { ProfileSafetyQueryService } from './profile-safety.query.service';
@@ -33,6 +34,7 @@ export class ProfileController {
     private readonly organizationWriteService: OrganizationWriteService,
     private readonly organizationMembersQueryService: ProfileOrganizationMembersQueryService,
     private readonly organizationMembersWriteService: ProfileOrganizationMembersWriteService,
+    private readonly organizationSelfLeaveService: ProfileOrganizationSelfLeaveService,
     private readonly securityQueryService: ProfileSecurityQueryService,
     private readonly securityWriteService: ProfileSecurityWriteService,
     private readonly governanceStatusQueryService: ProfileGovernanceStatusQueryService,
@@ -164,6 +166,18 @@ export class ProfileController {
   @Post('organization/switch')
   switchOrganization(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
     return this.organizationWriteService.switch(body, resolveRequestContext(headers));
+  }
+
+  @Post('organization/current/leave')
+  @HttpCode(200)
+  leaveCurrentOrganization(
+    @Body() body: Record<string, unknown> | undefined,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.organizationSelfLeaveService.leaveCurrent(
+      body,
+      resolveRequestContext(headers)
+    );
   }
 
   @Patch('organization/members/:memberId/role')

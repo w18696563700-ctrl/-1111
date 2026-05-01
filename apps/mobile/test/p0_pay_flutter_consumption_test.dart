@@ -159,6 +159,148 @@ void main() {
     },
   );
 
+  test(
+    'project authenticity sincerity active-order conflict keeps stable error code',
+    () async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          'POST ${ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders('project-1')}':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 409,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'statusCode': 409,
+                    'code': 'P0_PAY_STATE_CONFLICT',
+                    'message':
+                        'Current inquiry task already has an active sincerity money order.',
+                    'source': 'server',
+                  },
+                );
+              },
+        },
+      );
+      final consumer = ExhibitionConsumerLayer(client: _client(transport));
+
+      final result = await consumer.createProjectAuthenticitySincerityOrder(
+        projectId: 'project-1',
+        command: ProjectAuthenticitySincerityOrderCommand(
+          ruleVersion: 'platform_pricing_rules_master_v1',
+          ruleSnapshotHash: 'platform_pricing_rules_master_v1',
+        ),
+      );
+
+      expect(result.isSuccess, isFalse);
+      expect(result.errorCode, 'P0_PAY_STATE_CONFLICT');
+      expect(result.message, isNot(contains('unrecognized error code')));
+    },
+  );
+
+  test(
+    'project finance routes consume refund and settlement summaries without local money truth',
+    () async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          'POST ${ExhibitionCanonicalPaths.projectAuthenticitySincerityRefundInit('project-1', 'order-1')}':
+              (AppApiRequest request) async {
+                final body = _body(request);
+                expect(body['refundReasonCode'], 'publisher_cancelled');
+                expect(body['refundReasonText'], '发布方取消项目。');
+                expect(body, contains('idempotencyKey'));
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'orderId': 'order-1',
+                    'refundOrderId': 'refund-1',
+                    'refundStatus': 'refund_pending',
+                    'amount': '200.00',
+                    'currency': 'CNY',
+                    'callbackAwaiting': true,
+                    'updatedAt': '2026-06-01T10:00:00Z',
+                  },
+                );
+              },
+          'GET ${ExhibitionCanonicalPaths.projectAuthenticitySincerityRefundStatus('project-1', 'order-1')}':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'orderId': 'order-1',
+                    'refundOrderId': 'refund-1',
+                    'refundStatus': 'refund_pending',
+                    'amount': '200.00',
+                    'currency': 'CNY',
+                    'callbackAwaiting': true,
+                    'updatedAt': '2026-06-01T10:01:00Z',
+                  },
+                );
+              },
+          'GET ${ExhibitionCanonicalPaths.projectSettlementSummary('project-1')}':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'projectId': 'project-1',
+                    'settlementSummary': <String, Object?>{
+                      'settlementStatus': 'draft',
+                      'platformIncomeAmount': '675.00',
+                      'pendingSettlementAmount': '675.00',
+                      'settledAmount': '0.00',
+                      'autoPayoutEnabled': false,
+                    },
+                    'updatedAt': '2026-06-01T10:02:00Z',
+                  },
+                );
+              },
+        },
+      );
+      final consumer = ExhibitionConsumerLayer(client: _client(transport));
+
+      final refund = await consumer.initProjectAuthenticitySincerityRefund(
+        projectId: 'project-1',
+        orderId: 'order-1',
+        command: ProjectAuthenticitySincerityRefundCommand(
+          refundReasonCode: 'publisher_cancelled',
+          refundReasonText: '发布方取消项目。',
+          idempotencyKey: 'idem-refund',
+        ),
+      );
+      final refundStatus = await consumer
+          .loadProjectAuthenticitySincerityRefundStatus(
+            projectId: 'project-1',
+            orderId: 'order-1',
+            forceRefresh: true,
+          );
+      final settlement = await consumer.loadProjectSettlementSummary(
+        projectId: 'project-1',
+        forceRefresh: true,
+      );
+
+      expect(refund.isSuccess, isTrue);
+      expect(refundStatus.state, AppPageState.content);
+      expect(settlement.state, AppPageState.content);
+      expect(
+        transport.requests.map(
+          (AppApiRequest request) => request.canonicalPath,
+        ),
+        <String>[
+          ExhibitionCanonicalPaths.projectAuthenticitySincerityRefundInit(
+            'project-1',
+            'order-1',
+          ),
+          ExhibitionCanonicalPaths.projectAuthenticitySincerityRefundStatus(
+            'project-1',
+            'order-1',
+          ),
+          ExhibitionCanonicalPaths.projectSettlementSummary('project-1'),
+        ],
+      );
+    },
+  );
+
   test('project authenticity sincerity polling stops after paid', () async {
     var attempts = 0;
     final transport = FakeAppApiTransport(
@@ -390,7 +532,7 @@ void main() {
                   'authorizationId': 'auth-1',
                   'authorizationStatus': 'pending_authorization',
                   'quotedAmount': '80000.00',
-                  'feeRate': '0.025',
+                  'feeRate': '0.030',
                   'estimatedFeeAmount': '2000.00',
                   'currency': 'CNY',
                   'updatedAt': '2026-05-14T00:00:00Z',
@@ -469,7 +611,7 @@ void main() {
                       ? 'pending_user_confirm'
                       : 'succeeded',
                   'quotedAmount': '80000.00',
-                  'feeRate': '0.025',
+                  'feeRate': '0.030',
                   'estimatedFeeAmount': '2000.00',
                   'currency': 'CNY',
                   'updatedAt': '2026-05-14T00:0$attempts:00Z',
@@ -503,7 +645,7 @@ void main() {
                   'authorizationId': 'auth-2',
                   'authorizationStatus': 'failed',
                   'quotedAmount': '80000.00',
-                  'feeRate': '0.025',
+                  'feeRate': '0.030',
                   'estimatedFeeAmount': '2000.00',
                   'currency': 'CNY',
                   'failureReasonCode': 'PAYMENT_CHANNEL_UNAVAILABLE',
@@ -539,7 +681,12 @@ void main() {
         'taskType': 'fixed_price_bid',
         'platformServiceFee': <String, Object?>{
           'status': 'charged',
-          'estimatedFeeAmount': '2640.00',
+          'authorizationQuotaAmount': '4000.00',
+          'baseFeeAmount': '3000.00',
+          'membershipDiscountRate': '0.9000',
+          'capAmount': '3600.00',
+          'feeRateLabel': '标准会员 9折（作用于 baseFeeAmount）',
+          'membershipTierSnapshot': 'standard',
           'finalFeeAmount': '2700.00',
         },
         'contractConfirmation': <String, Object?>{'status': 'confirmed'},
@@ -561,7 +708,12 @@ void main() {
         }),
         containsAll(<String>[
           '竞标服务费预授权:已扣取',
-          '预授权额度:2640.00',
+          '预授权额度:4000.00',
+          '服务费规则:标准会员 9折（作用于 baseFeeAmount）',
+          '会员档位快照:标准会员',
+          '服务费基础金额:3000.00',
+          '会员折扣:9 折',
+          '服务费封顶:3600.00',
           '最终服务费:2700.00',
           '合同确认:已确认',
           '消息楼状态:已扣取',

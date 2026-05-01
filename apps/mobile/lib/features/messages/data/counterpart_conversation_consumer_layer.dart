@@ -135,32 +135,43 @@ class CounterpartConversationConsumerLayer {
   sendProjectCommunicationMessage({
     required String? threadId,
     required String? projectId,
-    required String body,
+    required String? body,
     required String clientMessageId,
+    String messageKind = 'text',
+    Map<String, Object?>? payload,
   }) {
     final normalizedThreadId = _normalize(threadId);
     final normalizedProjectId = _normalize(projectId);
-    final normalizedBody = _normalize(body);
+    final normalizedMessageKind = _normalize(messageKind) ?? 'text';
+    final normalizedBody = normalizedMessageKind == 'text'
+        ? _normalize(body)
+        : body?.trim();
     final normalizedClientMessageId = _normalize(clientMessageId);
     if (normalizedThreadId == null ||
         normalizedProjectId == null ||
-        normalizedBody == null ||
+        (normalizedMessageKind == 'text' && normalizedBody == null) ||
+        (normalizedMessageKind != 'text' && payload == null) ||
         normalizedClientMessageId == null) {
       return Future.value(
         _invalid(
           MessagesCanonicalPaths.projectCommunicationMessages,
-          'threadId, projectId, body and clientMessageId are required before sending message',
+          'threadId, projectId, message body or payload, and clientMessageId are required before sending message',
         ),
       );
     }
+    final requestBody = <String, Object?>{
+      'threadId': normalizedThreadId,
+      'projectId': normalizedProjectId,
+      'body': normalizedBody,
+      'clientMessageId': normalizedClientMessageId,
+    };
+    if (normalizedMessageKind != 'text') {
+      requestBody['messageKind'] = normalizedMessageKind;
+      requestBody['payload'] = payload;
+    }
     return _post(
       MessagesCanonicalPaths.projectCommunicationMessages,
-      body: <String, Object?>{
-        'threadId': normalizedThreadId,
-        'projectId': normalizedProjectId,
-        'body': normalizedBody,
-        'clientMessageId': normalizedClientMessageId,
-      },
+      body: requestBody,
       parser: parseProjectCommunicationMessage,
     );
   }
@@ -189,6 +200,70 @@ class CounterpartConversationConsumerLayer {
         'lastReadMessageId': _normalize(lastReadMessageId),
       },
       parser: parseProjectCommunicationReadCursor,
+    );
+  }
+
+  Future<
+    CounterpartConversationResult<ProjectCommunicationFilePreviewAccessView>
+  >
+  loadProjectCommunicationFilePreviewAccess({
+    required String? projectId,
+    required String? threadId,
+    required String? fileAssetId,
+  }) {
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedThreadId = _normalize(threadId);
+    final normalizedFileAssetId = _normalize(fileAssetId);
+    if (normalizedProjectId == null ||
+        normalizedThreadId == null ||
+        normalizedFileAssetId == null) {
+      return Future.value(
+        _invalid(
+          MessagesCanonicalPaths.projectCommunicationFilePreviewAccess,
+          'projectId, threadId and fileAssetId are required before loading file preview',
+        ),
+      );
+    }
+    return _get(
+      MessagesCanonicalPaths.projectCommunicationFilePreviewAccess,
+      queryParameters: <String, String>{
+        'projectId': normalizedProjectId,
+        'threadId': normalizedThreadId,
+        'fileAssetId': normalizedFileAssetId,
+      },
+      parser: parseProjectCommunicationFilePreviewAccess,
+    );
+  }
+
+  Future<
+    CounterpartConversationResult<ProjectCommunicationConfirmationSoftLinkView>
+  >
+  loadProjectCommunicationConfirmationSoftLink({
+    required String? projectId,
+    required String? threadId,
+    required String? messageId,
+  }) {
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedThreadId = _normalize(threadId);
+    final normalizedMessageId = _normalize(messageId);
+    if (normalizedProjectId == null ||
+        normalizedThreadId == null ||
+        normalizedMessageId == null) {
+      return Future.value(
+        _invalid(
+          MessagesCanonicalPaths.confirmationSoftLinkDetail,
+          'projectId, threadId and messageId are required before loading confirmation softLink',
+        ),
+      );
+    }
+    return _get(
+      MessagesCanonicalPaths.confirmationSoftLinkDetail,
+      queryParameters: <String, String>{
+        'projectId': normalizedProjectId,
+        'threadId': normalizedThreadId,
+        'messageId': normalizedMessageId,
+      },
+      parser: parseProjectCommunicationConfirmationSoftLink,
     );
   }
 

@@ -35,6 +35,7 @@ type ProjectListItemReadModel = {
   cityName: string | null;
   plannedStartAt: string | null;
   plannedEndAt: string | null;
+  publishedAt: string | null;
   state: string;
   nameAccess: ProjectListNameAccessReadModel;
   summary: ProjectSummary;
@@ -481,13 +482,18 @@ export class ProjectService {
 
     return {
       items: result.items.map((item) =>
-        this.toProjectListItemReadModel(this.requireProjectRecord(item)),
+        this.toProjectListItemReadModel(this.requireProjectRecord(item), {
+          requirePublishedAt: true,
+        }),
       ),
       pagination: this.toPaginationReadModel(pagination),
     };
   }
 
-  private toProjectListItemReadModel(result: Record<string, unknown>): ProjectListItemReadModel {
+  private toProjectListItemReadModel(
+    result: Record<string, unknown>,
+    options: { requirePublishedAt?: boolean } = {},
+  ): ProjectListItemReadModel {
     const displayState = readProjectListDisplayState(result);
     const projectId = this.asString(result.projectId);
     const projectNo = this.asString(result.projectNo);
@@ -526,6 +532,10 @@ export class ProjectService {
       cityName: this.asNullableString(result.cityName),
       plannedStartAt: this.asNullableDateString(result.plannedStartAt),
       plannedEndAt: this.asNullableDateString(result.plannedEndAt),
+      publishedAt: this.asProjectPublishedAt(
+        result.publishedAt,
+        options.requirePublishedAt === true,
+      ),
       state,
       nameAccess: displayState.nameAccess,
       summary,
@@ -882,6 +892,20 @@ export class ProjectService {
     }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
       throw new Error('Project detail response contains an invalid date field.');
+    }
+    return normalized;
+  }
+
+  private asProjectPublishedAt(value: unknown, required: boolean) {
+    const normalized = this.asString(value);
+    if (!normalized) {
+      if (required) {
+        throw new Error('Project list response is missing publishedAt.');
+      }
+      return null;
+    }
+    if (Number.isNaN(Date.parse(normalized))) {
+      throw new Error('Project response contains an invalid publishedAt field.');
     }
     return normalized;
   }

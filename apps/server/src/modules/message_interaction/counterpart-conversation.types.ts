@@ -69,6 +69,8 @@ export type CounterpartConversationBusinessCardProjection = {
   summary: string;
   status: string | null;
   updatedAt: string;
+  requesterCompanyName: string | null;
+  requesterOrganizationId: string | null;
   truthAnchor: CounterpartConversationTruthAnchorProjection;
   detailRouteTarget: CounterpartConversationRouteTarget | null;
   decisionAvailability: CounterpartConversationDecisionAvailabilityProjection | null;
@@ -80,7 +82,11 @@ export type CounterpartConversationProjectGroupProjection = {
   titleVisibility: 'masked' | 'visible';
   projectRelation: 'my_published' | 'my_bid' | 'unknown';
   projectState: string | null;
+  projectPublishedAt: string | null;
+  projectUpdatedAt: string | null;
   latestActivityAt: string;
+  projectUnreadCount: number;
+  hasProjectUnread: boolean;
   pricingSummary?: Record<string, unknown>;
   ratingEntry: CounterpartConversationRatingEntryProjection | null;
   cards: CounterpartConversationBusinessCardProjection[];

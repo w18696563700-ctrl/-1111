@@ -6,6 +6,7 @@ import { ProfileGovernanceAppealsService } from './profile-governance-appeals.se
 import { ProfileGovernanceStatusService } from './profile-governance-status.service';
 import { ProfilePaymentBillingStatusService } from './profile-payment-billing-status.service';
 import { ProfileOrganizationCreditScoringService } from './profile-organization-credit-scoring.service';
+import { ProfileMembershipPurchaseService } from './profile-membership-purchase.service';
 import { ProfileMembershipService } from './profile-membership.service';
 import { ProfileMembersService } from './profile-members.service';
 import { ProfileReadService } from './profile-read.service';
@@ -21,6 +22,7 @@ export class AppProfileReadController {
     private readonly profileOrganizationCreditScoringService: ProfileOrganizationCreditScoringService,
     private readonly profilePaymentBillingStatusService: ProfilePaymentBillingStatusService,
     private readonly profileMembershipService: ProfileMembershipService,
+    private readonly profileMembershipPurchaseService: ProfileMembershipPurchaseService,
     private readonly profileMembersService: ProfileMembersService,
     private readonly profileSafetyService: ProfileSafetyService,
     private readonly profileSecurityService: ProfileSecurityService,
@@ -109,6 +111,19 @@ export class AppProfileReadController {
   @Get('membership/upgrade-guide')
   getMembershipUpgradeGuide(@Headers() headers: IncomingHttpHeaders) {
     return this.profileMembershipService.getUpgradeGuide(headers);
+  }
+
+  @Get('membership/purchase-offers')
+  getMembershipPurchaseOffers(@Headers() headers: IncomingHttpHeaders) {
+    return this.profileMembershipPurchaseService.getPurchaseOffers(headers);
+  }
+
+  @Get('membership/orders/:membershipOrderId')
+  getMembershipOrder(
+    @Param('membershipOrderId') membershipOrderId: string,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileMembershipPurchaseService.getOrder(membershipOrderId, headers);
   }
 
   @Get('personal/safety')

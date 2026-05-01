@@ -71,6 +71,10 @@ namespaces:
   - MEMBERSHIP
   - CONFIG
   - PLATFORM
+  - NOTIFICATION
+  - PUSH
+  - FILE_PREVIEW
+  - CONFIRMATION_SOFTLINK
 codes:
   - code: AUTH_SESSION_INVALID
     owner: Server
@@ -135,6 +139,18 @@ codes:
   - code: ORG_MEMBER_DISABLE_INVALID
     owner: Server
     meaning: Organization member disable request is missing required fields or violates the current minimum membership disable boundary.
+  - code: ORG_SCOPE_REQUIRED
+    owner: Server
+    meaning: Current organization scope is required for the organization command and the verified session has no current organization.
+  - code: ORG_MEMBER_UNAVAILABLE
+    owner: Server
+    meaning: Current actor has no active membership under the verified current organization scope.
+  - code: ORG_MEMBER_LEAVE_INVALID
+    owner: Server
+    meaning: Current actor cannot leave the current organization because the membership state or request boundary is invalid.
+  - code: ORG_LAST_ADMIN_LEAVE_BLOCKED
+    owner: Server
+    meaning: Current actor is the last active organization administrator and cannot leave before another active administrator exists.
   - code: CERTIFICATION_SUBMIT_INVALID
     owner: Server
     meaning: Certification submit request is missing required fields or violates the current minimum certification submission boundary.
@@ -177,6 +193,30 @@ codes:
   - code: MEMBERSHIP_ROUTE_UNAVAILABLE
     owner: BFF
     meaning: The current paid-membership route is controlled-unavailable under the present app-facing boundary.
+  - code: MEMBERSHIP_PURCHASE_OFFERS_UNAVAILABLE
+    owner: BFF
+    meaning: Membership purchase offers are controlled-unavailable, closed by gate, or not materialized for the current actor and organization scope.
+  - code: MEMBERSHIP_ORDER_CREATE_REJECTED
+    owner: Server
+    meaning: Membership order create is rejected because the request, SKU, price echo, organization scope, or idempotency boundary is invalid.
+  - code: MEMBERSHIP_ORDER_NOT_FOUND
+    owner: Server
+    meaning: The requested membership order does not exist or is not visible to the current actor, organization, or admin scope.
+  - code: MEMBERSHIP_PAY_INIT_REJECTED
+    owner: Server
+    meaning: Membership pay-init is rejected because the current order, channel, request, or idempotency boundary cannot enter payment initialization.
+  - code: MEMBERSHIP_ORDER_RESULT_UNAVAILABLE
+    owner: BFF
+    meaning: Membership order-result readback is unavailable or cannot be normalized for the current actor and organization scope.
+  - code: MEMBERSHIP_ADMIN_QUERY_UNAVAILABLE
+    owner: Server
+    meaning: Admin paid-membership order or organization status query is unavailable under the current admin scope.
+  - code: MEMBERSHIP_ADMIN_ORDER_NOT_FOUND
+    owner: Server
+    meaning: The target paid-membership order is absent or hidden from the current admin scope.
+  - code: MEMBERSHIP_PRICING_SNAPSHOT_MISMATCH
+    owner: Server
+    meaning: The membership-related pricing snapshot echo does not match Server-owned platform-pricing truth.
   - code: SECURITY_EVENTS_UNAVAILABLE
     owner: Server
     meaning: The requested minimum security-event list is unavailable for the current admin scope or the targeted event projection is not materialized.
@@ -513,6 +553,30 @@ codes:
   - code: FILE_UPLOAD_CONFIRM_REQUIRED
     owner: BFF
     meaning: Uploaded object is not yet business-usable until confirm succeeds.
+  - code: NOTIFICATION_UNAVAILABLE
+    owner: Server
+    meaning: Notification center, notification object, or notification projection is unavailable under the bounded project communication notification package.
+  - code: NOTIFICATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization is not allowed to read or mark the requested notification.
+  - code: NOTIFICATION_READ_INVALID
+    owner: Server
+    meaning: Notification mark-read request is missing required ids, contains unsupported ids, or violates the bounded read contract.
+  - code: PUSH_TOKEN_INVALID
+    owner: Server
+    meaning: Device push token registration request is missing required fields, carries an unsupported platform/provider pair, or fails token-shape validation.
+  - code: PUSH_TOKEN_UNAVAILABLE
+    owner: Server
+    meaning: Push token registry, push provider adapter, or current push credential boundary is unavailable.
+  - code: FILE_PREVIEW_FORBIDDEN
+    owner: Server
+    meaning: The current actor cannot preview the requested project communication attachment under the projectId/threadId/FileAsset permission boundary.
+  - code: FILE_PREVIEW_UNAVAILABLE
+    owner: Server
+    meaning: The requested project communication attachment preview cannot be generated, the file is unsupported for preview, or the signed access dependency is unavailable.
+  - code: CONFIRMATION_SOFTLINK_INVALID
+    owner: Server
+    meaning: Confirmation softLink request is malformed, references an unsupported confirmation type, or is outside the current project/thread/message boundary.
   - code: PLATFORM_CAPABILITY_DISABLED
     owner: BFF
     meaning: Live, geo, or map capability is flag-off in the current environment.

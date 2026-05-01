@@ -111,20 +111,24 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
         label: '项目编号',
         value: projectNo ?? '未提供',
         fullWidth: true,
+        icon: Icons.local_offer_outlined,
       ),
       _ProjectDetailCompactMetaItemData(
         label: '项目类型',
         value: _buildingTypeLabel(buildingType),
+        icon: Icons.category_outlined,
       ),
       _ProjectDetailCompactMetaItemData(
         label: '项目面积',
         value: _projectAreaText(areaSqm),
+        icon: Icons.square_foot_outlined,
       ),
       _ProjectDetailCompactMetaItemData(
         label: '预算金额',
         value: _currencyText(budgetAmount),
         highlight: true,
         fullWidth: true,
+        icon: Icons.currency_yen_rounded,
       ),
     ];
   }
@@ -141,12 +145,20 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
   }) {
     return <Widget>[
       if (buildingTypeRemark != null) ...<Widget>[
-        const SizedBox(height: 12),
-        _DetailLine(label: '类型备注', value: buildingTypeRemark),
+        const SizedBox(height: 10),
+        _ProjectDetailInfoLine(
+          icon: Icons.notes_rounded,
+          label: '类型备注',
+          value: buildingTypeRemark,
+        ),
       ],
       if (summaryHeading != null) ...<Widget>[
         const SizedBox(height: 4),
-        _DetailLine(label: '项目摘要', value: summaryHeading),
+        _ProjectDetailInfoLine(
+          icon: Icons.subject_rounded,
+          label: '项目摘要',
+          value: summaryHeading,
+        ),
       ],
       const SizedBox(height: 8),
       if (arrangementMissing)
@@ -155,13 +167,35 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
           message: '当前项目暂未提供地点、范围、说明或时间安排。',
         ),
       if (locationSummary != null)
-        _DetailLine(label: '项目地点', value: locationSummary),
-      if (scopeSummary != null) _DetailLine(label: '范围说明', value: scopeSummary),
+        _ProjectDetailInfoLine(
+          icon: Icons.location_on_outlined,
+          label: '项目地点',
+          value: locationSummary,
+        ),
+      if (scopeSummary != null)
+        _ProjectDetailInfoLine(
+          icon: Icons.map_outlined,
+          label: '范围说明',
+          value: scopeSummary,
+        ),
       if (scheduleRange != null)
-        _DetailLine(label: '计划时间', value: scheduleRange),
+        _ProjectDetailInfoLine(
+          icon: Icons.event_outlined,
+          label: '计划时间',
+          value: scheduleRange,
+        ),
       if (scheduleDetail != null)
-        _DetailLine(label: '时间说明', value: scheduleDetail),
-      if (description != null) _DetailLine(label: '补充说明', value: description),
+        _ProjectDetailInfoLine(
+          icon: Icons.schedule_outlined,
+          label: '时间说明',
+          value: scheduleDetail,
+        ),
+      if (description != null)
+        _ProjectDetailInfoLine(
+          icon: Icons.description_outlined,
+          label: '补充说明',
+          value: description,
+        ),
     ];
   }
 
@@ -269,6 +303,10 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
             onPressed: () => _openBidResultWithGuard(projectId),
             child: const Text('查看竞标结果'),
           ),
+        if (!ownerSurface) ...<Widget>[
+          const SizedBox(height: 12),
+          _buildProjectReportAction(projectId: projectId),
+        ],
       ],
     );
   }

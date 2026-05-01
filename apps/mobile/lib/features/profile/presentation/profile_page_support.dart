@@ -205,12 +205,16 @@ String _myMembershipEntrySummary({
   required bool hasSession,
   required AppShellContextData shellContext,
 }) {
-  const base = '当前会员状态与权益摘要';
+  const base = '当前付费会员档位与权益摘要';
   if (!hasSession) {
     return '部分可用：$base';
   }
+  final paidTier = shellContext.paidMembershipTier?.trim();
   final pieces = <String>[
-    profileDisplayPaidMembershipTier(shellContext.paidMembershipTier),
+    if (paidTier == null || paidTier.isEmpty)
+      '付费会员暂未开通'
+    else
+      profileDisplayPaidMembershipTier(paidTier),
     ...shellContext.paidMembershipEntitlementsSummary,
     ...shellContext.paidMembershipQuotaSummary,
     if ((shellContext.paidMembershipNextRefreshAt ?? '').trim().isNotEmpty)

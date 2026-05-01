@@ -75,8 +75,8 @@ export class EnterpriseHubAdminController {
   }
 
   @Get('recommendation-slots')
-  listRecommendationSlots(@Query() query: Record<string, unknown>) {
-    return this.adminService.listRecommendationSlots(query);
+  listRecommendationSlots(@Query() query: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.adminService.listRecommendationSlots(query, resolveRequestContext(headers));
   }
 
   @Post('recommendation-slots')

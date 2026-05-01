@@ -240,6 +240,60 @@ String? _channelPayloadUrl(Object? payload) {
   return null;
 }
 
+String? _channelPayloadAlipayOrderString(Object? payload) {
+  final payloadMap = _payloadMap(payload);
+  final channelPayload =
+      _payloadMap(payloadMap?['channelPayload']) ?? payloadMap;
+  if (channelPayload == null) {
+    return null;
+  }
+
+  const candidateKeys = <String>[
+    'orderString',
+    'appPayOrderString',
+    'sdkOrderString',
+    'alipayOrderString',
+  ];
+  for (final key in candidateKeys) {
+    final value = _normalizeDynamicText(channelPayload[key]);
+    if (value != null) {
+      return value;
+    }
+  }
+  return null;
+}
+
+Future<bool> _openPaymentChannelPayload(Object? payload) async {
+  final url = _channelPayloadUrl(payload);
+  if (url != null) {
+    return launchUrlString(url);
+  }
+
+  final orderString = _channelPayloadAlipayOrderString(payload);
+  if (orderString == null) {
+    return false;
+  }
+  return _openAlipayAppPayOrderString(orderString);
+}
+
+Future<bool> _openAlipayAppPayOrderString(String orderString) async {
+  if (!Platform.isAndroid && !Platform.isIOS) {
+    return false;
+  }
+  try {
+    await const MethodChannel(
+      'com.zhanlandingzhijia.mobile/alipay_app_pay',
+    ).invokeMethod<Map<Object?, Object?>>('pay', <String, Object?>{
+      'orderString': orderString,
+    });
+    return true;
+  } on MissingPluginException {
+    return false;
+  } on PlatformException {
+    return false;
+  }
+}
+
 String? _stringFromPayload(Object? payload, String key) {
   return _normalizeDynamicText(_payloadMap(payload)?[key]);
 }

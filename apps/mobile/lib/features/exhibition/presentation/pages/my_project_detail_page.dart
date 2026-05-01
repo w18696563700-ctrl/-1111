@@ -28,7 +28,10 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   bool _loading = true;
   bool _deletingProject = false;
   bool _summaryExpanded = false;
+  bool _pricingSummaryLoading = false;
+  bool _continuingSincerityPayment = false;
   _MyProjectLifecycleActionKind? _submittingLifecycleAction;
+  ExhibitionLoadResult? _pricingSummaryResult;
 
   @override
   void initState() {
@@ -51,6 +54,20 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       _snapshot = snapshot;
       _loading = false;
     });
+    final payload = _payloadMap(snapshot.result.payload);
+    final publicProject = _payloadMap(payload?['publicProject']);
+    final state = _normalizeId(publicProject?['state'] as String?);
+    final projectId =
+        _normalizeId(publicProject?['projectId'] as String?) ??
+        _normalizeId(widget.projectId);
+    if (_shouldReadProjectPricingSummary(state) && projectId != null) {
+      await _loadProjectPricingSummary(projectId, forceRefresh: forceRefresh);
+    } else if (mounted) {
+      setState(() {
+        _pricingSummaryResult = null;
+        _pricingSummaryLoading = false;
+      });
+    }
   }
 
   String? _myProjectDetailHeaderState(Object? payload) {
@@ -128,6 +145,18 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             canManageAttachments &&
             (stage.value == _MyProjectStageBucket.submitted ||
                 stage.value == _MyProjectStageBucket.published);
+        final sinceritySnapshot =
+            _projectAuthenticitySinceritySnapshotFromPayload(
+              _pricingSummaryResult?.payload,
+            );
+        final publishProgressStep = _projectPublishProgressStepForState(
+          state: state,
+          sincerity: sinceritySnapshot,
+        );
+        final showSincerityCard =
+            isOwnerSurface &&
+            projectId != null &&
+            stage.value == _MyProjectStageBucket.submitted;
 
         return <Widget>[
           const SizedBox(height: 16),
@@ -145,6 +174,27 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 ? _scrollToAttachments
                 : null,
           ),
+          const SizedBox(height: 16),
+          _ProjectPublishProgressCard(
+            currentStep: publishProgressStep,
+            sincerity: sinceritySnapshot,
+          ),
+          if (showSincerityCard) ...<Widget>[
+            const SizedBox(height: 16),
+            _ProjectSincerityStatusCard(
+              snapshot: sinceritySnapshot,
+              loading: _pricingSummaryLoading,
+              continuing: _continuingSincerityPayment,
+              onRefresh: () =>
+                  _loadProjectPricingSummary(projectId, forceRefresh: true),
+              onContinuePayment: sinceritySnapshot?.canContinuePayment == true
+                  ? () => _continueProjectAuthenticitySincerityPayment(
+                      projectId,
+                      _pricingSummaryResult?.payload,
+                    )
+                  : null,
+            ),
+          ],
           const SizedBox(height: 16),
           _buildStageActionCard(
             context,
@@ -297,6 +347,10 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     ];
 
     switch (stage.value) {
+      case _MyProjectStageBucket.all:
+        children.add(
+          const OutlinedButton(onPressed: null, child: Text('按项目当前阶段查看')),
+        );
       case _MyProjectStageBucket.draft:
         children.add(
           FilledButton(
@@ -567,6 +621,15 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       _showPageMessage(_userFacingLoadFailureMessage(summary));
       return false;
     }
+    final existingOrderId = _projectAuthenticitySincerityOrderId(
+      summary.payload,
+    );
+    if (existingOrderId != null) {
+      return _continueProjectAuthenticitySincerityPayment(
+        projectId,
+        summary.payload,
+      );
+    }
 
     final orderResult = await ExhibitionConsumerLayer.instance
         .createProjectAuthenticitySincerityOrder(
@@ -593,13 +656,33 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return false;
     }
 
+    return _continueProjectAuthenticitySincerityPayment(
+      projectId,
+      orderResult.payload,
+    );
+  }
+
+  Future<bool> _continueProjectAuthenticitySincerityPayment(
+    String projectId,
+    Object? sourcePayload,
+  ) async {
+    if (_continuingSincerityPayment) {
+      return false;
+    }
+    final orderId = _projectAuthenticitySincerityOrderId(sourcePayload);
+    if (orderId == null) {
+      _showPageMessage('云端暂未返回当前项目的诚意金订单编号，请先刷新状态，不要重复创建。');
+      return false;
+    }
+
+    setState(() => _continuingSincerityPayment = true);
     final initResult = await ExhibitionConsumerLayer.instance
         .initProjectAuthenticitySincerityPayment(
           projectId: projectId,
           orderId: orderId,
           command: ProjectPricingPayInitCommand(
             payChannel:
-                _firstProjectPricingChannelCandidate(orderResult.payload) ??
+                _firstProjectPricingChannelCandidate(sourcePayload) ??
                 'alipay_candidate',
           ),
         );
@@ -607,11 +690,25 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return false;
     }
     if (!initResult.isSuccess) {
+      setState(() => _continuingSincerityPayment = false);
       _showPageMessage(_userFacingActionFailureMessage(initResult));
       return false;
     }
 
-    await _openProjectPricingChannelPayload(initResult.payload);
+    final opened = await _openProjectPricingChannelPayload(initResult.payload);
+    if (!mounted) {
+      return false;
+    }
+    if (!opened) {
+      final hasAlipaySdkPayload =
+          _channelPayloadAlipayOrderString(initResult.payload) != null;
+      _showPageMessage(
+        hasAlipaySdkPayload
+            ? '支付宝 APP 支付参数已返回；当前运行环境暂不能拉起支付宝 SDK，请在 Android 真机验证。'
+            : '支付通道已创建，但云端暂未返回可打开的支付链接。正在刷新当前订单状态。',
+      );
+    }
+
     final pollResult = await ExhibitionConsumerLayer.instance
         .pollProjectAuthenticitySincerityOrderStatus(
           projectId: projectId,
@@ -622,21 +719,28 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     if (!mounted) {
       return false;
     }
+    setState(() => _continuingSincerityPayment = false);
+    await _loadProjectPricingSummary(projectId, forceRefresh: true);
+    if (!mounted) {
+      return false;
+    }
     if (pollResult.isSuccess ||
         _projectAuthenticitySinceritySatisfied(pollResult.result.payload)) {
       return true;
     }
 
-    _showPageMessage(_projectAuthenticitySincerityPendingMessage(pollResult));
+    _showPageMessage(
+      opened
+          ? _projectAuthenticitySincerityPendingMessage(pollResult)
+          : _channelPayloadAlipayOrderString(initResult.payload) != null
+          ? '当前运行环境不能直接拉起支付宝 APP 支付；诚意金仍未完成，请在 Android 真机或正式包继续验证。'
+          : '云端暂未返回可打开的支付链接；当前诚意金仍未完成，请刷新状态或稍后再试。',
+    );
     return false;
   }
 
-  Future<void> _openProjectPricingChannelPayload(Object? payload) async {
-    final url = _channelPayloadUrl(payload);
-    if (url == null) {
-      return;
-    }
-    await launchUrlString(url);
+  Future<bool> _openProjectPricingChannelPayload(Object? payload) async {
+    return _openPaymentChannelPayload(payload);
   }
 
   Future<bool> _ensureRequiredEffectImageBeforePublish(String projectId) async {
@@ -699,12 +803,30 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   }
 
   String? _projectAuthenticitySincerityOrderId(Object? payload) {
-    return _orderIdFromPayload(payload) ?? _depositOrderIdFromPayload(payload);
+    final payloadMap = _payloadMap(payload);
+    final publisherPricing = _payloadMap(payloadMap?['publisherPricing']);
+    final sincerity =
+        _payloadMap(payloadMap?['projectAuthenticitySincerity']) ??
+        _payloadMap(payloadMap?['inquiryDeposit']);
+    return _normalizeDynamicText(
+          publisherPricing?['authenticitySincerityOrderId'],
+        ) ??
+        _normalizeDynamicText(sincerity?['orderId']) ??
+        _normalizeDynamicText(sincerity?['depositOrderId']) ??
+        _orderIdFromPayload(payload) ??
+        _depositOrderIdFromPayload(payload);
   }
 
   String? _firstProjectPricingChannelCandidate(Object? payload) {
     final payloadMap = _payloadMap(payload);
-    final candidates = payloadMap?['channelCandidates'];
+    final publisherPricing = _payloadMap(payloadMap?['publisherPricing']);
+    final sincerity =
+        _payloadMap(payloadMap?['projectAuthenticitySincerity']) ??
+        _payloadMap(payloadMap?['inquiryDeposit']);
+    final candidates =
+        publisherPricing?['authenticitySincerityChannelCandidates'] ??
+        sincerity?['channelCandidates'] ??
+        payloadMap?['channelCandidates'];
     if (candidates is! Iterable) {
       return null;
     }
@@ -715,6 +837,32 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       }
     }
     return null;
+  }
+
+  bool _shouldReadProjectPricingSummary(String? state) {
+    return switch (_normalizeDynamicText(state)) {
+      'submitted' || 'published' || 'awarded' || 'converted_to_order' => true,
+      _ => false,
+    };
+  }
+
+  Future<void> _loadProjectPricingSummary(
+    String projectId, {
+    bool forceRefresh = false,
+  }) async {
+    setState(() => _pricingSummaryLoading = true);
+    final result = await ExhibitionConsumerLayer.instance
+        .loadProjectPricingSummary(
+          projectId: projectId,
+          forceRefresh: forceRefresh,
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _pricingSummaryResult = result;
+      _pricingSummaryLoading = false;
+    });
   }
 
   String _projectAuthenticitySincerityPendingMessage(

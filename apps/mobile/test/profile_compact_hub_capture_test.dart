@@ -22,6 +22,7 @@ _forumHandlers() {
             'items': <Object?>[
               <String, Object?>{
                 'postId': 'post-1',
+                'title': '供应商交接模板',
                 'topicId': 'topic-1',
                 'topicTitle': '供应商交接模板',
                 'excerpt': '我发布过的一条帖子摘要',
@@ -31,6 +32,9 @@ _forumHandlers() {
                   'displayName': '赵工',
                 },
                 'publishedAt': '2026-03-27T10:00:00Z',
+                'updatedAt': '2026-03-28T10:00:00Z',
+                'canEdit': true,
+                'canDelete': true,
               },
             ],
             'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
@@ -76,6 +80,28 @@ _forumHandlers() {
                 'topicId': 'topic-2',
                 'topicTitle': '夜班排班经验',
                 'excerpt': '收藏过的一条帖子摘要',
+                'state': 'published',
+                'author': <String, Object?>{
+                  'authorId': 'member-2',
+                  'displayName': '王监理',
+                },
+                'publishedAt': '2026-03-26T20:00:00Z',
+              },
+            ],
+            'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+          },
+        ),
+    'GET /api/app/forum/me/likes': (AppApiRequest request) async =>
+        AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: <String, Object?>{
+            'items': <Object?>[
+              <String, Object?>{
+                'postId': 'post-2',
+                'topicId': 'topic-2',
+                'topicTitle': '夜班排班经验',
+                'excerpt': '点过赞的一条帖子摘要',
                 'state': 'published',
                 'author': <String, Object?>{
                   'authorId': 'member-2',

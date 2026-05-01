@@ -274,7 +274,10 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
             stateLabel: _homeFrontStateLabel(_homeTrimmedString(item['state'])),
             cityLabel: _homeProjectCityLabel(item),
             areaLabel: _homeProjectAreaLabel(item['areaSqm']),
+            exampleAssetPath: _homeProjectExampleAsset(item['areaSqm']),
+            typeLabel: _homeProjectTypeLabel(item['buildingType']),
             entryTimeLabel: _homeProjectEntryTimeLabel(item),
+            publishedAtLabel: _homeProjectPublishedAtLabel(item),
             actionLabel: _homeCanContinueBid(_homeTrimmedString(item['state']))
                 ? '进入项目详情'
                 : '查看项目详情',

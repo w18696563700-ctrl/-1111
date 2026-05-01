@@ -1,13 +1,13 @@
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
-import { RequestContext } from '../../shared/request-context';
-import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
-import { authPermissionInsufficient } from '../organization/organization-auth.errors';
-import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
-import { OrganizationMembershipQuotaSnapshotEntity } from './entities/organization-membership-quota-snapshot.entity';
-import { OrganizationPaidMembershipEntity } from './entities/organization-paid-membership.entity';
+import { Injectable } from "@nestjs/common";
+import { InjectRepository } from "@nestjs/typeorm";
+import { Repository } from "typeorm";
+import { requireVerifiedCurrentSessionContext } from "../../shared/current-session-verification";
+import { RequestContext } from "../../shared/request-context";
+import { CurrentSessionVerificationService } from "../auth/current-session-verification.service";
+import { authPermissionInsufficient } from "../organization/organization-auth.errors";
+import { CurrentActorEligibilityService } from "../organization/current-actor-eligibility.service";
+import { OrganizationMembershipQuotaSnapshotEntity } from "./entities/organization-membership-quota-snapshot.entity";
+import { OrganizationPaidMembershipEntity } from "./entities/organization-paid-membership.entity";
 import {
   buildQuotaSummaryLine,
   buildUpgradeGuide,
@@ -17,9 +17,9 @@ import {
   listAvailableTierItems,
   listEntitlementNotes,
   listExplanationTiers,
-  listQuotaNotes
-} from './membership.catalog';
-import { MembershipPresenter } from './membership.presenter';
+  listQuotaNotes,
+} from "./membership.catalog";
+import { MembershipPresenter } from "./membership.presenter";
 
 type ShellMembershipSummary = {
   paidMembershipTier: string | null;
@@ -45,7 +45,7 @@ export class MembershipQueryService {
     private readonly quotaSnapshotRepository: Repository<OrganizationMembershipQuotaSnapshotEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
-    private readonly presenter: MembershipPresenter
+    private readonly presenter: MembershipPresenter,
   ) {}
 
   async getCurrent(context: RequestContext) {
@@ -55,11 +55,12 @@ export class MembershipQueryService {
       organizationId,
       paidMembershipTier: projection.paidMembershipTier,
       rateBand: projection.rateBand,
+      serviceFeeDiscountSummary: projection.serviceFeeDiscountSummary,
       entitlementsSummary: projection.entitlementsSummary,
       quotaSummary: projection.quotaSummary,
       effectiveAt: projection.effectiveAt,
       expiresAt: projection.expiresAt,
-      nextRefreshAt: projection.nextRefreshAt
+      nextRefreshAt: projection.nextRefreshAt,
     });
   }
 
@@ -69,7 +70,7 @@ export class MembershipQueryService {
       tiers: listExplanationTiers(),
       entitlementNotes: listEntitlementNotes(),
       quotaNotes: listQuotaNotes(),
-      disclaimer: getCommercialDisclosure()
+      disclaimer: getCommercialDisclosure(),
     });
   }
 
@@ -78,7 +79,7 @@ export class MembershipQueryService {
     const projection = await this.buildScopedProjection(organizationId);
     return this.presenter.toQuota({
       items: projection.quotaItems,
-      nextRefreshAt: projection.nextRefreshAt
+      nextRefreshAt: projection.nextRefreshAt,
     });
   }
 
@@ -90,17 +91,19 @@ export class MembershipQueryService {
       currentTier: guide.currentTier,
       availableTiers: listAvailableTierItems(projection.paidMembershipTier),
       upgradeHighlights: guide.upgradeHighlights,
-      commercialDisclosure: getCommercialDisclosure()
+      commercialDisclosure: getCommercialDisclosure(),
     });
   }
 
-  async getShellSummaryProjection(organizationId: string | null): Promise<ShellMembershipSummary> {
+  async getShellSummaryProjection(
+    organizationId: string | null,
+  ): Promise<ShellMembershipSummary> {
     if (!organizationId) {
       return {
         paidMembershipTier: null,
         paidMembershipEntitlementsSummary: [],
         paidMembershipQuotaSummary: [],
-        paidMembershipNextRefreshAt: null
+        paidMembershipNextRefreshAt: null,
       };
     }
 
@@ -109,13 +112,13 @@ export class MembershipQueryService {
       paidMembershipTier: projection.paidMembershipTier,
       paidMembershipEntitlementsSummary: projection.entitlementsSummary,
       paidMembershipQuotaSummary: projection.quotaSummary,
-      paidMembershipNextRefreshAt: projection.nextRefreshAt
+      paidMembershipNextRefreshAt: projection.nextRefreshAt,
     };
   }
 
   async getPaidMembershipTierSnapshotForOrganization(
     organizationId: string,
-    at: Date = new Date()
+    at: Date = new Date(),
   ): Promise<PaidMembershipTierSnapshotProjection> {
     const currentCycle = await this.findCurrentCycle(organizationId, at);
     return {
@@ -123,19 +126,22 @@ export class MembershipQueryService {
       effectiveAt: currentCycle?.effectiveAt ?? null,
       expiresAt: currentCycle?.expiresAt ?? null,
       sourceType: currentCycle?.sourceType ?? null,
-      sourceRef: currentCycle?.sourceRef ?? null
+      sourceRef: currentCycle?.sourceRef ?? null,
     };
   }
 
   private async requireCurrentOrganizationId(context: RequestContext) {
     const currentSession = await requireVerifiedCurrentSessionContext(
       context,
-      this.currentSessionVerificationService
+      this.currentSessionVerificationService,
     );
     await this.eligibilityService.requireAuthenticatedActor(currentSession);
-    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+    const scope =
+      await this.eligibilityService.getCurrentOrganizationScope(currentSession);
     if (!scope) {
-      throw authPermissionInsufficient('Current organization scope is required for membership read.');
+      throw authPermissionInsufficient(
+        "Current organization scope is required for membership read.",
+      );
     }
     return scope.organization.id;
   }
@@ -143,7 +149,7 @@ export class MembershipQueryService {
   private async buildScopedProjection(organizationId: string) {
     const [currentCycle, quotaSnapshots] = await Promise.all([
       this.findCurrentCycle(organizationId),
-      this.listQuotaSnapshots(organizationId)
+      this.listQuotaSnapshots(organizationId),
     ]);
     const tierSpec = getTierSpec(currentCycle?.tierCode ?? null);
     const quotaItems = quotaSnapshots.map((snapshot) => {
@@ -153,10 +159,11 @@ export class MembershipQueryService {
         summary: buildQuotaSummaryLine({
           quotaType: snapshot.quotaType,
           currentValue: snapshot.currentValue,
-          refreshRule: snapshot.refreshRule
+          refreshRule: snapshot.refreshRule,
         }),
         currentValue: snapshot.currentValue,
-        refreshRule: snapshot.refreshRule ?? quotaSpec?.defaultRefreshRule ?? null
+        refreshRule:
+          snapshot.refreshRule ?? quotaSpec?.defaultRefreshRule ?? null,
       };
     });
     const nextRefreshAt = this.pickNextRefreshAt(quotaSnapshots);
@@ -164,34 +171,40 @@ export class MembershipQueryService {
     return {
       paidMembershipTier: currentCycle?.tierCode ?? null,
       rateBand: tierSpec?.rateBand ?? null,
+      serviceFeeDiscountSummary: tierSpec?.serviceFeeDiscountSummary ?? null,
       entitlementsSummary: tierSpec?.entitlementsSummary ?? [],
       quotaSummary: quotaItems.map((item) => item.summary),
       effectiveAt: currentCycle?.effectiveAt ?? null,
       expiresAt: currentCycle?.expiresAt ?? null,
       nextRefreshAt,
-      quotaItems
+      quotaItems,
     };
   }
 
   private findCurrentCycle(organizationId: string, at: Date = new Date()) {
     return this.paidMembershipRepository
-      .createQueryBuilder('membership')
-      .where('membership.organization_id = :organizationId', { organizationId })
-      .andWhere('membership.effective_at <= :at', { at })
-      .andWhere('(membership.expires_at IS NULL OR membership.expires_at > :at)', { at })
-      .orderBy('membership.effective_at', 'DESC')
-      .addOrderBy('membership.created_at', 'DESC')
+      .createQueryBuilder("membership")
+      .where("membership.organization_id = :organizationId", { organizationId })
+      .andWhere("membership.effective_at <= :at", { at })
+      .andWhere(
+        "(membership.expires_at IS NULL OR membership.expires_at > :at)",
+        { at },
+      )
+      .orderBy("membership.effective_at", "DESC")
+      .addOrderBy("membership.created_at", "DESC")
       .getOne();
   }
 
   private listQuotaSnapshots(organizationId: string) {
     return this.quotaSnapshotRepository.find({
       where: { organizationId },
-      order: { quotaType: 'ASC', updatedAt: 'DESC' }
+      order: { quotaType: "ASC", updatedAt: "DESC" },
     });
   }
 
-  private pickNextRefreshAt(quotaSnapshots: OrganizationMembershipQuotaSnapshotEntity[]) {
+  private pickNextRefreshAt(
+    quotaSnapshots: OrganizationMembershipQuotaSnapshotEntity[],
+  ) {
     return quotaSnapshots.reduce<Date | null>((earliest, item) => {
       if (!item.nextRefreshAt) {
         return earliest;

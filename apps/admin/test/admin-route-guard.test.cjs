@@ -136,6 +136,25 @@ test('route guard allows /audit with existing admin session carrier', () => {
   assert.deepEqual(result, { outcome: 'allow' });
 });
 
+test('route guard protects /membership admin read-only workbench', () => {
+  const missing = resolveProtectedPathAccess({
+    pathname: '/membership',
+    requestUrl: 'http://admin.local/membership',
+    sessionCarrier: '',
+  });
+  assert.deepEqual(missing, {
+    outcome: 'redirect',
+    location: 'http://admin.local/login?next=%2Fmembership',
+  });
+
+  const allowed = resolveProtectedPathAccess({
+    pathname: '/membership',
+    requestUrl: 'http://admin.local/membership',
+    sessionCarrier: 'opaque-access-carrier',
+  });
+  assert.deepEqual(allowed, { outcome: 'allow' });
+});
+
 test('route guard redirects /template_config to login when admin session carrier is missing', () => {
   const result = resolveProtectedPathAccess({
     pathname: '/template_config',

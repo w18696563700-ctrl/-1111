@@ -1,4 +1,9 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException
+} from '@nestjs/common';
 import { certificationDuplicateSubmit } from '../organization/organization-auth.errors';
 
 export function certificationSubmitInvalid(message: string) {
@@ -116,6 +121,27 @@ export function organizationMemberUnavailable(message: string) {
 export function organizationMemberInvalid(message: string) {
   return new BadRequestException({
     code: 'ORG_MEMBER_INVALID',
+    message
+  });
+}
+
+export function organizationScopeRequired(message: string) {
+  return new ForbiddenException({
+    code: 'ORG_SCOPE_REQUIRED',
+    message
+  });
+}
+
+export function organizationMemberLeaveInvalid(message: string) {
+  return new BadRequestException({
+    code: 'ORG_MEMBER_LEAVE_INVALID',
+    message
+  });
+}
+
+export function organizationLastAdminLeaveBlocked(message: string) {
+  return new ConflictException({
+    code: 'ORG_LAST_ADMIN_LEAVE_BLOCKED',
     message
   });
 }

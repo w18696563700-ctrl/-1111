@@ -149,6 +149,25 @@ class ProjectPricingPayInitCommand {
   };
 }
 
+class ProjectAuthenticitySincerityRefundCommand {
+  ProjectAuthenticitySincerityRefundCommand({
+    this.refundReasonCode = 'project_publish_cancelled',
+    this.refundReasonText = '',
+    String? idempotencyKey,
+  }) : idempotencyKey =
+           idempotencyKey ?? _p0PayIdempotencyKey('project-sincerity-refund');
+
+  final String refundReasonCode;
+  final String refundReasonText;
+  final String idempotencyKey;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'refundReasonCode': refundReasonCode,
+    'refundReasonText': refundReasonText,
+    'idempotencyKey': idempotencyKey,
+  };
+}
+
 class BidServiceFeeAuthorizationCommand {
   BidServiceFeeAuthorizationCommand({
     required this.bidParticipationRequestId,

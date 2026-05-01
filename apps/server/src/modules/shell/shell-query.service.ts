@@ -1,10 +1,11 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { MembershipQueryService } from '../membership/membership.query.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { PrivateOperatingSystemReorganizationService } from '../private_operating_system_reorganization/private-operating-system-reorganization.service';
+import { ProjectCommunicationUnreadQueryService } from '../project_communication/project-communication-unread.query.service';
 import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ShellPresenter } from './shell.presenter';
 
@@ -16,7 +17,9 @@ export class ShellQueryService {
     private readonly membershipQueryService: MembershipQueryService,
     private readonly privateOperatingSystemService: PrivateOperatingSystemReorganizationService,
     private readonly avatarUrlService: UploadPublicUrlService,
-    private readonly presenter: ShellPresenter
+    private readonly presenter: ShellPresenter,
+    @Optional()
+    private readonly projectCommunicationUnreadQueryService?: ProjectCommunicationUnreadQueryService
   ) {}
 
   async getContext(context: RequestContext) {
@@ -28,6 +31,9 @@ export class ShellQueryService {
     const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
     const membershipSummary = await this.loadMembershipSummary(scope?.organization.id ?? null);
     const myBuildingProjection = this.privateOperatingSystemService.getShellContextProjection();
+    const messagesUnreadCount = await this.countMessagesUnread(
+      scope?.organization.id ?? null
+    );
     return this.presenter.toContext({
       userId: user.id,
       displayName: this.toDisplayName(user),
@@ -53,8 +59,18 @@ export class ShellQueryService {
       paidMembershipEntitlementsSummary: membershipSummary.paidMembershipEntitlementsSummary,
       paidMembershipQuotaSummary: membershipSummary.paidMembershipQuotaSummary,
       paidMembershipNextRefreshAt: membershipSummary.paidMembershipNextRefreshAt,
+      messagesUnreadCount,
       myBuildingProjection
     });
+  }
+
+  private async countMessagesUnread(organizationId: string | null) {
+    if (!this.projectCommunicationUnreadQueryService) {
+      return 0;
+    }
+    return this.projectCommunicationUnreadQueryService.countUnreadForShell(
+      organizationId
+    );
   }
 
   private async loadMembershipSummary(organizationId: string | null) {

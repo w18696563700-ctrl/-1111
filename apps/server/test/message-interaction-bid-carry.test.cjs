@@ -60,6 +60,34 @@ function createProjectNameAccessRequestRepository(requests) {
   };
 }
 
+function createBidParticipationRequestRepository(requests) {
+  return {
+    createQueryBuilder() {
+      const builder = {
+        innerJoin() {
+          return builder;
+        },
+        where() {
+          return builder;
+        },
+        orWhere() {
+          return builder;
+        },
+        orderBy() {
+          return builder;
+        },
+        addOrderBy() {
+          return builder;
+        },
+        async getMany() {
+          return requests;
+        },
+      };
+      return builder;
+    },
+  };
+}
+
 test('my bids list returns controlled empty list when current bidder scope has no bids', async () => {
   const { MyBidQueryService } = require('../dist/modules/my_bid/my-bid.query.service.js');
   const service = new MyBidQueryService(
@@ -294,7 +322,77 @@ test('project-name-access counterpart displayName falls back to organization nam
   const seeds = await source.buildSeeds('org-owner');
   assert.equal(seeds.length, 1);
   assert.equal(seeds[0].counterpartDisplayName, '海川组织简称');
+  assert.equal(seeds[0].card.requesterCompanyName, '海川组织简称');
+  assert.equal(seeds[0].card.requesterOrganizationId, 'org-requester');
   assert.match(seeds[0].card.summary, /海川组织简称/);
+});
+
+test('bid-participation card exposes structured requester company fields', async () => {
+  const {
+    CounterpartConversationBidParticipationSource,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.bid-participation-source.js');
+  const now = new Date('2026-04-24T08:00:00.000Z');
+  const source = new CounterpartConversationBidParticipationSource(
+    createBidParticipationRequestRepository([
+      {
+        id: 'bid-request-1',
+        projectId: 'project-1',
+        requesterOrganizationId: 'org-requester',
+        requestedByUserId: 'user-requester',
+        state: 'pending',
+        createdAt: now,
+        updatedAt: now,
+        reviewedAt: null,
+      },
+    ]),
+    {
+      async findBy() {
+        return [
+          {
+            id: 'project-1',
+            organizationId: 'org-owner',
+            creatorUserId: 'user-owner',
+            state: 'published',
+            publishedAt: now,
+          },
+        ];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'org-requester', name: '坤特组织简称' }];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'user-requester',
+            nickname: '申请人昵称',
+            avatarUrl: null,
+          },
+        ];
+      },
+    },
+    {
+      async readAvatarUrl() {
+        return null;
+      },
+    },
+    createDisplayNameService([
+      {
+        organizationId: 'org-requester',
+        legalName: '重庆坤特展览展示有限公司',
+      },
+    ]),
+  );
+
+  const seeds = await source.buildSeeds('org-owner');
+  assert.equal(seeds.length, 1);
+  assert.equal(seeds[0].card.cardType, 'bid_participation_request');
+  assert.equal(seeds[0].card.requesterCompanyName, '重庆坤特展览展示有限公司');
+  assert.equal(seeds[0].card.requesterOrganizationId, 'org-requester');
+  assert.match(seeds[0].card.summary, /重庆坤特展览展示有限公司/);
 });
 
 test('clarification counterpart displayName uses approved certification legalName first', async () => {
@@ -646,6 +744,8 @@ test('counterpart conversation project title uses concrete project title when vi
     CounterpartConversationProjectionService,
   } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
   const now = '2026-04-24T08:05:00.000Z';
+  const publishedAt = new Date('2026-04-20T02:30:00.000Z');
+  const projectUpdatedAt = new Date('2026-04-21T03:40:00.000Z');
   const project = {
     id: 'project-luzhou',
     organizationId: 'org-owner',
@@ -654,6 +754,8 @@ test('counterpart conversation project title uses concrete project title when vi
     exhibitionName: '西洽会',
     brandName: '泸州',
     state: 'published',
+    publishedAt,
+    updatedAt: projectUpdatedAt,
   };
   const card = {
     cardId: 'bid-thread:bid-luzhou',
@@ -722,6 +824,13 @@ test('counterpart conversation project title uses concrete project title when vi
     sourceWithSeed,
     emptySource,
     emptySource,
+    {
+      async buildUnreadMapForCounterpartProjects(projectIds, viewerOrganizationId) {
+        assert.deepEqual(projectIds, ['project-luzhou']);
+        assert.equal(viewerOrganizationId, 'org-owner');
+        return new Map([['project-luzhou', 2]]);
+      },
+    },
   );
 
   const result = await service.getConversationDetail({
@@ -733,6 +842,94 @@ test('counterpart conversation project title uses concrete project title when vi
   assert.equal(result.projectGroups.length, 1);
   assert.equal(result.projectGroups[0].titleVisibility, 'visible');
   assert.equal(result.projectGroups[0].projectDisplayTitle, '西洽会 - 泸州');
+  assert.equal(result.projectGroups[0].projectPublishedAt, publishedAt.toISOString());
+  assert.equal(result.projectGroups[0].projectUpdatedAt, projectUpdatedAt.toISOString());
+  assert.equal(result.projectGroups[0].latestActivityAt, now);
+  assert.equal(result.projectGroups[0].projectUnreadCount, 2);
+  assert.equal(result.projectGroups[0].hasProjectUnread, true);
+});
+
+test('project communication unread query counts only counterpart unread threads', async () => {
+  const {
+    ProjectCommunicationUnreadQueryService,
+  } = require('../dist/modules/project_communication/project-communication-unread.query.service.js');
+  const threads = [
+    {
+      id: 'thread-unread',
+      projectId: 'project-1',
+      ownerOrganizationId: 'org-viewer',
+      counterpartOrganizationId: 'org-other',
+      lastMessageId: 'message-other-new',
+      lastMessageAt: new Date('2026-04-24T09:00:00.000Z'),
+    },
+    {
+      id: 'thread-read',
+      projectId: 'project-1',
+      ownerOrganizationId: 'org-viewer',
+      counterpartOrganizationId: 'org-third',
+      lastMessageId: 'message-other-read',
+      lastMessageAt: new Date('2026-04-24T08:00:00.000Z'),
+    },
+    {
+      id: 'thread-own-last',
+      projectId: 'project-2',
+      ownerOrganizationId: 'org-other',
+      counterpartOrganizationId: 'org-viewer',
+      lastMessageId: 'message-own',
+      lastMessageAt: new Date('2026-04-24T07:00:00.000Z'),
+    },
+  ];
+  const service = new ProjectCommunicationUnreadQueryService(
+    {
+      async find() {
+        return threads;
+      },
+    },
+    {
+      async find() {
+        return [
+          {
+            threadId: 'thread-unread',
+            organizationId: 'org-viewer',
+            projectId: 'project-1',
+            lastReadAt: new Date('2026-04-24T08:30:00.000Z'),
+          },
+          {
+            threadId: 'thread-read',
+            organizationId: 'org-viewer',
+            projectId: 'project-1',
+            lastReadAt: new Date('2026-04-24T08:30:00.000Z'),
+          },
+        ];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'message-other-new',
+            senderOrganizationId: 'org-other',
+          },
+          {
+            id: 'message-other-read',
+            senderOrganizationId: 'org-third',
+          },
+          {
+            id: 'message-own',
+            senderOrganizationId: 'org-viewer',
+          },
+        ];
+      },
+    },
+  );
+
+  const unreadByProject = await service.buildUnreadMapForCounterpartProjects(
+    ['project-1', 'project-2'],
+    'org-viewer',
+  );
+  assert.equal(unreadByProject.get('project-1'), 1);
+  assert.equal(unreadByProject.get('project-2'), 0);
+  assert.equal(await service.countUnreadForShell('org-viewer'), 1);
 });
 
 test('bid submission snapshot returns canonical attachment list instead of hardcoded zero', async () => {

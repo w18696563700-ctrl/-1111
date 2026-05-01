@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectCommunicationUnreadQueryService } from '../project_communication/project-communication-unread.query.service';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
@@ -63,6 +64,8 @@ export class CounterpartConversationProjectionService {
     bidThreadSource: CounterpartConversationBidThreadSource,
     bidParticipationSource: CounterpartConversationBidParticipationSource,
     clarificationSource: CounterpartConversationClarificationSource,
+    @Optional()
+    private readonly unreadQueryService?: ProjectCommunicationUnreadQueryService,
   ) {
     this.cardSources = [
       bidThreadSource,
@@ -135,9 +138,10 @@ export class CounterpartConversationProjectionService {
     }
 
     const projectIds = [...new Set(seeds.map((item) => item.projectId))];
-    const [projects, ratingEntryMap] = await Promise.all([
+    const [projects, ratingEntryMap, unreadByProjectId] = await Promise.all([
       this.projectRepository.findBy({ id: In(projectIds) }),
       this.buildRatingEntryMap(projectIds, viewerOrganizationId),
+      this.buildProjectUnreadMap(projectIds, viewerOrganizationId),
     ]);
     const projectMap = new Map(projects.map((item) => [item.id, item]));
     const nameAccessProjectionMap = await this.buildNameAccessProjectionMap({
@@ -154,6 +158,7 @@ export class CounterpartConversationProjectionService {
           nameAccessProjectionMap,
           viewerOrganizationId,
           ratingEntryMap,
+          unreadByProjectId,
         });
         const focusProject = projectGroups[0];
         const latestCard = focusProject.cards[0];
@@ -286,6 +291,7 @@ export class CounterpartConversationProjectionService {
     projectMap: Map<string, ProjectEntity>;
     viewerOrganizationId: string;
     ratingEntryMap: Map<string, CounterpartConversationRatingEntryProjection>;
+    unreadByProjectId: Map<string, number>;
     nameAccessProjectionMap: Awaited<
       ReturnType<ProjectNameAccessProjectionService['buildPublicProjectionMap']>
     >;
@@ -296,6 +302,7 @@ export class CounterpartConversationProjectionService {
         const projection = input.nameAccessProjectionMap.get(projectId);
         const titleVisibility =
           projection?.nameAccess.status === 'visible' ? 'visible' : 'masked';
+        const projectUnreadCount = input.unreadByProjectId.get(projectId) ?? 0;
         return {
           projectId,
           projectDisplayTitle: this.buildCounterpartProjectDisplayTitle({
@@ -309,7 +316,11 @@ export class CounterpartConversationProjectionService {
             viewerOrganizationId: input.viewerOrganizationId,
           }),
           projectState: project?.state ?? null,
+          projectPublishedAt: project?.publishedAt?.toISOString() ?? null,
+          projectUpdatedAt: project?.updatedAt?.toISOString() ?? null,
           latestActivityAt: group.latestActivityAt,
+          projectUnreadCount,
+          hasProjectUnread: projectUnreadCount > 0,
           ...(group.pricingSummary ? { pricingSummary: group.pricingSummary } : {}),
           ratingEntry:
             input.ratingEntryMap.get(
@@ -323,6 +334,19 @@ export class CounterpartConversationProjectionService {
       .sort((left, right) =>
         right.latestActivityAt.localeCompare(left.latestActivityAt),
       );
+  }
+
+  private async buildProjectUnreadMap(
+    projectIds: string[],
+    viewerOrganizationId: string,
+  ) {
+    if (!this.unreadQueryService) {
+      return new Map(projectIds.map((projectId) => [projectId, 0]));
+    }
+    return this.unreadQueryService.buildUnreadMapForCounterpartProjects(
+      projectIds,
+      viewerOrganizationId,
+    );
   }
 
   private buildCounterpartProjectDisplayTitle(input: {

@@ -24,7 +24,7 @@ inputs_canonical:
 
 - 正式 OTP/login contracts 重写
 - Flutter 正常登录流程变更
-- Admin 密码登录流程变更
+- Admin carrier-only 接入流程变更
 
 ## 2. Path Exposure Verdict
 
@@ -138,4 +138,3 @@ contracts 必须明确：
 - 只允许一个受控 `BFF app-facing path`
 - 该 path 只服务联调/内部调用
 - 它可以跳过 OTP，但不能跳过 `Server` session truth
-

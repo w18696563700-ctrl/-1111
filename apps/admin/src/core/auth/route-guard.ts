@@ -8,6 +8,7 @@ export const PROTECTED_PREFIXES = [
   '/project_review',
   '/template_config',
   '/audit',
+  '/membership',
   '/ticketing',
 ] as const;
 

@@ -59,6 +59,8 @@ final class CounterpartConversationBusinessCardView {
     required this.summary,
     required this.status,
     required this.updatedAt,
+    required this.requesterCompanyName,
+    required this.requesterOrganizationId,
     required this.truthAnchor,
     required this.detailRouteTarget,
     required this.decisionAvailability,
@@ -70,6 +72,8 @@ final class CounterpartConversationBusinessCardView {
   final String summary;
   final String? status;
   final String updatedAt;
+  final String? requesterCompanyName;
+  final String? requesterOrganizationId;
   final CounterpartConversationTruthAnchorView truthAnchor;
   final MessageInteractionRouteTarget? detailRouteTarget;
   final CounterpartConversationDecisionAvailabilityView? decisionAvailability;
@@ -82,7 +86,11 @@ final class CounterpartConversationProjectGroupView {
     required this.titleVisibility,
     required this.projectRelation,
     required this.projectState,
+    required this.projectPublishedAt,
+    required this.projectUpdatedAt,
     required this.latestActivityAt,
+    required this.projectUnreadCount,
+    required this.hasProjectUnread,
     required this.orderSummary,
     required this.ratingEntry,
     required this.cards,
@@ -93,7 +101,11 @@ final class CounterpartConversationProjectGroupView {
   final String titleVisibility;
   final String projectRelation;
   final String? projectState;
+  final String? projectPublishedAt;
+  final String? projectUpdatedAt;
   final String latestActivityAt;
+  final int projectUnreadCount;
+  final bool hasProjectUnread;
   final CounterpartConversationOrderSummaryView? orderSummary;
   final CounterpartConversationRatingEntryView? ratingEntry;
   final List<CounterpartConversationBusinessCardView> cards;
@@ -207,6 +219,8 @@ final class ProjectCommunicationMessageView {
     required this.senderOrganizationId,
     required this.messageKind,
     required this.body,
+    required this.attachment,
+    required this.confirmation,
     required this.clientMessageId,
     required this.messageState,
     required this.createdAt,
@@ -220,9 +234,93 @@ final class ProjectCommunicationMessageView {
   final String senderOrganizationId;
   final String messageKind;
   final String body;
+  final ProjectCommunicationAttachmentView? attachment;
+  final ProjectCommunicationConfirmationView? confirmation;
   final String? clientMessageId;
   final String messageState;
   final String createdAt;
+}
+
+final class ProjectCommunicationAttachmentView {
+  const ProjectCommunicationAttachmentView({
+    required this.fileAssetId,
+    required this.fileName,
+    required this.mimeType,
+    required this.size,
+    required this.category,
+  });
+
+  final String fileAssetId;
+  final String fileName;
+  final String mimeType;
+  final int size;
+  final String category;
+}
+
+final class ProjectCommunicationConfirmationView {
+  const ProjectCommunicationConfirmationView({
+    required this.confirmationType,
+    required this.title,
+    required this.summary,
+    required this.status,
+  });
+
+  final String confirmationType;
+  final String title;
+  final String summary;
+  final String status;
+}
+
+final class ProjectCommunicationFilePreviewAccessView {
+  const ProjectCommunicationFilePreviewAccessView({
+    required this.fileAssetId,
+    required this.projectId,
+    required this.threadId,
+    required this.previewType,
+    required this.canPreview,
+    required this.fileName,
+    required this.mimeType,
+    required this.accessUrl,
+    required this.expiresAt,
+    required this.contentLengthBytes,
+    required this.downloadAvailable,
+    required this.fallbackReason,
+  });
+
+  final String fileAssetId;
+  final String projectId;
+  final String threadId;
+  final String previewType;
+  final bool canPreview;
+  final String? fileName;
+  final String? mimeType;
+  final String? accessUrl;
+  final String? expiresAt;
+  final int? contentLengthBytes;
+  final bool downloadAvailable;
+  final String? fallbackReason;
+}
+
+final class ProjectCommunicationConfirmationSoftLinkView {
+  const ProjectCommunicationConfirmationSoftLinkView({
+    required this.projectId,
+    required this.threadId,
+    required this.messageId,
+    required this.confirmationType,
+    required this.status,
+    required this.title,
+    required this.summary,
+    required this.routeTarget,
+  });
+
+  final String projectId;
+  final String threadId;
+  final String messageId;
+  final String confirmationType;
+  final String status;
+  final String? title;
+  final String? summary;
+  final MessageInteractionRouteTarget? routeTarget;
 }
 
 final class ProjectCommunicationMessageListView {

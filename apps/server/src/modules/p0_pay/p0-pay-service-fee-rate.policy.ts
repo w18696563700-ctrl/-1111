@@ -28,6 +28,11 @@ export type P0PayFeeRateSnapshot = {
 export type P0PayServiceFeeRequirement = P0PayFeeRateSnapshot & {
   quotedAmount: string;
   estimatedFeeAmount: string;
+  baseFeeAmount: string;
+  membershipDiscountRate: string;
+  capAmount: string;
+  authorizationQuotaAmount: string;
+  quotaAmount: string;
   currency: 'CNY';
   authorizationRequired: boolean;
   authorizationStatus: 'pending_freeze';
@@ -52,39 +57,27 @@ type TierPolicy = {
 const TIER_POLICIES: Record<string, TierPolicy> = {
   none: {
     feeRate: '0.030000',
-    feeRateLabel: '默认费率 3.0%',
+    feeRateLabel: '基础平台定价规则',
     feeRateSource: 'fixed_default',
     membershipTierSnapshot: 'none'
   },
   free_certified: {
     feeRate: '0.030000',
-    feeRateLabel: '免费认证企业 3.0%',
+    feeRateLabel: '免费认证版无会员折扣',
     feeRateSource: 'fixed_default',
     membershipTierSnapshot: 'free_certified'
   },
   standard: {
-    feeRate: '0.025000',
-    feeRateLabel: '标准会员 2.5%',
+    feeRate: '0.030000',
+    feeRateLabel: '标准会员 9折（作用于 baseFeeAmount）',
     feeRateSource: 'paid_membership_tier',
     membershipTierSnapshot: 'standard'
   },
   professional: {
-    feeRate: '0.020000',
-    feeRateLabel: '专业会员 2.0%',
+    feeRate: '0.030000',
+    feeRateLabel: '专业会员 8折（作用于 baseFeeAmount）',
     feeRateSource: 'paid_membership_tier',
     membershipTierSnapshot: 'professional'
-  },
-  ka: {
-    feeRate: '0.015000',
-    feeRateLabel: 'KA 会员 1.5%',
-    feeRateSource: 'paid_membership_tier',
-    membershipTierSnapshot: 'ka'
-  },
-  flagship: {
-    feeRate: '0.015000',
-    feeRateLabel: '旗舰会员 1.5%',
-    feeRateSource: 'paid_membership_tier',
-    membershipTierSnapshot: 'flagship'
   }
 };
 
@@ -102,10 +95,20 @@ export class P0PayServiceFeeRatePolicy {
       factoryOrganizationId: input.factoryOrganizationId,
       calculatedAt: input.calculatedAt
     });
+    const feeCalculation = this.calculateDealServiceFee({
+      finalConfirmedAmount: quotedAmount,
+      membershipTierSnapshot: snapshot.membershipTierSnapshot,
+      authorizationQuotaAmount: PLATFORM_SERVICE_FEE_CAP_AMOUNT
+    });
     return {
       ...snapshot,
       quotedAmount,
-      estimatedFeeAmount: calculatePlatformServiceFeeAmount(quotedAmount, snapshot.feeRate),
+      estimatedFeeAmount: feeCalculation.finalFeeAmount,
+      baseFeeAmount: feeCalculation.baseFeeAmount,
+      membershipDiscountRate: feeCalculation.membershipDiscountRate,
+      capAmount: feeCalculation.capAmount,
+      authorizationQuotaAmount: PLATFORM_SERVICE_FEE_CAP_AMOUNT,
+      quotaAmount: PLATFORM_SERVICE_FEE_CAP_AMOUNT,
       currency: 'CNY',
       authorizationRequired: true,
       authorizationStatus: 'pending_freeze'

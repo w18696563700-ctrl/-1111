@@ -226,6 +226,7 @@ String _userFacingLoadFailureMessage(ExhibitionLoadResult result) {
 
   final controlledMessage = _controlledBusinessFailureMessage(
     errorCode: result.errorCode,
+    path: result.path,
   );
   if (controlledMessage != null) {
     return controlledMessage;
@@ -261,6 +262,7 @@ String _userFacingActionFailureMessage(ExhibitionActionResult result) {
 
   final controlledMessage = _controlledBusinessFailureMessage(
     errorCode: result.errorCode,
+    path: result.path,
   );
   if (controlledMessage != null) {
     return controlledMessage;
@@ -270,7 +272,16 @@ String _userFacingActionFailureMessage(ExhibitionActionResult result) {
       '当前动作暂时不能继续。你现在可以先重试；如果仍未恢复，请${_recoveryHintForPath(result.path)}。';
 }
 
-String? _controlledBusinessFailureMessage({required String? errorCode}) {
+String? _controlledBusinessFailureMessage({
+  required String? errorCode,
+  String? path,
+}) {
+  if (errorCode == 'P0_PAY_STATE_CONFLICT' &&
+      path != null &&
+      path.contains('/authenticity-sincerity/orders')) {
+    return '当前项目已经有一笔进行中的 200 元项目真实性诚意金订单，请刷新项目状态后继续支付或等待结果，不要重复创建。';
+  }
+
   return switch (errorCode) {
     'AUTH_SESSION_INVALID' => '当前登录状态已失效，请重新登录后再继续当前动作。',
     'AUTH_PERMISSION_INSUFFICIENT' => '当前账号没有权限执行这一步。请确认是否使用项目或订单所属组织账号进入。',
@@ -296,6 +307,11 @@ String? _controlledBusinessFailureMessage({required String? errorCode}) {
       '当前项目真实性诚意金状态暂不允许继续发布，请完成冻结后再试。',
     'PROJECT_AUTHENTICITY_SINCERITY_RESULT_UNAVAILABLE' =>
       '项目真实性诚意金结果暂不可用，请稍后刷新。',
+    'P0_PAY_INVALID' => '当前 P0-Pay 请求参数未通过校验，请刷新页面后再继续。',
+    'P0_PAY_RESOURCE_UNAVAILABLE' => '当前 P0-Pay 资源暂不可用，请刷新页面后再继续。',
+    'P0_PAY_PERMISSION_DENIED' => '当前账号没有权限操作这笔 P0-Pay 资源，请确认是否使用所属组织账号进入。',
+    'P0_PAY_STATE_CONFLICT' => '当前 P0-Pay 状态暂不允许继续，请刷新页面确认最新状态后再试。',
+    'P0_PAY_IDEMPOTENCY_CONFLICT' => '当前 P0-Pay 请求已被处理或正在处理，请刷新状态后再判断是否需要继续。',
     'PRICING_RULE_VERSION_MISMATCH' => '当前收费规则版本已更新，请刷新页面后再继续。',
     'BID_DUPLICATE_SUBMISSION' => '当前项目已提交过竞标，本页不再重复提交。请回到项目详情查看最新竞标状态。',
     'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED' =>

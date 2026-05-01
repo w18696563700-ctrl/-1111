@@ -86,74 +86,68 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
     final showState =
         _loading || (state != null && state != AppPageState.content);
 
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-      children: <Widget>[
-        if (showState)
-          ForumSlimStatePanel(
-            loading: _loading,
-            state: state,
-            emptyMessage: '暂无草稿',
-            onRetry: _load,
-            message: _result?.message,
-          )
-        else if (drafts.isEmpty)
-          _ForumDraftEmptyState(
-            onCreate: () =>
-                Navigator.of(context).pushNamed(ExhibitionRoutes.forumPublish),
-          )
-        else ...<Widget>[
-          DecoratedBox(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceContainerLowest,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(
-                color: Theme.of(context).colorScheme.outlineVariant,
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+    return ColoredBox(
+      color: AppVisualTokens.pageBackground,
+      child: ListView(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+        children: <Widget>[
+          if (showState)
+            ForumSlimStatePanel(
+              loading: _loading,
+              state: state,
+              emptyMessage: '暂无草稿',
+              onRetry: _load,
+              message: _result?.message,
+            )
+          else if (drafts.isEmpty)
+            _ForumDraftEmptyState(
+              onCreate: () => Navigator.of(
+                context,
+              ).pushNamed(ExhibitionRoutes.forumPublish),
+            )
+          else ...<Widget>[
+            AppCard(
+              backgroundColor: const Color(0xFFFFFCF6),
               child: Row(
                 children: <Widget>[
-                  Icon(
+                  const Icon(
                     Icons.swipe_left_rounded,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: AppVisualTokens.brandGoldDark,
                   ),
                   const SizedBox(width: 10),
-                  Expanded(
+                  const Expanded(
                     child: Text(
-                      '左滑草稿，点右侧红色减号即可删除。',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
+                      '左滑草稿，点右侧红色删除区即可删除。',
+                      style: AppTextTokens.body,
                     ),
                   ),
                 ],
               ),
             ),
-          ),
-          const SizedBox(height: 12),
-          ...drafts.map(
-            (ForumDraftCardView draft) => Padding(
-              padding: const EdgeInsets.only(bottom: 10),
-              child: _ForumSwipeDeleteCard(
-                enabled: !_deletingDraftIds.contains(draft.draftId),
-                onDelete: () => _deleteDraft(draft),
-                child: _ForumDraftListCard(
-                  draft: draft,
-                  onOpen: () => Navigator.of(context).pushNamed(
-                    ExhibitionRoutes.forumPublishWithDraftId(draft.draftId),
+            const SizedBox(height: 12),
+            ...drafts.map(
+              (ForumDraftCardView draft) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: _ForumSwipeDeleteCard(
+                  enabled: !_deletingDraftIds.contains(draft.draftId),
+                  onDelete: () => _deleteDraft(draft),
+                  child: _ForumDraftListCard(
+                    draft: draft,
+                    onOpen: () => Navigator.of(context).pushNamed(
+                      ExhibitionRoutes.forumPublishWithDraftId(draft.draftId),
+                    ),
+                    actionLabel: _deletingDraftIds.contains(draft.draftId)
+                        ? '删除中'
+                        : null,
+                    actionEnabled: !_deletingDraftIds.contains(draft.draftId),
                   ),
-                  actionLabel: _deletingDraftIds.contains(draft.draftId)
-                      ? '删除中'
-                      : null,
-                  actionEnabled: !_deletingDraftIds.contains(draft.draftId),
                 ),
               ),
             ),
-          ),
+            const AppBottomSafePadding(extra: 16),
+          ],
         ],
-      ],
+      ),
     );
   }
 }
@@ -186,7 +180,6 @@ class _ForumSwipeDeleteCardState extends State<_ForumSwipeDeleteCard> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Stack(
       children: <Widget>[
         Positioned.fill(
@@ -196,8 +189,9 @@ class _ForumSwipeDeleteCardState extends State<_ForumSwipeDeleteCard> {
               width: _actionWidth,
               child: DecoratedBox(
                 decoration: BoxDecoration(
-                  color: colorScheme.error,
+                  color: AppVisualTokens.dangerSoft,
                   borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: const Color(0xFFEBC2BD)),
                 ),
                 child: InkWell(
                   borderRadius: BorderRadius.circular(18),
@@ -212,15 +206,14 @@ class _ForumSwipeDeleteCardState extends State<_ForumSwipeDeleteCard> {
                     children: <Widget>[
                       Icon(
                         Icons.remove_rounded,
-                        color: colorScheme.onError,
+                        color: const Color(0xFFA13B34),
                         size: 28,
                       ),
                       const SizedBox(height: 4),
                       Text(
                         '删除',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: colorScheme.onError,
-                          fontWeight: FontWeight.w700,
+                        style: AppTextTokens.badgeText.copyWith(
+                          color: const Color(0xFFA13B34),
                         ),
                       ),
                     ],
@@ -289,7 +282,7 @@ class _ForumDraftEmptyState extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: onCreate, child: const Text('去发帖')),
+          AppPrimaryButton(label: '去发帖', onPressed: onCreate),
         ],
       ),
     );
@@ -311,69 +304,65 @@ class _ForumDraftListCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: AppVisualTokens.radiusLargeBorder,
         onTap: onOpen,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Row(
-                  children: <Widget>[
-                    ForumInfoPill(
-                      label: forumDisplayDraftStateLabel(draft.state),
-                      highlighted: draft.state.contains('ready'),
+        child: AppCard(
+          withShadow: true,
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  AppStatusBadge(
+                    label: forumDisplayDraftStateLabel(draft.state),
+                    tone: draft.state.contains('ready')
+                        ? AppStatusTone.brand
+                        : AppStatusTone.warning,
+                  ),
+                  const Spacer(),
+                  if (actionLabel != null)
+                    Text(
+                      actionLabel!,
+                      style: AppTextTokens.badgeText.copyWith(
+                        color: actionEnabled
+                            ? const Color(0xFFA13B34)
+                            : AppVisualTokens.textTertiary,
+                      ),
+                    )
+                  else
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      size: 20,
+                      color: AppVisualTokens.textTertiary,
                     ),
-                    const Spacer(),
-                    if (actionLabel != null)
-                      Text(
-                        actionLabel!,
-                        style: theme.textTheme.labelMedium?.copyWith(
-                          color: actionEnabled
-                              ? theme.colorScheme.error
-                              : theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      )
-                    else
-                      const Icon(Icons.chevron_right_rounded, size: 20),
-                  ],
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                draft.title,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextTokens.cardTitle,
+              ),
+              const SizedBox(height: 6),
+              Text(
+                draft.excerpt,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: AppTextTokens.body.copyWith(
+                  color: AppVisualTokens.textPrimary,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  draft.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  draft.excerpt,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.bodyMedium?.copyWith(height: 1.35),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '更新于 ${_compactPublishedAt(draft.updatedAt)}',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '更新于 ${_compactPublishedAt(draft.updatedAt)}',
+                style: AppTextTokens.caption,
+              ),
+            ],
           ),
         ),
       ),

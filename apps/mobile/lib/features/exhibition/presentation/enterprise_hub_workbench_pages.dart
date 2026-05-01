@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:crypto/crypto.dart';
-import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart';
@@ -37,6 +36,16 @@ part 'enterprise_hub_workbench_page_media_actions.dart';
 part 'enterprise_hub_workbench_page_location_actions.dart';
 part 'enterprise_hub_workbench_page_interactions.dart';
 part 'enterprise_hub_workbench_page_shell.dart';
+part 'enterprise_hub_workbench_page_company_homepage.dart';
+part 'enterprise_hub_workbench_page_company_modules.dart';
+part 'enterprise_hub_workbench_page_company_status_preview.dart';
+part 'enterprise_hub_workbench_page_company_support.dart';
+part 'enterprise_hub_workbench_page_company_widgets.dart';
+part 'enterprise_hub_workbench_page_supplier_homepage.dart';
+part 'enterprise_hub_workbench_page_supplier_homepage_entries.dart';
+part 'enterprise_hub_workbench_page_supplier_modules.dart';
+part 'enterprise_hub_workbench_page_supplier_support.dart';
+part 'enterprise_hub_workbench_page_supplier_widgets.dart';
 part 'enterprise_hub_workbench_page_display_sections.dart';
 part 'enterprise_hub_workbench_page_album_location_sections.dart';
 part 'enterprise_hub_workbench_page_basic_sections.dart';
@@ -225,6 +234,8 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
   String? _editingCaseId;
   String? _routeCaseId;
   String? _routeEnterpriseId;
+  VoidCallback? _companyModuleRouteRefresh;
+  VoidCallback? _supplierModuleRouteRefresh;
   bool _routeCaseSeedHydrated = false;
   String? _publishedEnterpriseId;
   String? _ensuredEnterpriseId;
@@ -413,6 +424,8 @@ class _EnterpriseApplicationPageState extends State<EnterpriseApplicationPage> {
 
   void _updateWorkbenchState(VoidCallback callback) {
     setState(callback);
+    _companyModuleRouteRefresh?.call();
+    _supplierModuleRouteRefresh?.call();
   }
 
   void _hydrateRouteCaseComposerFromItems(

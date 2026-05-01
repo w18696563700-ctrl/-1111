@@ -85,6 +85,7 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
     final cleanPostsContent =
         widget.scope == ForumMeScope.posts &&
         _activeState == AppPageState.content;
+    final showLikesLoading = widget.scope == ForumMeScope.likes && _loading;
     return ForumPageFrame(
       eyebrow: '我的论坛',
       title: config.title,
@@ -101,7 +102,9 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
         ),
       ],
       children: <Widget>[
-        if (!cleanPostsContent)
+        if (showLikesLoading)
+          const _ForumLikesLoadingPanel()
+        else if (!cleanPostsContent)
           ForumReadStateCard(
             loading: _loading,
             state: _activeState,
@@ -208,46 +211,38 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
           footer:
               '发布时间：${_compactPublishedAt(item.publishedAt)} | 最近更新：${_compactPublishedAt(item.updatedAt)}',
           actions: <Widget>[
-            FilledButton(
+            AppPrimaryButton(
+              label: '查看帖子',
               onPressed: () => Navigator.of(
                 context,
               ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
-              child: const Text('查看帖子'),
             ),
-            FilledButton.icon(
+            AppSecondaryButton(
+              icon: _editingPostIds.contains(item.postId)
+                  ? Icons.hourglass_top_rounded
+                  : Icons.edit_outlined,
+              label: item.canEdit
+                  ? _editingPostIds.contains(item.postId)
+                        ? '进入中'
+                        : '编辑帖子'
+                  : '不可编辑',
               onPressed: item.canEdit && !_editingPostIds.contains(item.postId)
                   ? () => _enterEditContinuation(item)
                   : null,
-              icon: Icon(
-                _editingPostIds.contains(item.postId)
-                    ? Icons.hourglass_top_rounded
-                    : Icons.edit_outlined,
-              ),
-              label: Text(
-                item.canEdit
-                    ? _editingPostIds.contains(item.postId)
-                          ? '进入中'
-                          : '编辑帖子'
-                    : '不可编辑',
-              ),
             ),
-            FilledButton.tonalIcon(
+            _ForumDangerButton(
+              icon: _deletingPostIds.contains(item.postId)
+                  ? Icons.hourglass_top_rounded
+                  : Icons.delete_outline_rounded,
+              label: item.canDelete
+                  ? _deletingPostIds.contains(item.postId)
+                        ? '删除中'
+                        : '删除帖子'
+                  : '不可删除',
               onPressed:
                   item.canDelete && !_deletingPostIds.contains(item.postId)
                   ? () => _deleteOwnedPost(item)
                   : null,
-              icon: Icon(
-                _deletingPostIds.contains(item.postId)
-                    ? Icons.hourglass_top_rounded
-                    : Icons.delete_outline_rounded,
-              ),
-              label: Text(
-                item.canDelete
-                    ? _deletingPostIds.contains(item.postId)
-                          ? '删除中'
-                          : '删除帖子'
-                    : '不可删除',
-              ),
             ),
           ],
         ),
@@ -279,17 +274,17 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
             footer:
                 '所属话题：${forumDisplayTopicLabel(rawLabel: item.topicLabel, topicId: item.topicId)}',
             actions: <Widget>[
-              FilledButton(
+              AppPrimaryButton(
+                label: '查看原帖',
                 onPressed: () => Navigator.of(
                   context,
                 ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
-                child: const Text('查看原帖'),
               ),
-              FilledButton.tonal(
+              AppSecondaryButton(
+                label: '回评论区',
                 onPressed: () => Navigator.of(context).pushNamed(
                   ExhibitionRoutes.forumCommentsWithPostId(item.postId),
                 ),
-                child: const Text('回评论区'),
               ),
             ],
           ),
@@ -323,17 +318,17 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
                 '发布时间：${_compactPublishedAt(item.publishedAt)} | 状态：${forumDisplayContentState(item.state)}',
             footer: '作者：${forumDisplayActorName(item.author.displayName)}',
             actions: <Widget>[
-              FilledButton(
+              AppPrimaryButton(
+                label: '查看帖子',
                 onPressed: () => Navigator.of(
                   context,
                 ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
-                child: const Text('查看帖子'),
               ),
-              FilledButton.tonal(
+              AppSecondaryButton(
+                label: '回话题',
                 onPressed: () => Navigator.of(context).pushNamed(
                   ExhibitionRoutes.forumTopicWithTopicId(item.topicId),
                 ),
-                child: const Text('回话题'),
               ),
             ],
           ),
@@ -364,16 +359,16 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
                 '发布时间：${_compactPublishedAt(item.publishedAt)} | 状态：${forumDisplayContentState(item.state)}',
             footer: '作者：${forumDisplayActorName(item.author.displayName)}',
             actions: <Widget>[
-              FilledButton(
+              AppPrimaryButton(
+                label: '查看帖子',
                 onPressed: () => Navigator.of(
                   context,
                 ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
-                child: const Text('查看帖子'),
               ),
-              FilledButton.tonal(
+              AppSecondaryButton(
+                label: '看作者',
                 onPressed: () =>
                     _openForumAuthorProfile(context, item.author.authorId),
-                child: const Text('看作者'),
               ),
             ],
           ),
@@ -446,10 +441,10 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
           summary: '这里暂时还没有持续关注的作者。',
           meta: '可以先从帖子详情进入作者主页关注',
         ),
-        FilledButton.tonal(
+        AppSecondaryButton(
+          label: '回论坛',
           onPressed: () =>
               Navigator.of(context).pushNamed(ExhibitionRoutes.forum),
-          child: const Text('回论坛'),
         ),
       ];
     }
@@ -468,19 +463,56 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
               '公开帖子 ${item.publicPostCount} | 公开评论 ${item.publicCommentCount}',
           footer: '关注时间：${_compactPublishedAt(item.followedAt)}',
           actions: <Widget>[
-            FilledButton(
+            AppPrimaryButton(
+              label: '进入主页',
               onPressed: () => _openForumAuthorProfile(context, item.authorId),
-              child: const Text('进入主页'),
             ),
-            FilledButton.tonal(
+            AppSecondaryButton(
+              label: '去消息楼',
               onPressed: () => Navigator.of(
                 context,
               ).pushNamed(AppBuilding.messages.routePath),
-              child: const Text('去消息楼'),
             ),
           ],
         ),
       ),
     ];
+  }
+}
+
+class _ForumLikesLoadingPanel extends StatelessWidget {
+  const _ForumLikesLoadingPanel();
+
+  @override
+  Widget build(BuildContext context) {
+    return AppCard(
+      withShadow: true,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          const AppStatusBadge(label: '页面提示', tone: AppStatusTone.neutral),
+          const SizedBox(height: 14),
+          Text('正在加载', style: AppTextTokens.sectionTitle),
+          const SizedBox(height: 8),
+          const Text('正在同步点赞记录，请稍候', style: AppTextTokens.body),
+          const SizedBox(height: 16),
+          const LinearProgressIndicator(minHeight: 5),
+          const SizedBox(height: 14),
+          ...List<Widget>.generate(
+            2,
+            (int index) => Padding(
+              padding: EdgeInsets.only(top: index == 0 ? 0 : 10),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F7F5),
+                  borderRadius: AppVisualTokens.radiusMediumBorder,
+                ),
+                child: const SizedBox(height: 42, width: double.infinity),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

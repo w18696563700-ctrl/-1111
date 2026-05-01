@@ -40,6 +40,15 @@ export class PlatformServiceFeeAuthorizationEntity {
   @Column({ name: 'estimated_fee_amount', type: 'numeric', precision: 12, scale: 2 })
   estimatedFeeAmount!: string | number;
 
+  @Column({ name: 'base_fee_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  baseFeeAmount!: string | number | null;
+
+  @Column({ name: 'membership_discount_rate', type: 'numeric', precision: 8, scale: 4, nullable: true })
+  membershipDiscountRate!: string | number | null;
+
+  @Column({ name: 'cap_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
+  capAmount!: string | number | null;
+
   @Column({ name: 'authorization_quota_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
   authorizationQuotaAmount!: string | number | null;
 
@@ -49,7 +58,7 @@ export class PlatformServiceFeeAuthorizationEntity {
   @Column({ name: 'released_amount', type: 'numeric', precision: 12, scale: 2, default: 0 })
   releasedAmount!: string | number;
 
-  @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '默认费率 3.0%' })
+  @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '基础平台定价规则' })
   feeRateLabel!: string;
 
   @Column({ name: 'fee_rate_source', type: 'varchar', length: 32, default: 'legacy_fixed_default' })

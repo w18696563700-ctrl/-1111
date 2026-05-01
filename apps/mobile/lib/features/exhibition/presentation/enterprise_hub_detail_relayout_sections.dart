@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_detail_company_hero_overlay.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_detail_relayout_support.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_detail_surface_widgets.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_shared.dart';
+import 'package:mobile/features/exhibition/presentation/presentation_support/external_map_launcher.dart';
 
 class EnterpriseDetailOverviewCard extends StatefulWidget {
   const EnterpriseDetailOverviewCard({super.key, required this.data});
@@ -63,9 +63,9 @@ class _EnterpriseDetailOverviewCardState
               EnterpriseDetailImageFrame(
                 imageUrl: fallbackHeroImageUrl,
                 fallback:
-                    enterpriseDetailDisplayName(widget.data)
-                        .characters
-                        .firstOrNull ??
+                    enterpriseDetailDisplayName(
+                      widget.data,
+                    ).characters.firstOrNull ??
                     '企',
               )
             else
@@ -82,9 +82,9 @@ class _EnterpriseDetailOverviewCardState
                   return EnterpriseDetailImageFrame(
                     imageUrl: heroImages[index],
                     fallback:
-                        enterpriseDetailDisplayName(widget.data)
-                            .characters
-                            .firstOrNull ??
+                        enterpriseDetailDisplayName(
+                          widget.data,
+                        ).characters.firstOrNull ??
                         '企',
                   );
                 },
@@ -218,19 +218,29 @@ class _EnterpriseDetailLocationMapCard extends StatelessWidget {
 
   Future<void> _openMap(BuildContext context) async {
     final mapLinkUrl = location.mapLinkUrl?.trim();
-    if (mapLinkUrl == null || mapLinkUrl.isEmpty) {
+    if (!location.hasCoordinates &&
+        (mapLinkUrl == null || mapLinkUrl.isEmpty)) {
       return;
     }
     try {
-      await launchUrlString(mapLinkUrl, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      if (!context.mounted) {
+      final opened = await launchExternalMapWithFallback(
+        latitude: location.latitude,
+        longitude: location.longitude,
+        address: location.displayAddress,
+        mapLinkUrl: mapLinkUrl,
+      );
+      if (opened) {
         return;
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('当前设备暂时无法直接打开地图，请稍后再试。')),
-      );
+    } catch (_) {
+      // The user-facing fallback is shown below.
     }
+    if (!context.mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('当前设备暂时无法直接打开地图，请稍后再试。')));
   }
 
   @override
@@ -238,6 +248,9 @@ class _EnterpriseDetailLocationMapCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final displayAddress = location.displayAddress ?? '当前企业位置已解析。';
     final mapLinkUrl = location.mapLinkUrl?.trim();
+    final canOpenMap =
+        location.hasCoordinates ||
+        (mapLinkUrl != null && mapLinkUrl.isNotEmpty);
     if (location.hasMapPreview) {
       return Container(
         width: double.infinity,
@@ -286,10 +299,7 @@ class _EnterpriseDetailLocationMapCard extends StatelessWidget {
                     right: 12,
                     bottom: 12,
                     child: FilledButton.tonalIcon(
-                      onPressed:
-                          mapLinkUrl == null || mapLinkUrl.isEmpty
-                              ? null
-                              : () => _openMap(context),
+                      onPressed: canOpenMap ? () => _openMap(context) : null,
                       style: FilledButton.styleFrom(
                         backgroundColor: colorScheme.primary,
                         foregroundColor: colorScheme.onPrimary,
@@ -386,7 +396,7 @@ class _EnterpriseDetailLocationMapCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (mapLinkUrl != null && mapLinkUrl.isNotEmpty)
+                    if (canOpenMap)
                       FilledButton.tonalIcon(
                         onPressed: () => _openMap(context),
                         style: FilledButton.styleFrom(

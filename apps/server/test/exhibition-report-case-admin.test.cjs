@@ -24,7 +24,23 @@ function makeService(options = {}) {
   };
   const txCaseRepository = {
     findOneBy: async ({ id }) => caseById.get(id) ?? null,
+    findOne: async ({ where }) => {
+      const statuses = readFindOperatorValues(where?.status);
+      return (
+        cases.find(
+          (item) =>
+            item.reporterUserId === where?.reporterUserId &&
+            item.targetType === where?.targetType &&
+            item.targetId === where?.targetId &&
+            item.reasonCode === where?.reasonCode &&
+            statuses.includes(item.status)
+        ) ?? null
+      );
+    },
     save: async (reportCase) => {
+      if (!caseById.has(reportCase.id)) {
+        cases.push(reportCase);
+      }
       caseById.set(reportCase.id, reportCase);
       return reportCase;
     }
@@ -43,6 +59,11 @@ function makeService(options = {}) {
     })
   };
   const eligibility = {
+    requireAuthenticatedActor: async () => ({ id: context.userId, status: 'active' }),
+    getCurrentOrganizationScope: async () => ({
+      organization: { id: 'org-reporter-1' },
+      roleKeys: ['supplier_admin']
+    }),
     requireReviewer: async () => ({ actorRole: 'platform_reviewer' })
   };
   const auditService = {
@@ -77,6 +98,19 @@ function makeService(options = {}) {
     cases,
     auditRecords
   };
+}
+
+function readFindOperatorValues(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  if (Array.isArray(value?._value)) {
+    return value._value;
+  }
+  if (Array.isArray(value?.value)) {
+    return value.value;
+  }
+  return [];
 }
 
 function makeQueryBuilder(items) {
@@ -129,6 +163,66 @@ function makeReportCase(overrides = {}) {
     ...overrides
   };
 }
+
+test('app submit creates minimum exhibition report case input and audits once', async () => {
+  const { service, cases, auditRecords } = makeService();
+
+  const response = await service.submit(
+    {
+      targetType: 'project',
+      targetId: 'project-report-1',
+      reasonCode: 'fabricated_project',
+      reasonDetail: 'Project materials look fabricated.',
+      evidenceFileAssetIds: ['asset-1', 'asset-1', 'asset-2']
+    },
+    context
+  );
+
+  assert.match(response.reportCaseId, /^report-case-[a-z0-9]{24}$/);
+  assert.equal(response.targetType, 'project');
+  assert.equal(response.targetId, 'project-report-1');
+  assert.equal(response.status, 'submitted');
+  assert.equal(response.acceptMode, 'created');
+  assert.equal(response.traceId, context.traceId);
+  assert.equal(cases.length, 1);
+  assert.equal(cases[0].reporterUserId, context.userId);
+  assert.equal(cases[0].reporterOrganizationId, 'org-reporter-1');
+  assert.deepEqual(cases[0].evidenceFileAssetIds, ['asset-1', 'asset-2']);
+  assert.equal(cases[0].metadata.source, 'app_exhibition_report_submit');
+  assert.equal(auditRecords.length, 1);
+  assert.equal(auditRecords[0].action, 'exhibition_report_case_submit');
+  assert.equal(auditRecords[0].actorRole, 'supplier_admin');
+});
+
+test('app submit returns existing active case without creating duplicate audit', async () => {
+  const existing = makeReportCase({
+    id: 'report-case-existing-1',
+    targetId: 'project-report-1',
+    reporterUserId: context.userId,
+    status: 'under_review'
+  });
+  const { service, cases, auditRecords } = makeService({ cases: [existing] });
+
+  const response = await service.submit(
+    {
+      targetType: 'project',
+      targetId: 'project-report-1',
+      reasonCode: 'fabricated_project'
+    },
+    context
+  );
+
+  assert.deepEqual(response, {
+    reportCaseId: 'report-case-existing-1',
+    targetType: 'project',
+    targetId: 'project-report-1',
+    status: 'under_review',
+    acceptMode: 'existing_active',
+    traceId: context.traceId
+  });
+  assert.equal(cases.length, 1);
+  assert.equal(auditRecords.length, 0);
+});
 
 test('report-case queue list and detail expose minimum admin adjudication desk projections', async () => {
   const createdAt = new Date('2026-04-10T03:00:00.000Z');

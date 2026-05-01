@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
+import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_published_change_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_workbench_consumer_layer.dart';
@@ -13,13 +14,14 @@ import 'package:mobile/shell/context/app_shell_scope.dart';
 
 void main() {
   tearDown(() {
+    ChinaRegionCatalogLoader.reset();
     EnterpriseHubConsumerLayer.reset();
     EnterpriseHubPublishedChangeConsumerLayer.reset();
     EnterpriseHubWorkbenchConsumerLayer.reset();
     ProfileIdentityConsumerLayer.reset();
   });
 
-  testWidgets('company workbench uses the stage-1 relayout skeleton', (
+  testWidgets('company workbench uses compact homepage and module drill-in', (
     WidgetTester tester,
   ) async {
     _installWorkbenchDependencies();
@@ -29,78 +31,211 @@ void main() {
       initialRoute: ExhibitionRoutes.companyDisplayWorkbench,
     );
 
-    final headerFinder = find.byKey(
-      const ValueKey<String>('enterprise-workbench-header-section'),
-    );
-    final displayFinder = find.byKey(
-      const ValueKey<String>(
-        'enterprise-workbench-display-identification-section',
-      ),
-    );
-    final albumFinder = find.byKey(
-      const ValueKey<String>('enterprise-workbench-album-section'),
-    );
-    final mapFinder = find.byKey(
-      const ValueKey<String>('enterprise-workbench-map-location-section'),
-    );
-    final basicFinder = find.byKey(
-      const ValueKey<String>('enterprise-workbench-basic-section'),
-    );
-    final submitFinder = find.byKey(
-      const ValueKey<String>('enterprise-workbench-submit-section'),
-    );
-
-    expect(headerFinder, findsOneWidget);
-    expect(displayFinder, findsOneWidget);
     expect(
-      tester.getTopLeft(headerFinder).dy,
-      lessThan(tester.getTopLeft(displayFinder).dy),
+      find.byKey(const ValueKey<String>('company-workbench-homepage')),
+      findsOneWidget,
+    );
+    expect(find.text('公司展示工作台'), findsOneWidget);
+    expect(find.text('西南会展搭建有限公司'), findsOneWidget);
+    expect(find.text('快捷入口'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('company-workbench-completeness')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('信息完整度'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('company-workbench-module-entries')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('核心信息概览'), findsOneWidget);
+    expect(find.text('最新动态'), findsNothing);
+    expect(find.text('暂无动态'), findsNothing);
+    expect(find.text('数据看板'), findsNothing);
+    expect(find.text('暂无数据'), findsNothing);
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'enterprise-workbench-display-identification-section',
+        ),
+      ),
+      findsNothing,
+    );
+    expect(find.text('服务城市（逗号分隔）'), findsNothing);
+    expect(find.text('最大项目规模'), findsNothing);
+    expect(find.text('资质说明'), findsNothing);
+
+    await tester.drag(find.byType(Scrollable).first, const Offset(0, 1200));
+    await tester.pumpAndSettle();
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('company-workbench-module-展示标识')),
+      180,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('company-workbench-module-展示标识')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('展示标识'), findsWidgets);
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'enterprise-workbench-display-identification-section',
+        ),
+      ),
+      findsOneWidget,
     );
     expect(find.text('公司名称'), findsOneWidget);
     expect(find.text('公司位置'), findsOneWidget);
     expect(find.text('公司信用评分（建设中）'), findsOneWidget);
-    expect(find.text('服务城市（逗号分隔）'), findsNothing);
-    expect(find.text('最大项目规模'), findsNothing);
-    expect(find.text('资质说明'), findsNothing);
-    await tester.scrollUntilVisible(
-      albumFinder,
-      180,
-      scrollable: find.byType(Scrollable).first,
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('company-workbench-module-基础资料')),
     );
-    expect(albumFinder, findsOneWidget);
-    await tester.scrollUntilVisible(
-      mapFinder,
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(mapFinder, findsOneWidget);
-    expect(find.text('位置补充说明（选填）'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      basicFinder,
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(basicFinder, findsOneWidget);
+    await tester.pumpAndSettle();
+
     expect(find.text('一句话简介'), findsNothing);
     expect(find.text('公司介绍（2000字以内）'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      find.text('公开展示联系人'),
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(find.text('公开展示联系人'), findsOneWidget);
-    await tester.scrollUntilVisible(
-      submitFinder,
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(submitFinder, findsOneWidget);
     expect(
       find.byWidgetPredicate(
         (widget) => widget is SegmentedButton<EnterpriseBoardType>,
       ),
       findsNothing,
     );
+  });
+
+  testWidgets('factory workbench uses compact homepage and module drill-in', (
+    WidgetTester tester,
+  ) async {
+    _installWorkbenchDependencies(
+      boardType: EnterpriseBoardType.factory,
+      workbenchPayload: _buildFactoryWorkbenchPayload(),
+    );
+
+    await _pumpWorkbench(
+      tester,
+      initialRoute: ExhibitionRoutes.factoryDisplayWorkbench,
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>('factory-workbench-homepage')),
+      findsOneWidget,
+    );
+    expect(find.text('工厂展示工作台'), findsOneWidget);
+    expect(find.text('重庆海川展览工厂'), findsOneWidget);
+    expect(find.text('快捷入口'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'enterprise-workbench-display-identification-section',
+        ),
+      ),
+      findsNothing,
+    );
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('factory-workbench-activity-empty')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('最新动态'), findsOneWidget);
+    expect(find.text('暂无动态'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('factory-workbench-analytics-empty')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('数据看板'), findsOneWidget);
+    expect(find.text('暂无数据'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('factory-workbench-highlights')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('工厂亮点'), findsOneWidget);
+    expect(find.text('厂房面积'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('company-workbench-module-展示标识')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.tap(
+      find.byKey(const ValueKey<String>('company-workbench-module-展示标识')),
+    );
+    await tester.pumpAndSettle();
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'enterprise-workbench-display-identification-section',
+        ),
+      ),
+      findsOneWidget,
+    );
+    final factoryNameFinder = find.byKey(
+      const ValueKey<String>('enterprise-workbench-factory-name-field'),
+    );
+    await tester.ensureVisible(factoryNameFinder);
+    await tester.pumpAndSettle();
+    expect(factoryNameFinder, findsOneWidget);
+  });
+
+  testWidgets('supplier workbench uses compact homepage and module drill-in', (
+    WidgetTester tester,
+  ) async {
+    _installWorkbenchDependencies(
+      boardType: EnterpriseBoardType.supplier,
+      workbenchPayload: _buildSupplierWorkbenchPayload(),
+    );
+
+    await _pumpWorkbench(
+      tester,
+      initialRoute: ExhibitionRoutes.supplierDisplayWorkbench,
+    );
+
+    expect(
+      find.byKey(const ValueKey<String>('supplier-workbench-homepage')),
+      findsOneWidget,
+    );
+    expect(find.text('供应商展示工作台'), findsOneWidget);
+    expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
+    expect(find.text('模块管理'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.byKey(const ValueKey<String>('supplier-workbench-homepage-preview')),
+      220,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('公开展示预览'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'enterprise-workbench-display-identification-section',
+        ),
+      ),
+      findsNothing,
+    );
+    expect(
+      find.byKey(const ValueKey<String>('supplier-workbench-bottom-status')),
+      findsOneWidget,
+    );
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('supplier-workbench-module-服务能力')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('服务能力'), findsOneWidget);
+    expect(
+      find.byKey(
+        const ValueKey<String>(
+          'enterprise-workbench-display-identification-section',
+        ),
+      ),
+      findsOneWidget,
+    );
+    expect(find.text('供应模式'), findsNothing);
   });
 
   testWidgets('published change mode keeps snapshot corridor after relayout', (
@@ -117,17 +252,14 @@ void main() {
           ),
     );
 
-    expect(find.text('公司展示变更工作台'), findsOneWidget);
+    expect(
+      find.byKey(const ValueKey<String>('company-workbench-homepage')),
+      findsOneWidget,
+    );
+    expect(find.text('公司展示工作台'), findsOneWidget);
+    expect(find.text('快捷入口'), findsOneWidget);
     final snapshotFinder = find.byKey(
       const ValueKey<String>('enterprise-published-change-snapshot-section'),
-    );
-    final displayFinder = find.byKey(
-      const ValueKey<String>(
-        'enterprise-workbench-display-identification-section',
-      ),
-    );
-    final albumFinder = find.byKey(
-      const ValueKey<String>('enterprise-workbench-album-section'),
     );
     final submitFinder = find.byKey(
       const ValueKey<String>('enterprise-workbench-submit-section'),
@@ -138,8 +270,15 @@ void main() {
     final livePreviewFinder = find.byKey(
       const ValueKey<String>('enterprise-published-live-preview-section'),
     );
+    expect(snapshotFinder, findsNothing);
+    expect(livePreviewFinder, findsNothing);
+
+    await tester.tap(
+      find.byKey(const ValueKey<String>('company-workbench-bottom-status')),
+    );
+    await tester.pumpAndSettle();
+
     expect(snapshotFinder, findsOneWidget);
-    expect(livePreviewFinder, findsOneWidget);
     expect(
       find.byKey(
         const ValueKey<String>('enterprise-published-change-current-snapshot'),
@@ -170,13 +309,27 @@ void main() {
       ),
       findsOneWidget,
     );
+
     await tester.scrollUntilVisible(
-      livePreviewFinder,
-      180,
+      submitFinder,
+      220,
       scrollable: find.byType(Scrollable).first,
     );
+    expect(submitFinder, findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(
+      find.byKey(const ValueKey<String>('company-workbench-quick-preview')),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(const ValueKey<String>('company-workbench-quick-preview')),
+    );
+    await tester.pumpAndSettle();
+
     expect(livePreviewFinder, findsOneWidget);
-    expect(find.text('线上公开展示'), findsOneWidget);
+    expect(find.text('线上公开展示'), findsWidgets);
     await tester.ensureVisible(
       find
           .byKey(
@@ -201,13 +354,29 @@ void main() {
     expect(find.text('认证主体'), findsOneWidget);
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
+
+    await tester.tap(find.byTooltip('Back'));
+    await tester.pumpAndSettle();
     await tester.scrollUntilVisible(
-      previewFinder,
+      find.byKey(const ValueKey<String>('company-workbench-preview-summary')),
       180,
       scrollable: find.byType(Scrollable).first,
     );
+    await tester.ensureVisible(
+      find.byKey(
+        const ValueKey<String>('company-workbench-preview-draft-entry'),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(
+      find.byKey(
+        const ValueKey<String>('company-workbench-preview-draft-entry'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
     expect(previewFinder, findsOneWidget);
-    expect(find.text('当前变更稿预览'), findsOneWidget);
+    expect(find.text('当前变更稿预览'), findsWidgets);
     expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsNothing);
     final previewToggle = find.byKey(
       const ValueKey<String>('enterprise-published-change-preview-toggle'),
@@ -243,24 +412,6 @@ void main() {
     expect(find.text('认证主体'), findsOneWidget);
     await tester.tapAt(const Offset(20, 20));
     await tester.pumpAndSettle();
-    await tester.scrollUntilVisible(
-      displayFinder,
-      180,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(displayFinder, findsOneWidget);
-    await tester.scrollUntilVisible(
-      albumFinder,
-      180,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(albumFinder, findsOneWidget);
-    await tester.scrollUntilVisible(
-      submitFinder,
-      220,
-      scrollable: find.byType(Scrollable).first,
-    );
-    expect(submitFinder, findsOneWidget);
   });
 
   test('company profile update body preserves hidden legacy fields', () {
@@ -305,17 +456,33 @@ Future<void> _pumpWorkbench(
   await tester.pumpAndSettle();
 }
 
-void _installWorkbenchDependencies({Map<String, Object?>? workbenchPayload}) {
+void _installWorkbenchDependencies({
+  EnterpriseBoardType boardType = EnterpriseBoardType.company,
+  Map<String, Object?>? workbenchPayload,
+}) {
+  _installRegionCatalogFixture();
+  final workbenchPath = switch (boardType) {
+    EnterpriseBoardType.company =>
+      '/api/app/exhibition/enterprise-hub/company/workbench',
+    EnterpriseBoardType.factory =>
+      '/api/app/exhibition/enterprise-hub/factory/workbench',
+    EnterpriseBoardType.supplier =>
+      '/api/app/exhibition/enterprise-hub/supplier/workbench',
+  };
   EnterpriseHubWorkbenchConsumerLayer.install(
     EnterpriseHubWorkbenchConsumerLayer(
       client: AppApiClient(
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-            'GET /api/app/exhibition/enterprise-hub/company/workbench':
-                (AppApiRequest request) async => AppApiResponse(
+            'GET $workbenchPath': (AppApiRequest request) async =>
+                AppApiResponse(
                   statusCode: 200,
                   uri: request.uri,
-                  body: workbenchPayload ?? _buildWorkbenchPayload(),
+                  body:
+                      workbenchPayload ??
+                      (boardType == EnterpriseBoardType.supplier
+                          ? _buildSupplierWorkbenchPayload()
+                          : _buildWorkbenchPayload()),
                 ),
           },
         ),
@@ -330,6 +497,7 @@ void _installPublishedChangeDependencies({
   Map<String, Object?>? statusPayload,
   Map<String, Object?>? liveDetailPayload,
 }) {
+  _installRegionCatalogFixture();
   EnterpriseHubPublishedChangeConsumerLayer.install(
     EnterpriseHubPublishedChangeConsumerLayer(
       client: AppApiClient(
@@ -377,6 +545,39 @@ void _installPublishedChangeDependencies({
     ),
   );
   ProfileIdentityConsumerLayer.install(_buildProfileIdentityConsumer());
+}
+
+void _installRegionCatalogFixture() {
+  ChinaRegionCatalogLoader.installLoadOverrideForTest(
+    () async => ChinaRegionCatalog(
+      provinces: const <ChinaProvinceOption>[
+        ChinaProvinceOption(
+          provinceCode: '500000',
+          provinceName: '重庆',
+          cities: <ChinaCityOption>[
+            ChinaCityOption(
+              provinceCode: '500000',
+              provinceName: '重庆',
+              cityCode: '500100',
+              cityName: '重庆',
+            ),
+          ],
+        ),
+        ChinaProvinceOption(
+          provinceCode: '510000',
+          provinceName: '四川',
+          cities: <ChinaCityOption>[
+            ChinaCityOption(
+              provinceCode: '510000',
+              provinceName: '四川',
+              cityCode: '510100',
+              cityName: '成都',
+            ),
+          ],
+        ),
+      ],
+    ),
+  );
 }
 
 ProfileIdentityConsumerLayer _buildProfileIdentityConsumer() {
@@ -494,6 +695,136 @@ Map<String, Object?> _buildWorkbenchPayload() {
       'certificationApproved': true,
       'submitReady': false,
       'blockers': <String>['请先补案例'],
+    },
+  };
+}
+
+Map<String, Object?> _buildFactoryWorkbenchPayload() {
+  return <String, Object?>{
+    'organizationId': 'org-1',
+    'enterpriseId': 'ent-factory-1',
+    'boardType': 'factory',
+    'latestApplication': const <String, Object?>{
+      'applicationId': 'app-factory-1',
+      'applicationStatus': 'draft',
+    },
+    'basic': const <String, Object?>{
+      'name': '重庆海川展览服务有限公司',
+      'shortIntro': '主打展台木作与结构制作。',
+      'fullIntro': '工厂完整介绍',
+      'provinceCode': '500000',
+      'provinceName': '重庆',
+      'cityCode': '500100',
+      'cityName': '重庆',
+      'address': '重庆市江北区洋河二村 73 号',
+      'foundedAt': '2018-08-08',
+      'cooperationModes': <String>['host_service'],
+      'contactVisible': true,
+    },
+    'boardProfile': const <String, Object?>{
+      'factoryName': '重庆海川展览工厂',
+      'processTypes': <String>['木作'],
+      'coreProducts': <String>['展台搭建'],
+      'equipmentList': <String>['雕刻机*2'],
+      'plantAreaSqm': 1800,
+    },
+    'primaryContact': const <String, Object?>{
+      'contactName': '李工',
+      'mobile': '13800000001',
+      'isPrimary': true,
+      'visibleToPublic': true,
+    },
+    'cases': const <Object?>[],
+    'certification': const <String, Object?>{
+      'certificationStatus': 'approved',
+      'legalName': '重庆海川展览服务有限公司',
+      'uscc': '91500100TEST12345',
+      'licenseFileId': 'license-factory-1',
+      'submittedAt': '2026-03-01',
+      'reviewedAt': '2026-03-05',
+    },
+    'readiness': const <String, Object?>{
+      'hasApplication': true,
+      'draftEditable': true,
+      'basicCompleted': true,
+      'profileCompleted': true,
+      'hasCase': false,
+      'hasContact': true,
+      'certificationApproved': true,
+      'submitReady': false,
+      'blockers': <String>['请先补案例'],
+    },
+  };
+}
+
+Map<String, Object?> _buildSupplierWorkbenchPayload() {
+  return <String, Object?>{
+    'organizationId': 'org-1',
+    'enterpriseId': 'ent-supplier-1',
+    'boardType': 'supplier',
+    'latestApplication': const <String, Object?>{
+      'applicationId': 'app-supplier-1',
+      'applicationStatus': 'draft',
+    },
+    'basic': const <String, Object?>{
+      'name': '重庆坤特展览展示有限公司',
+      'shortIntro': '供应展具、家具与多媒体设备。',
+      'fullIntro': '供应商完整介绍',
+      'provinceCode': '500000',
+      'provinceName': '重庆',
+      'cityCode': '500100',
+      'cityName': '重庆',
+      'address': '重庆市南岸区学府大道 33 号',
+      'foundedAt': '2018-06-18',
+      'teamSizeRange': '31_100',
+      'cooperationModes': <String>['host_service', 'long_term_cooperation'],
+      'contactVisible': true,
+    },
+    'boardProfile': const <String, Object?>{
+      'supplyCategories': <String>['广告喷绘公司'],
+      'coreProductsOrServices': <String>['标准展具', '租赁家具'],
+      'responseSlaDesc': '2 小时内响应',
+      'deliveryRange': '重庆及周边城市',
+    },
+    'primaryContact': const <String, Object?>{
+      'contactName': '张先生',
+      'mobile': '13812345678',
+      'isPrimary': true,
+      'visibleToPublic': true,
+    },
+    'cases': const <Object?>[
+      <String, Object?>{
+        'caseId': 'case-supplier-1',
+        'boardType': 'supplier',
+        'title': '重庆国际博览会 2024',
+        'exhibitionType': '展具租赁',
+        'city': '重庆',
+        'eventTime': '2024-05-01',
+        'summary': '标准展具和现场配送支持。',
+        'caseCoverFileAssetId': 'case-cover-1',
+        'caseMediaFileAssetIds': <String>['case-cover-1'],
+        'isFeatured': true,
+        'caseStatus': 'draft',
+      },
+    ],
+    'certification': const <String, Object?>{
+      'certificationStatus': 'approved',
+      'legalName': '重庆坤特展览展示有限公司',
+      'uscc': '91500100TEST12345',
+      'licenseFileId': 'license-supplier-1',
+      'submittedAt': '2026-03-01',
+      'reviewedAt': '2026-03-05',
+    },
+    'readiness': const <String, Object?>{
+      'hasApplication': true,
+      'draftEditable': true,
+      'basicCompleted': true,
+      'profileCompleted': true,
+      'hasCase': true,
+      'hasContact': true,
+      'certificationApproved': true,
+      'submitReady': true,
+      'blockers': <String>[],
     },
   };
 }

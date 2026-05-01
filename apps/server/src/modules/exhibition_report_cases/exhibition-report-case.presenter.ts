@@ -57,6 +57,21 @@ export class ExhibitionReportCasePresenter {
     };
   }
 
+  toSubmitResponse(
+    reportCase: ExhibitionReportCaseEntity,
+    acceptMode: 'created' | 'existing_active',
+    traceId: string
+  ) {
+    return {
+      reportCaseId: reportCase.id,
+      targetType: reportCase.targetType,
+      targetId: reportCase.targetId,
+      status: reportCase.status,
+      acceptMode,
+      traceId
+    };
+  }
+
   private toIso(value: Date | null | undefined) {
     return value ? value.toISOString() : null;
   }

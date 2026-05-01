@@ -112,9 +112,9 @@ function buildServerAdminHeaders(input: {
   const outgoing: Record<string, string> = {
     'x-admin-client': 'admin-governance-console'
   };
-  const authorization =
-    readForwardHeader(input.incomingHeaders, 'authorization') ??
-    toAdminAuthorizationCarrier(input.sessionCarrier);
+  // Admin runtime carrier truth comes from the verified admin_session cookie.
+  // Incoming Authorization is not a production carrier source for Admin.
+  const authorization = toAdminAuthorizationCarrier(input.sessionCarrier);
   if (authorization) {
     outgoing.authorization = authorization;
   }

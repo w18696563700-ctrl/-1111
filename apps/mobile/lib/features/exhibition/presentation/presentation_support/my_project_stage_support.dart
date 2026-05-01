@@ -2,7 +2,14 @@ part of '../exhibition_trade_pages.dart';
 
 enum _MyProjectWorkspaceBucket { published, bids }
 
-enum _MyProjectStageBucket { draft, submitted, published, active, archived }
+enum _MyProjectStageBucket {
+  all,
+  draft,
+  submitted,
+  published,
+  active,
+  archived,
+}
 
 enum _MyProjectLifecycleActionKind {
   publish,
@@ -91,6 +98,15 @@ _MyProjectWorkspaceOption _myProjectWorkspaceOption(
 
 const List<_MyProjectStageOption> _myProjectPrimaryStageOptions =
     <_MyProjectStageOption>[
+      _MyProjectStageOption(
+        value: _MyProjectStageBucket.all,
+        label: '全部',
+        description: '展示当前已读取的全部我的发布项目。',
+        cardNextStep: '按项目当前阶段处理',
+        detailNextStep: '按项目当前阶段处理。',
+        emptyTitle: '当前没有项目',
+        emptyMessage: '当前还没有可展示的我的发布项目。',
+      ),
       _MyProjectStageOption(
         value: _MyProjectStageBucket.draft,
         label: '草稿',
@@ -270,6 +286,18 @@ _MyProjectStageBucket _myProjectStageBucketFromState(String? state) {
   };
 }
 
+_MyProjectStageBucket? _myProjectStageBucketFromRoute(String? stage) {
+  return switch (_normalizeId(stage)) {
+    'all' => _MyProjectStageBucket.all,
+    'draft' => _MyProjectStageBucket.draft,
+    'submitted' => _MyProjectStageBucket.submitted,
+    'published' => _MyProjectStageBucket.published,
+    'active' => _MyProjectStageBucket.active,
+    'archived' => _MyProjectStageBucket.archived,
+    _ => null,
+  };
+}
+
 List<Map<String, Object?>> _myProjectAllItemsFromPayload(Object? payload) {
   final combined = <Map<String, Object?>>[
     ..._myProjectGroupItemsFromPayload(payload, 'ongoingProjects'),
@@ -299,6 +327,9 @@ List<Map<String, Object?>> _myProjectItemsForStage(
   Object? payload,
   _MyProjectStageBucket stage,
 ) {
+  if (stage == _MyProjectStageBucket.all) {
+    return _myProjectAllItemsFromPayload(payload);
+  }
   if (stage == _MyProjectStageBucket.archived) {
     return _myProjectArchivedItemsFromPayload(payload);
   }
@@ -326,6 +357,7 @@ List<Map<String, Object?>> _myProjectArchivedItemsFromPayload(Object? payload) {
 _MyProjectStageBucket _myProjectPreferredStageFromPayload(Object? payload) {
   for (final option in _myProjectPrimaryStageOptions.where(
     (_MyProjectStageOption option) =>
+        option.value != _MyProjectStageBucket.all &&
         option.value != _MyProjectStageBucket.draft,
   )) {
     if (_myProjectItemsForStage(payload, option.value).isNotEmpty) {

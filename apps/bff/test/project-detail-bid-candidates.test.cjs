@@ -33,6 +33,7 @@ function createProjectDetail(overrides = {}) {
     cityName: '重庆市',
     plannedStartAt: '2026-05-16',
     plannedEndAt: '2026-05-23',
+    publishedAt: '2026-04-30T08:15:00.000Z',
     state: 'published',
     nameAccess: {
       status: 'visible',

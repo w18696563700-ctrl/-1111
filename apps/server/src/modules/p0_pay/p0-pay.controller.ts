@@ -5,7 +5,9 @@ import { resolveRequestContext } from '../../shared/request-context';
 import { P0PayCallbackService } from './p0-pay-callback.service';
 import { P0PayContractConfirmationService } from './p0-pay-contract-confirmation.service';
 import { P0PayInquiryDepositService } from './p0-pay-inquiry-deposit.service';
+import { P0PayRefundService } from './p0-pay-refund.service';
 import { P0PayServiceFeeAuthorizationService } from './p0-pay-service-fee-authorization.service';
+import { P0PaySettlementService } from './p0-pay-settlement.service';
 import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
 
 @Controller()
@@ -15,6 +17,8 @@ export class P0PayController {
     private readonly tradeTaskService: P0PayTradeTaskService,
     private readonly inquiryDepositService: P0PayInquiryDepositService,
     private readonly contractConfirmationService: P0PayContractConfirmationService,
+    private readonly refundService: P0PayRefundService,
+    private readonly settlementService: P0PaySettlementService,
     private readonly callbackService: P0PayCallbackService
   ) {}
 
@@ -157,6 +161,37 @@ export class P0PayController {
     );
   }
 
+  @Post('server/exhibition/trade-tasks/:taskId/inquiry-deposit/orders/:depositOrderId/refund-init')
+  @HttpCode(202)
+  refundInquiryDeposit(
+    @Param('taskId') taskId: string,
+    @Param('depositOrderId') depositOrderId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.refundService.requestProjectAuthenticitySincerityRefund(
+      taskId,
+      depositOrderId,
+      body,
+      this.context(headers, request)
+    );
+  }
+
+  @Get('server/exhibition/trade-tasks/:taskId/inquiry-deposit/orders/:depositOrderId/refund')
+  getInquiryDepositRefund(
+    @Param('taskId') taskId: string,
+    @Param('depositOrderId') depositOrderId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.refundService.getProjectAuthenticitySincerityRefund(
+      taskId,
+      depositOrderId,
+      this.context(headers, request)
+    );
+  }
+
   @Post('server/exhibition/trade-tasks/:taskId/inquiry-quotations')
   @HttpCode(202)
   submitInquiryQuotation(
@@ -212,6 +247,34 @@ export class P0PayController {
     return this.tradeTaskService.getP0PaySummary(projectId, this.context(headers, request));
   }
 
+  @Get('server/project/:projectId/settlement/summary')
+  getProjectSettlementSummary(
+    @Param('projectId') projectId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.settlementService.getProjectSettlementSummary(projectId, this.context(headers, request));
+  }
+
+  @Post('server/project/:projectId/settlement/batch-draft')
+  @HttpCode(202)
+  createProjectSettlementBatchDraft(
+    @Param('projectId') projectId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.settlementService.createProjectSettlementBatchDraft(projectId, this.context(headers, request));
+  }
+
+  @Get('server/project/:projectId/settlement/reconciliation')
+  getProjectReconciliationSummary(
+    @Param('projectId') projectId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.settlementService.getProjectReconciliationSummary(projectId, this.context(headers, request));
+  }
+
   @Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/release-non-winning')
   @HttpCode(202)
   releaseNonWinning(
@@ -246,7 +309,7 @@ export class P0PayController {
   }
 
   @Post('server/exhibition/p0-pay/payment-callbacks/:paymentChannel')
-  @HttpCode(202)
+  @HttpCode(200)
   handlePaymentCallback(
     @Param('paymentChannel') paymentChannel: string,
     @Body() body: Record<string, unknown>,
@@ -258,7 +321,12 @@ export class P0PayController {
       body,
       this.readHeader(headers, 'x-p0-pay-signature'),
       this.context(headers, request)
-    );
+    ).then((result) => {
+      if (paymentChannel === 'alipay' && body && typeof body === 'object' && 'sign' in body) {
+        return result.verificationStatus === 'verified' ? 'success' : 'failure';
+      }
+      return result;
+    });
   }
 
   private context(headers: HeaderBag, request: Request) {

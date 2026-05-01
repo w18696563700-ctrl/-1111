@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
@@ -5,6 +7,7 @@ import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
+import 'package:mobile/shell/context/app_shell_scope.dart';
 
 part 'messages_page_support.dart';
 
@@ -32,6 +35,7 @@ class _MessagesPageState extends State<MessagesPage> {
       >{};
   _MessagesInteractionTab? _selectedTab;
   MessageInteractionListResult? _projectCommunicationResult;
+  AppNotificationListResult? _notificationResult;
   ValueListenable<int>? _refreshSignal;
   ValueListenable<int>? _entrySignal;
   int _lastRefreshTick = 0;
@@ -40,12 +44,15 @@ class _MessagesPageState extends State<MessagesPage> {
   int _latestReminderLoadToken = 0;
   bool _loading = false;
   bool _projectCommunicationLoading = false;
+  bool _notificationLoading = false;
+  bool _notificationCenterExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _bindRefreshSignal(widget.refreshSignal);
     _bindEntrySignal(widget.entrySignal);
+    _loadNotifications();
     _loadProjectCommunication();
   }
 
@@ -115,6 +122,7 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _refreshAll({bool showLoading = true}) async {
     final tasks = <Future<void>>[
+      _loadNotifications(showLoading: showLoading),
       _loadProjectCommunication(showLoading: showLoading),
     ];
     final selectedTab = _selectedTab;
@@ -168,6 +176,21 @@ class _MessagesPageState extends State<MessagesPage> {
     });
   }
 
+  Future<void> _loadNotifications({bool showLoading = true}) async {
+    final shouldShowLoading = showLoading || _notificationResult == null;
+    if (shouldShowLoading) {
+      setState(() => _notificationLoading = true);
+    }
+    final result = await MessagesConsumerLayer.instance.loadNotifications();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _notificationResult = result;
+      _notificationLoading = false;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final selectedTab = _selectedTab;
@@ -185,6 +208,22 @@ class _MessagesPageState extends State<MessagesPage> {
         physics: const AlwaysScrollableScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
         children: <Widget>[
+          if (_notificationLoading || _notificationResult != null) ...<Widget>[
+            _MessagesNotificationCenterSection(
+              loading: _notificationLoading,
+              expanded: _notificationCenterExpanded,
+              result: _notificationResult,
+              onToggleExpanded: () {
+                setState(
+                  () => _notificationCenterExpanded =
+                      !_notificationCenterExpanded,
+                );
+              },
+              onOpen: _openNotification,
+              onRetry: () => _loadNotifications(),
+            ),
+            const SizedBox(height: 14),
+          ],
           if (_projectCommunicationLoading ||
               _projectCommunicationResult != null) ...<Widget>[
             _MessagesProjectCommunicationSection(
@@ -249,6 +288,35 @@ class _MessagesPageState extends State<MessagesPage> {
     MessageInteractionItemView item,
   ) {
     Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
+  }
+
+  Future<void> _openNotification(AppNotificationItemView item) async {
+    if (item.unread) {
+      await MessagesConsumerLayer.instance.markNotificationsRead(<String>[
+        item.notificationId,
+      ]);
+      await _loadNotifications(showLoading: false);
+      _reloadShellContextAfterNotificationRead();
+    }
+    if (!mounted) {
+      return;
+    }
+    final routeLocation = item.routeTarget?.routeLocation;
+    if (routeLocation == null || routeLocation.isEmpty) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('当前通知暂时没有可打开的页面。')));
+      return;
+    }
+    Navigator.of(context).pushNamed(routeLocation);
+  }
+
+  void _reloadShellContextAfterNotificationRead() {
+    try {
+      unawaited(AppShellScope.read(context).reloadShellContext());
+    } catch (_) {
+      // Tests may mount this page without the full shell scope.
+    }
   }
 
   void _openSource(BuildContext context, ForumInteractionInboxItemView item) {

@@ -19,6 +19,7 @@ class ProfileMembershipCurrentView {
     required this.organizationId,
     required this.paidMembershipTier,
     required this.rateBand,
+    required this.serviceFeeDiscountSummary,
     required this.entitlementsSummary,
     required this.quotaSummary,
     required this.effectiveAt,
@@ -29,6 +30,7 @@ class ProfileMembershipCurrentView {
   final String? organizationId;
   final String? paidMembershipTier;
   final String? rateBand;
+  final String? serviceFeeDiscountSummary;
   final List<String> entitlementsSummary;
   final List<String> quotaSummary;
   final String? effectiveAt;
@@ -90,12 +92,14 @@ class MembershipUpgradeGuideTierItemView {
   const MembershipUpgradeGuideTierItemView({
     required this.tier,
     required this.title,
+    required this.serviceFeeDiscountSummary,
     required this.candidateDisplayPrice,
     required this.candidateDisplayRateBand,
   });
 
   final String tier;
   final String title;
+  final String? serviceFeeDiscountSummary;
   final String? candidateDisplayPrice;
   final String? candidateDisplayRateBand;
 }
@@ -312,6 +316,9 @@ class ProfileMembershipConsumerLayer {
       organizationId: _readNullableString(body['organizationId']),
       paidMembershipTier: _readNullableString(body['paidMembershipTier']),
       rateBand: _readNullableString(body['rateBand']),
+      serviceFeeDiscountSummary: _readNullableString(
+        body['serviceFeeDiscountSummary'],
+      ),
       entitlementsSummary: entitlementsSummary,
       quotaSummary: quotaSummary,
       effectiveAt: _readNullableString(body['effectiveAt']),
@@ -438,6 +445,9 @@ class ProfileMembershipConsumerLayer {
         MembershipUpgradeGuideTierItemView(
           tier: tier,
           title: title,
+          serviceFeeDiscountSummary: _readNullableString(
+            item['serviceFeeDiscountSummary'],
+          ),
           candidateDisplayPrice: _readNullableString(
             item['candidateDisplayPrice'],
           ),

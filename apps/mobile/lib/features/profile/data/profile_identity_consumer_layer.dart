@@ -21,6 +21,8 @@ final class ProfileIdentityCanonicalPaths {
       '/api/app/profile/organization/join-by-code';
   static const String organizationSwitch =
       '/api/app/profile/organization/switch';
+  static const String organizationCurrentLeave =
+      '/api/app/profile/organization/current/leave';
   static const String organizationMine = '/api/app/profile/organization/mine';
   static const String organizationMembers =
       '/api/app/profile/organization/members';
@@ -93,6 +95,20 @@ class ProfileOrganizationJoinAcceptedView {
 
   final String organizationId;
   final String membershipStatus;
+  final String traceId;
+}
+
+class OrganizationLeaveAcceptedView {
+  const OrganizationLeaveAcceptedView({
+    required this.leftOrganizationId,
+    required this.nextOrganizationId,
+    required this.shellBootstrapState,
+    required this.traceId,
+  });
+
+  final String leftOrganizationId;
+  final String? nextOrganizationId;
+  final String shellBootstrapState;
   final String traceId;
 }
 
@@ -429,6 +445,15 @@ class ProfileIdentityConsumerLayer {
     );
   }
 
+  Future<ProfileIdentityResult<OrganizationLeaveAcceptedView>>
+  leaveCurrentOrganization({String? reason}) {
+    return _post(
+      canonicalPath: ProfileIdentityCanonicalPaths.organizationCurrentLeave,
+      body: <String, Object?>{'reason': _trimNullable(reason)},
+      parser: _parseOrganizationLeaveAcceptedView,
+    );
+  }
+
   Future<ProfileIdentityResult<MyOrganizationsView>> loadMyOrganizations() {
     return _get(
       canonicalPath: ProfileIdentityCanonicalPaths.organizationMine,
@@ -496,7 +521,8 @@ class ProfileIdentityConsumerLayer {
     required String fileAssetId,
   }) {
     return _post(
-      canonicalPath: ProfileIdentityCanonicalPaths.personalCertificationIdCardOcr,
+      canonicalPath:
+          ProfileIdentityCanonicalPaths.personalCertificationIdCardOcr,
       body: <String, Object?>{
         'organizationId': organizationId.trim(),
         'idCardFrontFileId': fileAssetId.trim(),
@@ -1653,6 +1679,34 @@ class ProfileIdentityConsumerLayer {
           _readStringList(body['visibleBuildings']) ?? const <String>[],
       featureFlagsVersion: _readNullableString(body['featureFlagsVersion']),
       unreadSummary: _readObjectMap(body['unreadSummary']),
+    );
+  }
+
+  static OrganizationLeaveAcceptedView? _parseOrganizationLeaveAcceptedView(
+    Object? payload,
+  ) {
+    if (payload is! Map) {
+      return null;
+    }
+
+    final body = _map(payload);
+    final leftOrganizationId = _readNullableString(body['leftOrganizationId']);
+    final shellBootstrapState = _readNullableString(
+      body['shellBootstrapState'],
+    );
+    final traceId = _readNullableString(body['traceId']);
+    if (leftOrganizationId == null ||
+        traceId == null ||
+        (shellBootstrapState != 'authenticated' &&
+            shellBootstrapState != 'no_organization')) {
+      return null;
+    }
+
+    return OrganizationLeaveAcceptedView(
+      leftOrganizationId: leftOrganizationId,
+      nextOrganizationId: _readNullableString(body['nextOrganizationId']),
+      shellBootstrapState: shellBootstrapState!,
+      traceId: traceId,
     );
   }
 

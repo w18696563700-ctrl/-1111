@@ -99,6 +99,40 @@ extension ExhibitionP0PayConsumerActions on ExhibitionConsumerLayer {
     );
   }
 
+  Future<ExhibitionActionResult> initProjectAuthenticitySincerityRefund({
+    required String projectId,
+    required String orderId,
+    required ProjectAuthenticitySincerityRefundCommand command,
+  }) {
+    return _actionService.initProjectAuthenticitySincerityRefund(
+      projectId: projectId,
+      orderId: orderId,
+      command: command,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectAuthenticitySincerityRefundStatus({
+    required String projectId,
+    required String orderId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectAuthenticitySincerityRefundStatus(
+      projectId: projectId,
+      orderId: orderId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectSettlementSummary({
+    required String projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadService.loadProjectSettlementSummary(
+      projectId: projectId,
+      forceRefresh: forceRefresh,
+    );
+  }
+
   Future<P0PayPaymentPollResult> pollProjectAuthenticitySincerityOrderStatus({
     required String projectId,
     required String orderId,
@@ -296,6 +330,20 @@ extension _ExhibitionP0PayActionService on _ExhibitionActionService {
     );
   }
 
+  Future<ExhibitionActionResult> initProjectAuthenticitySincerityRefund({
+    required String projectId,
+    required String orderId,
+    required ProjectAuthenticitySincerityRefundCommand command,
+  }) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityRefundInit(
+        projectId,
+        orderId,
+      ),
+      body: command.toJson(),
+    );
+  }
+
   Future<ExhibitionActionResult> createProjectBidServiceFeeAuthorization({
     required String projectId,
     required BidServiceFeeAuthorizationCommand command,
@@ -379,6 +427,30 @@ extension _ExhibitionP0PayLoadService on _ExhibitionLoadService {
         projectId,
         orderId,
       ),
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectAuthenticitySincerityRefundStatus({
+    required String projectId,
+    required String orderId,
+    bool forceRefresh = false,
+  }) {
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityRefundStatus(
+        projectId,
+        orderId,
+      ),
+      forceRefresh: forceRefresh,
+    );
+  }
+
+  Future<ExhibitionLoadResult> loadProjectSettlementSummary({
+    required String projectId,
+    bool forceRefresh = false,
+  }) {
+    return _loadGet(
+      ExhibitionCanonicalPaths.projectSettlementSummary(projectId),
       forceRefresh: forceRefresh,
     );
   }

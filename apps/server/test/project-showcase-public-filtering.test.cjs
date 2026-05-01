@@ -68,6 +68,28 @@ function applyFindWhere(projects, where) {
   });
 }
 
+function createProjectNameAccessProjectionService() {
+  const toProjection = (project) => ({
+    displayTitle: project.exhibitionName ?? project.title,
+    title: project.title,
+    exhibitionName: project.exhibitionName ?? null,
+    brandName: project.brandName ?? null,
+    nameAccess: {
+      status: 'visible',
+      canRequest: false,
+      requestId: null,
+    },
+  });
+  return {
+    async buildPublicProjectionMap({ projects }) {
+      return new Map(projects.map((project) => [project.id, toProjection(project)]));
+    },
+    async buildSingleProjectProjection({ project }) {
+      return toProjection(project);
+    },
+  };
+}
+
 function createService(projects, options = {}) {
   const { ProjectQueryService } = require('../dist/modules/project/project-query.service.js');
   const { ProjectPresenter } = require('../dist/modules/project/project.presenter.js');
@@ -100,6 +122,9 @@ function createService(projects, options = {}) {
         }) ?? null
       );
     },
+    async query() {
+      return [];
+    },
   };
 
   const verificationService =
@@ -126,6 +151,7 @@ function createService(projects, options = {}) {
     repository,
     verificationService,
     eligibilityService,
+    createProjectNameAccessProjectionService(),
     new ProjectPresenter(),
   );
 }
@@ -150,6 +176,7 @@ test('project showcase list applies real city and bucket filters and trims expir
     result.items.map((item) => item.projectId),
     ['match'],
   );
+  assert.equal(result.items[0].publishedAt, '2026-04-10T08:00:00.000Z');
   assert.deepEqual(result.pagination, {
     page: 1,
     pageSize: 20,

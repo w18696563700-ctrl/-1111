@@ -24,6 +24,7 @@ export class P0PayPresenter {
       authorizationId: authorization.id,
       authorizationStatus: authorization.status,
       quotedAmount: authorization.quotedAmount,
+      serviceFeeEstimatedAmount: authorization.estimatedFeeAmount,
       authorizationQuotaAmount: quotaAmount,
       quotaAmount,
       currency: 'CNY',
@@ -35,6 +36,7 @@ export class P0PayPresenter {
         factoryOrganizationId: authorization.factoryOrganizationId,
         publisherOrganizationId: authorization.publisherOrganizationId,
         quotedAmount: authorization.quotedAmount,
+        serviceFeeEstimatedAmount: authorization.estimatedFeeAmount,
         authorizationQuotaAmount: quotaAmount,
         quotaAmount,
         chargedAmountUsed: authorization.chargedAmountUsed,
@@ -132,6 +134,38 @@ export class P0PayPresenter {
     };
   }
 
+  toInquiryDepositRefundResponse(
+    deposit: InquiryQuoteDepositEntity,
+    refundOrder: PaymentOrderEntity | null
+  ) {
+    return {
+      depositOrderId: deposit.id,
+      orderId: deposit.id,
+      refundOrderId: refundOrder?.id ?? null,
+      refundReferenceId: refundOrder?.merchantOrderNo ?? null,
+      refundStatus: this.resolveRefundStatus(deposit),
+      orderStatus: deposit.status,
+      amount: deposit.amount,
+      currency: deposit.currency,
+      refundChannel: refundOrder?.paymentChannel ?? deposit.paymentChannel,
+      callbackAwaiting: refundOrder ? ['created', 'pending_user_confirm', 'refund_pending'].includes(refundOrder.status) : false,
+      updatedAt: deposit.updatedAt,
+      refundOrder: refundOrder
+        ? {
+            paymentOrderId: refundOrder.id,
+            merchantOrderNo: refundOrder.merchantOrderNo,
+            paymentChannel: refundOrder.paymentChannel,
+            orderRole: refundOrder.orderRole,
+            status: refundOrder.status,
+            amount: refundOrder.amount,
+            currency: refundOrder.currency,
+            createdAt: refundOrder.createdAt,
+            updatedAt: refundOrder.updatedAt
+          }
+        : null
+    };
+  }
+
   toInquiryDepositPayInitResponse(deposit: InquiryQuoteDepositEntity, order: PaymentOrderEntity, action: ChannelAction) {
     return {
       paymentInitStatus: order.status,
@@ -168,7 +202,10 @@ export class P0PayPresenter {
   private toAuthorizationFeeSnapshot(authorization: PlatformServiceFeeAuthorizationEntity) {
     return {
       feeRate: authorization.feeRate,
-      feeRateLabel: authorization.feeRateLabel || '默认费率 3.0%',
+      baseFeeAmount: authorization.baseFeeAmount,
+      membershipDiscountRate: authorization.membershipDiscountRate,
+      capAmount: authorization.capAmount,
+      feeRateLabel: authorization.feeRateLabel || '基础平台定价规则',
       feeRateSource: authorization.feeRateSource || 'legacy_fixed_default',
       membershipTierSnapshot: authorization.membershipTierSnapshot || 'none',
       feeRateRuleVersion: authorization.feeRateRuleVersion || authorization.ruleVersion,
@@ -184,7 +221,7 @@ export class P0PayPresenter {
       baseFeeAmount: charge.baseFeeAmount,
       membershipDiscountRate: charge.membershipDiscountRate,
       capAmount: charge.capAmount,
-      feeRateLabel: charge.feeRateLabel || '默认费率 3.0%',
+      feeRateLabel: charge.feeRateLabel || '基础平台定价规则',
       feeRateSource: charge.feeRateSource || 'legacy_fixed_default',
       membershipTierSnapshot: charge.membershipTierSnapshot || 'none',
       feeRateRuleVersion: charge.feeRateRuleVersion,

@@ -64,6 +64,7 @@ export class ProjectPresenter {
       cityName: this.toNullableText(project.cityName),
       plannedStartAt: this.toNullableDate(project.plannedStartAt),
       plannedEndAt: this.toNullableDate(project.plannedEndAt),
+      publishedAt: this.toNullableDateTime(project.publishedAt),
       state: project.state,
       nameAccess: {
         status: access.nameAccess.status,
@@ -144,6 +145,13 @@ export class ProjectPresenter {
     }
     if (value instanceof Date && !Number.isNaN(value.getTime())) {
       return value.toISOString().slice(0, 10);
+    }
+    return null;
+  }
+
+  private toNullableDateTime(value: Date | null | undefined) {
+    if (value instanceof Date && !Number.isNaN(value.getTime())) {
+      return value.toISOString();
     }
     return null;
   }

@@ -43,7 +43,7 @@ test('shell context forwards projectCreateEligibility from server shell projecti
           },
           visibleBuildings: ['exhibition', 'messages', 'profile'],
           featureFlagsVersion: 'ffv-20260414',
-          unreadSummary: {},
+          unreadSummary: { messages: 4 },
           myBuildingProjection: {
             profileCorridorKey: 'my_building_compact_current_user_hub',
             profileEntryOrderBucket: 'my_building_compact_hub_first_level',
@@ -95,4 +95,5 @@ test('shell context forwards projectCreateEligibility from server shell projecti
   assert.equal(result.projectCreateEligibility.canCreateProject, true);
   assert.equal(result.organizationId, 'org-1');
   assert.equal(result.organizationType, 'both');
+  assert.equal(result.unreadSummary.messages, 4);
 });

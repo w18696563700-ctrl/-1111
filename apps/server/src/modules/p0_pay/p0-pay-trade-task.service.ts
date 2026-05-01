@@ -286,7 +286,13 @@ export class P0PayTradeTaskService {
           }
         : { status: 'not_required' },
       projectAuthenticitySincerity: deposit
-        ? { orderId: deposit.id, status: deposit.status, amount: deposit.amount, currency: deposit.currency }
+        ? {
+            orderId: deposit.id,
+            status: deposit.status,
+            amount: deposit.amount,
+            currency: deposit.currency,
+            channelCandidates: ['alipay_candidate', 'wechat_candidate', 'other_candidate']
+          }
         : { status: 'not_required' },
       dealConfirmation: { status: authorization?.status === 'charged' ? 'confirmed_deal' : 'not_confirmed' },
       messageDisplaySummary: {

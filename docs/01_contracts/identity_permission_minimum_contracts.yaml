@@ -1,10 +1,23 @@
 doc_meta:
   owner: Codex 总控
-  status: draft
+  status: frozen
   purpose: Freeze the minimum L2 transport contract set for login, session, organization, certification, permission, and security flows.
   layer: L2 Contracts
 
-version: 0.1.0
+version: 0.1.1
+
+status_notes:
+  freeze_reason: >
+    Freeze the minimum identity / permission transport baseline after the
+    membership read-surface cleanup confirmed that membershipStatus remains
+    organization-membership truth only and paid-membership display uses the
+    paidMembership* summary fields.
+  supersedes_draft_status_on: 2026-05-01
+  does_not_unlock:
+    - membership purchase
+    - payment execution
+    - P0-Pay membership discount linkage
+    - Admin membership governance
 
 scope:
   current_goal:
@@ -51,8 +64,10 @@ clients:
       - no_organization
       - authenticated
   admin:
-    login_mode: account_password_plus_second_factor
+    login_mode: server_session_carrier_only
     consumes: Server admin APIs
+    issuer: Server Auth
+    role_gate: platform_reviewer_or_super_admin
 
 auth_session_boundary:
   access_transport_carrier:
@@ -113,6 +128,9 @@ shell_context:
   rules:
     - Flutter App must not guess missing shell fields locally.
     - Optional fields require contract freeze first.
+    - membershipStatus is Package 1 organization membership truth only.
+    - membershipStatus must not be interpreted as paid-membership truth.
+    - Paid-membership display must use paidMembershipTier and the paidMembership* summary fields.
 
 app_route_groups:
   auth:
@@ -166,6 +184,12 @@ app_route_groups:
       response: AppShellContextResponse
       purpose: change current organization scope and reload shell context
       guard: authenticated
+    - method: POST
+      path: /api/app/profile/organization/current/leave
+      request: OrganizationLeaveRequest
+      response: OrganizationLeaveResponse
+      purpose: let current actor leave current organization membership without deleting organization or business history
+      guard: organization_scoped
     - method: GET
       path: /api/app/profile/organization/mine
       request: none
@@ -348,6 +372,17 @@ schema_minimums:
     required: [organizationId]
     fields:
       organizationId: uuid
+  OrganizationLeaveRequest:
+    required: []
+    fields:
+      reason: string_optional
+  OrganizationLeaveResponse:
+    required: [leftOrganizationId, nextOrganizationId, shellBootstrapState, traceId]
+    fields:
+      leftOrganizationId: uuid
+      nextOrganizationId: uuid_optional
+      shellBootstrapState: authenticated_or_no_organization
+      traceId: string
   CertificationSubmitRequest:
     required: [organizationId, legalName, uscc, licenseFileId]
     fields:
@@ -454,6 +489,7 @@ audit_and_risk_minimum:
     - organization_switch
     - member_role_change
     - member_disable
+    - organization_member_leave
     - certification_submit
     - certification_approve
     - certification_reject

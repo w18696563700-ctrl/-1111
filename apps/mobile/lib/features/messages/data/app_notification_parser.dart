@@ -1,0 +1,184 @@
+import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/features/messages/data/app_notification_models.dart';
+import 'package:mobile/features/messages/data/messages_interaction_parser.dart';
+import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
+
+AppNotificationListView parseAppNotificationList(Object? payload) {
+  final map = _requiredMap(payload, 'app notification list');
+  final rawItems = map['items'];
+  final items = rawItems is List
+      ? rawItems
+            .map<AppNotificationItemView>(parseAppNotificationItem)
+            .toList(growable: false)
+      : const <AppNotificationItemView>[];
+  final page = _optionalMap(map['page']);
+  return AppNotificationListView(
+    items: items,
+    nextCursor: _nullableString(page?['nextCursor']),
+    hasMore: page?['hasMore'] == true,
+    unread: parseAppNotificationUnread(map['unread']),
+  );
+}
+
+AppNotificationItemView parseAppNotificationItem(Object? payload) {
+  final map = _requiredMap(payload, 'app notification item');
+  return AppNotificationItemView(
+    notificationId: _requiredString(map, 'notificationId'),
+    type: _requiredString(map, 'type'),
+    source: _requiredString(map, 'source'),
+    title: _requiredString(map, 'title'),
+    body: _nullableString(map['body']),
+    projectId: _nullableString(map['projectId']),
+    threadId: _nullableString(map['threadId']),
+    routeTarget: parseAppNotificationRouteTarget(map['routeTarget']),
+    createdAt: _nullableString(map['createdAt']),
+    readAt: _nullableString(map['readAt']),
+    unread: map['unread'] == true,
+  );
+}
+
+AppNotificationUnreadView parseAppNotificationUnread(Object? payload) {
+  final map = _optionalMap(payload);
+  return AppNotificationUnreadView(
+    total: _optionalNonNegativeInt(map?['total']),
+    projectCommunication: _optionalNonNegativeInt(map?['projectCommunication']),
+    forumInteraction: _optionalNonNegativeInt(map?['forumInteraction']),
+    system: _optionalNonNegativeInt(map?['system']),
+  );
+}
+
+AppNotificationRouteTargetView? parseAppNotificationRouteTarget(
+  Object? payload,
+) {
+  final map = _optionalMap(payload);
+  if (map == null || map.isEmpty) {
+    return null;
+  }
+  final canonicalPath = _nullableString(map['canonicalPath']);
+  if (canonicalPath == null) {
+    return null;
+  }
+  final localEntryKey = _nullableString(map['localEntryKey']);
+  final params = _parseParams(map['routeParams'] ?? map['params']);
+  return AppNotificationRouteTargetView(
+    canonicalPath: canonicalPath,
+    localEntryKey: localEntryKey,
+    params: params,
+    routeLocation: _buildRouteLocation(
+      canonicalPath: canonicalPath,
+      localEntryKey: localEntryKey,
+      params: params,
+    ),
+  );
+}
+
+DevicePushTokenRegisterResult parseDevicePushTokenRegisterResult({
+  required Object? payload,
+}) {
+  final map = _requiredMap(payload, 'device push token register');
+  return DevicePushTokenRegisterResult(
+    state: AppPageState.content,
+    method: 'POST',
+    path: AppNotificationCanonicalPaths.deviceTokenRegister,
+    registered: map['registered'] == true,
+    tokenId: _nullableString(map['tokenId']),
+    platform: _nullableString(map['platform']),
+    provider: _nullableString(map['provider']),
+  );
+}
+
+AppNotificationReadResult parseAppNotificationReadResult(Object? payload) {
+  final map = _requiredMap(payload, 'app notification read result');
+  final rawIds = map['readNotificationIds'];
+  return AppNotificationReadResult(
+    state: AppPageState.content,
+    method: 'POST',
+    path: AppNotificationCanonicalPaths.notificationRead,
+    readNotificationIds: rawIds is List
+        ? rawIds.whereType<String>().toList(growable: false)
+        : const <String>[],
+    unread: parseAppNotificationUnread(map['unread']),
+  );
+}
+
+String? extractNotificationMessage(Object? payload) => extractMessage(payload);
+
+String? _buildRouteLocation({
+  required String canonicalPath,
+  required String? localEntryKey,
+  required Map<String, String> params,
+}) {
+  final actionKey = localEntryKey == 'counterpart_conversation.open'
+      ? localEntryKey
+      : canonicalPath == '/api/app/message/counterpart-conversation/detail'
+      ? 'counterpart_conversation.open'
+      : null;
+  if (actionKey == null) {
+    return null;
+  }
+  final definition = messagesRegisteredEntryByActionKey[actionKey];
+  if (definition == null || definition.canonicalPath != canonicalPath) {
+    return null;
+  }
+  final routeLocation = definition.buildRouteLocation(params);
+  if (routeLocation == null || routeLocation.startsWith('routeTarget.')) {
+    return null;
+  }
+  return routeLocation;
+}
+
+Map<String, Object?> _requiredMap(Object? value, String label) {
+  if (value is Map) {
+    return value.map((Object? key, Object? entry) => MapEntry('$key', entry));
+  }
+  throw FormatException('$label response must be an object');
+}
+
+Map<String, Object?>? _optionalMap(Object? value) {
+  if (value is! Map) {
+    return null;
+  }
+  return value.map((Object? key, Object? entry) => MapEntry('$key', entry));
+}
+
+Map<String, String> _parseParams(Object? value) {
+  final map = _optionalMap(value);
+  if (map == null) {
+    return const <String, String>{};
+  }
+  final result = <String, String>{};
+  for (final entry in map.entries) {
+    final normalized = _nullableString(entry.value);
+    if (normalized != null && entry.key.trim().isNotEmpty) {
+      result[entry.key.trim()] = normalized;
+    }
+  }
+  return Map<String, String>.unmodifiable(result);
+}
+
+String _requiredString(Map<String, Object?> map, String key) {
+  final value = _nullableString(map[key]);
+  if (value == null) {
+    throw FormatException('app notification response missing "$key"');
+  }
+  return value;
+}
+
+String? _nullableString(Object? value) {
+  if (value is! String) {
+    return null;
+  }
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+int _optionalNonNegativeInt(Object? value) {
+  final parsed = value is int
+      ? value
+      : value is num && value == value.roundToDouble()
+      ? value.toInt()
+      : value is String
+      ? int.tryParse(value)
+      : null;
+  return parsed == null || parsed < 0 ? 0 : parsed;
+}

@@ -43,31 +43,38 @@ test('P0-Pay membership service fee policy maps organization tier snapshots', as
   assert.equal(free.feeRate, '0.030000');
   assert.equal(free.feeRateSource, 'fixed_default');
   assert.equal(free.membershipTierSnapshot, 'free_certified');
-  assert.equal(free.estimatedFeeAmount, '3000.00');
+  assert.equal(free.estimatedFeeAmount, '1650.00');
+  assert.equal(free.membershipDiscountRate, '1.0000');
+  assert.equal(free.capAmount, '4000.00');
+  assert.equal(free.authorizationQuotaAmount, '4000.00');
 
   const standard = await policy.buildRequirement({ factoryOrganizationId: 'org-standard', quotedAmount: '188880.00' });
-  assert.equal(standard.feeRate, '0.025000');
+  assert.equal(standard.feeRate, '0.030000');
+  assert.equal(standard.feeRateLabel, '标准会员 9折（作用于 baseFeeAmount）');
   assert.equal(standard.feeRateSource, 'paid_membership_tier');
   assert.equal(standard.membershipTierSnapshot, 'standard');
-  assert.equal(standard.estimatedFeeAmount, '4722.00');
+  assert.equal(standard.baseFeeAmount, '2538.80');
+  assert.equal(standard.membershipDiscountRate, '0.9000');
+  assert.equal(standard.capAmount, '3600.00');
+  assert.equal(standard.estimatedFeeAmount, '2284.92');
 
   const professional = await policy.buildRequirement({ factoryOrganizationId: 'org-professional', quotedAmount: '100000.00' });
-  assert.equal(professional.feeRate, '0.020000');
+  assert.equal(professional.feeRate, '0.030000');
+  assert.equal(professional.feeRateLabel, '专业会员 8折（作用于 baseFeeAmount）');
   assert.equal(professional.feeRateSource, 'paid_membership_tier');
   assert.equal(professional.membershipTierSnapshot, 'professional');
-  assert.equal(professional.estimatedFeeAmount, '2000.00');
+  assert.equal(professional.membershipDiscountRate, '0.8000');
+  assert.equal(professional.capAmount, '3200.00');
+  assert.equal(professional.estimatedFeeAmount, '1320.00');
 
-  const ka = await policy.buildRequirement({ factoryOrganizationId: 'org-ka', quotedAmount: '100000.00' });
-  assert.equal(ka.feeRate, '0.015000');
-  assert.equal(ka.feeRateSource, 'paid_membership_tier');
-  assert.equal(ka.membershipTierSnapshot, 'ka');
-  assert.equal(ka.estimatedFeeAmount, '1500.00');
-
-  const flagship = await policy.buildRequirement({ factoryOrganizationId: 'org-flagship', quotedAmount: '100000.00' });
-  assert.equal(flagship.feeRate, '0.015000');
-  assert.equal(flagship.feeRateSource, 'paid_membership_tier');
-  assert.equal(flagship.membershipTierSnapshot, 'flagship');
-  assert.equal(flagship.estimatedFeeAmount, '1500.00');
+  await assert.rejects(
+    () => policy.buildRequirement({ factoryOrganizationId: 'org-ka', quotedAmount: '100000.00' }),
+    /Current paid membership tier is not supported/,
+  );
+  await assert.rejects(
+    () => policy.buildRequirement({ factoryOrganizationId: 'org-flagship', quotedAmount: '100000.00' }),
+    /Current paid membership tier is not supported/,
+  );
 
   const expired = await policy.buildRequirement({ factoryOrganizationId: 'org-expired', quotedAmount: '100000.00' });
   assert.equal(expired.feeRate, '0.030000');
@@ -153,15 +160,20 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
   } = require('../dist/modules/p0_pay/p0-pay-service-fee.factory.js');
 
   const feeRequirement = {
-    feeRate: '0.025000',
-    feeRateLabel: '标准会员 2.5%',
+    feeRate: '0.030000',
+    feeRateLabel: '标准会员 9折（作用于 baseFeeAmount）',
     feeRateSource: 'paid_membership_tier',
     membershipTierSnapshot: 'standard',
     feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
     feeRateSnapshotHash: 'snapshot-hash',
     feeCalculatedAt: new Date('2026-05-10T10:00:00.000Z'),
     quotedAmount: '188880.00',
-    estimatedFeeAmount: '4722.00',
+    estimatedFeeAmount: '2284.92',
+    baseFeeAmount: '2538.80',
+    membershipDiscountRate: '0.9000',
+    capAmount: '3600.00',
+    authorizationQuotaAmount: '4000.00',
+    quotaAmount: '4000.00',
     currency: 'CNY',
     authorizationRequired: true,
     authorizationStatus: 'pending_freeze',
@@ -179,11 +191,11 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
   };
 
   await factory.assertExpectedAmounts(
-    {
-      expectedQuotedAmount: '188880.00',
-      expectedFeeRate: '0.025000',
-      expectedAuthorizationAmount: '4000.00',
-      currency: 'CNY',
+      {
+        expectedQuotedAmount: '188880.00',
+        expectedFeeRate: '0.030000',
+        expectedAuthorizationAmount: '4000.00',
+        currency: 'CNY',
     },
     bid,
   );
@@ -191,8 +203,8 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
     () => factory.assertExpectedAmounts(
       {
         expectedQuotedAmount: '188880.00',
-        expectedFeeRate: '0.030000',
-        expectedAuthorizationAmount: '5666.40',
+        expectedFeeRate: '0.025000',
+        expectedAuthorizationAmount: '4000.00',
         currency: 'CNY',
       },
       bid,
@@ -208,11 +220,14 @@ test('P0-Pay authorization factory writes the Server fee snapshot into authoriza
     feeRequirement,
   });
 
-  assert.equal(authorization.feeRate, '0.025000');
-  assert.equal(authorization.estimatedFeeAmount, '4722.00');
+  assert.equal(authorization.feeRate, '0.030000');
+  assert.equal(authorization.estimatedFeeAmount, '2284.92');
+  assert.equal(authorization.baseFeeAmount, '2538.80');
+  assert.equal(authorization.membershipDiscountRate, '0.9000');
+  assert.equal(authorization.capAmount, '3600.00');
   assert.equal(authorization.authorizationQuotaAmount, '4000.00');
   assert.equal(authorization.status, 'pending_freeze');
-  assert.equal(authorization.feeRateLabel, '标准会员 2.5%');
+  assert.equal(authorization.feeRateLabel, '标准会员 9折（作用于 baseFeeAmount）');
   assert.equal(authorization.feeRateSource, 'paid_membership_tier');
   assert.equal(authorization.membershipTierSnapshot, 'standard');
   assert.equal(authorization.feeRateRuleVersion, 'p0_pay_membership_service_fee_v1');

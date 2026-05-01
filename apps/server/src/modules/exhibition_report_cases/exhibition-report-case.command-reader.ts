@@ -1,9 +1,11 @@
 import {
   EXHIBITION_REPORT_ADJUDICATION_RESULTS,
   EXHIBITION_REPORT_CASE_STATUSES,
+  EXHIBITION_REPORT_REASON_CODES,
   EXHIBITION_REPORT_TARGET_TYPES,
   ExhibitionReportAdjudicationResult,
   ExhibitionReportCaseStatus,
+  ExhibitionReportReasonCode,
   ExhibitionReportTargetType
 } from './exhibition-report-case.constants';
 
@@ -27,6 +29,14 @@ export type DecideCommand = {
 
 export type EscalateCommand = {
   reason: string;
+};
+
+export type ExhibitionReportSubmitCommand = {
+  targetType: ExhibitionReportTargetType;
+  targetId: string;
+  reasonCode: ExhibitionReportReasonCode;
+  reasonDetail: string | null;
+  evidenceFileAssetIds: string[];
 };
 
 export function readListQuery(
@@ -104,6 +114,38 @@ export function toEscalateCommand(
   }
   return {
     reason: readRequiredText(payload.reason, 'reason', 500, errorFactory)
+  };
+}
+
+export function toSubmitCommand(
+  payload: Record<string, unknown>,
+  errorFactory: (message: string) => Error
+): ExhibitionReportSubmitCommand {
+  if (!payload || Array.isArray(payload) || typeof payload !== 'object') {
+    throw errorFactory('Exhibition report submit payload must be an object.');
+  }
+  return {
+    targetType: readEnum(
+      payload.targetType,
+      EXHIBITION_REPORT_TARGET_TYPES,
+      'targetType',
+      errorFactory
+    ) as ExhibitionReportTargetType,
+    targetId: readReportCaseTargetId(payload.targetId, errorFactory),
+    reasonCode: readEnum(
+      payload.reasonCode,
+      EXHIBITION_REPORT_REASON_CODES,
+      'reasonCode',
+      errorFactory
+    ) as ExhibitionReportReasonCode,
+    reasonDetail: readOptionalText(payload.reasonDetail, 500, errorFactory),
+    evidenceFileAssetIds: readOptionalStringArray(
+      payload.evidenceFileAssetIds,
+      'evidenceFileAssetIds',
+      20,
+      64,
+      errorFactory
+    )
   };
 }
 
@@ -187,6 +229,14 @@ function readRequiredText(
   return normalized;
 }
 
+function readReportCaseTargetId(value: unknown, errorFactory: (message: string) => Error) {
+  const id = readRequiredText(value, 'targetId', 64, errorFactory);
+  if (!/^[a-zA-Z0-9._:-]{2,64}$/.test(id)) {
+    throw errorFactory('targetId is invalid.');
+  }
+  return id;
+}
+
 function readOptionalText(
   value: unknown,
   maxLength: number,
@@ -206,6 +256,35 @@ function readOptionalText(
     throw errorFactory(`Text field exceeds maximum length ${maxLength}.`);
   }
   return normalized;
+}
+
+function readOptionalStringArray(
+  value: unknown,
+  fieldName: string,
+  maxItems: number,
+  maxLength: number,
+  errorFactory: (message: string) => Error
+) {
+  if (value === undefined || value === null) {
+    return [];
+  }
+  if (!Array.isArray(value)) {
+    throw errorFactory(`${fieldName} must be an array.`);
+  }
+  if (value.length > maxItems) {
+    throw errorFactory(`${fieldName} exceeds maximum item count ${maxItems}.`);
+  }
+
+  const result: string[] = [];
+  const seen = new Set<string>();
+  for (const item of value) {
+    const normalized = readRequiredText(item, fieldName, maxLength, errorFactory);
+    if (!seen.has(normalized)) {
+      result.push(normalized);
+      seen.add(normalized);
+    }
+  }
+  return result;
 }
 
 function readOptionalDate(

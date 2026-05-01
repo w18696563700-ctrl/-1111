@@ -2,7 +2,9 @@ import { Body, Controller, Headers, HttpCode, Param, Patch, Post } from '@nestjs
 import type { IncomingHttpHeaders } from 'http';
 import { ProfileBlockService } from './profile-block.service';
 import { ProfileCommandService } from './profile-command.service';
+import { ProfileMembershipPurchaseService } from './profile-membership-purchase.service';
 import { ProfileMembersService } from './profile-members.service';
+import { ProfileOrganizationLeaveService } from './profile-organization-leave.service';
 import { ProfileSafetyService } from './profile-safety.service';
 import { ProfileSecurityService } from './profile-security.service';
 
@@ -11,7 +13,9 @@ export class AppProfileCommandController {
   constructor(
     private readonly profileCommandService: ProfileCommandService,
     private readonly profileBlockService: ProfileBlockService,
+    private readonly profileMembershipPurchaseService: ProfileMembershipPurchaseService,
     private readonly profileMembersService: ProfileMembersService,
+    private readonly profileOrganizationLeaveService: ProfileOrganizationLeaveService,
     private readonly profileSafetyService: ProfileSafetyService,
     private readonly profileSecurityService: ProfileSecurityService,
   ) {}
@@ -39,6 +43,25 @@ export class AppProfileCommandController {
     return this.profileBlockService.unblock(body, headers);
   }
 
+  @Post('membership/orders')
+  @HttpCode(201)
+  createMembershipOrder(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileMembershipPurchaseService.createOrder(body, headers);
+  }
+
+  @Post('membership/orders/:membershipOrderId/pay-init')
+  @HttpCode(202)
+  initMembershipOrderPayment(
+    @Param('membershipOrderId') membershipOrderId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileMembershipPurchaseService.payInit(membershipOrderId, body, headers);
+  }
+
   @Post('organization/join-by-code')
   joinOrganizationByCode(@Body() body: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
     return this.profileCommandService.joinOrganizationByCode(body, headers);
@@ -47,6 +70,15 @@ export class AppProfileCommandController {
   @Post('organization/switch')
   switchOrganization(@Body() body: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
     return this.profileCommandService.switchOrganization(body, headers);
+  }
+
+  @Post('organization/current/leave')
+  @HttpCode(200)
+  leaveCurrentOrganization(
+    @Body() body: Record<string, unknown> | undefined,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.profileOrganizationLeaveService.leaveCurrentOrganization(body, headers);
   }
 
   @Post('certification/submit')

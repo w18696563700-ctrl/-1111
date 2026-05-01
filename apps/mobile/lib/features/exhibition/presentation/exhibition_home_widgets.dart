@@ -7,7 +7,10 @@ class _HomeProjectCard extends StatelessWidget {
     required this.stateLabel,
     required this.cityLabel,
     required this.areaLabel,
+    required this.exampleAssetPath,
+    required this.typeLabel,
     required this.entryTimeLabel,
+    required this.publishedAtLabel,
     required this.actionLabel,
     required this.onPressed,
   });
@@ -17,7 +20,10 @@ class _HomeProjectCard extends StatelessWidget {
   final String stateLabel;
   final String cityLabel;
   final String areaLabel;
+  final String? exampleAssetPath;
+  final String typeLabel;
   final String entryTimeLabel;
+  final String? publishedAtLabel;
   final String actionLabel;
   final VoidCallback? onPressed;
 
@@ -47,9 +53,8 @@ class _HomeProjectCard extends StatelessWidget {
               children: <Widget>[
                 LayoutBuilder(
                   builder: (BuildContext context, BoxConstraints constraints) {
-                    final useSideCover = constraints.maxWidth >= 360;
-                    final coverWidth = useSideCover ? 96.0 : double.infinity;
-                    final coverHeight = useSideCover ? 78.0 : 96.0;
+                    final coverWidth = constraints.maxWidth < 330 ? 86.0 : 96.0;
+                    const coverHeight = 78.0;
 
                     final information = Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,28 +105,28 @@ class _HomeProjectCard extends StatelessWidget {
                                       icon: Icons.calendar_month_outlined,
                                       label: '进场',
                                       value: entryTimeLabel,
-                                      compact: useSideCover,
+                                      compact: true,
                                     ),
                                     _HomeProjectInfoTile(
                                       width: infoTileWidth,
                                       icon: Icons.location_on_outlined,
                                       label: '搭建地',
                                       value: cityLabel,
-                                      compact: useSideCover,
+                                      compact: true,
                                     ),
                                     _HomeProjectInfoTile(
                                       width: infoTileWidth,
                                       icon: Icons.crop_square_outlined,
                                       label: '面积',
                                       value: areaLabel,
-                                      compact: useSideCover,
+                                      compact: true,
                                     ),
                                     _HomeProjectInfoTile(
                                       width: infoTileWidth,
                                       icon: Icons.payments_outlined,
                                       label: '预算',
                                       value: budgetLabel,
-                                      compact: useSideCover,
+                                      compact: true,
                                     ),
                                   ],
                                 );
@@ -130,26 +135,23 @@ class _HomeProjectCard extends StatelessWidget {
                       ],
                     );
 
-                    if (!useSideCover) {
-                      return Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          _HomeDefaultProjectCover(
-                            width: coverWidth,
-                            height: coverHeight,
-                          ),
-                          const SizedBox(height: 9),
-                          information,
-                        ],
-                      );
-                    }
-
                     return Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        _HomeDefaultProjectCover(
-                          width: coverWidth,
-                          height: coverHeight,
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            _HomeDefaultProjectCover(
+                              width: coverWidth,
+                              height: coverHeight,
+                              assetPath: exampleAssetPath,
+                            ),
+                            const SizedBox(height: 6),
+                            _HomeProjectTypeBadge(
+                              label: typeLabel,
+                              width: coverWidth,
+                            ),
+                          ],
                         ),
                         const SizedBox(width: 10),
                         Expanded(child: information),
@@ -158,10 +160,25 @@ class _HomeProjectCard extends StatelessWidget {
                   },
                 ),
                 const SizedBox(height: 6),
-                _HomeProjectPrimaryAction(
-                  label: actionLabel,
-                  onPressed: onPressed,
-                ),
+                if (publishedAtLabel case final String label)
+                  Row(
+                    children: <Widget>[
+                      Expanded(child: _HomeProjectPublishedTime(label: label)),
+                      const SizedBox(width: 8),
+                      _HomeProjectPrimaryAction(
+                        label: actionLabel,
+                        onPressed: onPressed,
+                      ),
+                    ],
+                  )
+                else
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: _HomeProjectPrimaryAction(
+                      label: actionLabel,
+                      onPressed: onPressed,
+                    ),
+                  ),
               ],
             ),
           ),
@@ -171,80 +188,148 @@ class _HomeProjectCard extends StatelessWidget {
   }
 }
 
+class _HomeProjectTypeBadge extends StatelessWidget {
+  const _HomeProjectTypeBadge({required this.label, required this.width});
+
+  final String label;
+  final double width;
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: width,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: const Color(0xFFFFF8EB),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: ExhibitionHomeVisualTokens.brandGoldLight.withValues(
+              alpha: 0.92,
+            ),
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 5),
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.center,
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
+              color: ExhibitionHomeVisualTokens.brandGoldDeep,
+              fontWeight: FontWeight.w800,
+              height: 1,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _HomeDefaultProjectCover extends StatelessWidget {
-  const _HomeDefaultProjectCover({required this.width, required this.height});
+  const _HomeDefaultProjectCover({
+    required this.width,
+    required this.height,
+    required this.assetPath,
+  });
 
   final double width;
   final double height;
+  final String? assetPath;
 
   @override
   Widget build(BuildContext context) {
     final borderRadius = BorderRadius.circular(12);
+    final imageAsset = assetPath;
 
     return Semantics(
-      label: '商业示意默认封面，不代表项目真实图片',
+      label: imageAsset == null
+          ? '商业示意默认封面，不代表项目真实图片'
+          : '按项目面积匹配的商业示意封面，不代表项目真实图片',
       image: true,
       child: ClipRRect(
         borderRadius: borderRadius,
         child: SizedBox(
           width: width,
           height: height,
-          child: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[Color(0xFF3B3F45), Color(0xFFF7EEE1)],
+          child: Stack(
+            fit: StackFit.expand,
+            children: <Widget>[
+              if (imageAsset == null)
+                const _HomeDefaultProjectCoverArtwork()
+              else
+                Image.asset(
+                  imageAsset,
+                  fit: BoxFit.cover,
+                  errorBuilder:
+                      (
+                        BuildContext context,
+                        Object error,
+                        StackTrace? stackTrace,
+                      ) => const _HomeDefaultProjectCoverArtwork(),
+                ),
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: <Color>[
+                      Colors.black.withValues(alpha: 0.06),
+                      Colors.black.withValues(alpha: 0.00),
+                      Colors.black.withValues(alpha: 0.12),
+                    ],
+                  ),
+                ),
               ),
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                CustomPaint(
-                  painter: const _HomeDefaultProjectCoverPainter(),
-                  child: const SizedBox.expand(),
-                ),
-                DecoratedBox(
+              Positioned(
+                left: 8,
+                top: 8,
+                child: DecoratedBox(
                   decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: <Color>[
-                        Colors.black.withValues(alpha: 0.10),
-                        Colors.black.withValues(alpha: 0.02),
-                        Colors.black.withValues(alpha: 0.16),
-                      ],
-                    ),
+                    color: Colors.white.withValues(alpha: 0.86),
+                    borderRadius: BorderRadius.circular(999),
                   ),
-                ),
-                Positioned(
-                  left: 8,
-                  top: 8,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.84),
-                      borderRadius: BorderRadius.circular(999),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 7,
+                      vertical: 3,
                     ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 7,
-                        vertical: 3,
-                      ),
-                      child: Text(
-                        '示意图',
-                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: ExhibitionHomeVisualTokens.brandGoldDeep,
-                          fontWeight: FontWeight.w800,
-                          height: 1,
-                        ),
+                    child: Text(
+                      '示意图',
+                      style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: ExhibitionHomeVisualTokens.brandGoldDeep,
+                        fontWeight: FontWeight.w800,
+                        height: 1,
                       ),
                     ),
                   ),
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+class _HomeDefaultProjectCoverArtwork extends StatelessWidget {
+  const _HomeDefaultProjectCoverArtwork();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DecoratedBox(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: <Color>[Color(0xFF3B3F45), Color(0xFFF7EEE1)],
+        ),
+      ),
+      child: CustomPaint(
+        painter: _HomeDefaultProjectCoverPainter(),
+        child: SizedBox.expand(),
       ),
     );
   }
@@ -510,33 +595,63 @@ class _HomeProjectPrimaryAction extends StatelessWidget {
     return Semantics(
       button: true,
       enabled: enabled,
-      child: Align(
-        alignment: Alignment.centerRight,
-        child: TextButton.icon(
-          onPressed: onPressed,
-          style: TextButton.styleFrom(
-            foregroundColor: enabled
-                ? ExhibitionHomeVisualTokens.brandGoldDeep
-                : ExhibitionHomeVisualTokens.textSecondary,
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-            visualDensity: VisualDensity.compact,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(999),
-            ),
-            textStyle: theme.textTheme.labelLarge?.copyWith(
-              fontWeight: FontWeight.w900,
-            ),
+      child: TextButton.icon(
+        onPressed: onPressed,
+        style: TextButton.styleFrom(
+          foregroundColor: enabled
+              ? ExhibitionHomeVisualTokens.brandGoldDeep
+              : ExhibitionHomeVisualTokens.textSecondary,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          visualDensity: VisualDensity.compact,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(999),
           ),
-          icon: Icon(
-            Icons.arrow_forward_rounded,
-            size: 17,
-            color: enabled
-                ? ExhibitionHomeVisualTokens.brandGoldDeep
-                : ExhibitionHomeVisualTokens.textSecondary,
+          textStyle: theme.textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w900,
           ),
-          label: Text(label),
         ),
+        icon: Icon(
+          Icons.arrow_forward_rounded,
+          size: 17,
+          color: enabled
+              ? ExhibitionHomeVisualTokens.brandGoldDeep
+              : ExhibitionHomeVisualTokens.textSecondary,
+        ),
+        label: Text(label),
       ),
+    );
+  }
+}
+
+class _HomeProjectPublishedTime extends StatelessWidget {
+  const _HomeProjectPublishedTime({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Icon(
+          Icons.schedule_rounded,
+          size: 14,
+          color: ExhibitionHomeVisualTokens.textSecondary,
+        ),
+        const SizedBox(width: 4),
+        Flexible(
+          child: Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.labelMedium?.copyWith(
+              color: ExhibitionHomeVisualTokens.textSecondary,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

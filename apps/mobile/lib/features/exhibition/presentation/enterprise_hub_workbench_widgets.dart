@@ -86,13 +86,34 @@ class EnterpriseWorkbenchProgressCard extends StatelessWidget {
         spacing: 8,
         runSpacing: 8,
         children: <Widget>[
-          _ReadinessPill(label: '可编辑', done: readiness.draftEditable),
-          _ReadinessPill(label: '基础资料', done: readiness.basicCompleted),
-          _ReadinessPill(label: '板块画像', done: readiness.profileCompleted),
-          _ReadinessPill(label: '案例', done: readiness.hasCase),
-          _ReadinessPill(label: '联系人', done: readiness.hasContact),
-          _ReadinessPill(label: '企业认证', done: readiness.certificationApproved),
-          _ReadinessPill(label: '可提交', done: readiness.submitReady),
+          EnterpriseWorkbenchReadinessPill(
+            label: '可编辑',
+            done: readiness.draftEditable,
+          ),
+          EnterpriseWorkbenchReadinessPill(
+            label: '基础资料',
+            done: readiness.basicCompleted,
+          ),
+          EnterpriseWorkbenchReadinessPill(
+            label: '板块画像',
+            done: readiness.profileCompleted,
+          ),
+          EnterpriseWorkbenchReadinessPill(
+            label: '案例',
+            done: readiness.hasCase,
+          ),
+          EnterpriseWorkbenchReadinessPill(
+            label: '联系人',
+            done: readiness.hasContact,
+          ),
+          EnterpriseWorkbenchReadinessPill(
+            label: '企业认证',
+            done: readiness.certificationApproved,
+          ),
+          EnterpriseWorkbenchReadinessPill(
+            label: '可提交',
+            done: readiness.submitReady,
+          ),
         ],
       ),
     );
@@ -385,8 +406,12 @@ class _WorkbenchFieldLabel extends StatelessWidget {
   }
 }
 
-class _ReadinessPill extends StatelessWidget {
-  const _ReadinessPill({required this.label, required this.done});
+class EnterpriseWorkbenchReadinessPill extends StatelessWidget {
+  const EnterpriseWorkbenchReadinessPill({
+    super.key,
+    required this.label,
+    required this.done,
+  });
 
   final String label;
   final bool done;

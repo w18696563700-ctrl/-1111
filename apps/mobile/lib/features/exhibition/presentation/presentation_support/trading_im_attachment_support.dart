@@ -109,6 +109,7 @@ String _confirmationTypeLabel(String type) {
   return switch (type) {
     'quote' => '报价确认',
     'craft_material' => '工艺材料确认',
+    'material_process' => '工艺/材质确认',
     'schedule' => '排期确认',
     _ => type,
   };

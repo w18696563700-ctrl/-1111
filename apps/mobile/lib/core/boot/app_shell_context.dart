@@ -103,6 +103,23 @@ class AppShellContextData {
     return total > 99 ? '99+' : '$total';
   }
 
+  int? get messagesUnreadCount {
+    final summary = unreadSummary;
+    if (summary == null || summary.isEmpty) {
+      return null;
+    }
+    return _readUnreadCount(summary['messages']);
+  }
+
+  String? get messagesUnreadBadgeLabel {
+    final total = messagesUnreadCount;
+    if (total == null || total <= 0) {
+      return null;
+    }
+
+    return total > 99 ? '99+' : '$total';
+  }
+
   static int? _readUnreadCount(Object? raw) {
     if (raw is int && raw >= 0) {
       return raw;

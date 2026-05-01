@@ -39,6 +39,8 @@ final class ExhibitionCanonicalPaths {
       '/api/app/project/breach/record-factory';
   static const String projectDetail = '/api/app/project/detail';
   static const String projectBidMaterials = '/api/app/project/bid-materials';
+  static const String exhibitionReportSubmit =
+      '/api/app/exhibition/report/submit';
   static const String bidSubmit = '/api/app/bid/submit';
   static const String bidAward = '/api/app/bid/award';
   static const String bidSelectAndCreateOrder =
@@ -89,6 +91,32 @@ final class ExhibitionCanonicalPaths {
     String orderId,
   ) {
     return '${projectAuthenticitySincerityOrders(projectId)}/${Uri.encodeComponent(orderId)}';
+  }
+
+  static String projectAuthenticitySincerityRefundInit(
+    String projectId,
+    String orderId,
+  ) {
+    return '${projectAuthenticitySincerityOrderStatus(projectId, orderId)}/refund-init';
+  }
+
+  static String projectAuthenticitySincerityRefundStatus(
+    String projectId,
+    String orderId,
+  ) {
+    return '${projectAuthenticitySincerityOrderStatus(projectId, orderId)}/refund';
+  }
+
+  static String projectSettlementSummary(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/settlement/summary';
+  }
+
+  static String projectSettlementBatchDraft(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/settlement/batch-draft';
+  }
+
+  static String projectSettlementReconciliation(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/settlement/reconciliation';
   }
 
   static String projectBidServiceFeeAuthorizations(String projectId) {

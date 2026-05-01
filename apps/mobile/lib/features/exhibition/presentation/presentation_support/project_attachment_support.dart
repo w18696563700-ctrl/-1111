@@ -1,6 +1,8 @@
 part of '../exhibition_trade_pages.dart';
 
 typedef ProjectAttachmentPicker = Future<ProjectAttachmentDraft?> Function();
+typedef ProjectAttachmentSourceChooser =
+    Future<ProjectAttachmentPickSource?> Function(String attachmentKind);
 typedef ProjectAttachmentExternalUrlOpener = Future<bool> Function(Uri uri);
 typedef ProjectAttachmentRemoteImageBytesLoader =
     Future<List<int>?> Function(Uri uri);
@@ -16,6 +18,8 @@ const String _projectAttachmentKindServiceList = 'service_list';
 const String _projectAttachmentKindOtherMaterial = 'other_material';
 const String _projectAttachmentFullFormatSupportedTypes = '全格式文件';
 
+enum ProjectAttachmentPickSource { photo, file }
+
 class ProjectAttachmentDraft {
   const ProjectAttachmentDraft({required this.fileName, required this.bytes});
 
@@ -27,11 +31,16 @@ final class ProjectAttachmentDebugOverrides {
   const ProjectAttachmentDebugOverrides._();
 
   static ProjectAttachmentPicker? _pickerOverride;
+  static ProjectAttachmentSourceChooser? _sourceChooserOverride;
   static ProjectAttachmentExternalUrlOpener? _externalUrlOpener;
   static ProjectAttachmentRemoteImageBytesLoader? _remoteImageBytesLoader;
 
   static void installPicker(ProjectAttachmentPicker? picker) {
     _pickerOverride = picker;
+  }
+
+  static void installSourceChooser(ProjectAttachmentSourceChooser? chooser) {
+    _sourceChooserOverride = chooser;
   }
 
   static void installExternalUrlOpener(
@@ -50,6 +59,7 @@ final class ProjectAttachmentDebugOverrides {
 
   static void reset() {
     _pickerOverride = null;
+    _sourceChooserOverride = null;
     _externalUrlOpener = null;
     _remoteImageBytesLoader = null;
     clearSession();
@@ -138,10 +148,16 @@ const List<_ProjectAttachmentKindOption> _projectAttachmentKindOptions =
       ),
     ];
 
-Future<ProjectAttachmentDraft?> _pickProjectAttachmentDraft() async {
+Future<ProjectAttachmentDraft?> _pickProjectAttachmentDraft({
+  bool imageOnly = false,
+}) async {
   final override = ProjectAttachmentDebugOverrides._pickerOverride;
   if (override != null) {
     return override();
+  }
+
+  if (imageOnly) {
+    return _pickProjectImageAttachmentDraft();
   }
 
   final file = await openFile();
@@ -153,6 +169,101 @@ Future<ProjectAttachmentDraft?> _pickProjectAttachmentDraft() async {
     fileName: file.name,
     bytes: await file.readAsBytes(),
   );
+}
+
+Future<ProjectAttachmentDraft?> _pickProjectImageAttachmentDraft() async {
+  final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+  if (image == null) {
+    return null;
+  }
+  final bytes = await image.readAsBytes();
+  final fileName = _projectAttachmentImagePickerFileName(image);
+  return ProjectAttachmentDraft(fileName: fileName, bytes: bytes);
+}
+
+String _projectAttachmentImagePickerFileName(XFile image) {
+  final normalizedName = image.name.trim();
+  if (normalizedName.isNotEmpty) {
+    return normalizedName;
+  }
+  final normalizedPath = image.path.trim();
+  if (normalizedPath.isNotEmpty) {
+    final separatorIndex = normalizedPath.lastIndexOf(Platform.pathSeparator);
+    final candidate = separatorIndex == -1
+        ? normalizedPath
+        : normalizedPath.substring(separatorIndex + 1);
+    if (candidate.trim().isNotEmpty) {
+      return candidate.trim();
+    }
+  }
+  return 'chat-image-${DateTime.now().millisecondsSinceEpoch}.jpg';
+}
+
+Future<ProjectAttachmentPickSource?> _resolveProjectAttachmentPickSource({
+  required BuildContext context,
+  required String attachmentKind,
+}) async {
+  final override = ProjectAttachmentDebugOverrides._sourceChooserOverride;
+  if (override != null) {
+    return override(attachmentKind);
+  }
+  if (ProjectAttachmentDebugOverrides._pickerOverride != null ||
+      !_projectAttachmentKindSupportsPhotoSource(attachmentKind)) {
+    return ProjectAttachmentPickSource.file;
+  }
+
+  return showModalBottomSheet<ProjectAttachmentPickSource>(
+    context: context,
+    showDragHandle: true,
+    builder: (BuildContext context) {
+      final theme = Theme.of(context);
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '选择效果图来源',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '效果图可以是手机照片，也可以是 PDF、图纸或其他资料文件。',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ListTile(
+                leading: const Icon(Icons.photo_library_outlined),
+                title: const Text('从相册选择照片'),
+                subtitle: const Text('适合手机里的现场照片、效果图截图。'),
+                onTap: () => Navigator.of(
+                  context,
+                ).pop(ProjectAttachmentPickSource.photo),
+              ),
+              ListTile(
+                leading: const Icon(Icons.folder_open_rounded),
+                title: const Text('从文件选择资料'),
+                subtitle: const Text('适合 PDF、图纸、文档、压缩包等资料。'),
+                onTap: () =>
+                    Navigator.of(context).pop(ProjectAttachmentPickSource.file),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
+}
+
+bool _projectAttachmentKindSupportsPhotoSource(String attachmentKind) {
+  return attachmentKind == _projectAttachmentKindEffectImage;
 }
 
 _ResolvedProjectAttachmentDraft? _resolveProjectAttachmentDraft(

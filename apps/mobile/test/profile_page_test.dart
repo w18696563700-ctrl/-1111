@@ -21,6 +21,7 @@ import 'package:mobile/features/profile/data/profile_governance_status_consumer_
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_organization_credit_scoring_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_membership_consumer_layer.dart';
+import 'package:mobile/features/profile/data/profile_membership_purchase_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_payment_billing_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_personal_edit_upload_models.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
@@ -577,6 +578,10 @@ class _FakeOrganizationMembersConsumer implements ProfileIdentityConsumerLayer {
   }) => throw UnimplementedError();
 
   @override
+  Future<ProfileIdentityResult<OrganizationLeaveAcceptedView>>
+  leaveCurrentOrganization({String? reason}) => throw UnimplementedError();
+
+  @override
   Future<ProfileIdentityResult<ProfileCertificationAcceptedView>>
   submitCertification({
     required String organizationId,
@@ -781,6 +786,7 @@ void main() {
     );
     ProfileOrganizationCreditScoringConsumerLayer.reset();
     ProfileMembershipConsumerLayer.reset();
+    ProfileMembershipPurchaseConsumerLayer.reset();
     AppRuntimeInfoService.install(_FakeAppRuntimeInfoService());
     LocalCacheCleanupService.install(_FakeLocalCacheCleanupService());
   });
@@ -792,6 +798,7 @@ void main() {
     ProfilePaymentBillingConsumerLayer.reset();
     ProfileOrganizationCreditScoringConsumerLayer.reset();
     ProfileMembershipConsumerLayer.reset();
+    ProfileMembershipPurchaseConsumerLayer.reset();
     AppRuntimeInfoService.reset();
     LocalCacheCleanupService.reset();
   });
@@ -999,12 +1006,7 @@ void main() {
     expect(find.text('我的公司'), findsWidgets);
     await scrollTo(tester, find.text('我的会员'));
     expect(find.text('我的会员'), findsOneWidget);
-    expect(
-      find.text(
-        '部分可用：当前会员状态与权益摘要 · 标准会员 · 更高排序 · 商机提醒剩余 12 次 · 下次刷新 2026-04-06 00:00',
-      ),
-      findsOneWidget,
-    );
+    expect(find.textContaining('当前付费会员档位与权益摘要'), findsNothing);
     await scrollTo(tester, find.text('我的项目'));
     expect(find.text('当前组织项目列表与项目详情入口 · 进行中 1 个 · 历史 2 个'), findsOneWidget);
     expect(find.text('发布项目工作台'), findsNothing);
@@ -1108,7 +1110,7 @@ void main() {
       expect(find.text('来电铃声'), findsNothing);
       expect(find.text('我的发票抬头'), findsNothing);
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('我的论坛'));
@@ -1119,11 +1121,14 @@ void main() {
       expect(find.text('我的帖子'), findsOneWidget);
       expect(find.text('我的评论'), findsOneWidget);
       expect(find.text('我的收藏'), findsOneWidget);
+      expect(find.text('我的点赞'), findsOneWidget);
       expect(find.text('我的关注'), findsOneWidget);
       await scrollTo(tester, find.text('草稿箱'));
       expect(find.text('草稿箱'), findsOneWidget);
+      await scrollTo(tester, find.text('我的举报记录'));
+      expect(find.text('我的举报记录'), findsOneWidget);
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('我的公司'));
@@ -2033,7 +2038,9 @@ void main() {
                             body: const <String, Object?>{
                               'organizationId': 'org-membership',
                               'paidMembershipTier': 'standard',
-                              'rateBand': '标准费率档位',
+                              'rateBand': null,
+                              'serviceFeeDiscountSummary':
+                                  '平台服务费 9 折，作用于 baseFeeAmount，单项目封顶 3600。',
                               'entitlementsSummary': <String>['更高排序', '更多曝光位'],
                               'quotaSummary': <String>[
                                 '商机提醒剩余 12 次',
@@ -2100,12 +2107,15 @@ void main() {
                                 <String, Object?>{
                                   'tier': 'professional',
                                   'title': '专业档位',
-                                  'candidateDisplayPrice': '预计年费 ¥9,800',
-                                  'candidateDisplayRateBand': '更低费率档位',
+                                  'serviceFeeDiscountSummary':
+                                      '平台服务费 8 折，作用于 baseFeeAmount，单项目封顶 3200。',
+                                  'candidateDisplayPrice': null,
+                                  'candidateDisplayRateBand': null,
                                 },
                               ],
                               'upgradeHighlights': <String>['人工撮合优先', '客服优先'],
-                              'commercialDisclosure': '当前仅提供升级说明，不提供下单与支付。',
+                              'commercialDisclosure':
+                                  '升级引导页只展示档位与权益说明；购买、支付、续费仍需后续门禁解锁。',
                             },
                           );
                         },
@@ -2154,12 +2164,7 @@ void main() {
       expect(find.text('我的信用与约束'), findsOneWidget);
       await scrollTo(tester, find.text('我的会员'));
       expect(find.text('我的会员'), findsOneWidget);
-      expect(
-        find.text(
-          '部分可用：当前会员状态与权益摘要 · 标准会员 · 更高排序 · 商机提醒剩余 12 次 · 下次刷新 2026-04-06 00:00',
-        ),
-        findsOneWidget,
-      );
+      expect(find.textContaining('当前付费会员档位与权益摘要'), findsNothing);
       expect(find.text('公司认证与我的身份'), findsNothing);
       expect(find.text('我的项目'), findsOneWidget);
       expect(find.text('发布项目工作台'), findsNothing);
@@ -2168,14 +2173,23 @@ void main() {
       await tester.tap(find.text('我的会员'));
       await tester.pumpAndSettle();
 
-      expect(find.text('功能状态'), findsOneWidget);
-      expect(find.text('当前功能状态'), findsOneWidget);
-      expect(find.text('当前不承接购买、续费、下单、支付与账单闭环。'), findsOneWidget);
+      expect(find.text('功能状态总览'), findsOneWidget);
+      expect(find.text('当前会员'), findsOneWidget);
+      expect(find.text('当前已完成'), findsWidgets);
+      expect(find.text('全部 4 项'), findsOneWidget);
+      expect(find.text('当前未完成'), findsWidgets);
+      expect(find.text('2 项'), findsOneWidget);
+      expect(find.text('依赖项'), findsOneWidget);
+      expect(find.text('后续开启条件'), findsWidgets);
+      expect(find.text('支付沙箱验收未完成；续费、取消、退款、发票、KA/旗舰仍关闭。'), findsOneWidget);
       await scrollTo(tester, find.text('会员档位'));
       expect(find.text('会员档位'), findsOneWidget);
       expect(find.text('标准会员'), findsWidgets);
-      expect(find.text('费率档位'), findsOneWidget);
-      expect(find.text('标准费率档位'), findsOneWidget);
+      expect(find.text('服务费优惠'), findsOneWidget);
+      expect(
+        find.text('平台服务费 9 折，作用于 baseFeeAmount，单项目封顶 3600。'),
+        findsWidgets,
+      );
       expect(find.textContaining('更高排序'), findsWidgets);
       await scrollTo(tester, find.textContaining('商机提醒剩余 12 次'));
       expect(find.textContaining('商机提醒剩余 12 次'), findsWidgets);
@@ -2192,7 +2206,7 @@ void main() {
       expect(find.text('当前权益以组织 scope 下的会员档位为准。'), findsOneWidget);
       expect(find.text('当前说明仅用于会员读面，不构成支付承诺。'), findsOneWidget);
 
-      await tester.pageBack();
+      Navigator.of(tester.element(find.text('档位说明'))).pop();
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('配额说明页'));
@@ -2203,7 +2217,7 @@ void main() {
       expect(find.text('当前剩余 12 · 刷新规则：自然日刷新'), findsOneWidget);
       expect(find.text('刷新时间'), findsOneWidget);
 
-      await tester.pageBack();
+      Navigator.of(tester.element(find.text('当前额度'))).pop();
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('升级引导页'));
@@ -2211,9 +2225,107 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('当前档位'), findsOneWidget);
       expect(find.text('专业会员 · 专业档位'), findsOneWidget);
-      expect(find.text('预计年费 ¥9,800 · 费率档位：更低费率档位'), findsOneWidget);
+      expect(
+        find.text('平台服务费 8 折，作用于 baseFeeAmount，单项目封顶 3200。'),
+        findsOneWidget,
+      );
       expect(find.text('人工撮合优先'), findsOneWidget);
-      expect(find.text('当前仅提供升级说明，不提供下单与支付。'), findsOneWidget);
+      expect(find.text('升级引导页只展示档位与权益说明；购买、支付、续费仍需后续门禁解锁。'), findsOneWidget);
+      expect(find.text('进入会员直购'), findsNothing);
+      expect(find.text('会员直购最小闭环'), findsNothing);
+      expect(find.text('支付宝支付'), findsNothing);
+      expect(find.text('微信支付（保留/灰度）'), findsNothing);
+      expect(find.textContaining('2.5%'), findsNothing);
+      expect(find.textContaining('2.0%'), findsNothing);
+      expect(find.textContaining('1.5%'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'my membership does not present paid member badge or fake quota without paid tier',
+    (WidgetTester tester) async {
+      ProfileMembershipConsumerLayer.install(
+        ProfileMembershipConsumerLayer(
+          client: AppApiClient(
+            config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+            transport: FakeAppApiTransport(
+              handlers:
+                  <
+                    String,
+                    Future<AppApiResponse> Function(AppApiRequest request)
+                  >{
+                    'GET /api/app/profile/membership/current':
+                        (AppApiRequest request) async {
+                          return AppApiResponse(
+                            statusCode: 200,
+                            uri: request.uri,
+                            body: const <String, Object?>{
+                              'organizationId': 'org-membership',
+                              'paidMembershipTier': null,
+                              'rateBand': null,
+                              'serviceFeeDiscountSummary': null,
+                              'entitlementsSummary': <String>[],
+                              'quotaSummary': <String>[],
+                              'effectiveAt': null,
+                              'expiresAt': null,
+                              'nextRefreshAt': null,
+                            },
+                          );
+                        },
+                  },
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/profile/index': (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _profilePayload(
+                        organizationId: 'org-membership',
+                        roleKeys: const <String>['buyer_admin'],
+                        certificationStatus: 'approved',
+                        membershipStatus: 'active',
+                      ),
+                    );
+                  },
+                },
+          ),
+          shellContext: _shellContextData(
+            organizationId: 'org-membership',
+            roleKeys: const <String>['buyer_admin'],
+            certificationStatus: 'approved',
+            membershipStatus: 'active',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await scrollTo(tester, find.text('我的会员'));
+      await tester.tap(find.text('我的会员'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('未开通'), findsOneWidget);
+      expect(find.text('当前会员'), findsNothing);
+      expect(find.text('当前未开通付费会员折扣'), findsOneWidget);
+      expect(find.text('会员档位暂未提供'), findsWidgets);
+      await scrollTo(tester, find.text('配额摘要'));
+      expect(find.text('配额摘要'), findsOneWidget);
+      expect(find.text('当前暂未提供。后续将根据会员档位与支付主线开放。'), findsOneWidget);
+      expect(find.text('进入会员直购'), findsNothing);
+      expect(find.text('支付宝支付'), findsNothing);
+      expect(find.textContaining('2.5%'), findsNothing);
+      expect(find.textContaining('2.0%'), findsNothing);
+      expect(find.textContaining('1.5%'), findsNothing);
     },
   );
 
@@ -2470,7 +2582,7 @@ void main() {
       await tester.tap(find.text('我的信用与约束'));
       await tester.pumpAndSettle();
 
-      expect(find.text('功能状态'), findsOneWidget);
+      expect(find.text('功能状态总览'), findsOneWidget);
       expect(find.text('当前不承接真实保证金缴纳、资金冻结、支付执行或结算。'), findsOneWidget);
       await scrollTo(tester, find.text('当前摘要'));
       expect(find.text('当前摘要'), findsOneWidget);
@@ -2488,7 +2600,7 @@ void main() {
         findsWidgets,
       );
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('处理与衔接页'));
@@ -2694,10 +2806,11 @@ void main() {
       await tester.tap(find.text('组织信用评分 reserve'));
       await tester.pumpAndSettle();
 
-      expect(find.text('评分 86'), findsOneWidget);
+      expect(find.text('组织信用评分'), findsWidgets);
+      expect(find.text('评分 86'), findsNWidgets(2));
       expect(find.text('稳态档位'), findsWidgets);
       expect(find.text('未来主线 reserve 只读总览'), findsNothing);
-      expect(find.text('未来主线 reserve'), findsWidgets);
+      expect(find.textContaining('future-mainline reserve'), findsWidgets);
 
       await scrollTo(tester, find.text('说明页'));
       await tester.tap(find.text('说明页'));
@@ -2707,7 +2820,7 @@ void main() {
       expect(find.textContaining('order_rating_sample_ready'), findsWidgets);
       expect(find.text('低风险姿态'), findsWidgets);
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('衔接页'));
@@ -2717,9 +2830,9 @@ void main() {
       expect(find.text('未来主线 reserve 仅作只读衔接'), findsOneWidget);
       expect(find.text('继续观察'), findsOneWidget);
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('我的信用与约束'));
@@ -2850,7 +2963,8 @@ void main() {
 
       expect(find.text('样本不足'), findsWidgets);
       expect(find.text('风险姿态暂未提供'), findsWidgets);
-      expect(find.text('当前评分暂未提供'), findsOneWidget);
+      expect(find.text('当前暂无评分'), findsOneWidget);
+      expect(find.text('当前暂无可执行建议'), findsOneWidget);
 
       await scrollTo(tester, find.text('说明页'));
       await tester.tap(find.text('说明页'));
@@ -2858,7 +2972,7 @@ void main() {
       expect(find.textContaining('当前有效评价样本不足'), findsOneWidget);
       expect(find.text('风险姿态暂未提供'), findsWidgets);
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('衔接页'));
@@ -3808,6 +3922,7 @@ void main() {
       expect(find.textContaining('当前主体：重庆坤特展览展示有限公司'), findsOneWidget);
       expect(find.text('切换为当前公司/组织'), findsNothing);
       expect(find.text('Smoke Admin Review P0 Platform Org'), findsNothing);
+      expect(find.text('当前'), findsOneWidget);
       expect(find.text('我的公司'), findsOneWidget);
       expect(find.text('切换'), findsOneWidget);
       expect(
@@ -3917,10 +4032,147 @@ void main() {
 
       await tester.tap(find.text('切换').first);
       await tester.pumpAndSettle();
+      expect(find.text('确认切换当前主体'), findsOneWidget);
+      expect(find.textContaining('切换到“切换后主体”'), findsOneWidget);
+
+      await tester.tap(find.text('确认切换'));
+      await tester.pumpAndSettle();
 
       expect(find.text('切换成功'), findsOneWidget);
       expect(find.textContaining('当前主体：切换后主体'), findsOneWidget);
       expect(find.text('切换当前未完成'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'organization switch page leaves current organization and reloads next organization',
+    (WidgetTester tester) async {
+      String currentOrganizationId = 'org-leave-a';
+      var leaveCalls = 0;
+
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _profilePayload(
+                    organizationId: currentOrganizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+      final profileIdentityTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/organization/mine':
+                  (AppApiRequest request) async {
+                    final items = currentOrganizationId == 'org-leave-a'
+                        ? <Object?>[
+                            <String, Object?>{
+                              'organizationId': 'org-leave-a',
+                              'name': '退出前主体',
+                              'organizationType': 'supplier',
+                              'roleKeys': <Object?>['buyer_member(scoped)'],
+                              'membershipStatus': 'active',
+                              'certificationStatus': 'approved',
+                              'current': true,
+                            },
+                            <String, Object?>{
+                              'organizationId': 'org-leave-b',
+                              'name': '退出后主体',
+                              'organizationType': 'both',
+                              'roleKeys': <Object?>['buyer_admin'],
+                              'membershipStatus': 'active',
+                              'certificationStatus': 'not_submitted',
+                              'current': false,
+                            },
+                          ]
+                        : <Object?>[
+                            <String, Object?>{
+                              'organizationId': 'org-leave-b',
+                              'name': '退出后主体',
+                              'organizationType': 'both',
+                              'roleKeys': <Object?>['buyer_admin'],
+                              'membershipStatus': 'active',
+                              'certificationStatus': 'not_submitted',
+                              'current': true,
+                            },
+                          ];
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{'items': items},
+                    );
+                  },
+              'POST /api/app/profile/organization/current/leave':
+                  (AppApiRequest request) async {
+                    leaveCalls += 1;
+                    currentOrganizationId = 'org-leave-b';
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'leftOrganizationId': 'org-leave-a',
+                        'nextOrganizationId': 'org-leave-b',
+                        'shellBootstrapState': 'authenticated',
+                        'traceId': 'trace-leave',
+                      },
+                    );
+                  },
+            },
+      );
+      final shellTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/shell/context': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _shellContextPayload(
+                    organizationId: currentOrganizationId,
+                    roleKeys: const <String>['buyer_admin'],
+                    certificationStatus: 'not_submitted',
+                    membershipStatus: 'active',
+                  ),
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildProfileApp(
+          transport: transport,
+          initialRoute: ProfileIdentityRoutes.organizationSwitch,
+          profileIdentityTransport: profileIdentityTransport,
+          shellContextConsumer: AppShellContextConsumer(
+            client: AppApiClient(
+              config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+              transport: shellTransport,
+            ),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('当前主体：退出前主体'), findsOneWidget);
+      await scrollTo(tester, find.widgetWithText(FilledButton, '退出当前组织'));
+      await tester.tap(find.widgetWithText(FilledButton, '退出当前组织'));
+      await tester.pumpAndSettle();
+      expect(find.text('确认退出当前组织'), findsOneWidget);
+
+      await tester.tap(find.text('确认退出'));
+      await tester.pumpAndSettle();
+
+      expect(leaveCalls, 1);
+      expect(find.text('已退出当前组织'), findsOneWidget);
+      expect(find.text('退出对象：退出后主体'), findsOneWidget);
+      expect(find.textContaining('页面已重新读取当前组织上下文'), findsOneWidget);
     },
   );
 
@@ -4034,16 +4286,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('可切换主体'), findsOneWidget);
+      expect(find.text('我的主体列表'), findsOneWidget);
       expect(find.textContaining('当前主体：重庆坤特展览展示有限公司'), findsOneWidget);
       expect(find.text('Smoke Admin Review P0 Platform Org'), findsNothing);
       expect(find.text('我的公司'), findsOneWidget);
 
-      await tester.pageBack();
+      await tester.tap(find.byIcon(Icons.arrow_back_ios_new_rounded));
       await tester.pumpAndSettle();
 
       expect(find.text('公司与组织'), findsWidgets);
-      expect(find.text('可切换主体'), findsNothing);
+      expect(find.text('我的主体列表'), findsNothing);
       expect(find.text('编辑当前组织'), findsOneWidget);
     },
   );

@@ -82,6 +82,17 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage>
                   ).pushNamed(ProfileRoutes.sessionDeviceStatus),
                 ),
                 _ProfileActionRow(
+                  title: '账号注销 / 删除账号',
+                  subtitle: '当前提供受理说明，不直接删除审计、举报或争议留痕',
+                  leadingIcon: Icons.delete_outline_rounded,
+                  onTap: () => _showProfileComplianceInfoSheet(
+                    context,
+                    title: '账号注销 / 删除账号受理说明',
+                    message:
+                        '当前阶段不提供一键自助注销。你可以通过客服邮箱 182401625@qq.com 提交账号注销或个人信息删除申请；平台会先核验身份、处理未完结项目/举报/争议/合规留痕，再在符合法律法规和平台规则的范围内处理。',
+                  ),
+                ),
+                _ProfileActionRow(
                   title: '公司认证与我的身份',
                   subtitle: profileDisplayCertificationIdentitySummary(
                     certificationStatus: shellContext.certificationStatus,
@@ -192,6 +203,17 @@ class _ProfileSettingsPageState extends State<ProfileSettingsPage>
               leadingIcon: Icons.info_outline_rounded,
               onTap: () =>
                   Navigator.of(context).pushNamed(ProfileRoutes.versionInfo),
+            ),
+            _ProfileActionRow(
+              title: '客服与投诉',
+              subtitle: '客服邮箱：182401625@qq.com',
+              leadingIcon: Icons.support_agent_outlined,
+              onTap: () => _showProfileComplianceInfoSheet(
+                context,
+                title: '客服与投诉',
+                message:
+                    '如需咨询产品服务、账号登录、企业认证、举报处理、隐私权利或投诉事项，请通过客服邮箱 182401625@qq.com 联系平台。客服电话当前暂未公示。',
+              ),
             ),
           ],
         ),

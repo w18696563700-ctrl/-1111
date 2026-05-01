@@ -435,6 +435,44 @@ String _homeFrontStateLabel(String? state) => switch (state) {
 
 bool _homeCanContinueBid(String? state) => state == 'published';
 
+String? _homeProjectExampleAsset(Object? value) {
+  final areaSqm = _homeNumber(value);
+  if (areaSqm == null || areaSqm <= 0) {
+    return null;
+  }
+
+  const assetRoot = 'assets/exhibition/project_examples/';
+  if (areaSqm <= 9) return '${assetRoot}area_009.png';
+  if (areaSqm <= 18) return '${assetRoot}area_018.png';
+  if (areaSqm <= 27) return '${assetRoot}area_027.png';
+  if (areaSqm <= 36) return '${assetRoot}area_036.png';
+  if (areaSqm <= 45) return '${assetRoot}area_045.png';
+  if (areaSqm <= 54) return '${assetRoot}area_054.png';
+  if (areaSqm <= 63) return '${assetRoot}area_063.png';
+  if (areaSqm <= 72) return '${assetRoot}area_072.png';
+  if (areaSqm <= 81) return '${assetRoot}area_081.png';
+  if (areaSqm <= 90) return '${assetRoot}area_090.png';
+  if (areaSqm <= 108) return '${assetRoot}area_108.png';
+  return '${assetRoot}area_108_plus.png';
+}
+
+String _homeProjectTypeLabel(Object? value) {
+  final raw = _homeTrimmedString(value);
+  if (raw == null) {
+    return '类型待确认';
+  }
+
+  final normalized = raw.toLowerCase();
+  return switch (normalized) {
+    'exhibition' => '会展',
+    'renovation' => '装修',
+    'custom_furniture' => '定制',
+    'showroom' => '展厅',
+    'commercial_activity' || 'commercial_event' => '商业活动',
+    _ => raw,
+  };
+}
+
 String _homeProjectAreaLabel(Object? value) {
   final areaSqm = _homeNumber(value);
   if (areaSqm == null) {
@@ -455,4 +493,21 @@ String _homeProjectCityLabel(Map<String, Object?> item) {
 
 String _homeProjectEntryTimeLabel(Map<String, Object?> item) {
   return _homeTrimmedString(item['plannedStartAt']) ?? '当前项目暂未提供';
+}
+
+String? _homeProjectPublishedAtLabel(Map<String, Object?> item) {
+  final raw = _homeTrimmedString(item['publishedAt']);
+  if (raw == null) {
+    return null;
+  }
+
+  final parsed = DateTime.tryParse(raw);
+  if (parsed == null) {
+    return null;
+  }
+
+  final local = parsed.isUtc ? parsed.toLocal() : parsed;
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+  return '发布 ${local.month}月${local.day}日 $hour:$minute';
 }

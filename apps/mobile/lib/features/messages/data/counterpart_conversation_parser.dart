@@ -64,10 +64,70 @@ ProjectCommunicationMessageView parseProjectCommunicationMessage(
     senderActorId: _nullableString(map['senderActorId']),
     senderOrganizationId: _requiredString(map, 'senderOrganizationId'),
     messageKind: _requiredString(map, 'messageKind'),
-    body: _requiredString(map, 'body'),
+    body: _requiredBodyString(map, 'body'),
+    attachment: _parseProjectCommunicationAttachment(map['payload']),
+    confirmation: _parseProjectCommunicationConfirmation(map['payload']),
     clientMessageId: _nullableString(map['clientMessageId']),
     messageState: _requiredString(map, 'messageState'),
     createdAt: _requiredString(map, 'createdAt'),
+  );
+}
+
+ProjectCommunicationAttachmentView? _parseProjectCommunicationAttachment(
+  Object? payload,
+) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload, 'project communication message payload');
+  final attachment = map['attachment'];
+  if (attachment == null) {
+    return null;
+  }
+  final attachmentMap = _requiredMap(
+    attachment,
+    'project communication attachment payload',
+  );
+  return ProjectCommunicationAttachmentView(
+    fileAssetId: _requiredString(attachmentMap, 'fileAssetId'),
+    fileName: _requiredString(attachmentMap, 'fileName'),
+    mimeType: _requiredString(attachmentMap, 'mimeType'),
+    size: _requiredInt(attachmentMap, 'size'),
+    category: _enumValue(_requiredString(attachmentMap, 'category'), const {
+      'image',
+      'file',
+    }, 'category'),
+  );
+}
+
+ProjectCommunicationConfirmationView? _parseProjectCommunicationConfirmation(
+  Object? payload,
+) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload, 'project communication message payload');
+  final confirmation = map['confirmation'];
+  if (confirmation == null) {
+    return null;
+  }
+  final confirmationMap = _requiredMap(
+    confirmation,
+    'project communication confirmation payload',
+  );
+  return ProjectCommunicationConfirmationView(
+    confirmationType: _enumValue(
+      _requiredString(confirmationMap, 'confirmationType'),
+      const {'quote', 'material_process', 'schedule'},
+      'confirmationType',
+    ),
+    title: _requiredString(confirmationMap, 'title'),
+    summary: _requiredString(confirmationMap, 'summary'),
+    status: _enumValue(
+      _nullableString(confirmationMap['status']) ?? 'proposed',
+      const {'proposed'},
+      'status',
+    ),
   );
 }
 
@@ -82,6 +142,58 @@ ProjectCommunicationReadCursorView parseProjectCommunicationReadCursor(
     lastReadMessageId: _nullableString(map['lastReadMessageId']),
     lastReadAt: _requiredString(map, 'lastReadAt'),
     updatedAt: _requiredString(map, 'updatedAt'),
+  );
+}
+
+ProjectCommunicationFilePreviewAccessView
+parseProjectCommunicationFilePreviewAccess(Object? payload) {
+  final map = _requiredMap(
+    payload,
+    'project communication file preview access',
+  );
+  return ProjectCommunicationFilePreviewAccessView(
+    fileAssetId: _requiredString(map, 'fileAssetId'),
+    projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
+    previewType: _enumValue(_requiredString(map, 'previewType'), const {
+      'image',
+      'pdf',
+      'text',
+      'unsupported',
+    }, 'previewType'),
+    canPreview: _requiredBool(map, 'canPreview'),
+    fileName: _nullableString(map['fileName']),
+    mimeType: _nullableString(map['mimeType']),
+    accessUrl: _nullableString(map['accessUrl']),
+    expiresAt: _nullableString(map['expiresAt']),
+    contentLengthBytes: _nullableInt(map['contentLengthBytes']),
+    downloadAvailable: map['downloadAvailable'] == true,
+    fallbackReason: _nullableString(map['fallbackReason']),
+  );
+}
+
+ProjectCommunicationConfirmationSoftLinkView
+parseProjectCommunicationConfirmationSoftLink(Object? payload) {
+  final map = _requiredMap(
+    payload,
+    'project communication confirmation softLink',
+  );
+  return ProjectCommunicationConfirmationSoftLinkView(
+    projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
+    messageId: _requiredString(map, 'messageId'),
+    confirmationType: _enumValue(
+      _requiredString(map, 'confirmationType'),
+      const {'quote', 'material', 'material_process', 'schedule'},
+      'confirmationType',
+    ),
+    status: _enumValue(_nullableString(map['status']) ?? 'pending', const {
+      'pending',
+      'recorded',
+    }, 'status'),
+    title: _nullableString(map['title']),
+    summary: _nullableString(map['summary']),
+    routeTarget: _parseOptionalSoftLinkRouteTarget(map['routeTarget']),
   );
 }
 
@@ -156,7 +268,15 @@ CounterpartConversationProjectGroupView _parseProjectGroup(Object? payload) {
       'projectRelation',
     ),
     projectState: _nullableString(map['projectState']),
+    projectPublishedAt: _nullableString(map['projectPublishedAt']),
+    projectUpdatedAt: _nullableString(map['projectUpdatedAt']),
     latestActivityAt: _requiredString(map, 'latestActivityAt'),
+    projectUnreadCount: _optionalNonNegativeInt(
+      map['projectUnreadCount'],
+      'projectUnreadCount',
+    ),
+    hasProjectUnread:
+        _optionalBool(map['hasProjectUnread'], 'hasProjectUnread') ?? false,
     orderSummary: _parseOrderSummary(
       map['orderSummary'] ??
           map['order'] ??
@@ -245,6 +365,8 @@ CounterpartConversationBusinessCardView _parseBusinessCard(Object? payload) {
     summary: _requiredString(map, 'summary'),
     status: _nullableString(map['status']),
     updatedAt: _requiredString(map, 'updatedAt'),
+    requesterCompanyName: _nullableString(map['requesterCompanyName']),
+    requesterOrganizationId: _nullableString(map['requesterOrganizationId']),
     truthAnchor: truthAnchor,
     detailRouteTarget: detailRouteTarget,
     decisionAvailability: _parseDecisionAvailability(
@@ -426,6 +548,14 @@ String _requiredString(Map<String, Object?> payload, String field) {
   return normalized;
 }
 
+String _requiredBodyString(Map<String, Object?> payload, String field) {
+  final value = payload[field];
+  if (value is! String) {
+    throw FormatException('field "$field" must be a string');
+  }
+  return value;
+}
+
 int _requiredInt(Map<String, Object?> payload, String field) {
   final value = payload[field];
   if (value is int) {
@@ -440,6 +570,26 @@ bool _requiredBool(Map<String, Object?> payload, String field) {
     return value;
   }
   throw FormatException('field "$field" must be a bool');
+}
+
+bool? _optionalBool(Object? value, String field) {
+  if (value == null) {
+    return null;
+  }
+  if (value is bool) {
+    return value;
+  }
+  throw FormatException('field "$field" must be a bool');
+}
+
+int _optionalNonNegativeInt(Object? value, String field) {
+  if (value == null) {
+    return 0;
+  }
+  if (value is int && value >= 0) {
+    return value;
+  }
+  throw FormatException('field "$field" must be a non-negative int');
 }
 
 String _enumValue(String value, Set<String> allowed, String context) {
@@ -476,4 +626,24 @@ String? _nullableString(Object? value) {
   }
   final normalized = value.trim();
   return normalized.isEmpty ? null : normalized;
+}
+
+int? _nullableInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num && value == value.roundToDouble()) {
+    return value.toInt();
+  }
+  return null;
+}
+
+MessageInteractionRouteTarget? _parseOptionalSoftLinkRouteTarget(
+  Object? payload,
+) {
+  try {
+    return _parseRouteTarget(payload);
+  } on FormatException {
+    return null;
+  }
 }

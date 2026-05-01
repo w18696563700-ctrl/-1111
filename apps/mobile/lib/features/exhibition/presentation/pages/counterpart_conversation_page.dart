@@ -45,6 +45,12 @@ class _CounterpartConversationPageState
   bool _sending = false;
   bool _fallbackPolling = false;
   bool _pausedByLifecycle = false;
+  String? _lastMarkedReadMessageId;
+  final Map<String, ProjectCommunicationFilePreviewAccessView>
+  _attachmentPreviewCache =
+      <String, ProjectCommunicationFilePreviewAccessView>{};
+  final Set<String> _loadingAttachmentPreviewKeys = <String>{};
+  final Set<String> _failedAttachmentPreviewKeys = <String>{};
 
   @override
   void initState() {
@@ -56,7 +62,7 @@ class _CounterpartConversationPageState
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _stopRealtime();
+    unawaited(_stopRealtime(waitForClose: false));
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();
@@ -76,7 +82,7 @@ class _CounterpartConversationPageState
       case AppLifecycleState.detached:
       case AppLifecycleState.hidden:
         _pausedByLifecycle = true;
-        _stopRealtime();
+        unawaited(_stopRealtime(waitForClose: false));
         return;
     }
   }
@@ -158,6 +164,7 @@ class _CounterpartConversationPageState
       _messageResult = result;
       _loadingMessages = false;
     });
+    _preloadImageAttachmentPreviews(result.data?.items);
     if (scrollToBottom && result.state == AppPageState.content) {
       _scheduleScrollToBottom();
     }
@@ -177,6 +184,7 @@ class _CounterpartConversationPageState
       return;
     }
     setState(() => _messageResult = result);
+    _preloadImageAttachmentPreviews(result.data?.items);
     if (result.data?.items.isNotEmpty == true) {
       await _markLatestRead(thread, result.data!.items.last.messageId);
     }
@@ -215,7 +223,7 @@ class _CounterpartConversationPageState
     }
   }
 
-  Future<void> _stopRealtime() async {
+  Future<void> _stopRealtime({bool waitForClose = true}) async {
     _fallbackPolling = false;
     _reconnectTimer?.cancel();
     _reconnectTimer = null;
@@ -230,11 +238,13 @@ class _CounterpartConversationPageState
     final subscription = _realtimeSubscription;
     _realtimeSubscription = null;
     final closeFuture = subscription?.close();
-    if (closeFuture != null) {
+    if (closeFuture != null && waitForClose) {
       await closeFuture.timeout(
         const Duration(milliseconds: 500),
         onTimeout: () {},
       );
+    } else if (closeFuture != null) {
+      unawaited(closeFuture.catchError((_) {}));
     }
   }
 
@@ -348,6 +358,7 @@ class _CounterpartConversationPageState
         );
       }
     });
+    _preloadImageAttachmentPreviews(nextMessages);
     _scheduleScrollToBottom();
     _markLatestRead(thread, event.messageId);
   }
@@ -369,13 +380,26 @@ class _CounterpartConversationPageState
   Future<void> _markLatestRead(
     ProjectCommunicationThreadView thread,
     String lastReadMessageId,
-  ) {
-    return CounterpartConversationConsumerLayer.instance
+  ) async {
+    if (_lastMarkedReadMessageId == lastReadMessageId) {
+      return;
+    }
+    await CounterpartConversationConsumerLayer.instance
         .markProjectCommunicationReadCursor(
           threadId: thread.threadId,
           projectId: thread.projectId,
           lastReadMessageId: lastReadMessageId,
         );
+    _lastMarkedReadMessageId = lastReadMessageId;
+    _reloadShellContextAfterRead();
+  }
+
+  void _reloadShellContextAfterRead() {
+    try {
+      unawaited(AppShellScope.read(context).reloadShellContext());
+    } catch (_) {
+      // Tests may mount this page without the full shell scope.
+    }
   }
 
   Future<void> _sendCurrentMessage() async {
@@ -387,6 +411,12 @@ class _CounterpartConversationPageState
       }
       return;
     }
+    if (_shouldShowContactSoftPrompt(body)) {
+      final shouldContinue = await _showContactSoftPrompt();
+      if (!shouldContinue) {
+        return;
+      }
+    }
     final draft = _DraftProjectCommunicationMessage(
       clientMessageId: _newClientMessageId(),
       body: body,
@@ -397,6 +427,62 @@ class _CounterpartConversationPageState
       _messageController.clear();
       _drafts.add(draft);
     });
+    _scheduleScrollToBottom();
+    await _sendDraft(draft);
+  }
+
+  Future<void> _sendAttachmentMessage({required bool imageOnly}) async {
+    final thread = _threadResult?.data;
+    if (thread == null || _sending) {
+      return;
+    }
+    final outcome = await _pickAndUploadProjectCommunicationAttachment(
+      projectId: thread.projectId,
+      imageOnly: imageOnly,
+    );
+    if (!mounted || outcome == null) {
+      return;
+    }
+    if (!outcome.isSuccess) {
+      _showSnack(outcome.message);
+      return;
+    }
+    final caption = _messageController.text.trim();
+    final attachment = outcome.attachment!;
+    final draft = _DraftProjectCommunicationMessage(
+      clientMessageId: _newClientMessageId(),
+      body: caption,
+      createdAt: DateTime.now(),
+      state: _DraftProjectCommunicationState.sending,
+      messageKind: attachment.category == 'image' ? 'image' : 'file',
+      attachment: attachment,
+    );
+    setState(() {
+      _messageController.clear();
+      _drafts.add(draft);
+    });
+    _scheduleScrollToBottom();
+    await _sendDraft(draft);
+  }
+
+  Future<void> _sendConfirmationCard() async {
+    final thread = _threadResult?.data;
+    if (thread == null || _sending) {
+      return;
+    }
+    final confirmation = await _showConfirmationComposer();
+    if (!mounted || confirmation == null) {
+      return;
+    }
+    final draft = _DraftProjectCommunicationMessage(
+      clientMessageId: _newClientMessageId(),
+      body: '',
+      createdAt: DateTime.now(),
+      state: _DraftProjectCommunicationState.sending,
+      messageKind: 'confirmation_card',
+      confirmation: confirmation,
+    );
+    setState(() => _drafts.add(draft));
     _scheduleScrollToBottom();
     await _sendDraft(draft);
   }
@@ -420,6 +506,8 @@ class _CounterpartConversationPageState
           projectId: thread.projectId,
           body: draft.body,
           clientMessageId: draft.clientMessageId,
+          messageKind: draft.messageKind,
+          payload: _draftPayload(draft),
         );
     if (!mounted) {
       return;
@@ -457,6 +545,243 @@ class _CounterpartConversationPageState
     });
   }
 
+  Map<String, Object?>? _draftPayload(_DraftProjectCommunicationMessage draft) {
+    final attachment = draft.attachment;
+    if (attachment != null) {
+      return <String, Object?>{
+        'attachment': <String, Object?>{
+          'fileAssetId': attachment.fileAssetId,
+          'fileName': attachment.fileName,
+          'mimeType': attachment.mimeType,
+          'size': attachment.size,
+          'category': attachment.category,
+        },
+      };
+    }
+    final confirmation = draft.confirmation;
+    if (confirmation != null) {
+      return <String, Object?>{
+        'confirmation': <String, Object?>{
+          'confirmationType': confirmation.confirmationType,
+          'title': confirmation.title,
+          'summary': confirmation.summary,
+          'status': confirmation.status,
+        },
+      };
+    }
+    return null;
+  }
+
+  Future<_ProjectCommunicationUploadOutcome?>
+  _pickAndUploadProjectCommunicationAttachment({
+    required String projectId,
+    required bool imageOnly,
+  }) async {
+    _showSnack(imageOnly ? '请选择要发送的图片。' : '请选择要发送的附件。');
+    late final ProjectAttachmentDraft? draft;
+    try {
+      draft = await _pickProjectAttachmentDraft(imageOnly: imageOnly);
+    } catch (_) {
+      return _ProjectCommunicationUploadOutcome(
+        message: imageOnly
+            ? '当前设备暂时打不开相册，请检查相册权限后再试。'
+            : '当前设备暂时打不开文件选择器，请稍后再试。',
+      );
+    }
+    if (draft == null) {
+      return _ProjectCommunicationUploadOutcome(
+        message: imageOnly ? '当前没有选择图片。' : '当前没有选择文件。',
+      );
+    }
+    final resolved = _resolveProjectAttachmentDraft(draft);
+    if (resolved == null) {
+      return const _ProjectCommunicationUploadOutcome(message: '当前文件格式暂不支持。');
+    }
+    final isImage = resolved.mimeType.toLowerCase().startsWith('image/');
+    if (imageOnly && !isImage) {
+      return const _ProjectCommunicationUploadOutcome(message: '图片入口仅支持图片文件。');
+    }
+    if (imageOnly) {
+      final confirmed = await _confirmProjectCommunicationImageSend(resolved);
+      if (!mounted || !confirmed) {
+        return null;
+      }
+    }
+    _showSnack('正在申请上传策略。');
+    final init = await ExhibitionConsumerLayer.instance.uploadInit(
+      UploadInitCommand(
+        businessType: 'project',
+        businessId: projectId,
+        fileKind: 'project_communication_attachment',
+        mimeType: resolved.mimeType,
+        size: resolved.sizeInBytes,
+        checksum: resolved.checksum,
+      ),
+    );
+    final directive = init.directive;
+    if (init.state != AppUploadState.signedReady || directive == null) {
+      return _ProjectCommunicationUploadOutcome(
+        message: init.message ?? '当前上传初始化未完成，请稍后重试。',
+      );
+    }
+    _showSnack('正在上传 ${resolved.fileName}。');
+    final direct = await ExhibitionConsumerLayer.instance.directUpload(
+      directive: directive,
+      bodyBytes: resolved.bytes,
+    );
+    final confirmDirective = direct.directive;
+    if (direct.state != AppUploadState.uploadConfirming ||
+        confirmDirective == null) {
+      return _ProjectCommunicationUploadOutcome(
+        message: direct.message ?? '当前文件直传未完成，请重新上传。',
+      );
+    }
+    _showSnack('正在确认文件。');
+    final confirm = await ExhibitionConsumerLayer.instance.uploadConfirm(
+      directive: confirmDirective,
+    );
+    final fileAssetId = confirm.fileAssetId?.trim();
+    if (confirm.state != AppUploadState.uploadBound ||
+        fileAssetId == null ||
+        fileAssetId.isEmpty) {
+      return _ProjectCommunicationUploadOutcome(
+        message: confirm.message ?? '当前文件确认失败，请稍后重试。',
+      );
+    }
+    return _ProjectCommunicationUploadOutcome(
+      message: '${resolved.fileName} 已上传。',
+      attachment: ProjectCommunicationAttachmentView(
+        fileAssetId: fileAssetId,
+        fileName: resolved.fileName,
+        mimeType: resolved.mimeType,
+        size: resolved.sizeInBytes,
+        category: isImage ? 'image' : 'file',
+      ),
+    );
+  }
+
+  Future<bool> _confirmProjectCommunicationImageSend(
+    _ResolvedProjectAttachmentDraft draft,
+  ) async {
+    final result = await showModalBottomSheet<bool>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        final theme = Theme.of(context);
+        final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(18, 8, 18, 18 + bottomInset),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '发送这张图片？',
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: Image.memory(
+                    Uint8List.fromList(draft.bytes),
+                    width: double.infinity,
+                    height: 240,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, _, _) => SizedBox(
+                      height: 160,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  '图片 · ${_formatBytes(draft.sizeInBytes)}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: <Widget>[
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.of(context).pop(false),
+                        child: const Text('取消'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: () => Navigator.of(context).pop(true),
+                        icon: const Icon(Icons.send_rounded),
+                        label: const Text('发送图片'),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    return result == true;
+  }
+
+  bool _shouldShowContactSoftPrompt(String body) {
+    final normalized = body.toLowerCase();
+    if (RegExp(r'1[3-9]\d{9}').hasMatch(normalized)) {
+      return true;
+    }
+    return normalized.contains('微信') ||
+        normalized.contains('qq') ||
+        normalized.contains('联系我') ||
+        normalized.contains('加我') ||
+        normalized.contains('电话多少');
+  }
+
+  Future<bool> _showContactSoftPrompt() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('建议优先在平台内继续沟通'),
+        content: const Text('平台内沟通更便于留存关键记录，报价、材质、排期等事项建议优先保留在项目沟通中。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('返回修改'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('继续发送'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
+
+  Future<ProjectCommunicationConfirmationView?> _showConfirmationComposer() {
+    return showModalBottomSheet<ProjectCommunicationConfirmationView>(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => const _ProjectConfirmationComposerSheet(),
+    );
+  }
+
   Future<void> _openProjectCommunication(
     CounterpartConversationProjectGroupView group,
   ) async {
@@ -469,6 +794,7 @@ class _CounterpartConversationPageState
       _selectedProjectId = group.projectId;
       _threadResult = null;
       _messageResult = null;
+      _lastMarkedReadMessageId = null;
       _drafts.clear();
       _loadingThread = true;
       _loadingMessages = true;
@@ -490,6 +816,7 @@ class _CounterpartConversationPageState
       _selectedProjectId = null;
       _threadResult = null;
       _messageResult = null;
+      _lastMarkedReadMessageId = null;
       _drafts.clear();
       _loadingThread = false;
       _loadingMessages = false;
@@ -540,6 +867,9 @@ class _CounterpartConversationPageState
                   enabled: !_loadingThread,
                   sending: _sending,
                   onSend: _sendCurrentMessage,
+                  onAttachFile: () => _sendAttachmentMessage(imageOnly: false),
+                  onAttachImage: () => _sendAttachmentMessage(imageOnly: true),
+                  onCreateConfirmation: _sendConfirmationCard,
                 ),
           ],
         ),
@@ -559,7 +889,7 @@ class _CounterpartConversationPageState
           data: data,
           onOpenSubjectCard: () => _openSubjectCard(data),
           canOpenSubjectCard: _canOpenSubjectCard(data),
-          title: '项目沟通',
+          title: '当前沟通对象',
         ),
         const SizedBox(height: 16),
         _CounterpartProjectEntryList(
@@ -574,11 +904,15 @@ class _CounterpartConversationPageState
         );
     final selectedOrderId = _orderIdFromConversationGroup(selectedGroup);
     return <Widget>[
-      _CounterpartConversationHeader(
+      _ProjectConversationHeaderCard(
         data: data,
+        group: selectedGroup,
+        thread: thread,
+        currentOrganizationId: _currentOrganizationId(context),
+        currentDisplayName: _currentDisplayName(context),
+        currentAvatarUrl: _currentAvatarUrl(context),
         onOpenSubjectCard: () => _openSubjectCard(data),
         canOpenSubjectCard: _canOpenSubjectCard(data),
-        title: '竞标沟通',
       ),
       const SizedBox(height: 16),
       _SelectedProjectBusinessEntrypoints(
@@ -593,6 +927,8 @@ class _CounterpartConversationPageState
         onOpenOrder: () => _openOrderDetail(selectedGroup),
         onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
       ),
+      const SizedBox(height: 12),
+      const _ConversationGuidanceBanner(),
       if (exitGovernanceSnapshot != null) ...<Widget>[
         const SizedBox(height: 16),
         _ProjectExitGovernanceStatusCard(
@@ -614,10 +950,17 @@ class _CounterpartConversationPageState
           messageResult: _messageResult,
           drafts: _drafts,
           currentOrganizationId: _currentOrganizationId(context),
+          currentDisplayName: _currentDisplayName(context),
+          currentAvatarUrl: _currentAvatarUrl(context),
+          counterpart: data.counterpart,
+          attachmentPreviewForMessage: _previewForMessage,
+          attachmentPreviewLoadingForMessage: _previewLoadingForMessage,
           onRetryDraft: _retryDraft,
           onRefreshMessages: thread == null
               ? null
               : () => _loadMessages(thread),
+          onPreviewAttachment: _openAttachmentPreview,
+          onOpenConfirmationSoftLink: _openConfirmationSoftLink,
         ),
       ),
     ];
@@ -665,6 +1008,201 @@ class _CounterpartConversationPageState
     ).pushNamed(ExhibitionRoutes.projectAlbumWithProjectId(group.projectId));
   }
 
+  void _preloadImageAttachmentPreviews(
+    List<ProjectCommunicationMessageView>? messages,
+  ) {
+    if (messages == null || messages.isEmpty) {
+      return;
+    }
+    for (final message in messages) {
+      final attachment = message.attachment;
+      if (attachment == null || !_isProjectCommunicationImage(attachment)) {
+        continue;
+      }
+      final key = _attachmentPreviewKey(message);
+      if (_attachmentPreviewCache.containsKey(key) ||
+          _loadingAttachmentPreviewKeys.contains(key) ||
+          _failedAttachmentPreviewKeys.contains(key)) {
+        continue;
+      }
+      _loadingAttachmentPreviewKeys.add(key);
+      unawaited(_loadAttachmentPreviewForThumbnail(message, key));
+    }
+  }
+
+  Future<void> _loadAttachmentPreviewForThumbnail(
+    ProjectCommunicationMessageView message,
+    String key,
+  ) async {
+    final result = await CounterpartConversationConsumerLayer.instance
+        .loadProjectCommunicationFilePreviewAccess(
+          projectId: message.projectId,
+          threadId: message.threadId,
+          fileAssetId: message.attachment?.fileAssetId,
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _loadingAttachmentPreviewKeys.remove(key);
+      final data = result.data;
+      if (result.state == AppPageState.content && data != null) {
+        _attachmentPreviewCache[key] = data;
+        return;
+      }
+      _failedAttachmentPreviewKeys.add(key);
+    });
+  }
+
+  ProjectCommunicationFilePreviewAccessView? _previewForMessage(
+    ProjectCommunicationMessageView message,
+  ) {
+    return _attachmentPreviewCache[_attachmentPreviewKey(message)];
+  }
+
+  bool _previewLoadingForMessage(ProjectCommunicationMessageView message) {
+    return _loadingAttachmentPreviewKeys.contains(
+      _attachmentPreviewKey(message),
+    );
+  }
+
+  String _attachmentPreviewKey(ProjectCommunicationMessageView message) {
+    return '${message.projectId}::${message.threadId}::${message.attachment?.fileAssetId ?? ''}';
+  }
+
+  bool _isProjectCommunicationImage(ProjectCommunicationAttachmentView item) {
+    return item.category == 'image' ||
+        item.mimeType.toLowerCase().startsWith('image/');
+  }
+
+  Future<void> _openAttachmentPreview(
+    ProjectCommunicationMessageView message,
+  ) async {
+    final attachment = message.attachment;
+    if (attachment == null) {
+      return;
+    }
+    final key = _attachmentPreviewKey(message);
+    var data = _attachmentPreviewCache[key];
+    if (data == null) {
+      final result = await CounterpartConversationConsumerLayer.instance
+          .loadProjectCommunicationFilePreviewAccess(
+            projectId: message.projectId,
+            threadId: message.threadId,
+            fileAssetId: attachment.fileAssetId,
+          );
+      if (!mounted) {
+        return;
+      }
+      data = result.data;
+      if (result.state != AppPageState.content || data == null) {
+        _showSnack(result.message ?? '当前附件暂不可预览。');
+        return;
+      }
+      _attachmentPreviewCache[key] = data;
+    }
+
+    final accessUrl = data.accessUrl?.trim();
+    if (_isProjectCommunicationImage(attachment) &&
+        data.canPreview &&
+        data.previewType == 'image' &&
+        accessUrl != null &&
+        accessUrl.isNotEmpty) {
+      await _showProjectAttachmentNetworkImagePreviewDialog(
+        context,
+        fileName: data.fileName ?? attachment.fileName,
+        imageUrl: accessUrl,
+      );
+      return;
+    }
+    await _showAttachmentPreviewDialog(data);
+  }
+
+  Future<void> _showAttachmentPreviewDialog(
+    ProjectCommunicationFilePreviewAccessView preview,
+  ) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) {
+        final theme = Theme.of(context);
+        final canPreview = preview.canPreview && preview.accessUrl != null;
+        return AlertDialog(
+          title: const Text('附件预览'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                preview.fileName ?? preview.fileAssetId,
+                style: theme.textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                canPreview
+                    ? '${_previewTypeLabel(preview.previewType)}预览链接已就绪。'
+                    : '当前文件暂不支持在线预览，可保留下载入口。',
+              ),
+              if (preview.mimeType != null) ...<Widget>[
+                const SizedBox(height: 6),
+                Text(
+                  preview.mimeType!,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('关闭'),
+            ),
+            if (canPreview)
+              FilledButton(
+                onPressed: () {
+                  final url = preview.accessUrl;
+                  if (url != null) {
+                    unawaited(launchUrlString(url));
+                  }
+                },
+                child: const Text('打开预览'),
+              ),
+          ],
+        );
+      },
+    );
+  }
+
+  Future<void> _openConfirmationSoftLink(
+    ProjectCommunicationMessageView message,
+  ) async {
+    final result = await CounterpartConversationConsumerLayer.instance
+        .loadProjectCommunicationConfirmationSoftLink(
+          projectId: message.projectId,
+          threadId: message.threadId,
+          messageId: message.messageId,
+        );
+    if (!mounted) {
+      return;
+    }
+    final data = result.data;
+    if (result.state != AppPageState.content || data == null) {
+      _showSnack(result.message ?? '当前确认卡入口暂不可用。');
+      return;
+    }
+    final routeLocation = data.routeTarget?.routeLocation;
+    if (routeLocation == null || routeLocation.isEmpty) {
+      _showSnack(
+        '${_confirmationSoftLinkLabel(data.confirmationType)}暂未开放独立页面。',
+      );
+      return;
+    }
+    Navigator.of(context).pushNamed(routeLocation);
+  }
+
   void _openSubjectCard(CounterpartConversationDetailView data) {
     final group = _subjectProjectGroup(data);
     if (group == null || data.counterpart.organizationId.trim().isEmpty) {
@@ -710,7 +1248,11 @@ class _CounterpartConversationPageState
             titleVisibility: group.titleVisibility,
             projectRelation: group.projectRelation,
             projectState: group.projectState,
+            projectPublishedAt: group.projectPublishedAt,
+            projectUpdatedAt: group.projectUpdatedAt,
             latestActivityAt: group.latestActivityAt,
+            projectUnreadCount: group.projectUnreadCount,
+            hasProjectUnread: group.hasProjectUnread,
             orderSummary: group.orderSummary,
             ratingEntry: group.ratingEntry,
             cards: _sortedBusinessCards(group.cards),
@@ -942,6 +1484,20 @@ class _CounterpartConversationPageState
     return scope?.notifier?.snapshot.shellContext.organizationId;
   }
 
+  String? _currentDisplayName(BuildContext context) {
+    final element = context
+        .getElementForInheritedWidgetOfExactType<AppShellScope>();
+    final scope = element?.widget as AppShellScope?;
+    return scope?.notifier?.snapshot.shellContext.displayName;
+  }
+
+  String? _currentAvatarUrl(BuildContext context) {
+    final element = context
+        .getElementForInheritedWidgetOfExactType<AppShellScope>();
+    final scope = element?.widget as AppShellScope?;
+    return scope?.notifier?.snapshot.shellContext.avatarUrl;
+  }
+
   String? _orderIdFromConversationGroup(
     CounterpartConversationProjectGroupView group,
   ) {
@@ -997,4 +1553,16 @@ class _CounterpartConversationPageState
       context,
     )?.showSnackBar(SnackBar(content: Text(message)));
   }
+}
+
+class _ProjectCommunicationUploadOutcome {
+  const _ProjectCommunicationUploadOutcome({
+    required this.message,
+    this.attachment,
+  });
+
+  final String message;
+  final ProjectCommunicationAttachmentView? attachment;
+
+  bool get isSuccess => attachment != null;
 }

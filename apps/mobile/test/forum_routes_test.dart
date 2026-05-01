@@ -86,6 +86,7 @@ void main() {
       ExhibitionRoutes.forumMePosts,
       ExhibitionRoutes.forumMeComments,
       ExhibitionRoutes.forumMeBookmarks,
+      ExhibitionRoutes.forumMeLikes,
       ExhibitionRoutes.forumMeFollows,
       ExhibitionRoutes.forumMeReports,
       ExhibitionRoutes.forumMeReportDetailWithTicketId('report-ticket-1'),
@@ -173,7 +174,7 @@ void main() {
     expect(find.textContaining('Admin Review'), findsNothing);
     expect(find.textContaining('AI'), findsNothing);
 
-    await tester.drag(find.byType(ListView).last, const Offset(0, -320));
+    await tester.dragFrom(const Offset(400, 420), const Offset(0, -560));
     await tester.pumpAndSettle();
     await tester.tap(find.widgetWithText(FilledButton, '查看详情'));
     await tester.pumpAndSettle();
@@ -204,9 +205,12 @@ void main() {
     expect(find.text('我的论坛'), findsWidgets);
     expect(find.text('我的举报记录'), findsOneWidget);
 
-    await tester.drag(find.byType(ListView).last, const Offset(0, -320));
+    await tester.dragFrom(const Offset(400, 420), const Offset(0, -560));
     await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(ListTile, '我的举报记录'));
+    final reportEntry = find
+        .ancestor(of: find.text('我的举报记录'), matching: find.byType(InkWell))
+        .last;
+    tester.widget<InkWell>(reportEntry).onTap?.call();
     await tester.pumpAndSettle();
 
     expect(find.text('夜间进场窗口怎么排吊装和安检顺序？'), findsOneWidget);

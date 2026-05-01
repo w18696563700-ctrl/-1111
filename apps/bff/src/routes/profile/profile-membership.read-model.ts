@@ -2,6 +2,7 @@ export type MembershipCurrentViewModel = {
   organizationId: string | null;
   paidMembershipTier: string | null;
   rateBand: string | null;
+  serviceFeeDiscountSummary: string | null;
   entitlementsSummary: string[];
   quotaSummary: string[];
   effectiveAt: string | null;
@@ -37,6 +38,7 @@ export type MembershipQuotaViewModel = {
 export type MembershipUpgradeGuideTierItemViewModel = {
   tier: string;
   title: string;
+  serviceFeeDiscountSummary: string | null;
   candidateDisplayPrice: string | null;
   candidateDisplayRateBand: string | null;
 };
@@ -59,23 +61,26 @@ export function readMembershipCurrentViewModel(
   result: Record<string, unknown>,
 ): MembershipCurrentViewModel {
   requireKeys(result, [
-    'organizationId',
-    'paidMembershipTier',
-    'entitlementsSummary',
-    'quotaSummary',
+    "organizationId",
+    "paidMembershipTier",
+    "entitlementsSummary",
+    "quotaSummary",
   ]);
 
   return {
     organizationId: readNullableString(result.organizationId),
     paidMembershipTier: readNullableString(result.paidMembershipTier),
     rateBand: readNullableString(result.rateBand),
+    serviceFeeDiscountSummary: readNullableString(
+      result.serviceFeeDiscountSummary,
+    ),
     entitlementsSummary: readStringArray(
       result.entitlementsSummary,
-      'Membership current response contains an invalid entitlementsSummary.',
+      "Membership current response contains an invalid entitlementsSummary.",
     ),
     quotaSummary: readStringArray(
       result.quotaSummary,
-      'Membership current response contains an invalid quotaSummary.',
+      "Membership current response contains an invalid quotaSummary.",
     ),
     effectiveAt: readNullableString(result.effectiveAt),
     expiresAt: readNullableString(result.expiresAt),
@@ -86,28 +91,33 @@ export function readMembershipCurrentViewModel(
 export function readMembershipExplanationViewModel(
   result: Record<string, unknown>,
 ): MembershipExplanationViewModel {
-  requireKeys(result, ['tiers', 'entitlementNotes', 'quotaNotes', 'disclaimer']);
+  requireKeys(result, [
+    "tiers",
+    "entitlementNotes",
+    "quotaNotes",
+    "disclaimer",
+  ]);
 
   return {
     tiers: readObjectArray(
       result.tiers,
-      'Membership explanation response contains an invalid tiers array.',
+      "Membership explanation response contains an invalid tiers array.",
     ).map((item) => {
-      requireKeys(item, ['tier', 'title']);
+      requireKeys(item, ["tier", "title"]);
       return {
         tier: readRequiredString(
           item.tier,
-          'Membership explanation response contains an invalid tier.',
+          "Membership explanation response contains an invalid tier.",
         ),
         title: readRequiredString(
           item.title,
-          'Membership explanation response contains an invalid title.',
+          "Membership explanation response contains an invalid title.",
         ),
-        ...(Object.prototype.hasOwnProperty.call(item, 'highlights')
+        ...(Object.prototype.hasOwnProperty.call(item, "highlights")
           ? {
               highlights: readStringArray(
                 item.highlights,
-                'Membership explanation response contains invalid highlights.',
+                "Membership explanation response contains invalid highlights.",
               ),
             }
           : {}),
@@ -115,15 +125,15 @@ export function readMembershipExplanationViewModel(
     }),
     entitlementNotes: readStringArray(
       result.entitlementNotes,
-      'Membership explanation response contains an invalid entitlementNotes array.',
+      "Membership explanation response contains an invalid entitlementNotes array.",
     ),
     quotaNotes: readStringArray(
       result.quotaNotes,
-      'Membership explanation response contains an invalid quotaNotes array.',
+      "Membership explanation response contains an invalid quotaNotes array.",
     ),
     disclaimer: readRequiredString(
       result.disclaimer,
-      'Membership explanation response is missing disclaimer.',
+      "Membership explanation response is missing disclaimer.",
     ),
   };
 }
@@ -131,22 +141,22 @@ export function readMembershipExplanationViewModel(
 export function readMembershipQuotaViewModel(
   result: Record<string, unknown>,
 ): MembershipQuotaViewModel {
-  requireKeys(result, ['items']);
+  requireKeys(result, ["items"]);
 
   return {
     items: readObjectArray(
       result.items,
-      'Membership quota response contains an invalid items array.',
+      "Membership quota response contains an invalid items array.",
     ).map((item) => {
-      requireKeys(item, ['quotaType', 'summary']);
+      requireKeys(item, ["quotaType", "summary"]);
       return {
         quotaType: readRequiredString(
           item.quotaType,
-          'Membership quota response contains an invalid quotaType.',
+          "Membership quota response contains an invalid quotaType.",
         ),
         summary: readRequiredString(
           item.summary,
-          'Membership quota response contains an invalid summary.',
+          "Membership quota response contains an invalid summary.",
         ),
         currentValue: readNullableInteger(item.currentValue),
         refreshRule: readNullableString(item.refreshRule),
@@ -159,35 +169,45 @@ export function readMembershipQuotaViewModel(
 export function readMembershipUpgradeGuideViewModel(
   result: Record<string, unknown>,
 ): MembershipUpgradeGuideViewModel {
-  requireKeys(result, ['currentTier', 'availableTiers', 'upgradeHighlights', 'commercialDisclosure']);
+  requireKeys(result, [
+    "currentTier",
+    "availableTiers",
+    "upgradeHighlights",
+    "commercialDisclosure",
+  ]);
 
   return {
     currentTier: readNullableString(result.currentTier),
     availableTiers: readObjectArray(
       result.availableTiers,
-      'Membership upgrade guide response contains an invalid availableTiers array.',
+      "Membership upgrade guide response contains an invalid availableTiers array.",
     ).map((item) => {
-      requireKeys(item, ['tier', 'title']);
+      requireKeys(item, ["tier", "title"]);
       return {
         tier: readRequiredString(
           item.tier,
-          'Membership upgrade guide response contains an invalid tier.',
+          "Membership upgrade guide response contains an invalid tier.",
         ),
         title: readRequiredString(
           item.title,
-          'Membership upgrade guide response contains an invalid title.',
+          "Membership upgrade guide response contains an invalid title.",
+        ),
+        serviceFeeDiscountSummary: readNullableString(
+          item.serviceFeeDiscountSummary,
         ),
         candidateDisplayPrice: readNullableString(item.candidateDisplayPrice),
-        candidateDisplayRateBand: readNullableString(item.candidateDisplayRateBand),
+        candidateDisplayRateBand: readNullableString(
+          item.candidateDisplayRateBand,
+        ),
       };
     }),
     upgradeHighlights: readStringArray(
       result.upgradeHighlights,
-      'Membership upgrade guide response contains an invalid upgradeHighlights array.',
+      "Membership upgrade guide response contains an invalid upgradeHighlights array.",
     ),
     commercialDisclosure: readRequiredString(
       result.commercialDisclosure,
-      'Membership upgrade guide response is missing commercialDisclosure.',
+      "Membership upgrade guide response is missing commercialDisclosure.",
     ),
   };
 }
@@ -197,10 +217,10 @@ export function readPaidMembershipShellSummary(
   context: string,
 ): PaidMembershipShellSummaryViewModel {
   requireKeys(result, [
-    'paidMembershipTier',
-    'paidMembershipEntitlementsSummary',
-    'paidMembershipQuotaSummary',
-    'paidMembershipNextRefreshAt',
+    "paidMembershipTier",
+    "paidMembershipEntitlementsSummary",
+    "paidMembershipQuotaSummary",
+    "paidMembershipNextRefreshAt",
   ]);
 
   return {
@@ -213,16 +233,18 @@ export function readPaidMembershipShellSummary(
       result.paidMembershipQuotaSummary,
       `${context} contains an invalid paidMembershipQuotaSummary.`,
     ),
-    paidMembershipNextRefreshAt: readNullableString(result.paidMembershipNextRefreshAt),
+    paidMembershipNextRefreshAt: readNullableString(
+      result.paidMembershipNextRefreshAt,
+    ),
   };
 }
 
 export function hasPaidMembershipShellSummary(result: Record<string, unknown>) {
   return [
-    'paidMembershipTier',
-    'paidMembershipEntitlementsSummary',
-    'paidMembershipQuotaSummary',
-    'paidMembershipNextRefreshAt',
+    "paidMembershipTier",
+    "paidMembershipEntitlementsSummary",
+    "paidMembershipQuotaSummary",
+    "paidMembershipNextRefreshAt",
   ].some((key) => Object.prototype.hasOwnProperty.call(result, key));
 }
 
@@ -230,11 +252,11 @@ function requireKeys(source: Record<string, unknown>, keys: string[]) {
   if (keys.every((key) => Object.prototype.hasOwnProperty.call(source, key))) {
     return;
   }
-  throw new Error('Membership response is missing required fields.');
+  throw new Error("Membership response is missing required fields.");
 }
 
 function readRequiredString(value: unknown, message: string) {
-  if (typeof value !== 'string') {
+  if (typeof value !== "string") {
     throw new Error(message);
   }
   const normalized = value.trim();
@@ -248,7 +270,7 @@ function readNullableString(value: unknown) {
   if (value === null || value === undefined) {
     return null;
   }
-  return readRequiredString(value, 'Expected a string value.');
+  return readRequiredString(value, "Expected a string value.");
 }
 
 function readStringArray(value: unknown, message: string) {
@@ -263,7 +285,7 @@ function readObjectArray(value: unknown, message: string) {
     throw new Error(message);
   }
   return value.map((item) => {
-    if (item !== null && typeof item === 'object' && !Array.isArray(item)) {
+    if (item !== null && typeof item === "object" && !Array.isArray(item)) {
       return item as Record<string, unknown>;
     }
     throw new Error(message);
@@ -274,7 +296,7 @@ function readNullableInteger(value: unknown) {
   if (value === null || value === undefined) {
     return null;
   }
-  return typeof value === 'number' && Number.isInteger(value) && value >= 0
+  return typeof value === "number" && Number.isInteger(value) && value >= 0
     ? value
     : null;
 }

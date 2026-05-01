@@ -13,6 +13,15 @@ import {
 } from './project-communication.read-model';
 import { readProjectCommunicationRealtimeEventListReadModel } from './project-communication-realtime.read-model';
 
+type ProjectCommunicationMessageKind = 'text' | 'image' | 'file' | 'confirmation_card';
+
+const PROJECT_COMMUNICATION_MESSAGE_KINDS = new Set<ProjectCommunicationMessageKind>([
+  'text',
+  'image',
+  'file',
+  'confirmation_card'
+]);
+
 @Injectable()
 export class MessageInteractionService {
   constructor(
@@ -284,12 +293,18 @@ export class MessageInteractionService {
 
   private toProjectCommunicationMessagePayload(payload: Record<string, unknown>) {
     const source = this.requireBodyRecord(payload);
-    return {
+    const messageKind = this.readProjectCommunicationMessageKind(source.messageKind);
+    const result: Record<string, unknown> = {
       threadId: this.readRequiredProjectCommunicationField(source.threadId, 'threadId'),
       projectId: this.readRequiredProjectCommunicationField(source.projectId, 'projectId'),
-      body: this.readRequiredProjectCommunicationField(source.body, 'body'),
+      body: this.readProjectCommunicationMessageBody(source.body, messageKind),
       clientMessageId: this.readOptionalPayloadString(source.clientMessageId)
     };
+    if (messageKind !== 'text') {
+      result.messageKind = messageKind;
+      result.payload = this.readProjectCommunicationPayload(source.payload);
+    }
+    return result;
   }
 
   private toProjectCommunicationReadCursorPayload(payload: Record<string, unknown>) {
@@ -313,6 +328,43 @@ export class MessageInteractionService {
       throw this.badProjectCommunicationRequest(`Field \`${field}\` is required.`);
     }
     return value.trim();
+  }
+
+  private readProjectCommunicationMessageKind(value: unknown): ProjectCommunicationMessageKind {
+    if (value === undefined || value === null) {
+      return 'text';
+    }
+    if (typeof value !== 'string' || !value.trim()) {
+      throw this.badProjectCommunicationRequest('Project communication messageKind is invalid.');
+    }
+    const normalized = value.trim();
+    if (PROJECT_COMMUNICATION_MESSAGE_KINDS.has(normalized as ProjectCommunicationMessageKind)) {
+      return normalized as ProjectCommunicationMessageKind;
+    }
+    throw this.badProjectCommunicationRequest('Project communication messageKind is unsupported.');
+  }
+
+  private readProjectCommunicationMessageBody(
+    value: unknown,
+    messageKind: ProjectCommunicationMessageKind
+  ) {
+    if (messageKind === 'text') {
+      return this.readRequiredProjectCommunicationField(value, 'body');
+    }
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+    if (typeof value !== 'string') {
+      throw this.badProjectCommunicationRequest('Project communication body must be a string when provided.');
+    }
+    return value;
+  }
+
+  private readProjectCommunicationPayload(value: unknown) {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      throw this.badProjectCommunicationRequest('Project communication payload must be an object.');
+    }
+    return value as Record<string, unknown>;
   }
 
   private readRequiredProjectCommunicationParam(value: string | undefined) {

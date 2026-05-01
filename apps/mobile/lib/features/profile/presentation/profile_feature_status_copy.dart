@@ -166,10 +166,10 @@ const ProfileFeatureStatusSnapshot profileMembershipFeatureStatus =
     ProfileFeatureStatusSnapshot(
       featureName: '我的会员',
       statusLabel: '部分可用',
-      completedSummary: '已完成会员当前态、权益摘要、配额摘要、说明页、配额说明页与升级引导页读取。',
-      incompleteSummary: '当前不承接购买、续费、下单、支付与账单闭环。',
-      dependencySummary: '会员真值、组织 scope、后续支付系统。',
-      unlockConditionSummary: '支付 MVP 主线解锁。',
+      completedSummary: '已完成会员当前态、权益摘要、配额摘要、说明页、配额说明页、升级引导页与直购最小入口。',
+      incompleteSummary: '当前不承接续费、取消、退款、发票、KA/旗舰或复杂账单闭环。',
+      dependencySummary: '会员真值、组织 scope、Server 订单与支付回调。',
+      unlockConditionSummary: 'Admin 查询、支付治理与发布门禁解锁。',
     );
 
 const ProfileFeatureStatusSnapshot profileCreditConstraintsFeatureStatus =

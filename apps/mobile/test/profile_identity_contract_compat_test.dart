@@ -151,45 +151,51 @@ void main() {
     );
   });
 
-  test('password reset stays content on HTTP 200 and does not auto login', () async {
-    final consumer = AuthConsumerLayer(
-      client: AppApiClient(
-        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
-        transport: FakeAppApiTransport(
-          handlers:
-              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-                'POST /api/app/auth/password/reset':
-                    (AppApiRequest request) async {
-                      expect(request.body, <String, Object?>{
-                        'mobile': '13800000000',
-                        'otpCode': '654321',
-                        'newPassword': 'Password456!',
-                      });
-                      return AppApiResponse(
-                        statusCode: 200,
-                        uri: request.uri,
-                        body: const <String, Object?>{
-                          'ok': true,
-                          'traceId': 'trace-password-reset',
-                        },
-                      );
-                    },
-              },
+  test(
+    'password reset stays content on HTTP 200 and does not auto login',
+    () async {
+      final consumer = AuthConsumerLayer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'POST /api/app/auth/password/reset':
+                      (AppApiRequest request) async {
+                        expect(request.body, <String, Object?>{
+                          'mobile': '13800000000',
+                          'otpCode': '654321',
+                          'newPassword': 'Password456!',
+                        });
+                        return AppApiResponse(
+                          statusCode: 200,
+                          uri: request.uri,
+                          body: const <String, Object?>{
+                            'ok': true,
+                            'traceId': 'trace-password-reset',
+                          },
+                        );
+                      },
+                },
+          ),
         ),
-      ),
-    );
+      );
 
-    final resetResult = await consumer.resetPassword(
-      mobile: '13800000000',
-      otpCode: '654321',
-      newPassword: 'Password456!',
-    );
+      final resetResult = await consumer.resetPassword(
+        mobile: '13800000000',
+        otpCode: '654321',
+        newPassword: 'Password456!',
+      );
 
-    expect(resetResult.state, AppPageState.content);
-    expect(resetResult.data?.traceId, 'trace-password-reset');
-    expect(AppSessionStore.instance.hasAnySession, isFalse);
-    expect(AppSessionStore.instance.snapshot.localLoginSource, isNull);
-  });
+      expect(resetResult.state, AppPageState.content);
+      expect(resetResult.data?.traceId, 'trace-password-reset');
+      expect(AppSessionStore.instance.hasAnySession, isFalse);
+      expect(AppSessionStore.instance.snapshot.localLoginSource, isNull);
+    },
+  );
 
   test('password set stays content on HTTP 200 for active session', () async {
     AppSessionStore.instance.establishSession(
@@ -639,10 +645,19 @@ void main() {
       final result = await consumer.loadCertificationCurrent();
 
       expect(result.state, AppPageState.content);
-      expect(result.data?.personalCertification?.organizationId, 'org-cert-current-2');
+      expect(
+        result.data?.personalCertification?.organizationId,
+        'org-cert-current-2',
+      );
       expect(result.data?.personalCertification?.realName, '张三');
-      expect(result.data?.personalCertification?.idNumberMasked, '310***********1234');
-      expect(result.data?.personalCertification?.qualifiedForCurrentActor, isTrue);
+      expect(
+        result.data?.personalCertification?.idNumberMasked,
+        '310***********1234',
+      );
+      expect(
+        result.data?.personalCertification?.qualifiedForCurrentActor,
+        isTrue,
+      );
       expect(result.data?.personalCertification?.lockedToOtherActor, isFalse);
     },
   );
@@ -875,7 +890,9 @@ void main() {
                         body: const <String, Object?>{
                           'organizationId': 'org-member-1',
                           'paidMembershipTier': 'standard',
-                          'rateBand': '标准费率档位',
+                          'rateBand': null,
+                          'serviceFeeDiscountSummary':
+                              '平台服务费 9 折，作用于 baseFeeAmount，单项目封顶 3600。',
                           'entitlementsSummary': <String>['更高排序'],
                           'quotaSummary': <String>['商机提醒剩余 12 次'],
                           'effectiveAt': '2026-04-01T00:00:00Z',
@@ -893,7 +910,10 @@ void main() {
 
     expect(result.state, AppPageState.content);
     expect(result.data?.paidMembershipTier, 'standard');
-    expect(result.data?.rateBand, '标准费率档位');
+    expect(
+      result.data?.serviceFeeDiscountSummary,
+      '平台服务费 9 折，作用于 baseFeeAmount，单项目封顶 3600。',
+    );
     expect(result.data?.entitlementsSummary, const <String>['更高排序']);
   });
 
@@ -990,8 +1010,10 @@ void main() {
                             <String, Object?>{
                               'tier': 'professional',
                               'title': '专业档位',
-                              'candidateDisplayPrice': '预计年费 ¥9,800',
-                              'candidateDisplayRateBand': '更低费率档位',
+                              'serviceFeeDiscountSummary':
+                                  '平台服务费 8 折，作用于 baseFeeAmount，单项目封顶 3200。',
+                              'candidateDisplayPrice': null,
+                              'candidateDisplayRateBand': null,
                             },
                           ],
                           'upgradeHighlights': <String>['人工撮合优先'],

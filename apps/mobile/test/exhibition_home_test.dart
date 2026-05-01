@@ -468,9 +468,12 @@ void main() {
                               'title': index == 0 ? title : '$title-$index',
                               'buildingType': 'exhibition',
                               'budgetAmount': 188000 + index * 10000,
-                              'areaSqm': 200 + index * 50,
+                              'areaSqm': 150 + index * 50,
                               'cityName': '重庆市',
                               'plannedStartAt': '2026-05-${16 + index}',
+                              'publishedAt': index == 0
+                                  ? '2026-04-30T08:15:00'
+                                  : '2026-04-30T09:0$index:00',
                               'state': 'published',
                               'summary': <String, Object?>{
                                 'heading': 'project-$requestCount-$index',
@@ -499,7 +502,21 @@ void main() {
       expect(find.text('发现优质项目，把握商机'), findsOneWidget);
       await _scrollTo(tester, find.text('重庆春季展台项目'));
       expect(find.text('重庆春季展台项目'), findsOneWidget);
+      expect(find.text('发布 4月30日 08:15'), findsOneWidget);
       expect(find.text('示意图'), findsNWidgets(3));
+      expect(find.text('会展'), findsNWidgets(3));
+      final plusExampleImages = find.byWidgetPredicate((Widget widget) {
+        if (widget is! Image || widget.image is! AssetImage) {
+          return false;
+        }
+        final assetImage = widget.image as AssetImage;
+        return assetImage.assetName ==
+            'assets/exhibition/project_examples/area_108_plus.png';
+      });
+      expect(plusExampleImages, findsNWidgets(3));
+      final coverLabelTop = tester.getTopLeft(find.text('示意图').first).dy;
+      final titleTop = tester.getTopLeft(find.text('重庆春季展台项目')).dy;
+      expect(coverLabelTop, greaterThan(titleTop));
       expect(find.widgetWithText(TextButton, '去发布项目'), findsOneWidget);
       expect(find.byTooltip('回到顶部'), findsOneWidget);
       expect(requestCount, 1);

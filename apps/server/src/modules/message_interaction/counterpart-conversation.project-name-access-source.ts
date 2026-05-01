@@ -90,6 +90,7 @@ export class CounterpartConversationProjectNameAccessSource
         continue;
       }
       const isOwnerViewer = project.organizationId === viewerOrganizationId;
+      organizationIds.add(request.requesterOrganizationId);
       organizationIds.add(
         isOwnerViewer ? request.requesterOrganizationId : project.organizationId,
       );
@@ -141,6 +142,12 @@ export class CounterpartConversationProjectNameAccessSource
       approvedLegalNameByOrganizationId:
         input.counterpart.approvedLegalNameByOrganizationId,
     });
+    const requesterCompanyName = this.displayNameService.resolveCompanyName({
+      organizationId: input.request.requesterOrganizationId,
+      organizationMap: input.counterpart.organizationMap,
+      approvedLegalNameByOrganizationId:
+        input.counterpart.approvedLegalNameByOrganizationId,
+    });
     const counterpartDisplayName = counterpartCompanyName;
     const requesterOrganizationName =
       input.request.requesterOrganizationId === counterpartOrganizationId
@@ -178,6 +185,8 @@ export class CounterpartConversationProjectNameAccessSource
         }),
         status: input.request.state,
         updatedAt,
+        requesterCompanyName,
+        requesterOrganizationId: input.request.requesterOrganizationId,
         truthAnchor: {
           truthType: 'project_name_access_request' as const,
           projectId: input.request.projectId,

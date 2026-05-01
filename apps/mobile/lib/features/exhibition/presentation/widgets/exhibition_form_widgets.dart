@@ -15,7 +15,6 @@ class _InputField extends StatelessWidget {
     this.errorText,
     this.required = false,
     this.readOnly = false,
-    this.enabled = true,
     this.contentPadding,
     this.onTap,
     this.onChanged,
@@ -34,13 +33,27 @@ class _InputField extends StatelessWidget {
   final String? errorText;
   final bool required;
   final bool readOnly;
-  final bool enabled;
   final EdgeInsetsGeometry? contentPadding;
   final VoidCallback? onTap;
   final ValueChanged<String>? onChanged;
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final borderRadius = BorderRadius.circular(18);
+    final enabledBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: colorScheme.outlineVariant),
+    );
+    final focusedBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: colorScheme.primary, width: 1.4),
+    );
+    final errorBorder = OutlineInputBorder(
+      borderRadius: borderRadius,
+      borderSide: BorderSide(color: colorScheme.error),
+    );
     return Padding(
       key: fieldKey,
       padding: const EdgeInsets.only(bottom: 10),
@@ -49,7 +62,6 @@ class _InputField extends StatelessWidget {
         controller: controller,
         keyboardType: keyboardType,
         maxLines: maxLines,
-        enabled: enabled,
         readOnly: readOnly,
         onTap: onTap,
         onChanged: onChanged,
@@ -59,17 +71,27 @@ class _InputField extends StatelessWidget {
           helperText: helperText,
           errorText: errorText,
           errorMaxLines: 2,
+          helperMaxLines: 2,
           prefixText: required ? '* ' : null,
           prefixStyle: required
-              ? Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Theme.of(context).colorScheme.error,
+              ? theme.textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.error,
                   fontWeight: FontWeight.w700,
                 )
               : null,
           suffixText: suffixText,
           suffixIcon: suffixIcon,
-          border: const OutlineInputBorder(),
-          contentPadding: contentPadding,
+          filled: true,
+          fillColor: colorScheme.surface,
+          border: enabledBorder,
+          enabledBorder: enabledBorder,
+          focusedBorder: focusedBorder,
+          errorBorder: errorBorder,
+          focusedErrorBorder: errorBorder,
+          disabledBorder: enabledBorder,
+          contentPadding:
+              contentPadding ??
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 18),
           alignLabelWithHint: maxLines > 1,
         ),
       ),

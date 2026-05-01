@@ -10,6 +10,8 @@ const FILE_UPLOAD_CONFIRM_ENDPOINT = "/api/app/file/upload/confirm";
 const FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE = "forum_draft_attachment";
 const PROJECT_UPLOAD_BUSINESS_TYPE = "project";
 const PROJECT_ATTACHMENT_FILE_KIND = "project_attachment";
+const PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND =
+  "project_communication_attachment";
 
 type UploadInitCommand = {
   businessType: string;
@@ -298,7 +300,7 @@ export class FileService {
   ) {
     if (
       command.businessType !== PROJECT_UPLOAD_BUSINESS_TYPE ||
-      command.fileKind !== PROJECT_ATTACHMENT_FILE_KIND
+      !this.isProjectWorkAttachmentKind(command.fileKind)
     ) {
       return null;
     }
@@ -363,7 +365,17 @@ export class FileService {
       ) ||
       message.includes(
         "Current upload init only supports project/evidence, profile/avatar, profile/business_license, or enterprise_display image bindings.",
+      ) ||
+      message.includes(
+        "Current upload init only supports project/evidence, project/project_attachment, project/project_communication_attachment",
       )
+    );
+  }
+
+  private isProjectWorkAttachmentKind(fileKind: string) {
+    return (
+      fileKind === PROJECT_ATTACHMENT_FILE_KIND ||
+      fileKind === PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND
     );
   }
 

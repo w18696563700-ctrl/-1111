@@ -406,41 +406,45 @@ class _ProjectQuoteIntentionSelector extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       key: const ValueKey<String>('project-create-quote-intention'),
-      padding: const EdgeInsets.only(top: 6),
-      child: Align(
-        alignment: Alignment.center,
-        child: FittedBox(
-          fit: BoxFit.scaleDown,
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              _ProjectQuoteIntentionChip(
-                key: const ValueKey<String>(
-                  'project-create-quote-intention-fixed-price',
-                ),
-                label: '明价',
-                selected: selectedValue == _projectQuoteIntentionFixedPrice,
-                onPressed: () => onChanged(_projectQuoteIntentionFixedPrice),
-              ),
-              const SizedBox(width: 6),
-              _ProjectQuoteIntentionChip(
-                key: const ValueKey<String>(
-                  'project-create-quote-intention-inquiry',
-                ),
-                label: '询价',
-                selected: selectedValue == _projectQuoteIntentionInquiry,
-                onPressed: () => onChanged(_projectQuoteIntentionInquiry),
-              ),
-            ],
+      padding: const EdgeInsets.only(top: 6, bottom: 4),
+      child: Container(
+        height: 36,
+        padding: const EdgeInsets.all(3),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(
+            color: Theme.of(context).colorScheme.outlineVariant,
           ),
+        ),
+        child: Row(
+          children: <Widget>[
+            _ProjectQuoteIntentionSegment(
+              key: const ValueKey<String>(
+                'project-create-quote-intention-fixed-price',
+              ),
+              label: '明价',
+              selected: selectedValue == _projectQuoteIntentionFixedPrice,
+              onPressed: () => onChanged(_projectQuoteIntentionFixedPrice),
+            ),
+            const SizedBox(width: 4),
+            _ProjectQuoteIntentionSegment(
+              key: const ValueKey<String>(
+                'project-create-quote-intention-inquiry',
+              ),
+              label: '询价',
+              selected: selectedValue == _projectQuoteIntentionInquiry,
+              onPressed: () => onChanged(_projectQuoteIntentionInquiry),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-class _ProjectQuoteIntentionChip extends StatelessWidget {
-  const _ProjectQuoteIntentionChip({
+class _ProjectQuoteIntentionSegment extends StatelessWidget {
+  const _ProjectQuoteIntentionSegment({
     super.key,
     required this.label,
     required this.selected,
@@ -456,53 +460,43 @@ class _ProjectQuoteIntentionChip extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final foregroundColor = selected
-        ? colorScheme.onSecondaryContainer
-        : colorScheme.onSurface;
+        ? colorScheme.primary
+        : colorScheme.onSurfaceVariant;
 
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: SizedBox(
-        width: 58,
-        height: 30,
+    return Expanded(
+      child: Semantics(
+        button: true,
+        selected: selected,
         child: Material(
           color: selected
-              ? colorScheme.secondaryContainer
-              : colorScheme.surface,
-          shape: StadiumBorder(
-            side: BorderSide(
-              color: selected
-                  ? colorScheme.secondary
-                  : colorScheme.outlineVariant,
-            ),
-          ),
+              ? colorScheme.primaryContainer.withValues(alpha: 0.62)
+              : Colors.transparent,
+          shape: const StadiumBorder(),
           child: InkWell(
             customBorder: const StadiumBorder(),
             onTap: onPressed,
-            child: Stack(
-              alignment: Alignment.center,
-              children: <Widget>[
-                if (selected)
-                  Positioned(
-                    left: 7,
-                    child: Icon(
-                      Icons.check_rounded,
-                      size: 14,
-                      color: foregroundColor,
+            child: Center(
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  if (selected) ...<Widget>[
+                    Icon(Icons.check_rounded, size: 14, color: foregroundColor),
+                    const SizedBox(width: 3),
+                  ],
+                  Flexible(
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.clip,
+                      style: theme.textTheme.labelMedium?.copyWith(
+                        color: foregroundColor,
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
-                Center(
-                  child: Text(
-                    label,
-                    maxLines: 1,
-                    overflow: TextOverflow.clip,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: foregroundColor,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),

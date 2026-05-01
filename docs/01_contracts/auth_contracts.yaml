@@ -10,8 +10,10 @@ clients:
     login_mode: phone_code_plus_org_invite
     consumes: BFF
   admin:
-    login_mode: account_password_plus_second_factor
+    login_mode: server_session_carrier_only
     consumes: Server admin APIs
+    issuer: Server Auth
+    role_gate: platform_reviewer_or_super_admin
 transport_boundary:
   authorization:
     role: access_transport_carrier_only

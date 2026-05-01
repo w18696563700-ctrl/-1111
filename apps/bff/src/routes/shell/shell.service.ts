@@ -141,7 +141,7 @@ export class ShellService {
     const userId = this.asString(result.userId);
     const displayName = this.asString(result.displayName);
     const featureFlagsVersion = this.asString(result.featureFlagsVersion);
-    const unreadSummary = this.asOptionalRecord(result.unreadSummary);
+    const unreadSummary = this.readUnreadSummary(result.unreadSummary);
 
     if (!userId || !displayName || !featureFlagsVersion || !unreadSummary) {
       throw new Error('Shell context response is missing required fields.');
@@ -213,6 +213,21 @@ export class ShellService {
     return value !== null && typeof value === 'object' && !Array.isArray(value)
       ? (value as Record<string, unknown>)
       : null;
+  }
+
+  private readUnreadSummary(value: unknown) {
+    const record = this.asOptionalRecord(value);
+    if (!record) {
+      return null;
+    }
+    if (record.messages != null && !this.isNonNegativeNumber(record.messages)) {
+      throw new Error('Shell context unreadSummary.messages must be a non-negative number.');
+    }
+    return record;
+  }
+
+  private isNonNegativeNumber(value: unknown) {
+    return typeof value === 'number' && Number.isFinite(value) && value >= 0;
   }
 
   private asStringArray(value: unknown) {

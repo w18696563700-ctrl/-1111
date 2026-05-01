@@ -67,6 +67,7 @@ layer: L2 Contracts
   - `POST /api/app/profile/organization/create`
   - `POST /api/app/profile/organization/join-by-code`
   - `POST /api/app/profile/organization/switch`
+  - `POST /api/app/profile/organization/current/leave`
   - `GET /api/app/profile/organization/mine`
   - `GET /api/app/profile/organization/members`
   - `PATCH /api/app/profile/organization/members/{memberId}/role`
@@ -218,6 +219,10 @@ layer: L2 Contracts
   - `ORG_SWITCH_INVALID`
   - `ORG_MEMBER_ROLE_INVALID`
   - `ORG_MEMBER_DISABLE_INVALID`
+  - `ORG_SCOPE_REQUIRED`
+  - `ORG_MEMBER_UNAVAILABLE`
+  - `ORG_MEMBER_LEAVE_INVALID`
+  - `ORG_LAST_ADMIN_LEAVE_BLOCKED`
   - `CERTIFICATION_SUBMIT_INVALID`
   - `CERTIFICATION_RESUBMIT_INVALID`
   - `CERTIFICATION_DUPLICATE_SUBMIT`

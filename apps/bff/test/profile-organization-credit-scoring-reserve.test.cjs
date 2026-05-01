@@ -17,6 +17,9 @@ const { ProfileCreditConstraintsService } = require('../src/routes/profile/profi
 const { ProfileGovernanceAppealsService } = require('../src/routes/profile/profile-governance-appeals.service.ts');
 const { ProfileGovernanceStatusService } = require('../src/routes/profile/profile-governance-status.service.ts');
 const { ProfileMembershipService } = require('../src/routes/profile/profile-membership.service.ts');
+const {
+  ProfileMembershipPurchaseService,
+} = require('../src/routes/profile/profile-membership-purchase.service.ts');
 const { ProfileMembersService } = require('../src/routes/profile/profile-members.service.ts');
 const { ProfileOrganizationCreditScoringErrorService } = require('../src/routes/profile/profile-organization-credit-scoring-error.service.ts');
 const { ProfileOrganizationCreditScoringService } = require('../src/routes/profile/profile-organization-credit-scoring.service.ts');
@@ -193,6 +196,10 @@ async function createProfileReadApp({
       {
         provide: ProfileMembershipService,
         useValue: { getCurrent() {}, getExplanation() {}, getQuota() {}, getUpgradeGuide() {} },
+      },
+      {
+        provide: ProfileMembershipPurchaseService,
+        useValue: { getPurchaseOffers() {}, getOrder() {} },
       },
       { provide: ProfileMembersService, useValue: { getOrganizationMembers() {} } },
       { provide: ProfileSafetyService, useValue: { getSafetyStatus() {} } },

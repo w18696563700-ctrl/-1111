@@ -393,6 +393,8 @@ class AppRouter {
       ExhibitionRoutes.projectList => const ProjectListPage(),
       ExhibitionRoutes.myProjectList => MyProjectListPage(
         initialWorkspace: routeUri.queryParameters['workspace'],
+        initialStage: routeUri.queryParameters['stage'],
+        highlightProjectId: routeUri.queryParameters['projectId'],
       ),
       ExhibitionRoutes.projectCreate => const ProjectCreatePage(),
       ExhibitionRoutes.projectEdit => ProjectCreatePage(
@@ -568,7 +570,7 @@ class AppRouter {
     final title = switch (routePath) {
       ProfileRoutes.personal => '个人资料',
       ProfileRoutes.company => '我的公司',
-      ProfileRoutes.organizationCreditScoring => '组织信用评分 reserve',
+      ProfileRoutes.organizationCreditScoring => '组织信用评分',
       ProfileRoutes.organizationCreditScoringExplanation => '组织信用评分说明',
       ProfileRoutes.organizationCreditScoringHandoff => '组织信用评分衔接',
       ProfileRoutes.forum => '我的论坛',

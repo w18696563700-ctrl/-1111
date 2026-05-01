@@ -80,6 +80,27 @@ final class ExhibitionRoutes {
     return _withQuery(myProjectList, <String, String>{'workspace': workspace});
   }
 
+  static String myProjectListWithStage({
+    required String workspace,
+    required String stage,
+    String? projectId,
+  }) {
+    return _withQuery(myProjectList, <String, String>{
+      'workspace': workspace,
+      'stage': stage,
+      if (projectId != null && projectId.trim().isNotEmpty)
+        'projectId': projectId.trim(),
+    });
+  }
+
+  static String myProjectDraftboxWithProjectId(String projectId) {
+    return myProjectListWithStage(
+      workspace: 'published',
+      stage: 'draft',
+      projectId: projectId,
+    );
+  }
+
   static String projectDetailWithProjectId(
     String projectId, {
     String? surface,

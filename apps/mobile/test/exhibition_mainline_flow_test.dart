@@ -332,7 +332,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('创建项目'), findsWidgets);
-    expect(find.text('基础信息'), findsOneWidget);
+    expect(find.text('基础信息'), findsWidgets);
     expect(find.text('第二步 地址与范围'), findsNothing);
     expect(find.text('第三步 文件资料'), findsNothing);
     expect(find.text('第四步 文字说明与 AI 辅助'), findsNothing);

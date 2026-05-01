@@ -19,6 +19,7 @@ const BID_PROJECT_UNDERSTANDING_FILE_KIND = 'bid_project_understanding';
 const BID_QUOTE_SHEET_FILE_KIND = 'bid_quote_sheet';
 const BID_SCHEDULE_PLAN_FILE_KIND = 'bid_schedule_plan';
 const PROJECT_ALBUM_PHOTO_FILE_KIND = 'project_album_photo';
+const PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND = 'project_communication_attachment';
 
 export function toUploadInitCommand(payload: Record<string, unknown>): UploadInitCommand {
   const source = asRecord(payload);
@@ -89,7 +90,9 @@ function ensureSupportedUploadBinding(
   const normalizedMimeType = mimeType.toLowerCase();
   if (
     businessType === 'project' &&
-    (fileKind === 'evidence' || fileKind === 'project_attachment')
+    (fileKind === 'evidence' ||
+      fileKind === 'project_attachment' ||
+      fileKind === PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND)
   ) {
     return;
   }
@@ -116,7 +119,7 @@ function ensureSupportedUploadBinding(
     return;
   }
   throw uploadInitInvalid(
-    'Current upload init only supports project/evidence, project/project_attachment, project/project_album_photo, project bid attachments, profile/avatar, profile/business_license, profile/id_card_front, or enterprise_display image bindings.'
+    'Current upload init only supports project/evidence, project/project_attachment, project/project_communication_attachment, project/project_album_photo, project bid attachments, profile/avatar, profile/business_license, profile/id_card_front, or enterprise_display image bindings.'
   );
 }
 

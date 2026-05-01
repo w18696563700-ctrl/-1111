@@ -22,7 +22,8 @@ export type P0PayBusinessType =
   | 'bid_service_fee_authorization_release'
   | 'platform_service_fee_authorization'
   | 'platform_service_fee_charge'
-  | 'inquiry_deposit';
+  | 'inquiry_deposit'
+  | 'membership_direct_purchase';
 
 export type PlatformServiceFeeAuthorizationStatus =
   | 'pending_freeze'

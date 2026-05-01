@@ -110,6 +110,35 @@ extension _EnterpriseWorkbenchPageShell on _EnterpriseApplicationPageState {
       return _buildCaseEditorWorkbenchPage(context);
     }
 
+    if (_boardType == EnterpriseBoardType.company ||
+        _boardType == EnterpriseBoardType.factory) {
+      return _buildCompanyWorkbenchHomepage(
+        result: result,
+        data: data,
+        readiness: readiness,
+        latestApplication: latestApplication,
+        submitDisposition: submitDisposition,
+        publishedWorkbenchResult: publishedWorkbenchResult,
+        publishedData: publishedData,
+        showUpstreamTruthSection: showUpstreamTruthSection,
+        showCertificationSummarySection: showCertificationSummarySection,
+      );
+    }
+
+    if (_boardType == EnterpriseBoardType.supplier) {
+      return _buildSupplierWorkbenchHomepage(
+        result: result,
+        data: data,
+        readiness: readiness,
+        latestApplication: latestApplication,
+        submitDisposition: submitDisposition,
+        publishedWorkbenchResult: publishedWorkbenchResult,
+        publishedData: publishedData,
+        showUpstreamTruthSection: showUpstreamTruthSection,
+        showCertificationSummarySection: showCertificationSummarySection,
+      );
+    }
+
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: <Widget>[

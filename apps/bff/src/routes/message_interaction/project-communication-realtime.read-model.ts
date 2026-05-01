@@ -7,6 +7,7 @@ export type ProjectCommunicationRealtimeEventReadModel = {
   senderOrganizationId: string;
   messageKind: string;
   body: string;
+  payload: Record<string, unknown> | null;
   clientMessageId: string | null;
   createdAt: string;
 };
@@ -35,7 +36,8 @@ export function readProjectCommunicationRealtimeEventReadModel(
     projectId: readString(source.projectId, 'projectId'),
     senderOrganizationId: readString(source.senderOrganizationId, 'senderOrganizationId'),
     messageKind: readString(source.messageKind, 'messageKind'),
-    body: readString(source.body, 'body'),
+    body: readBodyString(source.body, 'body'),
+    payload: readNullableRecord(source.payload, 'payload'),
     clientMessageId: readNullableString(source.clientMessageId, 'clientMessageId'),
     createdAt: readString(source.createdAt, 'createdAt')
   };
@@ -57,6 +59,13 @@ function readString(value: unknown, field: string) {
   return value.trim();
 }
 
+function readBodyString(value: unknown, field: string) {
+  if (typeof value !== 'string') {
+    throw new FormatError(`Project communication realtime field \`${field}\` is required.`);
+  }
+  return value;
+}
+
 function readNullableString(value: unknown, field: string) {
   if (value === null || value === undefined) {
     return null;
@@ -66,4 +75,14 @@ function readNullableString(value: unknown, field: string) {
   }
   const normalized = value.trim();
   return normalized ? normalized : null;
+}
+
+function readNullableRecord(value: unknown, field: string) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  if (!value || Array.isArray(value) || typeof value !== 'object') {
+    throw new FormatError(`Project communication realtime field \`${field}\` must be an object or null.`);
+  }
+  return value as Record<string, unknown>;
 }

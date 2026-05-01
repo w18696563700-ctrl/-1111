@@ -220,6 +220,15 @@ export class ExhibitionP0PayPayloadService {
     };
   }
 
+  toProjectAuthenticitySincerityRefundPayload(value: unknown, idempotencyKey?: string) {
+    const source = this.requireRecord(value);
+    return {
+      refundReasonCode: this.readOptionalString(source.refundReasonCode) ?? 'project_publish_cancelled',
+      refundReasonText: this.readOptionalString(source.refundReasonText) ?? '',
+      idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
+    };
+  }
+
   toDealConfirmationPayload(value: unknown, idempotencyKey?: string) {
     const source = this.requireRecord(value);
     return {

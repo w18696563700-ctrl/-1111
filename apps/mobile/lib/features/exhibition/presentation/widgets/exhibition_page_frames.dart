@@ -116,9 +116,11 @@ class _SubmissionPageFrame extends StatelessWidget {
     required this.onSubmitPressed,
     required this.body,
     this.submitButtonLabel = '提交',
+    this.submitHintText,
     this.showSubmitButton = true,
     this.submitEnabled = true,
     this.submitDisabledMessage,
+    this.bottomPadding = 28,
     this.showConnectionInfo = false,
     this.showTechnicalDisclosure = false,
     this.showPageSummaryCard = true,
@@ -138,9 +140,11 @@ class _SubmissionPageFrame extends StatelessWidget {
   final VoidCallback onSubmitPressed;
   final List<Widget> body;
   final String submitButtonLabel;
+  final String? submitHintText;
   final bool showSubmitButton;
   final bool submitEnabled;
   final String? submitDisabledMessage;
+  final double bottomPadding;
   final bool showConnectionInfo;
   final bool showTechnicalDisclosure;
   final bool showPageSummaryCard;
@@ -160,8 +164,27 @@ class _SubmissionPageFrame extends StatelessWidget {
         const SizedBox(height: 18),
         FilledButton(
           onPressed: submitting || !submitEnabled ? null : onSubmitPressed,
+          style: FilledButton.styleFrom(
+            minimumSize: const Size.fromHeight(50),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
           child: Text(submitButtonLabel),
         ),
+        if (submitHintText case final String hint
+            when hint.trim().isNotEmpty) ...<Widget>[
+          const SizedBox(height: 8),
+          Center(
+            child: Text(
+              hint,
+              textAlign: TextAlign.center,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
         if (!submitEnabled &&
             submitDisabledMessage != null &&
             submitDisabledMessage!.trim().isNotEmpty) ...<Widget>[
@@ -188,7 +211,7 @@ class _SubmissionPageFrame extends StatelessWidget {
     ];
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPadding),
       children: <Widget>[
         if (showPageSummaryCard)
           _SummaryCard(

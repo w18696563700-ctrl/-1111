@@ -531,6 +531,17 @@ Finder _projectCreateField(String label) {
   return find.byKey(ValueKey<String>(key));
 }
 
+Finder _projectCreateSubmitLabel() {
+  return find.text('保存并查看我的项目');
+}
+
+Finder _projectCreateSubmitButton() {
+  return find.ancestor(
+    of: _projectCreateSubmitLabel(),
+    matching: find.byType(FilledButton),
+  );
+}
+
 Map<String, Object?> _projectCreateAddressRangeBody({
   String title = '展览项目',
   String buildingType = 'exhibition',
@@ -2075,10 +2086,7 @@ void main() {
               'messages',
               'profile',
             ],
-            unreadSummary: <String, Object?>{
-              'instanceTodo': 4,
-              'profileNotice': 3,
-            },
+            unreadSummary: <String, Object?>{'messages': 4, 'profileNotice': 3},
           ),
         ),
       );
@@ -2087,6 +2095,10 @@ void main() {
       final navigationBar = find.byType(NavigationBar);
       expect(
         find.descendant(of: navigationBar, matching: find.text('7')),
+        findsNothing,
+      );
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('4')),
         findsOneWidget,
       );
       expect(
@@ -3995,7 +4007,13 @@ void main() {
       expect(find.text('当前连接信息（次级）'), findsNothing);
       expect(find.text('协议承接信息（次级）'), findsNothing);
       expect(find.text('payload snapshot'), findsNothing);
-      expect(find.text('基础信息'), findsOneWidget);
+      expect(find.text('基础信息'), findsWidgets);
+      await tester.scrollUntilVisible(
+        _projectCreateField('项目名称'),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await tester.pumpAndSettle();
       expect(_projectCreateField('项目名称'), findsOneWidget);
       expect(_projectCreateField('项目类型'), findsOneWidget);
       expect(_projectCreateField('预算金额'), findsOneWidget);
@@ -4063,9 +4081,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    final submitButton = find.widgetWithText(FilledButton, '保存项目基本信息并跳转至我的项目');
+    final submitButton = _projectCreateSubmitButton();
     await tester.scrollUntilVisible(
-      submitButton,
+      _projectCreateSubmitLabel(),
       200,
       scrollable: find.byType(Scrollable).first,
     );
@@ -5712,14 +5730,19 @@ void main() {
                   'bidId': 'bid-1',
                   'bidStatus': 'pending_authorization',
                   'platformServiceFeeRequirement': <String, Object?>{
-                    'feeRate': '0.025',
-                    'feeRateLabel': '标准会员费率',
+                    'feeRate': '0.030',
+                    'feeRateLabel': '标准会员 9折（作用于 baseFeeAmount）',
                     'feeRateSource': 'paid_membership_tier',
                     'membershipTierSnapshot': 'standard',
                     'feeRateRuleVersion': 'membership-fee-linkage-v1',
-                    'feeRateSnapshotHash': 'hash-standard-025',
+                    'feeRateSnapshotHash': 'hash-standard-09',
                     'quotedAmount': '1200.00',
-                    'estimatedFeeAmount': '30.00',
+                    'baseFeeAmount': '200.00',
+                    'membershipDiscountRate': '0.9000',
+                    'capAmount': '3600.00',
+                    'estimatedFeeAmount': '180.00',
+                    'authorizationQuotaAmount': '4000.00',
+                    'quotaAmount': '4000.00',
                     'currency': 'CNY',
                     'authorizationRequired': true,
                     'authorizationStatus': 'pending_authorization',
@@ -5731,8 +5754,8 @@ void main() {
             (AppApiRequest request) async {
               final body = request.body as Map<String, Object?>;
               expect(body['expectedQuotedAmount'], 1200);
-              expect(body['expectedFeeRate'], '0.025');
-              expect(body['expectedAuthorizationAmount'], '30.00');
+              expect(body['expectedFeeRate'], '0.030');
+              expect(body['expectedAuthorizationAmount'], '4000.00');
               return AppApiResponse(
                 statusCode: 201,
                 uri: request.uri,
@@ -5763,10 +5786,14 @@ void main() {
                 'authorizationId': 'auth-1',
                 'authorizationStatus': 'authorized',
                 'quotedAmount': '1200.00',
-                'feeRate': '0.025',
-                'feeRateLabel': '标准会员费率',
+                'feeRate': '0.030',
+                'feeRateLabel': '标准会员 9折（作用于 baseFeeAmount）',
                 'membershipTierSnapshot': 'standard',
-                'estimatedFeeAmount': '30.00',
+                'baseFeeAmount': '200.00',
+                'membershipDiscountRate': '0.9000',
+                'capAmount': '3600.00',
+                'estimatedFeeAmount': '180.00',
+                'authorizationQuotaAmount': '4000.00',
                 'currency': 'CNY',
                 'updatedAt': '2026-05-13T00:03:00Z',
               },

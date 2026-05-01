@@ -170,6 +170,10 @@ inputs_canonical:
 - `authenticitySincerityRequired`
 - `authenticitySincerityAmount`
 - `authenticitySincerityStatus`
+- `authenticitySincerityOrderId`（可选；已有当前项目 200 元项目真实性诚意金订单时返回）
+- `authenticitySincerityCurrency`（可选；默认 CNY）
+- `authenticitySincerityChannelCandidates`（可选；继续支付可用的通道候选）
+- `authenticitySincerityExpiresAt`（可选；订单过期时间）
 - `publishGateStatus`
 - `formalResultProcessingRequired`
 - `nextAction`

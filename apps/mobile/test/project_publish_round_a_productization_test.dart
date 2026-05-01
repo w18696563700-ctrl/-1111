@@ -5,6 +5,7 @@ import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
+import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
@@ -139,6 +140,17 @@ Finder _projectCreateScopeSummaryInput() {
   );
 }
 
+Finder _projectCreateSubmitLabel() {
+  return find.text('保存并查看我的项目');
+}
+
+Finder _projectCreateSubmitButton() {
+  return find.ancestor(
+    of: _projectCreateSubmitLabel(),
+    matching: find.byType(FilledButton),
+  );
+}
+
 Future<void> _setProjectCreateScopeSummary(
   WidgetTester tester,
   String value,
@@ -159,12 +171,48 @@ Future<void> _selectProjectType(
   await tester.pumpAndSettle();
 }
 
+Map<String, Object?> _draftMyProjectListBody({
+  required String projectId,
+  required String title,
+}) {
+  return <String, Object?>{
+    'ongoingProjects': <Object?>[
+      <String, Object?>{
+        'publicProject': <String, Object?>{
+          'projectId': projectId,
+          'projectNo': 'EXH-2026-DRAFT',
+          'title': title,
+          'buildingType': 'exhibition',
+          'budgetAmount': 200000,
+          'state': 'draft',
+          'summary': const <String, Object?>{'heading': '当前项目已保存'},
+          'provinceCode': '510000',
+          'provinceName': '四川',
+          'cityCode': '510100',
+          'cityName': '成都',
+        },
+        'privateSummary': const <String, Object?>{
+          'hasAcceptedOrder': false,
+          'orderStatus': null,
+          'contractStatus': null,
+          'fulfillmentStatus': null,
+          'acceptanceStatus': null,
+          'afterSalesOrDisputeStatus': null,
+          'formalCompletionStatus': 'not_formally_completed',
+          'evaluationStatus': 'not_eligible',
+        },
+      },
+    ],
+    'historicalProjects': const <Object?>[],
+  };
+}
+
 void main() {
   testWidgets(
     'Round A create page keeps selector, address row, and localized date display',
     (WidgetTester tester) async {
       addTearDown(() => tester.binding.setSurfaceSize(null));
-      await tester.binding.setSurfaceSize(const Size(900, 1100));
+      await tester.binding.setSurfaceSize(const Size(900, 1600));
 
       final transport = FakeAppApiTransport(
         handlers:
@@ -180,9 +228,12 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('基础信息'), findsOneWidget);
+      expect(find.text('基础信息'), findsWidgets);
       expect(find.text('项目地点与范围', skipOffstage: false), findsOneWidget);
       expect(find.text('计划时间', skipOffstage: false), findsOneWidget);
+      expect(find.text('正在填写项目基础信息'), findsOneWidget);
+      expect(find.text('报价依据资料'), findsOneWidget);
+      expect(find.textContaining('我的项目草稿箱'), findsOneWidget);
 
       final titleY = tester.getTopLeft(_projectCreateField('项目名称')).dy;
       final brandY = tester.getTopLeft(_projectCreateField('品牌')).dy;
@@ -246,6 +297,40 @@ void main() {
       expect(tester.takeException(), isNull);
     },
   );
+
+  testWidgets('create submit button uses truthful my-project landing copy', (
+    WidgetTester tester,
+  ) async {
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+    await tester.binding.setSurfaceSize(const Size(390, 900));
+
+    await tester.pumpWidget(
+      _buildApp(
+        transport: FakeAppApiTransport(
+          handlers:
+              <
+                String,
+                Future<AppApiResponse> Function(AppApiRequest request)
+              >{},
+        ),
+        sessionStore: _buildAuthenticatedSessionStore(
+          deviceId: 'draftbox-copy',
+        ),
+        shellContextConsumer: _buildShellContextConsumer(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      _projectCreateSubmitLabel(),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(_projectCreateSubmitLabel(), findsOneWidget);
+    expect(find.text('保存后可在“我的项目”继续编辑和进入预发布核对。'), findsOneWidget);
+  });
 
   testWidgets('Round A location fields use province and city wording', (
     WidgetTester tester,
@@ -323,8 +408,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(_projectCreateField('省'));
-      await tester.pumpAndSettle();
+      await _scrollAndTap(tester, _projectCreateField('省'));
 
       expect(find.text('选择省 / 市'), findsOneWidget);
       await tester.tap(find.text('确定'));
@@ -360,17 +444,14 @@ void main() {
         find.byType(Scrollable).first,
       );
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, '保存项目基本信息并跳转至我的项目'),
+        _projectCreateSubmitLabel(),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
       final beforeSubmitOffset = scrollable.position.pixels;
 
-      final submitButton = find.widgetWithText(
-        FilledButton,
-        '保存项目基本信息并跳转至我的项目',
-      );
+      final submitButton = _projectCreateSubmitButton();
       final submitAction = tester.widget<FilledButton>(submitButton);
       expect(submitAction.onPressed, isNotNull);
       submitAction.onPressed!();
@@ -419,9 +500,9 @@ void main() {
     await tester.enterText(_projectCreateField('详细地址'), '西博城');
     await tester.pumpAndSettle();
 
-    final submitButton = find.widgetWithText(FilledButton, '保存项目基本信息并跳转至我的项目');
+    final submitButton = _projectCreateSubmitButton();
     await tester.scrollUntilVisible(
-      submitButton,
+      _projectCreateSubmitLabel(),
       200,
       scrollable: find.byType(Scrollable).first,
     );
@@ -435,6 +516,112 @@ void main() {
     expect(find.textContaining('请选择省 / 市'), findsWidgets);
     expect(find.textContaining('请补充范围说明'), findsNothing);
   });
+
+  testWidgets(
+    'create success lands in my project draftbox and highlights item',
+    (WidgetTester tester) async {
+      addTearDown(() {
+        tester.binding.setSurfaceSize(null);
+        ChinaRegionCatalogLoader.reset();
+      });
+      await tester.binding.setSurfaceSize(const Size(390, 900));
+      ChinaRegionCatalogLoader.installLoadOverrideForTest(() async {
+        return ChinaRegionCatalog(
+          provinces: const <ChinaProvinceOption>[
+            ChinaProvinceOption(
+              provinceCode: '510000',
+              provinceName: '四川',
+              cities: <ChinaCityOption>[
+                ChinaCityOption(
+                  provinceCode: '510000',
+                  provinceName: '四川',
+                  cityCode: '510100',
+                  cityName: '成都',
+                  districts: <ChinaDistrictOption>[
+                    ChinaDistrictOption(
+                      districtCode: '510107',
+                      districtName: '武侯区',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ],
+        );
+      });
+
+      var createCalled = false;
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'POST /api/app/project/create': (AppApiRequest request) async {
+                createCalled = true;
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'projectId': 'round-a-created',
+                    'state': 'draft',
+                  },
+                );
+              },
+              'GET /api/app/my/projects': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _draftMyProjectListBody(
+                    projectId: 'round-a-created',
+                    title: '草稿项目',
+                  ),
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          transport: transport,
+          sessionStore: _buildAuthenticatedSessionStore(
+            deviceId: 'draftbox-route',
+          ),
+          shellContextConsumer: _buildShellContextConsumer(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.enterText(_projectCreateField('项目名称'), '西洽会');
+      await tester.enterText(_projectCreateField('品牌'), '泸州');
+      await _selectProjectType(tester);
+      await tester.enterText(_projectCreateField('预算金额'), '200000');
+      await _scrollAndTap(tester, _projectCreateField('省'));
+      await tester.tap(find.text('确定'));
+      await tester.pumpAndSettle();
+      await _scrollAndTap(tester, _projectCreateField('详细地址'));
+      await tester.enterText(_projectCreateField('详细地址'), '重庆国际博览中心');
+      await tester.pumpAndSettle();
+
+      await tester.scrollUntilVisible(
+        _projectCreateSubmitLabel(),
+        200,
+        scrollable: find.byType(Scrollable).first,
+      );
+      final submitAction = tester.widget<FilledButton>(
+        _projectCreateSubmitButton(),
+      );
+      expect(submitAction.onPressed, isNotNull);
+      submitAction.onPressed!();
+      await tester.pumpAndSettle();
+
+      expect(createCalled, isTrue);
+      expect(
+        ExhibitionRoutes.myProjectDraftboxWithProjectId('round-a-created'),
+        contains('stage=draft'),
+      );
+      expect(find.text('草稿项目'), findsOneWidget);
+      expect(find.text('刚刚保存到草稿箱'), findsOneWidget);
+      expect(find.text('预发布项目'), findsNothing);
+    },
+  );
 
   testWidgets(
     'Round A selector still submits canonical buildingType exhibition',

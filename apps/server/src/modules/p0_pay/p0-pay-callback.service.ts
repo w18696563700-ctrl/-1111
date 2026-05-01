@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'crypto';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
+import { MembershipPurchaseService } from '../membership/membership.purchase.service';
 import { InquiryQuoteDepositEntity } from './entities/inquiry-quote-deposit.entity';
 import { PaymentCallbackEventEntity } from './entities/payment-callback-event.entity';
 import { PaymentOrderEntity } from './entities/payment-order.entity';
@@ -34,7 +35,8 @@ export class P0PayCallbackService {
     private readonly callbackRepository: Repository<PaymentCallbackEventEntity>,
     private readonly dataSource: DataSource,
     private readonly paymentChannelService: P0PayPaymentChannelService,
-    private readonly auditService: P0PayAuditService
+    private readonly auditService: P0PayAuditService,
+    private readonly membershipPurchaseService: MembershipPurchaseService
   ) {}
 
   async handleCallback(
@@ -54,7 +56,7 @@ export class P0PayCallbackService {
 
     const event = await this.dataSource.transaction(async (manager) => {
       const callback = this.buildCallbackEvent(command, context);
-      const verification = this.paymentChannelService.verifyCallback(payload, signature);
+      const verification = this.paymentChannelService.verifyCallback(payload, signature, command.paymentChannel);
       if (!verification.verified) {
         callback.verificationStatus = 'rejected';
         callback.applyStatus = 'not_applied';
@@ -91,6 +93,12 @@ export class P0PayCallbackService {
       await manager.getRepository(PaymentCallbackEventEntity).save(callback);
       return;
     }
+    if (!this.amountMatches(order.amount, command.amount)) {
+      callback.applyStatus = 'apply_failed';
+      callback.rejectedReasonCode = 'payment_amount_mismatch';
+      await manager.getRepository(PaymentCallbackEventEntity).save(callback);
+      return;
+    }
 
     if (this.isSuccessEvent(command)) {
       await this.applySuccess(manager, callback, order, command, context);
@@ -113,13 +121,16 @@ export class P0PayCallbackService {
     command: CallbackCommand,
     context: RequestContext
   ) {
-    if (order.status === 'succeeded') {
+    if (order.status === 'succeeded' || order.status === 'refunded') {
       callback.applyStatus = 'duplicate';
       callback.appliedAt = new Date();
       await manager.getRepository(PaymentCallbackEventEntity).save(callback);
       return;
     }
-    if (!['created', 'pending_user_confirm'].includes(order.status)) {
+    const successMutableStatuses = order.businessType === 'project_authenticity_sincerity_refund'
+      ? ['created', 'pending_user_confirm', 'refund_pending']
+      : ['created', 'pending_user_confirm'];
+    if (!successMutableStatuses.includes(order.status)) {
       callback.applyStatus = 'ignored_out_of_order';
       callback.rejectedReasonCode = `order_status_${order.status}`;
       await manager.getRepository(PaymentCallbackEventEntity).save(callback);
@@ -127,7 +138,7 @@ export class P0PayCallbackService {
     }
 
     const beforeOrderState = order.status;
-    order.status = 'succeeded';
+    order.status = order.businessType === 'project_authenticity_sincerity_refund' ? 'refunded' : 'succeeded';
     order.channelOrderId = command.channelOrderId;
     await manager.getRepository(PaymentOrderEntity).save(order);
     await this.saveTransaction(manager, order, command, 'succeeded');
@@ -158,7 +169,10 @@ export class P0PayCallbackService {
     command: CallbackCommand,
     context: RequestContext
   ) {
-    if (!['created', 'pending_user_confirm'].includes(order.status)) {
+    const failureMutableStatuses = order.businessType === 'project_authenticity_sincerity_refund'
+      ? ['created', 'pending_user_confirm', 'refund_pending']
+      : ['created', 'pending_user_confirm'];
+    if (!failureMutableStatuses.includes(order.status)) {
       callback.applyStatus = 'ignored_out_of_order';
       callback.rejectedReasonCode = `order_status_${order.status}`;
       await manager.getRepository(PaymentCallbackEventEntity).save(callback);
@@ -217,9 +231,42 @@ export class P0PayCallbackService {
         await manager.getRepository(InquiryQuoteDepositEntity).save(deposit);
       }
     }
+    if (order.businessType === 'project_authenticity_sincerity_refund') {
+      await this.applyDepositRefundSuccess(manager, order, context);
+    }
     if (order.businessType === 'platform_service_fee_charge') {
       await this.applyChargeSuccess(manager, order, context);
     }
+    if (order.businessType === 'membership_direct_purchase') {
+      await this.membershipPurchaseService.applyPaymentSuccess(manager, order, context);
+    }
+  }
+
+  private async applyDepositRefundSuccess(manager: EntityManager, order: PaymentOrderEntity, context: RequestContext) {
+    const deposit = await manager.getRepository(InquiryQuoteDepositEntity).findOneBy({ id: order.businessId });
+    if (!deposit || deposit.status === 'refunded') {
+      return;
+    }
+    const beforeState = deposit.status;
+    if (!['refund_pending', 'paid'].includes(deposit.status)) {
+      return;
+    }
+    deposit.status = 'refunded';
+    deposit.refundedAt = new Date();
+    await manager.getRepository(InquiryQuoteDepositEntity).save(deposit);
+    await this.auditService.record(
+      {
+        objectType: 'project_authenticity_sincerity_order',
+        objectId: deposit.id,
+        objectNo: order.merchantOrderNo,
+        action: PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityRefunded,
+        beforeState,
+        afterState: deposit.status,
+        reason: `taskId=${deposit.taskId}; amount=${deposit.amount}`
+      },
+      context,
+      manager
+    );
   }
 
   private async applyChargeSuccess(manager: EntityManager, order: PaymentOrderEntity, context: RequestContext) {
@@ -275,6 +322,12 @@ export class P0PayCallbackService {
         { status: 'failed' }
       );
     }
+    if (order.businessType === 'project_authenticity_sincerity_refund') {
+      await manager.getRepository(InquiryQuoteDepositEntity).update(
+        { id: order.businessId, status: 'refund_pending' },
+        { status: 'paid' }
+      );
+    }
     if (order.businessType === 'platform_service_fee_charge') {
       await manager.getRepository(PlatformServiceFeeChargeEntity).update(
         { id: order.businessId, chargeStatus: 'pending_charge' },
@@ -284,6 +337,9 @@ export class P0PayCallbackService {
         { id: order.businessId, chargeStatus: 'charge_pending' },
         { chargeStatus: 'charge_failed' }
       );
+    }
+    if (order.businessType === 'membership_direct_purchase') {
+      await this.membershipPurchaseService.applyPaymentFailure(manager, order);
     }
   }
 
@@ -296,14 +352,18 @@ export class P0PayCallbackService {
     await manager.getRepository(PaymentTransactionEntity).save({
       id: randomUUID(),
       paymentOrderId: order.id,
-      transactionType: order.orderRole === 'authorization' ? 'authorization' : 'payment',
+      transactionType: order.orderRole === 'authorization'
+        ? 'authorization'
+        : order.orderRole === 'refund'
+          ? 'refund'
+          : 'payment',
       paymentChannel: order.paymentChannel,
       channelTransactionId: command.channelOrderId,
       amount: order.amount,
       requestedAmount: order.amount,
       confirmedAmount: status === 'succeeded' ? order.amount : null,
       status,
-      channelActionType: 'web_redirect',
+      channelActionType: order.paymentChannel === 'alipay' ? 'sdk_payload' : 'web_redirect',
       channelReference: command.providerEventId,
       rawStatus: command.eventStatus,
       initiatedAt: null,
@@ -365,6 +425,9 @@ export class P0PayCallbackService {
     if (order.businessType === 'project_authenticity_sincerity_payment') {
       return PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityPaid;
     }
+    if (order.businessType === 'project_authenticity_sincerity_refund') {
+      return PLATFORM_PRICING_AUDIT_ACTIONS.projectAuthenticitySincerityRefunded;
+    }
     if (order.businessType === 'platform_service_fee_authorization') {
       return PLATFORM_PRICING_AUDIT_ACTIONS.bidServiceFeeAuthorizationFrozen;
     }
@@ -374,23 +437,42 @@ export class P0PayCallbackService {
     if (order.businessType === 'platform_service_fee_charge') {
       return PLATFORM_PRICING_AUDIT_ACTIONS.platformServiceFeeCharged;
     }
+    if (order.businessType === 'membership_direct_purchase') {
+      return PLATFORM_PRICING_AUDIT_ACTIONS.paymentCallbackVerified;
+    }
     return PLATFORM_PRICING_AUDIT_ACTIONS.paymentCallbackReceived;
   }
 
   private toCallbackCommand(paymentChannel: string, payload: Record<string, unknown>) {
     const channel = this.readPaymentChannel(paymentChannel);
-    const merchantOrderNo = this.readRequiredString(payload.merchantOrderNo, 'merchantOrderNo');
-    const providerEventId = this.readRequiredString(payload.providerEventId, 'providerEventId');
-    const eventType = this.readRequiredString(payload.eventType, 'eventType');
+    const merchantOrderNo = this.readRequiredString(
+      this.readFirst(payload.merchantOrderNo, payload.out_trade_no),
+      'merchantOrderNo'
+    );
+    const providerEventId = this.readRequiredString(
+      this.readFirst(payload.providerEventId, payload.notify_id, payload.trade_no),
+      'providerEventId'
+    );
+    const eventType = this.readRequiredString(
+      this.readFirst(payload.eventType, payload.notify_type, 'alipay_trade_status_sync'),
+      'eventType'
+    );
+    const eventStatus = this.readRequiredString(
+      this.readFirst(payload.eventStatus, this.toCanonicalAlipayStatus(payload.trade_status)),
+      'eventStatus'
+    );
     return {
       paymentChannel: channel,
       merchantOrderNo,
-      channelOrderId: this.readRequiredString(payload.channelOrderId, 'channelOrderId'),
+      channelOrderId: this.readRequiredString(
+        this.readFirst(payload.channelOrderId, payload.trade_no, providerEventId),
+        'channelOrderId'
+      ),
       providerEventId,
       channelEventId: this.readOptionalString(payload.channelEventId) ?? providerEventId,
       eventType,
-      eventStatus: this.readRequiredString(payload.eventStatus, 'eventStatus'),
-      amount: this.readOptionalString(payload.amount),
+      eventStatus,
+      amount: this.readOptionalString(this.readFirst(payload.amount, payload.total_amount, payload.receipt_amount, payload.refund_fee)),
       payloadSnapshot: this.toSnapshot(payload)
     } satisfies CallbackCommand;
   }
@@ -420,6 +502,24 @@ export class P0PayCallbackService {
     return normalized ? normalized : null;
   }
 
+  private readFirst(...values: unknown[]) {
+    return values.find((value) => value !== null && value !== undefined && value !== '');
+  }
+
+  private toCanonicalAlipayStatus(value: unknown) {
+    const status = this.readOptionalString(value);
+    if (!status) {
+      return null;
+    }
+    if (status === 'TRADE_SUCCESS' || status === 'TRADE_FINISHED') {
+      return 'succeeded';
+    }
+    if (status === 'TRADE_CLOSED') {
+      return 'failed';
+    }
+    return status.toLowerCase();
+  }
+
   private isSuccessEvent(command: CallbackCommand) {
     return command.eventStatus === 'succeeded' || command.eventType.endsWith('_succeeded');
   }
@@ -428,16 +528,30 @@ export class P0PayCallbackService {
     return command.eventStatus === 'failed' || command.eventType.endsWith('_failed');
   }
 
+  private amountMatches(expected: string | number, actual: string | null) {
+    if (actual === null) {
+      return true;
+    }
+    const expectedNumber = Number(expected);
+    const actualNumber = Number(actual);
+    return Number.isFinite(expectedNumber) &&
+      Number.isFinite(actualNumber) &&
+      expectedNumber.toFixed(2) === actualNumber.toFixed(2);
+  }
+
   private toSnapshot(payload: Record<string, unknown>) {
     return {
-      merchantOrderNo: payload.merchantOrderNo,
-      channelOrderId: payload.channelOrderId,
-      providerEventId: payload.providerEventId,
+      merchantOrderNo: this.readFirst(payload.merchantOrderNo, payload.out_trade_no),
+      channelOrderId: this.readFirst(payload.channelOrderId, payload.trade_no),
+      providerEventId: this.readFirst(payload.providerEventId, payload.notify_id, payload.trade_no),
       channelEventId: payload.channelEventId,
-      eventType: payload.eventType,
-      eventStatus: payload.eventStatus,
-      amount: payload.amount,
-      currency: payload.currency
+      eventType: this.readFirst(payload.eventType, payload.notify_type),
+      eventStatus: this.readFirst(payload.eventStatus, this.toCanonicalAlipayStatus(payload.trade_status), payload.trade_status),
+      amount: this.readFirst(payload.amount, payload.total_amount, payload.receipt_amount, payload.refund_fee),
+      currency: this.readFirst(payload.currency, 'CNY'),
+      provider: payload.sign ? 'alipay' : undefined,
+      rawTradeStatus: payload.trade_status,
+      rawNotifyType: payload.notify_type
     };
   }
 

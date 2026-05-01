@@ -19,6 +19,7 @@ import { MembershipModule } from './modules/membership/membership.module';
 import { MessageInteractionModule } from './modules/message_interaction/message-interaction.module';
 import { MyProjectModule } from './modules/my_project/my-project.module';
 import { MyBidModule } from './modules/my_bid/my-bid.module';
+import { NotificationModule } from './modules/notifications/notification.module';
 import { OrderModule } from './modules/order/order.module';
 import { P0PayModule } from './modules/p0_pay/p0-pay.module';
 import { PaymentBillingModule } from './modules/payment_billing/payment-billing.module';
@@ -68,6 +69,7 @@ import { UploadModule } from './modules/upload/upload.module';
     GovernanceModule,
     MembershipModule,
     MessageInteractionModule,
+    NotificationModule,
     OrderModule,
     P0PayModule,
     PaymentBillingModule,

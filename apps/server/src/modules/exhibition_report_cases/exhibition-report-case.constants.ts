@@ -38,6 +38,8 @@ export const EXHIBITION_REPORT_ADJUDICATION_RESULTS = [
 
 export type ExhibitionReportTargetType =
   (typeof EXHIBITION_REPORT_TARGET_TYPES)[number];
+export type ExhibitionReportReasonCode =
+  (typeof EXHIBITION_REPORT_REASON_CODES)[number];
 export type ExhibitionReportCaseStatus =
   (typeof EXHIBITION_REPORT_CASE_STATUSES)[number];
 export type ExhibitionTemporaryRestrictionState =

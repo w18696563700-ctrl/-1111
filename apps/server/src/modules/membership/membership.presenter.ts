@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 
 @Injectable()
 export class MembershipPresenter {
@@ -6,6 +6,7 @@ export class MembershipPresenter {
     organizationId: string;
     paidMembershipTier: string | null;
     rateBand: string | null;
+    serviceFeeDiscountSummary: string | null;
     entitlementsSummary: string[];
     quotaSummary: string[];
     effectiveAt: Date | null;
@@ -16,11 +17,12 @@ export class MembershipPresenter {
       organizationId: input.organizationId,
       paidMembershipTier: input.paidMembershipTier,
       rateBand: input.rateBand,
+      serviceFeeDiscountSummary: input.serviceFeeDiscountSummary,
       entitlementsSummary: input.entitlementsSummary,
       quotaSummary: input.quotaSummary,
       effectiveAt: input.effectiveAt?.toISOString() ?? null,
       expiresAt: input.expiresAt?.toISOString() ?? null,
-      nextRefreshAt: input.nextRefreshAt?.toISOString() ?? null
+      nextRefreshAt: input.nextRefreshAt?.toISOString() ?? null,
     };
   }
 
@@ -48,7 +50,7 @@ export class MembershipPresenter {
   }) {
     return {
       items: input.items,
-      nextRefreshAt: input.nextRefreshAt?.toISOString() ?? null
+      nextRefreshAt: input.nextRefreshAt?.toISOString() ?? null,
     };
   }
 
@@ -57,6 +59,7 @@ export class MembershipPresenter {
     availableTiers: Array<{
       tier: string;
       title: string;
+      serviceFeeDiscountSummary?: string | null;
       candidateDisplayPrice: string | null;
       candidateDisplayRateBand: string | null;
     }>;

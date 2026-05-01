@@ -591,7 +591,11 @@ test("counterpart conversation detail service forwards frozen server path and hi
               titleVisibility: "visible",
               projectRelation: "my_published",
               projectState: "published",
+              projectPublishedAt: "2026-04-28T09:00:00.000Z",
+              projectUpdatedAt: "2026-04-29T08:30:00.000Z",
               latestActivityAt: "2026-04-29T10:00:00.000Z",
+              projectUnreadCount: 2,
+              hasProjectUnread: true,
               orderSummary: {
                 orderId: "order-1",
                 projectId: "project-1",
@@ -616,6 +620,8 @@ test("counterpart conversation detail service forwards frozen server path and hi
                   summary: "重庆海川展览工厂 申请查看当前项目名称。",
                   status: "pending",
                   updatedAt: "2026-04-29T10:00:00.000Z",
+                  requesterCompanyName: "重庆海川展览工厂",
+                  requesterOrganizationId: "org-1",
                   truthAnchor: {
                     truthType: "project_name_access_request",
                     projectId: "project-1",
@@ -667,6 +673,8 @@ test("counterpart conversation detail service forwards frozen server path and hi
                   summary: "供应商已获得竞标资格。",
                   status: "approved",
                   updatedAt: "2026-04-29T10:02:00.000Z",
+                  requesterCompanyName: "重庆海川展览工厂",
+                  requesterOrganizationId: "org-1",
                   truthAnchor: {
                     truthType: "bid_participation_request",
                     projectId: "project-1",
@@ -713,6 +721,10 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.equal(result.projectGroups[0].projectDisplayTitle, "西洽会 - 泸州");
   assert.equal(result.projectGroups[0].titleVisibility, "visible");
   assert.equal(result.projectGroups[0].projectRelation, "my_published");
+  assert.equal(result.projectGroups[0].projectPublishedAt, "2026-04-28T09:00:00.000Z");
+  assert.equal(result.projectGroups[0].projectUpdatedAt, "2026-04-29T08:30:00.000Z");
+  assert.equal(result.projectGroups[0].projectUnreadCount, 2);
+  assert.equal(result.projectGroups[0].hasProjectUnread, true);
   assert.deepEqual(result.projectGroups[0].orderSummary, {
     orderId: "order-1",
     projectId: "project-1",
@@ -732,6 +744,8 @@ test("counterpart conversation detail service forwards frozen server path and hi
   const bidParticipationCard = result.projectGroups[0].cards.find(
     (card) => card.cardType === "bid_participation_request",
   );
+  assert.equal(bidParticipationCard.requesterCompanyName, "重庆海川展览工厂");
+  assert.equal(bidParticipationCard.requesterOrganizationId, "org-1");
   assert.deepEqual(bidParticipationCard.detailRouteTarget, {
     objectType: "bid_service_fee_authorization",
     actionKey: "bid_service_fee_authorization.open",
@@ -811,12 +825,13 @@ test("project communication routes forward thread, message list, send, and read 
               projectId: options.params.projectId,
               senderUserId: "user-1",
               senderActorId: "actor-1",
-              senderOrganizationId: "org-1",
-              messageKind: "text",
-              body: "在吗",
-              clientMessageId: null,
-              messageState: "active",
-              createdAt: "2026-04-30T10:01:00.000Z",
+            senderOrganizationId: "org-1",
+            messageKind: "text",
+            body: "在吗",
+            payload: null,
+            clientMessageId: null,
+            messageState: "active",
+            createdAt: "2026-04-30T10:01:00.000Z",
             },
           ],
           nextCursor: "2026-04-30T10:01:00.000Z",
@@ -843,6 +858,7 @@ test("project communication routes forward thread, message list, send, and read 
           senderOrganizationId: "org-1",
           messageKind: "text",
           body: body.body,
+          payload: null,
           clientMessageId: body.clientMessageId ?? null,
           messageState: "active",
           createdAt: "2026-04-30T10:03:00.000Z",
@@ -887,6 +903,7 @@ test("project communication routes forward thread, message list, send, and read 
     {},
   );
   assert.equal(message.body, "收到");
+  assert.equal(message.payload, null);
 
   const cursor = await service.markProjectCommunicationReadCursor(
     {
@@ -933,6 +950,109 @@ test("project communication routes forward thread, message list, send, and read 
         threadId: "thread-1",
         projectId: "project-1",
         lastReadMessageId: "message-2",
+      },
+    },
+  ]);
+});
+
+test("project communication service passes through image and confirmation payloads", async () => {
+  const calls = [];
+  const service = new MessageInteractionService(
+    {
+      async post(pathName, body) {
+        calls.push({ pathName, body });
+        return {
+          messageId: "message-attachment-1",
+          threadId: body.threadId,
+          projectId: body.projectId,
+          senderUserId: "user-1",
+          senderActorId: "actor-1",
+          senderOrganizationId: "org-1",
+          messageKind: body.messageKind,
+          body: body.body ?? "",
+          payload: body.payload,
+          clientMessageId: body.clientMessageId ?? null,
+          messageState: "active",
+          createdAt: "2026-04-30T10:03:00.000Z",
+        };
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {
+          authorization: "Bearer token",
+          "x-organization-id": "org-1",
+        };
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  const imagePayload = {
+    attachment: {
+      fileAssetId: "file-1",
+      fileName: "booth.png",
+      mimeType: "image/png",
+      size: 128,
+      category: "image",
+    },
+  };
+  const image = await service.sendProjectCommunicationMessage(
+    {
+      threadId: "thread-1",
+      projectId: "project-1",
+      messageKind: "image",
+      payload: imagePayload,
+      clientMessageId: "client-image-1",
+    },
+    {},
+  );
+
+  assert.equal(image.messageKind, "image");
+  assert.deepEqual(image.payload, imagePayload);
+
+  const confirmationPayload = {
+    confirmation: {
+      confirmationType: "quote",
+      title: "报价确认",
+      summary: "确认当前报价为 12000 元。",
+      status: "proposed",
+    },
+  };
+  const confirmation = await service.sendProjectCommunicationMessage(
+    {
+      threadId: "thread-1",
+      projectId: "project-1",
+      messageKind: "confirmation_card",
+      body: "报价确认",
+      payload: confirmationPayload,
+    },
+    {},
+  );
+
+  assert.equal(confirmation.messageKind, "confirmation_card");
+  assert.deepEqual(confirmation.payload, confirmationPayload);
+  assert.deepEqual(calls, [
+    {
+      pathName: "/server/project-communication/messages",
+      body: {
+        threadId: "thread-1",
+        projectId: "project-1",
+        body: undefined,
+        clientMessageId: "client-image-1",
+        messageKind: "image",
+        payload: imagePayload,
+      },
+    },
+    {
+      pathName: "/server/project-communication/messages",
+      body: {
+        threadId: "thread-1",
+        projectId: "project-1",
+        body: "报价确认",
+        clientMessageId: undefined,
+        messageKind: "confirmation_card",
+        payload: confirmationPayload,
       },
     },
   ]);

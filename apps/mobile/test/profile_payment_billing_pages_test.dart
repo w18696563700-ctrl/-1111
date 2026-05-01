@@ -215,7 +215,7 @@ void main() {
     await tester.tap(find.text(copy.actionLabel));
     await tester.pumpAndSettle();
 
-    expect(find.text('切换当前公司/组织'), findsOneWidget);
+    expect(find.text('切换当前主体'), findsOneWidget);
     expect(find.text('可切换主体'), findsOneWidget);
     expect(find.textContaining('当前主体：'), findsOneWidget);
   }
@@ -506,15 +506,22 @@ void main() {
       expect(find.text('我的项目'), findsOneWidget);
       expect(find.text('发布项目工作台'), findsNothing);
       expect(find.text('我的论坛'), findsOneWidget);
-      expect(find.text('设置'), findsWidgets);
 
       await tester.tap(find.text('支付与账单状态'));
       await tester.pumpAndSettle();
 
-      await scrollTo(tester, find.text('当前摘要'));
-      expect(find.text('当前摘要'), findsOneWidget);
+      await scrollTo(tester, find.text('一、当前摘要'));
+      expect(find.text('一、当前摘要'), findsOneWidget);
       expect(find.text('当前需后续衔接'), findsWidgets);
       expect(find.textContaining('后续结算 / 清分 / 税务 / 财务后台依赖'), findsWidgets);
+      await scrollTo(tester, find.text('三、资金摘要'));
+      expect(find.text('三、资金摘要'), findsOneWidget);
+      expect(find.text('扣款'), findsOneWidget);
+      expect(find.text('以项目合同确认后的服务费扣取记录为准。'), findsOneWidget);
+      expect(find.text('退款'), findsOneWidget);
+      expect(find.text('以项目诚意金或服务费的云端回读状态为准，不承诺即时到账。'), findsOneWidget);
+      expect(find.text('结算'), findsOneWidget);
+      expect(find.text('当前只展示结算摘要和对账状态，不自动打款。'), findsOneWidget);
       await scrollTo(tester, find.text('BILL-REF-001'));
       expect(find.text('BILL-REF-001'), findsOneWidget);
 
@@ -525,7 +532,7 @@ void main() {
       expect(find.text('当前账单参考'), findsOneWidget);
       expect(find.text('后续依赖'), findsWidgets);
 
-      await tester.pageBack();
+      Navigator.of(tester.element(find.text('当前支付状态'))).pop();
       await tester.pumpAndSettle();
 
       await scrollTo(tester, find.text('处理与衔接页'));

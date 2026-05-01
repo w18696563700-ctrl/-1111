@@ -1,9 +1,16 @@
 part of '../exhibition_trade_pages.dart';
 
 class MyProjectListPage extends StatefulWidget {
-  const MyProjectListPage({super.key, this.initialWorkspace});
+  const MyProjectListPage({
+    super.key,
+    this.initialWorkspace,
+    this.initialStage,
+    this.highlightProjectId,
+  });
 
   final String? initialWorkspace;
+  final String? initialStage;
+  final String? highlightProjectId;
 
   @override
   State<MyProjectListPage> createState() => _MyProjectListPageState();
@@ -25,12 +32,18 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
   bool _loading = true;
   bool _myBidLoading = false;
   late _MyProjectWorkspaceBucket _selectedWorkspace;
-  _MyProjectStageBucket _selectedStage = _MyProjectStageBucket.draft;
+  late _MyProjectStageBucket _selectedStage;
+  late final bool _hasInitialStage;
+  final GlobalKey _highlightedProjectKey = GlobalKey();
+  bool _highlightScrollScheduled = false;
 
   @override
   void initState() {
     super.initState();
     _selectedWorkspace = _myProjectWorkspaceFromRoute(widget.initialWorkspace);
+    final initialStage = _myProjectStageBucketFromRoute(widget.initialStage);
+    _selectedStage = initialStage ?? _MyProjectStageBucket.draft;
+    _hasInitialStage = initialStage != null;
     _load();
     if (_selectedWorkspace == _MyProjectWorkspaceBucket.bids) {
       _loadMyBidList(forceRefresh: true);
@@ -46,11 +59,14 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
 
     setState(() {
       _snapshot = snapshot;
-      _selectedStage = _myProjectPreferredStageFromPayload(
-        snapshot.result.payload,
-      );
+      if (!_hasInitialStage) {
+        _selectedStage = _myProjectPreferredStageFromPayload(
+          snapshot.result.payload,
+        );
+      }
       _loading = false;
     });
+    _scheduleHighlightScroll();
   }
 
   Future<void> _openRoute(String routeName) async {
@@ -93,17 +109,20 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
 
         return <Widget>[
           const SizedBox(height: 16),
+          _buildMyProjectOverviewCard(result.payload),
+          const SizedBox(height: 14),
           _buildMyProjectWorkspaceTabsCard(
             selectedWorkspace: _selectedWorkspace,
             onSelected: _selectWorkspace,
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 14),
           if (_selectedWorkspace == _MyProjectWorkspaceBucket.published) ...[
-            _buildStageTabsCard(result.payload),
-            const SizedBox(height: 16),
-            _buildStageSection(context, result.payload),
+            _buildStageTabsCard(context, result.payload),
+            const SizedBox(height: 14),
+            _buildStageSection(result.payload),
           ] else
             _buildMyBidWorkspaceSection(context),
+          const SizedBox(height: 68),
         ];
       },
     );
@@ -119,68 +138,131 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
     }
   }
 
-  Widget _buildStageTabsCard(Object? payload) {
+  String? get _highlightProjectId => _normalizeId(widget.highlightProjectId);
+
+  void _scheduleHighlightScroll() {
+    if (_highlightProjectId == null || _highlightScrollScheduled) {
+      return;
+    }
+    _highlightScrollScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _highlightScrollScheduled = false;
+      if (!mounted) {
+        return;
+      }
+      final targetContext = _highlightedProjectKey.currentContext;
+      if (targetContext == null) {
+        return;
+      }
+      Scrollable.ensureVisible(
+        targetContext,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+        alignment: 0.18,
+      );
+    });
+  }
+
+  Widget _buildMyProjectOverviewCard(Object? payload) {
+    final publishCount = _myProjectAllItemsFromPayload(payload).length;
+    final myBidCount = _myBidResult == null
+        ? null
+        : _myBidItemsFromPayload(_myBidResult?.payload).length;
+
+    return _MyProjectOverviewCard(
+      publishCount: publishCount,
+      bidCount: myBidCount,
+      bidLoading: _myBidLoading,
+    );
+  }
+
+  Widget _buildStageTabsCard(BuildContext context, Object? payload) {
     final currentStage = _myProjectStageOption(_selectedStage);
     final currentCount = _myProjectItemsForStage(
       payload,
       _selectedStage,
     ).length;
-    final mainlineStageOptions = _myProjectPrimaryStageOptions
-        .where(
-          (_MyProjectStageOption option) =>
-              option.value != _MyProjectStageBucket.draft,
-        )
-        .toList();
+    final stageOptions = <_MyProjectStageOption>[
+      ..._myProjectPrimaryStageOptions,
+      _myProjectArchivedStageOption,
+    ];
 
-    return _ActionCard(
-      title: '项目阶段',
-      summary: '预发布、竞标中和进行中保持主流程展示；草稿和已归档收进下方入口。',
-      tone: _ActionCardTone.emphasis,
-      children: <Widget>[
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: mainlineStageOptions.map((_MyProjectStageOption option) {
-            final count = _myProjectItemsForStage(payload, option.value).length;
-            return ChoiceChip(
-              label: Text('${option.label} · $count'),
-              selected: option.value == _selectedStage,
-              onSelected: (_) {
-                setState(() => _selectedStage = option.value);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '项目阶段',
+              style: Theme.of(
+                context,
+              ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: stageOptions.map((_MyProjectStageOption option) {
+                  final count = _myProjectItemsForStage(
+                    payload,
+                    option.value,
+                  ).length;
+                  return Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text('${option.label} · $count'),
+                      selected: option.value == _selectedStage,
+                      onSelected: (_) {
+                        setState(() => _selectedStage = option.value);
+                      },
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
+            const SizedBox(height: 10),
+            _MyProjectStageHint(
+              label: currentStage.label,
+              count: currentCount,
+              body: _myProjectStageShortDescription(currentStage.value),
+            ),
+            const SizedBox(height: 12),
+            _MyProjectSecondaryStageEntrances(
+              draftCount: _myProjectItemsForStage(
+                payload,
+                _MyProjectStageBucket.draft,
+              ).length,
+              archivedCount: _myProjectArchivedItemsFromPayload(payload).length,
+              selectedStage: _selectedStage,
+              onSelected: (_MyProjectStageBucket stage) {
+                setState(() => _selectedStage = stage);
               },
-            );
-          }).toList(),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
-        _StateMessage(
-          title: currentStage.label,
-          body:
-              '${currentStage.description} 当前只显示${currentStage.label}阶段，共 $currentCount 个项目；切换上方阶段标签可查看其他阶段。',
-        ),
-        const SizedBox(height: 16),
-        _MyProjectSecondaryStageEntrances(
-          draftCount: _myProjectItemsForStage(
-            payload,
-            _MyProjectStageBucket.draft,
-          ).length,
-          archivedCount: _myProjectArchivedItemsFromPayload(payload).length,
-          selectedStage: _selectedStage,
-          onSelected: (_MyProjectStageBucket stage) {
-            setState(() => _selectedStage = stage);
-          },
-        ),
-      ],
+      ),
     );
   }
 
-  Widget _buildStageSection(BuildContext context, Object? payload) {
+  Widget _buildStageSection(Object? payload) {
     final currentStage = _myProjectStageOption(_selectedStage);
     final items = _myProjectItemsForStage(payload, _selectedStage);
 
     return _ActionCard(
       title: _myProjectStageSectionTitle(currentStage.value),
-      summary: currentStage.description,
+      summary: _myProjectStageSectionSummary(currentStage.value),
       children: <Widget>[
+        if (items.isNotEmpty)
+          _MyProjectSectionCountLine(
+            count: items.length,
+            stageLabel: currentStage.label,
+          ),
         if (items.isEmpty)
           _EmptyNotice(
             title: currentStage.emptyTitle,
@@ -220,12 +302,7 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
               ...?(regionLabel == null ? null : <String>[regionLabel]),
               buildingType,
               if (publicProject['areaSqm'] is num) areaLabel,
-              _myProjectFormalCompletionLabel(
-                privateSummary['formalCompletionStatus'] as String?,
-              ),
-              _myProjectEvaluationLabel(
-                privateSummary['evaluationStatus'] as String?,
-              ),
+              _currencyText(publicProject['budgetAmount']),
             ];
 
             final actionLabel = switch (stage.value) {
@@ -236,186 +313,48 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
             final routeName = stage.value == _MyProjectStageBucket.draft
                 ? ExhibitionRoutes.projectEditWithProjectId(projectId)
                 : ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
+            final detailRouteName =
+                ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
+            final highlighted = projectId == _highlightProjectId;
+
+            Widget card = _MyProjectCompactCard(
+              title: title,
+              description: summaryHeading,
+              statusLabel: stage.label,
+              chips: pills,
+              stageLabel: stage.label,
+              nextStep: _myProjectStageListNextStep(stage.value),
+              projectNo: projectNo,
+              formalStatus: _myProjectFormalCompletionLabel(
+                privateSummary['formalCompletionStatus'] as String?,
+              ),
+              evaluationStatus: _myProjectEvaluationLabel(
+                privateSummary['evaluationStatus'] as String?,
+              ),
+              actionLabel: actionLabel,
+              onPressed: () => _openRoute(routeName),
+              secondaryActionLabel:
+                  stage.value == _MyProjectStageBucket.draft ||
+                      stage.value == _MyProjectStageBucket.submitted
+                  ? '查看详情'
+                  : null,
+              onSecondaryPressed:
+                  stage.value == _MyProjectStageBucket.draft ||
+                      stage.value == _MyProjectStageBucket.submitted
+                  ? () => _openRoute(detailRouteName)
+                  : null,
+              highlighted: highlighted,
+            );
+            if (highlighted) {
+              card = KeyedSubtree(key: _highlightedProjectKey, child: card);
+            }
 
             return Padding(
-              padding: const EdgeInsets.only(top: 12),
-              child: _EntityCard(
-                title: title,
-                description: summaryHeading,
-                statusLabel: stage.label,
-                detailLines: <Widget>[
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: pills.map((String item) {
-                      return _StatusPill(
-                        label: item,
-                        tone: _ActionCardTone.muted,
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 8),
-                  _DetailLine(label: '项目编号', value: projectNo),
-                  _DetailLine(
-                    label: '当前阶段',
-                    value: stage.label,
-                    highlight: true,
-                  ),
-                  _DetailLine(
-                    label: '当前下一步',
-                    value: stage.cardNextStep,
-                    highlight: true,
-                  ),
-                  _DetailLine(
-                    label: '预算金额',
-                    value: _currencyText(publicProject['budgetAmount']),
-                    highlight: true,
-                  ),
-                  if (regionLabel != null)
-                    _DetailLine(label: '项目地点', value: regionLabel),
-                  if (publicProject['areaSqm'] is num)
-                    _DetailLine(label: '项目面积', value: areaLabel),
-                ],
-                actionLabel: actionLabel,
-                actionSummary: stage.cardNextStep,
-                onPressed: () => _openRoute(routeName),
-              ),
+              padding: const EdgeInsets.only(top: 10),
+              child: card,
             );
           }),
       ],
-    );
-  }
-}
-
-String _myProjectStageSectionTitle(_MyProjectStageBucket stage) {
-  return switch (stage) {
-    _MyProjectStageBucket.draft => '草稿列表',
-    _MyProjectStageBucket.archived => '已归档列表',
-    _ => _myProjectStageOption(stage).label,
-  };
-}
-
-class _MyProjectSecondaryStageEntrances extends StatelessWidget {
-  const _MyProjectSecondaryStageEntrances({
-    required this.draftCount,
-    required this.archivedCount,
-    required this.selectedStage,
-    required this.onSelected,
-  });
-
-  final int draftCount;
-  final int archivedCount;
-  final _MyProjectStageBucket selectedStage;
-  final ValueChanged<_MyProjectStageBucket> onSelected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '低频入口',
-          style: Theme.of(
-            context,
-          ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-        ),
-        const SizedBox(height: 10),
-        _MyProjectSecondaryStageTile(
-          label: '草稿',
-          count: draftCount,
-          summary: '未完成项目先收起，需要继续编辑或删除时再进入。',
-          selected: selectedStage == _MyProjectStageBucket.draft,
-          onPressed: () => onSelected(_MyProjectStageBucket.draft),
-        ),
-        const SizedBox(height: 10),
-        _MyProjectSecondaryStageTile(
-          label: '已归档',
-          count: archivedCount,
-          summary: '历史项目只保留查看入口，不开放删除。',
-          selected: selectedStage == _MyProjectStageBucket.archived,
-          onPressed: () => onSelected(_MyProjectStageBucket.archived),
-        ),
-      ],
-    );
-  }
-}
-
-class _MyProjectSecondaryStageTile extends StatelessWidget {
-  const _MyProjectSecondaryStageTile({
-    required this.label,
-    required this.count,
-    required this.summary,
-    required this.selected,
-    required this.onPressed,
-  });
-
-  final String label;
-  final int count;
-  final String summary;
-  final bool selected;
-  final VoidCallback onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    final borderColor = selected
-        ? colorScheme.primary.withValues(alpha: 0.38)
-        : colorScheme.outlineVariant;
-    final backgroundColor = selected
-        ? colorScheme.primaryContainer.withValues(alpha: 0.42)
-        : colorScheme.surface;
-
-    return Semantics(
-      button: true,
-      selected: selected,
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(16),
-          onTap: onPressed,
-          child: DecoratedBox(
-            decoration: BoxDecoration(
-              color: backgroundColor,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: borderColor),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              child: Row(
-                children: <Widget>[
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          '$label · $count 个',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          summary,
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            height: 1.35,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: selected ? colorScheme.primary : colorScheme.outline,
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

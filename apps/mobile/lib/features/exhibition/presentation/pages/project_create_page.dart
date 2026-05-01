@@ -547,6 +547,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       ),
     );
     if (result.isSuccess) {
+      final createdProjectId = _projectIdFromPayload(result.payload);
+      final landingRoute = createdProjectId == null
+          ? ExhibitionRoutes.myProjectListWithStage(
+              workspace: 'published',
+              stage: 'draft',
+            )
+          : ExhibitionRoutes.myProjectDraftboxWithProjectId(createdProjectId);
       ExhibitionConsumerLayer.instance.invalidateMyProjectList();
       await ExhibitionConsumerLayer.instance.loadMyProjectList(
         forceRefresh: true,
@@ -564,7 +571,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           return;
         }
         Navigator.of(context, rootNavigator: true).pushNamedAndRemoveUntil(
-          ExhibitionRoutes.myProjectList,
+          landingRoute,
           (Route<dynamic> route) =>
               route.settings.name == AppBuilding.exhibition.routePath,
         );
@@ -905,14 +912,16 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       title: isEditMode ? '编辑项目' : '创建项目',
       summary: isEditMode
           ? '继续查看当前项目编辑回显，并按当前生命周期选择下一步。'
-          : '先保存项目基本信息，成功后直接跳转到我的项目继续处理。',
+          : '先保存项目基本信息，成功后直接跳转到我的项目草稿箱继续处理。',
       canonicalPath: isEditMode
           ? ExhibitionCanonicalPaths.projectSave
           : ExhibitionCanonicalPaths.projectCreate,
       submitting: _submitting,
       lastResult: _lastResult,
       onSubmitPressed: _submitCreate,
-      submitButtonLabel: '保存项目基本信息并跳转至我的项目',
+      submitButtonLabel: '保存并查看我的项目',
+      submitHintText: isEditMode ? null : '保存后可在“我的项目”继续编辑和进入预发布核对。',
+      bottomPadding: isEditMode ? 28 : 96,
       showSubmitButton: !isEditMode && !_guardLoading && !_accessGuard.blocked,
       showConnectionInfo: false,
       showTechnicalDisclosure: false,
@@ -928,60 +937,69 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               editResult: editResult,
               currentState: editState,
             )
-          : _buildProjectCreateRoundABody(
-              context: context,
-              guardLoading: _guardLoading,
-              accessGuard: _accessGuard,
-              formErrorMessage: _formErrorMessage,
-              selectedProjectTypeLabel: _selectedProjectTypeLabel,
-              selectedStandardizedLocationLabel:
-                  _selectedStandardizedLocationLabel,
-              selectedP0PayTaskType: _p0PayTaskType,
-              showSupplementalSection: false,
-              hasStandardizedLocationSelection:
-                  _selectedStandardizedLocation != null,
-              districtSelectionEnabled:
-                  _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
-              exhibitionNameController: _titleController,
-              brandNameController: _brandNameController,
-              buildingTypeController: _buildingTypeController,
-              buildingTypeRemarkController: _buildingTypeRemarkController,
-              budgetAmountController: _budgetAmountController,
-              areaSqmController: _areaSqmController,
-              provinceNameController: _provinceNameController,
-              cityNameController: _cityNameController,
-              districtNameController: _districtNameController,
-              detailAddressController: _detailAddressController,
-              scopeSummaryController: _scopeSummaryController,
-              plannedStartAtController: _plannedStartAtController,
-              plannedEndAtController: _plannedEndAtController,
-              scheduleDetailController: _scheduleDetailController,
-              descriptionController: _descriptionController,
-              fieldKeys: _fieldKeys,
-              fieldErrors: _fieldErrors,
-              onFieldInteracted: _handleFieldInteracted,
-              onProjectTypePressed: _pickProjectType,
-              onStandardizedLocationPressed: _pickStandardizedLocation,
-              onDistrictPressed: _pickDistrict,
-              onScopeSummaryPressed: _editScopeSummary,
-              onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
-              onPlannedStartDatePressed: () => _pickDate(
-                controller: _plannedStartAtController,
-                fieldId: _ProjectCreateFieldId.plannedStartAt,
+          : <Widget>[
+              const _ProjectPublishProgressCard(
+                currentStep: _ProjectPublishProgressStep.basic,
+                basicInfoOnlyNote: true,
+                useDraftLandingCopy: true,
               ),
-              onPlannedEndDatePressed: () => _pickDate(
-                controller: _plannedEndAtController,
-                fieldId: _ProjectCreateFieldId.plannedEndAt,
+              const SizedBox(height: 16),
+              ..._buildProjectCreateRoundABody(
+                context: context,
+                guardLoading: _guardLoading,
+                accessGuard: _accessGuard,
+                formErrorMessage: _formErrorMessage,
+                selectedProjectTypeLabel: _selectedProjectTypeLabel,
+                selectedStandardizedLocationLabel:
+                    _selectedStandardizedLocationLabel,
+                selectedP0PayTaskType: _p0PayTaskType,
+                showSupplementalSection: false,
+                hasStandardizedLocationSelection:
+                    _selectedStandardizedLocation != null,
+                districtSelectionEnabled:
+                    _selectedStandardizedLocation?.districts.isNotEmpty ??
+                    false,
+                exhibitionNameController: _titleController,
+                brandNameController: _brandNameController,
+                buildingTypeController: _buildingTypeController,
+                buildingTypeRemarkController: _buildingTypeRemarkController,
+                budgetAmountController: _budgetAmountController,
+                areaSqmController: _areaSqmController,
+                provinceNameController: _provinceNameController,
+                cityNameController: _cityNameController,
+                districtNameController: _districtNameController,
+                detailAddressController: _detailAddressController,
+                scopeSummaryController: _scopeSummaryController,
+                plannedStartAtController: _plannedStartAtController,
+                plannedEndAtController: _plannedEndAtController,
+                scheduleDetailController: _scheduleDetailController,
+                descriptionController: _descriptionController,
+                fieldKeys: _fieldKeys,
+                fieldErrors: _fieldErrors,
+                onFieldInteracted: _handleFieldInteracted,
+                onProjectTypePressed: _pickProjectType,
+                onStandardizedLocationPressed: _pickStandardizedLocation,
+                onDistrictPressed: _pickDistrict,
+                onScopeSummaryPressed: _editScopeSummary,
+                onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
+                onPlannedStartDatePressed: () => _pickDate(
+                  controller: _plannedStartAtController,
+                  fieldId: _ProjectCreateFieldId.plannedStartAt,
+                ),
+                onPlannedEndDatePressed: () => _pickDate(
+                  controller: _plannedEndAtController,
+                  fieldId: _ProjectCreateFieldId.plannedEndAt,
+                ),
+                onPlannedStartDateCleared: () => _clearDate(
+                  controller: _plannedStartAtController,
+                  fieldId: _ProjectCreateFieldId.plannedStartAt,
+                ),
+                onPlannedEndDateCleared: () => _clearDate(
+                  controller: _plannedEndAtController,
+                  fieldId: _ProjectCreateFieldId.plannedEndAt,
+                ),
               ),
-              onPlannedStartDateCleared: () => _clearDate(
-                controller: _plannedStartAtController,
-                fieldId: _ProjectCreateFieldId.plannedStartAt,
-              ),
-              onPlannedEndDateCleared: () => _clearDate(
-                controller: _plannedEndAtController,
-                fieldId: _ProjectCreateFieldId.plannedEndAt,
-              ),
-            ),
+            ],
     );
   }
 
@@ -1241,11 +1259,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   }
 
   Future<void> _openP0PayChannelPayload(Object? payload) async {
-    final url = _channelPayloadUrl(payload);
-    if (url == null) {
-      return;
-    }
-    await launchUrlString(url);
+    await _openPaymentChannelPayload(payload);
   }
 
   String? _p0PayTradeTaskBlockerMessage() {
@@ -1498,6 +1512,12 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     final reviewExpanded = _isEditReviewExpanded(currentState);
     final showBottomReturnToPrepublish = currentState == 'submitted';
     return <Widget>[
+      _ProjectPublishProgressCard(
+        currentStep: _projectPublishProgressStepForState(state: currentState),
+        basicInfoOnlyNote: currentState == 'draft',
+        useDraftLandingCopy: currentState == 'draft',
+      ),
+      const SizedBox(height: 16),
       _ActionCard(
         title: '当前生命周期',
         summary: _projectLifecycleSummary(currentState),
@@ -1607,14 +1627,8 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         _ActionCard(
           title: '报价依据资料',
           children: <Widget>[
-            const _DetailLine(
-              label: '当前状态',
-              value: '当前项目尚未进入预发布附件补充阶段。',
-            ),
-            const _DetailLine(
-              label: '当前提示',
-              value: '请仔细核对上面信息，确认进入预发布列表。',
-            ),
+            const _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
+            const _DetailLine(label: '当前提示', value: '请仔细核对上面信息，确认进入预发布列表。'),
             const SizedBox(height: 12),
             SizedBox(
               width: double.infinity,

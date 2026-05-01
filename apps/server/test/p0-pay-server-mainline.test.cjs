@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const { createSign, generateKeyPairSync } = require('node:crypto');
 
 test('P0-Pay migration registers inquiry deposit, callback, contract confirmation and charge truth', () => {
   const { p0PayMigrations } = require('../dist/core/migrations/migrations.js');
@@ -43,7 +44,7 @@ test('P0-Pay migration registers inquiry deposit, callback, contract confirmatio
   assert.doesNotMatch(sql, /guarantee_freezing/);
 });
 
-test('P0-Pay payment channel callback verification is HMAC based and does not require account binding', () => {
+test('P0-Pay payment channel supports controlled HMAC callbacks and Alipay APP Pay RSA2 payload', () => {
   const {
     P0PayPaymentChannelService,
   } = require('../dist/modules/p0_pay/p0-pay-payment-channel.service.js');
@@ -60,13 +61,23 @@ test('P0-Pay payment channel callback verification is HMAC based and does not re
     currency: 'CNY',
   };
   const signature = service.signPayload(payload);
-  assert.deepEqual(service.verifyCallback(payload, signature), {
+  assert.deepEqual(service.verifyCallback(payload, signature, 'other'), {
     verified: true,
     reasonCode: '',
   });
-  assert.equal(service.verifyCallback(payload, 'sha256=bad').verified, false);
+  assert.equal(service.verifyCallback(payload, 'sha256=bad', 'other').verified, false);
 
   const action = service.buildChannelAction({
+    paymentOrderId: 'order-1',
+    merchantOrderNo: 'P0PAY_DEP_1',
+    amount: '200.00',
+    currency: 'CNY',
+    channel: 'other',
+    clientPlatform: 'flutter',
+  });
+  assert.equal(action.channelPayload.accountBindingRequired, false);
+
+  const unavailable = service.buildChannelAction({
     paymentOrderId: 'order-1',
     merchantOrderNo: 'P0PAY_DEP_1',
     amount: '200.00',
@@ -74,7 +85,59 @@ test('P0-Pay payment channel callback verification is HMAC based and does not re
     channel: 'alipay',
     clientPlatform: 'flutter',
   });
-  assert.equal(action.channelPayload.accountBindingRequired, false);
+  assert.equal(unavailable.channelActionType, 'unavailable');
+
+  const { privateKey, publicKey } = generateKeyPairSync('rsa', {
+    modulusLength: 2048,
+    publicKeyEncoding: { type: 'spki', format: 'pem' },
+    privateKeyEncoding: { type: 'pkcs8', format: 'pem' },
+  });
+  process.env.P0_PAY_ALIPAY_APP_PAY_ENABLED = 'true';
+  process.env.P0_PAY_ALIPAY_APP_ID = '2021000000000000';
+  process.env.P0_PAY_ALIPAY_APP_PRIVATE_KEY = privateKey;
+  process.env.P0_PAY_ALIPAY_PUBLIC_KEY = publicKey;
+  process.env.P0_PAY_ALIPAY_NOTIFY_URL = 'https://example.com/server/exhibition/p0-pay/payment-callbacks/alipay';
+
+  const alipayAction = service.buildChannelAction({
+    paymentOrderId: 'order-1',
+    merchantOrderNo: 'P0PAY_DEP_1',
+    amount: '200.00',
+    currency: 'CNY',
+    channel: 'alipay',
+    clientPlatform: 'android',
+  });
+  assert.equal(alipayAction.channelActionType, 'sdk_payload');
+  assert.match(alipayAction.channelPayload.orderString, /method=alipay\.trade\.app\.pay/);
+  assert.match(alipayAction.channelPayload.orderString, /sign=/);
+
+  const alipayCallback = {
+    app_id: '2021000000000000',
+    out_trade_no: 'P0PAY_DEP_1',
+    trade_no: '2026043000000001',
+    notify_id: 'notify-1',
+    notify_type: 'trade_status_sync',
+    trade_status: 'TRADE_SUCCESS',
+    total_amount: '200.00',
+    charset: 'utf-8',
+    sign_type: 'RSA2',
+  };
+  const signContent = Object.keys(alipayCallback)
+    .filter((key) => key !== 'sign' && key !== 'sign_type')
+    .sort()
+    .map((key) => `${key}=${alipayCallback[key]}`)
+    .join('&');
+  const alipaySign = createSign('RSA-SHA256').update(signContent, 'utf8').sign(privateKey, 'base64');
+  assert.deepEqual(service.verifyCallback({ ...alipayCallback, sign: alipaySign }, '', 'alipay'), {
+    verified: true,
+    reasonCode: '',
+  });
+  assert.equal(service.verifyCallback({ ...alipayCallback, sign: 'bad' }, '', 'alipay').verified, false);
+
+  delete process.env.P0_PAY_ALIPAY_APP_PAY_ENABLED;
+  delete process.env.P0_PAY_ALIPAY_APP_ID;
+  delete process.env.P0_PAY_ALIPAY_APP_PRIVATE_KEY;
+  delete process.env.P0_PAY_ALIPAY_PUBLIC_KEY;
+  delete process.env.P0_PAY_ALIPAY_NOTIFY_URL;
 });
 
 test('P0-Pay server exposes BFF-forwarded trade task routes and controlled state actions', () => {
@@ -99,6 +162,11 @@ test('P0-Pay server exposes BFF-forwarded trade task routes and controlled state
     "Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/release-non-winning')",
     "Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/publisher-breach-release')",
     "Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/factory-refusal-breach-hold')",
+    "Post('server/exhibition/trade-tasks/:taskId/inquiry-deposit/orders/:depositOrderId/refund-init')",
+    "Get('server/exhibition/trade-tasks/:taskId/inquiry-deposit/orders/:depositOrderId/refund')",
+    "Get('server/project/:projectId/settlement/summary')",
+    "Post('server/project/:projectId/settlement/batch-draft')",
+    "Get('server/project/:projectId/settlement/reconciliation')",
   ].forEach((route) => assert.match(controller, new RegExp(escapeRegExp(route))));
 
   assert.match(stateActions, /releaseNonWinningAuthorizations/);
@@ -147,8 +215,8 @@ test('P0-Pay payment callbacks preserve locked authorization fee snapshot across
 
   async function runCallbackScenario({ eventStatus, eventType, duplicate = false }) {
     const originalSnapshot = {
-      feeRate: '0.025000',
-      feeRateLabel: '标准会员 2.5%',
+      feeRate: '0.030000',
+      feeRateLabel: '标准会员 9折（作用于 baseFeeAmount）',
       feeRateSource: 'paid_membership_tier',
       membershipTierSnapshot: 'standard',
       feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
@@ -298,6 +366,72 @@ test('P0-Pay payment callbacks preserve locked authorization fee snapshot across
   assert.equal(failure.response.applyStatus, 'applied');
 });
 
+test('P0-Pay callback signature rejection records event without applying money state', async () => {
+  const {
+    P0PayCallbackService,
+  } = require('../dist/modules/p0_pay/p0-pay-callback.service.js');
+
+  let paymentOrderTouched = false;
+  const savedCallbacks = [];
+  const manager = {
+    getRepository(entity) {
+      if (entity?.name === 'PaymentCallbackEventEntity') {
+        return {
+          async save(value) {
+            savedCallbacks.push({ ...value });
+            return value;
+          },
+        };
+      }
+      if (entity?.name === 'PaymentOrderEntity') {
+        paymentOrderTouched = true;
+      }
+      return {
+        async findOneBy() { return null; },
+        async save(value) { return value; },
+      };
+    },
+  };
+  const service = new P0PayCallbackService(
+    {
+      async findOneBy() { return null; },
+      create(value) { return value; },
+    },
+    {
+      async transaction(callback) {
+        return callback(manager);
+      },
+    },
+    {
+      verifyCallback() { return { verified: false, reasonCode: 'callback_signature_invalid' }; },
+      hashPayload() { return 'payload-hash'; },
+    },
+    { async record() { return undefined; } },
+  );
+
+  const response = await service.handleCallback(
+    'alipay',
+    {
+      merchantOrderNo: 'P0PAY_DEP_REJECTED',
+      channelOrderId: 'channel-rejected',
+      providerEventId: 'provider-rejected',
+      channelEventId: 'event-rejected',
+      eventType: 'payment_succeeded',
+      eventStatus: 'succeeded',
+      amount: '200.00',
+      currency: 'CNY',
+    },
+    'sha256=bad',
+    { requestId: 'req-1', traceId: 'trace-1' },
+  );
+
+  assert.equal(response.verificationStatus, 'rejected');
+  assert.equal(response.applyStatus, 'not_applied');
+  assert.equal(response.rejectedReasonCode, 'callback_signature_invalid');
+  assert.equal(paymentOrderTouched, false);
+  assert.ok(savedCallbacks.some((item) => item.verificationStatus === 'rejected'));
+});
+
 test('P0-Pay project sincerity callback pays pricing object without auto-publishing project', async () => {
   const {
     P0PayCallbackService,
@@ -399,16 +533,207 @@ test('P0-Pay project sincerity callback pays pricing object without auto-publish
   assert.ok(auditRecords.some((item) => item.action === 'project_authenticity_sincerity_paid'));
 });
 
+test('P0-Pay project sincerity refund callback handles success, duplicate and failure without extra money mutation', async () => {
+  const {
+    P0PayCallbackService,
+  } = require('../dist/modules/p0_pay/p0-pay-callback.service.js');
+
+  async function runRefundCallbackScenario({ eventStatus, eventType, duplicate = false }) {
+    const deposit = {
+      id: 'sincerity-refund-1',
+      taskId: 'project-1',
+      amount: '200.00',
+      status: 'refund_pending',
+      paidAt: new Date('2026-06-01T08:00:00.000Z'),
+      refundedAt: null,
+    };
+    const refundOrder = {
+      id: 'refund-order-1',
+      businessType: 'project_authenticity_sincerity_refund',
+      businessId: deposit.id,
+      merchantOrderNo: 'P0PAY_REF_1',
+      paymentChannel: 'alipay',
+      orderRole: 'refund',
+      amount: '200.00',
+      status: 'refund_pending',
+      channelOrderId: null,
+    };
+    const savedTransactions = [];
+    const auditRecords = [];
+    let transactionCalled = false;
+    let depositUpdateCalled = false;
+
+    const manager = {
+      getRepository(entity) {
+        if (entity?.name === 'PaymentCallbackEventEntity') {
+          return { async save(value) { return value; } };
+        }
+        if (entity?.name === 'PaymentOrderEntity') {
+          return {
+            async findOneBy() { return refundOrder; },
+            async save(value) { return value; },
+          };
+        }
+        if (entity?.name === 'PaymentTransactionEntity') {
+          return {
+            async save(value) { savedTransactions.push({ ...value }); return value; },
+          };
+        }
+        if (entity?.name === 'InquiryQuoteDepositEntity') {
+          return {
+            async findOneBy() { return deposit; },
+            async save(value) { return value; },
+            async update(where, patch) {
+              depositUpdateCalled = true;
+              if (where.id === deposit.id && where.status === deposit.status) {
+                Object.assign(deposit, patch);
+              }
+            },
+          };
+        }
+        return {
+          async findOneBy() { return null; },
+          async save(value) { return value; },
+          async update() { return undefined; },
+        };
+      },
+    };
+
+    const service = new P0PayCallbackService(
+      {
+        async findOneBy() {
+          return duplicate
+            ? {
+                id: 'callback-duplicate',
+                verificationStatus: 'verified',
+                applyStatus: 'applied',
+                rejectedReasonCode: '',
+                receivedAt: new Date('2026-06-01T10:00:00.000Z'),
+                processedAt: new Date('2026-06-01T10:00:01.000Z'),
+              }
+            : null;
+        },
+        create(value) { return value; },
+      },
+      {
+        async transaction(callback) {
+          transactionCalled = true;
+          return callback(manager);
+        },
+      },
+      {
+        verifyCallback() { return { verified: true, reasonCode: '' }; },
+        hashPayload() { return 'payload-hash'; },
+      },
+      { async record(input) { auditRecords.push(input); } },
+    );
+
+    const response = await service.handleCallback(
+      'alipay',
+      {
+        merchantOrderNo: refundOrder.merchantOrderNo,
+        channelOrderId: 'channel-refund-1',
+        providerEventId: `provider-refund-${eventStatus}`,
+        channelEventId: `event-refund-${eventStatus}`,
+        eventType,
+        eventStatus,
+        amount: refundOrder.amount,
+        currency: 'CNY',
+      },
+      'sha256=test',
+      { requestId: 'req-1', traceId: 'trace-1' },
+    );
+
+    return {
+      deposit,
+      refundOrder,
+      response,
+      savedTransactions,
+      auditRecords,
+      transactionCalled,
+      depositUpdateCalled,
+    };
+  }
+
+  const success = await runRefundCallbackScenario({
+    eventStatus: 'succeeded',
+    eventType: 'refund_succeeded',
+  });
+  assert.equal(success.response.applyStatus, 'applied');
+  assert.equal(success.refundOrder.status, 'refunded');
+  assert.equal(success.deposit.status, 'refunded');
+  assert.ok(success.deposit.refundedAt instanceof Date);
+  assert.equal(success.savedTransactions.length, 1);
+  assert.equal(success.savedTransactions[0].transactionType, 'refund');
+  assert.equal(success.savedTransactions[0].confirmedAmount, '200.00');
+  assert.ok(success.auditRecords.some((item) => item.action === 'project_authenticity_sincerity_refunded'));
+
+  const duplicate = await runRefundCallbackScenario({
+    eventStatus: 'succeeded',
+    eventType: 'refund_succeeded',
+    duplicate: true,
+  });
+  assert.equal(duplicate.response.duplicate, true);
+  assert.equal(duplicate.response.applyStatus, 'duplicate');
+  assert.equal(duplicate.transactionCalled, false);
+  assert.equal(duplicate.savedTransactions.length, 0);
+  assert.equal(duplicate.deposit.status, 'refund_pending');
+
+  const failure = await runRefundCallbackScenario({
+    eventStatus: 'failed',
+    eventType: 'refund_failed',
+  });
+  assert.equal(failure.response.applyStatus, 'applied');
+  assert.equal(failure.refundOrder.status, 'failed');
+  assert.equal(failure.deposit.status, 'paid');
+  assert.equal(failure.depositUpdateCalled, true);
+  assert.equal(failure.savedTransactions.length, 1);
+  assert.equal(failure.savedTransactions[0].transactionType, 'refund');
+  assert.equal(failure.savedTransactions[0].status, 'failed');
+});
+
 test('P0-Pay contract confirmation charges from tiered fee, discount and cap instead of quote fee rate', async () => {
   const {
     P0PayContractConfirmationService,
   } = require('../dist/modules/p0_pay/p0-pay-contract-confirmation.service.js');
 
   const scenarios = [
-    { tier: 'standard', feeRate: '0.025000', label: '标准会员 2.5%', expected: '1350.00', discount: '0.9000', cap: '3600.00' },
-    { tier: 'professional', feeRate: '0.020000', label: '专业会员 2.0%', expected: '1200.00', discount: '0.8000', cap: '3200.00' },
-    { tier: 'ka', feeRate: '0.015000', label: 'KA 会员 1.5%', expected: '1500.00', discount: '1.0000', cap: '4000.00' },
-    { tier: 'flagship', feeRate: '0.015000', label: '旗舰会员 1.5%', expected: '1500.00', discount: '1.0000', cap: '4000.00' },
+    {
+      tier: 'none',
+      feeRate: '0.030000',
+      label: '基础平台定价规则',
+      expected: '1500.00',
+      discount: '1.0000',
+      cap: '4000.00',
+      source: 'fixed_default',
+    },
+    {
+      tier: 'free_certified',
+      feeRate: '0.030000',
+      label: '免费认证版无会员折扣',
+      expected: '1500.00',
+      discount: '1.0000',
+      cap: '4000.00',
+      source: 'fixed_default',
+    },
+    {
+      tier: 'standard',
+      feeRate: '0.030000',
+      label: '标准会员 9折（作用于 baseFeeAmount）',
+      expected: '1350.00',
+      discount: '0.9000',
+      cap: '3600.00',
+      source: 'paid_membership_tier',
+    },
+    {
+      tier: 'professional',
+      feeRate: '0.030000',
+      label: '专业会员 8折（作用于 baseFeeAmount）',
+      expected: '1200.00',
+      discount: '0.8000',
+      cap: '3200.00',
+      source: 'paid_membership_tier',
+    },
   ];
 
   for (const scenario of scenarios) {
@@ -465,7 +790,7 @@ test('P0-Pay contract confirmation charges from tiered fee, discount and cap ins
       authorizationQuotaAmount: '4000.00',
       feeRate: scenario.feeRate,
       feeRateLabel: scenario.label,
-      feeRateSource: 'paid_membership_tier',
+      feeRateSource: scenario.source,
       membershipTierSnapshot: scenario.tier,
       feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
       feeRateSnapshotHash: `snapshot-hash-${scenario.tier}`,
@@ -497,11 +822,138 @@ test('P0-Pay contract confirmation charges from tiered fee, discount and cap ins
     assert.equal(charge.finalFeeAmount, scenario.expected);
     assert.equal(charge.releasedRemainderAmount, (4000 - Number(scenario.expected)).toFixed(2));
     assert.equal(charge.feeRateLabel, scenario.label);
-    assert.equal(charge.feeRateSource, 'paid_membership_tier');
+    assert.equal(charge.feeRateSource, scenario.source);
     assert.equal(charge.membershipTierSnapshot, scenario.tier);
     assert.equal(charge.feeRateSnapshotHash, `snapshot-hash-${scenario.tier}`);
     assert.equal(savedCharges.length, 1);
   }
+});
+
+test('P0-Pay contract final charge returns existing charge idempotently', async () => {
+  const {
+    P0PayContractConfirmationService,
+  } = require('../dist/modules/p0_pay/p0-pay-contract-confirmation.service.js');
+
+  const existingCharge = {
+    id: 'charge-existing',
+    contractConfirmationId: 'contract-1',
+    chargeStatus: 'charged',
+    finalFeeAmount: '1200.00',
+  };
+  const service = new P0PayContractConfirmationService(
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+      calculateDealServiceFee() {
+        throw new Error('fee policy must not run for existing charge');
+      },
+    },
+  );
+  service.createChargePaymentOrder = async () => {
+    throw new Error('payment order must not be created twice');
+  };
+
+  const manager = {
+    getRepository(entity) {
+      if (entity?.name === 'PlatformServiceFeeChargeEntity') {
+        return {
+          async findOneBy() { return existingCharge; },
+          async save(value) { return value; },
+        };
+      }
+      return { async save(value) { return value; } };
+    },
+  };
+
+  const charge = await service.ensureCharge(
+    manager,
+    {
+      id: 'contract-1',
+      taskId: 'task-1',
+      finalConfirmedAmount: '60000.00',
+      contractStatus: 'confirmed_deal',
+    },
+    {
+      authorization: { id: 'auth-1', paymentChannel: 'alipay' },
+      bid: { id: 'bid-1', bidderOrganizationId: 'factory-1' },
+      project: { projectNo: 'EXH-1' },
+      scope: { membership: { roleKey: 'factory' } },
+      currentSession: { userId: 'user-1' },
+    },
+    { requestId: 'req-1', traceId: 'trace-1' },
+  );
+
+  assert.equal(charge, existingCharge);
+});
+
+test('P0-Pay contract final charge fail-closes without locked payment channel', async () => {
+  const {
+    P0PayContractConfirmationService,
+  } = require('../dist/modules/p0_pay/p0-pay-contract-confirmation.service.js');
+
+  const service = new P0PayContractConfirmationService(
+    null,
+    null,
+    { create: (value) => value },
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    null,
+    {
+      calculateDealServiceFee() {
+        throw new Error('fee policy must not run when payment channel is missing');
+      },
+    },
+  );
+  const manager = {
+    getRepository(entity) {
+      if (entity?.name === 'PlatformServiceFeeChargeEntity') {
+        return {
+          async findOneBy() { return null; },
+          async save(value) { return value; },
+        };
+      }
+      return { async save(value) { return value; } };
+    },
+  };
+
+  await assert.rejects(
+    () => service.ensureCharge(
+      manager,
+      {
+        id: 'contract-1',
+        taskId: 'task-1',
+        finalConfirmedAmount: '60000.00',
+        contractStatus: 'confirmed_deal',
+      },
+      {
+        authorization: { id: 'auth-1', paymentChannel: null },
+        bid: { id: 'bid-1', bidderOrganizationId: 'factory-1' },
+        project: { projectNo: 'EXH-1' },
+        scope: { membership: { roleKey: 'factory' } },
+        currentSession: { userId: 'user-1' },
+      },
+      { requestId: 'req-1', traceId: 'trace-1' },
+    ),
+    /no payment channel/,
+  );
 });
 
 test('message interaction bid-thread projection carries only read-only pricing summary', () => {

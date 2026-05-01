@@ -50,6 +50,7 @@ const p0PayPostRoutes = [
 const projectPricingPostRoutes = [
   '/api/app/project/project-1/authenticity-sincerity/orders',
   '/api/app/project/project-1/authenticity-sincerity/orders/order-1/pay-init',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund-init',
   '/api/app/project/project-1/bid-service-fee-authorizations',
   '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/freeze-init',
   '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/release',
@@ -66,8 +67,11 @@ const p0PayGetRoutes = [
 const projectPricingGetRoutes = [
   '/api/app/project/project-1/pricing-summary',
   '/api/app/project/project-1/authenticity-sincerity/orders/order-1',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund',
   '/api/app/project/project-1/bid-service-fee-authorizations/auth-1',
   '/api/app/project/project-1/deal-confirmations/deal-1',
+  '/api/app/project/project-1/settlement/summary',
+  '/api/app/project/project-1/settlement/reconciliation',
 ];
 
 function createAxiosResponseError(status, data, message = `Request failed with status code ${status}`) {
@@ -200,6 +204,20 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
         orderStatus: 'paid',
       };
     },
+    initProjectAuthenticitySincerityRefund(projectId, orderId) {
+      calls.push(['sincerityRefund', projectId, orderId]);
+      return {
+        orderId,
+        refundStatus: 'refund_pending',
+      };
+    },
+    getProjectAuthenticitySincerityRefund(projectId, orderId) {
+      calls.push(['sincerityRefundStatus', projectId, orderId]);
+      return {
+        orderId,
+        refundStatus: 'refund_pending',
+      };
+    },
     createBidServiceFeeAuthorization(projectId) {
       calls.push(['bidAuthCreate', projectId]);
       return { authorizationId: 'auth-1' };
@@ -223,6 +241,18 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     getDealConfirmation(projectId, dealConfirmationId) {
       calls.push(['dealDetail', projectId, dealConfirmationId]);
       return { dealConfirmationId, dealStatus: 'confirmed_deal' };
+    },
+    getProjectSettlementSummary(projectId) {
+      calls.push(['settlementSummary', projectId]);
+      return { projectId, settlementSummary: { settlementStatus: 'draft' } };
+    },
+    createProjectSettlementBatchDraft(projectId) {
+      calls.push(['settlementBatchDraft', projectId]);
+      return { projectId, batchDraft: { status: 'draft' } };
+    },
+    getProjectSettlementReconciliation(projectId) {
+      calls.push(['settlementReconciliation', projectId]);
+      return { projectId, reconciliationSummary: { status: 'balanced' } };
     },
     releaseNonWinning(taskId) {
       calls.push(['releaseNonWinning', taskId]);
@@ -291,6 +321,13 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     assert.equal(sincerityResponse.status, 200);
     assert.equal((await sincerityResponse.json()).orderStatus, 'paid');
 
+    const refundResponse = await fetch(
+      `${url}/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund-init`,
+      { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
+    );
+    assert.equal(refundResponse.status, 202);
+    assert.equal((await refundResponse.json()).refundStatus, 'refund_pending');
+
     const bidAuthorizationResponse = await fetch(
       `${url}/api/app/project/project-1/bid-service-fee-authorizations`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
@@ -303,6 +340,19 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     );
     assert.equal(dealResponse.status, 200);
     assert.equal((await dealResponse.json()).dealStatus, 'confirmed_deal');
+
+    const settlementResponse = await fetch(
+      `${url}/api/app/project/project-1/settlement/summary`,
+    );
+    assert.equal(settlementResponse.status, 200);
+    assert.equal((await settlementResponse.json()).settlementSummary.settlementStatus, 'draft');
+
+    const batchDraftResponse = await fetch(
+      `${url}/api/app/project/project-1/settlement/batch-draft`,
+      { method: 'POST' },
+    );
+    assert.equal(batchDraftResponse.status, 202);
+    assert.equal((await batchDraftResponse.json()).batchDraft.status, 'draft');
 
     const releaseResponse = await fetch(
       `${url}/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/release-non-winning`,
@@ -319,8 +369,11 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     ['authInit', 'task-1', 'bid-1', 'auth-1'],
     ['pricingSummary', 'project-1'],
     ['sincerityStatus', 'project-1', 'order-1'],
+    ['sincerityRefund', 'project-1', 'order-1'],
     ['bidAuthCreate', 'project-1'],
     ['dealDetail', 'project-1', 'deal-1'],
+    ['settlementSummary', 'project-1'],
+    ['settlementBatchDraft', 'project-1'],
     ['releaseNonWinning', 'task-1'],
   ]);
 });
@@ -336,7 +389,7 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
       );
       assert.deepEqual(body, {
         expectedQuotedAmount: '80000',
-        expectedFeeRate: '0.025',
+        expectedFeeRate: '0.030',
         expectedAuthorizationAmount: '4000',
         currency: 'CNY',
         idempotencyKey: 'idem-auth',
@@ -347,10 +400,14 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
           authorizationId: 'auth-1',
           status: 'pending_authorization',
           quotedAmount: '80000.00',
-          feeRate: '0.025000',
-          feeRateLabel: '标准会员 2.5%',
+          feeRate: '0.030000',
+          feeRateLabel: '标准会员 9折（作用于 baseFeeAmount）',
           feeRateSource: 'paid_membership_tier',
           membershipTierSnapshot: 'standard',
+          baseFeeAmount: '1350.00',
+          membershipDiscountRate: '0.9000',
+          capAmount: '3600.00',
+          estimatedFeeAmount: '1215.00',
           feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
           feeRateSnapshotHash: 'snapshot-hash',
           feeCalculatedAt: '2026-05-10T09:59:00.000Z',
@@ -370,7 +427,7 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
     'bid-1',
     {
       expectedQuotedAmount: 80000,
-      expectedFeeRate: '0.025',
+      expectedFeeRate: '0.030',
       expectedAuthorizationAmount: '4000',
       currency: 'CNY',
       idempotencyKey: 'idem-auth',
@@ -384,10 +441,15 @@ test('P0-Pay service forwards Server paths, trims command payload, and keeps ide
     authorizationId: 'auth-1',
     authorizationStatus: 'pending_authorization',
     quotedAmount: '80000.00',
-    feeRate: '0.025000',
-    feeRateLabel: '标准会员 2.5%',
+    estimatedFeeAmount: '1215.00',
+    feeRate: '0.030000',
+    feeRateLabel: '标准会员 9折（作用于 baseFeeAmount）',
     feeRateSource: 'paid_membership_tier',
     membershipTierSnapshot: 'standard',
+    baseFeeAmount: '1350.00',
+    membershipDiscountRate: '0.9000',
+    capAmount: '3600.00',
+    finalFeeAmount: undefined,
     feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
     feeRateSnapshotHash: 'snapshot-hash',
     feeCalculatedAt: '2026-05-10T09:59:00.000Z',
@@ -413,10 +475,13 @@ test('P0-Pay BFF read model projects Server fee snapshots without calculating fe
         platformServiceFeeStatus: 'charged',
         platformServiceFeeCharge: {
           finalConfirmedAmount: '90000.00',
-          feeRate: '0.025000',
-          feeRateLabel: '标准会员 2.5%',
+          feeRate: '0.030000',
+          feeRateLabel: '标准会员 9折（作用于 baseFeeAmount）',
           feeRateSource: 'paid_membership_tier',
           membershipTierSnapshot: 'standard',
+          baseFeeAmount: '2500.00',
+          membershipDiscountRate: '0.9000',
+          capAmount: '3600.00',
           feeRateRuleVersion: 'p0_pay_membership_service_fee_v1',
           feeRateSnapshotHash: 'snapshot-hash',
           feeCalculatedAt: '2026-05-10T09:59:00.000Z',
@@ -445,7 +510,8 @@ test('P0-Pay BFF read model projects Server fee snapshots without calculating fe
     {},
   );
 
-  assert.equal(result.platformServiceFeeCharge.feeRate, '0.025000');
+  assert.equal(result.platformServiceFeeCharge.feeRate, '0.030000');
+  assert.equal(result.platformServiceFeeCharge.membershipDiscountRate, '0.9000');
   assert.equal(result.platformServiceFeeCharge.membershipTierSnapshot, 'standard');
   assert.equal(result.serverInternalFeeDebug, undefined);
 });
@@ -561,8 +627,11 @@ test('pricing summary is read-only and no longer exposes old P0-Pay authority sh
         projectId: 'task-1',
         pricingRuleVersion: 'platform_pricing_rules_master_v1',
         projectAuthenticitySincerity: {
+          orderId: 'sincerity-task-1',
           status: 'paid',
           amount: '200.00',
+          currency: 'CNY',
+          channelCandidates: ['alipay_candidate'],
         },
         bidServiceFeeAuthorization: {
           status: 'frozen',
@@ -593,6 +662,10 @@ test('pricing summary is read-only and no longer exposes old P0-Pay authority sh
       authenticitySincerityRequired: true,
       authenticitySincerityAmount: '200.00',
       authenticitySincerityStatus: 'paid',
+      authenticitySincerityOrderId: 'sincerity-task-1',
+      authenticitySincerityCurrency: 'CNY',
+      authenticitySincerityChannelCandidates: ['alipay_candidate'],
+      authenticitySincerityExpiresAt: null,
       publishGateStatus: 'satisfied',
       formalResultProcessingRequired: true,
       nextAction: {
@@ -678,6 +751,32 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
           updatedAt: '2026-06-01T10:02:00.000Z',
         };
       }
+      if (pathName.endsWith('/refund-init')) {
+        assert.deepEqual(body, {
+          refundReasonCode: 'publisher_cancelled',
+          refundReasonText: '发布方取消项目。',
+          idempotencyKey: 'idem-refund',
+        });
+        return {
+          orderId: 'sincerity-1',
+          refundOrderId: 'refund-1',
+          refundStatus: 'refund_pending',
+          amount: '200.00',
+          currency: 'CNY',
+          updatedAt: '2026-06-01T10:02:30.000Z',
+        };
+      }
+      if (pathName.endsWith('/settlement/batch-draft')) {
+        return {
+          projectId: 'project-1',
+          settlementSummary: {
+            settlementStatus: 'draft',
+            platformIncomeAmount: '675.00',
+          },
+          batchDraft: { status: 'draft', autoPayoutEnabled: false },
+          updatedAt: '2026-06-01T10:05:00.000Z',
+        };
+      }
       if (pathName.endsWith('/deal-confirmations')) {
         return {
           dealConfirmationId: 'deal-1',
@@ -706,6 +805,38 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
           chargeStatus: 'not_charged',
           releaseStatus: 'not_released',
           updatedAt: '2026-06-01T10:04:00.000Z',
+        };
+      }
+      if (pathName.endsWith('/inquiry-deposit/orders/sincerity-1/refund')) {
+        return {
+          orderId: 'sincerity-1',
+          refundStatus: 'refund_pending',
+          amount: '200.00',
+          currency: 'CNY',
+          updatedAt: '2026-06-01T10:04:30.000Z',
+        };
+      }
+      if (pathName.endsWith('/settlement/summary')) {
+        return {
+          projectId: 'project-1',
+          settlementSummary: {
+            settlementStatus: 'draft',
+            platformIncomeAmount: '675.00',
+            pendingSettlementAmount: '675.00',
+            autoPayoutEnabled: false,
+          },
+          charges: [],
+          updatedAt: '2026-06-01T10:06:00.000Z',
+        };
+      }
+      if (pathName.endsWith('/settlement/reconciliation')) {
+        return {
+          projectId: 'project-1',
+          reconciliationSummary: {
+            status: 'balanced',
+            differenceAmount: '0.00',
+          },
+          updatedAt: '2026-06-01T10:07:00.000Z',
         };
       }
       return {
@@ -753,6 +884,21 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
     },
     {},
   );
+  const refund = await service.initProjectAuthenticitySincerityRefund(
+    'project-1',
+    'sincerity-1',
+    {
+      refundReasonCode: 'publisher_cancelled',
+      refundReasonText: '发布方取消项目。',
+      idempotencyKey: 'idem-refund',
+    },
+    {},
+  );
+  const refundStatus = await service.getProjectAuthenticitySincerityRefund(
+    'project-1',
+    'sincerity-1',
+    {},
+  );
   const deal = await service.createDealConfirmation(
     'project-1',
     {
@@ -766,20 +912,33 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
     {},
   );
   const detail = await service.getDealConfirmation('project-1', 'deal-1', {});
+  const settlement = await service.getProjectSettlementSummary('project-1', {});
+  const settlementDraft = await service.createProjectSettlementBatchDraft('project-1', {});
+  const reconciliation = await service.getProjectSettlementReconciliation('project-1', {});
 
   assert.equal(created.authorizationQuotaAmount, '4000.00');
   assert.equal(freeze.freezeInitStatus, 'pending_user_confirm');
   assert.equal(status.authorizationStatus, 'frozen');
   assert.equal(released.bidSubmissionEligible, false);
+  assert.equal(refund.refundStatus, 'refund_pending');
+  assert.equal(refundStatus.refundStatus, 'refund_pending');
   assert.equal(deal.platformServiceFeeCalculation.finalFeeAmount, '675.00');
   assert.equal(detail.publisherAuthenticitySincerityStatus, 'refunded');
+  assert.equal(settlement.settlementSummary.platformIncomeAmount, '675.00');
+  assert.equal(settlementDraft.batchDraft.status, 'draft');
+  assert.equal(reconciliation.reconciliationSummary.status, 'balanced');
   assert.deepEqual(calls.map((item) => [item.method, item.pathName]), [
     ['POST', '/server/projects/project-1/bid-service-fee-authorizations'],
     ['POST', '/server/projects/project-1/bid-service-fee-authorizations/auth-1/freeze-init'],
     ['GET', '/server/projects/project-1/bid-service-fee-authorizations/auth-1'],
     ['POST', '/server/projects/project-1/bid-service-fee-authorizations/auth-1/release'],
+    ['POST', '/server/exhibition/trade-tasks/project-1/inquiry-deposit/orders/sincerity-1/refund-init'],
+    ['GET', '/server/exhibition/trade-tasks/project-1/inquiry-deposit/orders/sincerity-1/refund'],
     ['POST', '/server/projects/project-1/deal-confirmations'],
     ['GET', '/server/projects/project-1/deal-confirmations/deal-1'],
+    ['GET', '/server/project/project-1/settlement/summary'],
+    ['POST', '/server/project/project-1/settlement/batch-draft'],
+    ['GET', '/server/project/project-1/settlement/reconciliation'],
   ]);
 });
 

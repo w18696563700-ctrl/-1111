@@ -26,6 +26,7 @@ export class ShellPresenter {
     paidMembershipEntitlementsSummary: string[];
     paidMembershipQuotaSummary: string[];
     paidMembershipNextRefreshAt: Date | null;
+    messagesUnreadCount?: number;
     myBuildingProjection: {
       profileCorridorKey: string;
       profileEntryOrderBucket: string;
@@ -100,7 +101,9 @@ export class ShellPresenter {
       paidMembershipNextRefreshAt: input.paidMembershipNextRefreshAt?.toISOString() ?? null,
       visibleBuildings: SHELL_VISIBLE_BUILDINGS,
       featureFlagsVersion: SHELL_FEATURE_FLAGS_VERSION,
-      unreadSummary: {},
+      unreadSummary: {
+        messages: Math.max(0, Math.floor(input.messagesUnreadCount ?? 0))
+      },
       myBuildingProjection: {
         profileCorridorKey: input.myBuildingProjection.profileCorridorKey,
         profileEntryOrderBucket: input.myBuildingProjection.profileEntryOrderBucket,

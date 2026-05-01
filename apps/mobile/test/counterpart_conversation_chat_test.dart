@@ -105,7 +105,7 @@ Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _enterFirstProjectCommunication(WidgetTester tester) async {
-  final entry = find.widgetWithText(FilledButton, '进入此项目竞标沟通').first;
+  final entry = find.widgetWithText(FilledButton, '进入沟通').first;
   await _ensureVisible(tester, entry);
   await tester.tap(entry);
   await tester.pumpAndSettle();
@@ -253,7 +253,11 @@ Map<String, Object?> _detailPayload({
         'titleVisibility': 'masked',
         'projectRelation': 'my_published',
         'projectState': projectState,
+        'projectPublishedAt': '2026-05-01T18:00:00',
+        'projectUpdatedAt': '2026-05-04T17:00:00',
         'latestActivityAt': '2026-05-04T10:00:00Z',
+        'projectUnreadCount': 1,
+        'hasProjectUnread': true,
         'orderSummary': orderSummary,
         'ratingEntry': ratingEntry,
         'cards': <Object?>[
@@ -264,6 +268,8 @@ Map<String, Object?> _detailPayload({
             'summary': '当前申请组织申请参与当前项目竞标。',
             'status': 'pending',
             'updatedAt': '2026-05-04T10:00:00Z',
+            'requesterCompanyName': '重庆坤特展览展示有限公司',
+            'requesterOrganizationId': 'org-counterpart',
             'truthAnchor': const <String, Object?>{
               'truthType': 'bid_participation_request',
               'projectId': 'project-1',
@@ -355,8 +361,15 @@ Map<String, Object?> _twoProjectDetailPayload() {
       'projectId': projectId,
       'projectDisplayTitle': title,
       'titleVisibility': 'visible',
+      'projectRelation': 'my_published',
       'projectState': 'published',
+      'projectPublishedAt': projectId == 'project-luzhou'
+          ? '2026-05-01T18:00:00'
+          : '2026-05-02T18:00:00',
+      'projectUpdatedAt': latestActivityAt,
       'latestActivityAt': latestActivityAt,
+      'projectUnreadCount': projectId == 'project-luzhou' ? 2 : 0,
+      'hasProjectUnread': projectId == 'project-luzhou',
       'orderSummary': null,
       'ratingEntry': null,
       'cards': <Object?>[
@@ -367,6 +380,8 @@ Map<String, Object?> _twoProjectDetailPayload() {
           'summary': '当前申请组织申请参与当前项目竞标。',
           'status': 'pending',
           'updatedAt': latestActivityAt,
+          'requesterCompanyName': '重庆坤特展览展示有限公司',
+          'requesterOrganizationId': 'org-counterpart',
           'truthAnchor': <String, Object?>{
             'truthType': 'bid_participation_request',
             'projectId': projectId,
@@ -471,6 +486,8 @@ Map<String, Object?> _messagePayload({
   String? clientMessageId,
   String threadId = 'project-thread-1',
   String projectId = 'project-1',
+  String messageKind = 'text',
+  Map<String, Object?>? payload,
 }) {
   return <String, Object?>{
     'messageId': messageId,
@@ -479,8 +496,9 @@ Map<String, Object?> _messagePayload({
     'senderUserId': 'user-1',
     'senderActorId': 'actor-1',
     'senderOrganizationId': 'org-owner',
-    'messageKind': 'text',
+    'messageKind': messageKind,
     'body': body,
+    'payload': ?payload,
     'clientMessageId': clientMessageId,
     'messageState': 'active',
     'createdAt': '2026-05-04T10:02:00Z',
@@ -1142,25 +1160,28 @@ void main() {
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
 
-      expect(find.text('项目沟通'), findsOneWidget);
+      expect(find.text('当前沟通对象'), findsOneWidget);
       expect(find.text('江北嘴嘴帅'), findsOneWidget);
       expect(find.text('重庆涪川展览工厂'), findsOneWidget);
       expect(find.text('昵称'), findsNothing);
       expect(find.text('对方主体'), findsNothing);
       expect(find.text('1 个项目'), findsNothing);
       expect(find.text('项目列表'), findsOneWidget);
-      expect(find.text('进入此项目竞标沟通'), findsOneWidget);
+      expect(find.text('发布时间：2026-05-01 18:00'), findsOneWidget);
+      expect(find.text('未读 1'), findsOneWidget);
+      expect(find.text('进入沟通'), findsOneWidget);
       expect(find.text('查看申请'), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
 
       await _enterFirstProjectCommunication(tester);
-      expect(find.text('竞标沟通'), findsOneWidget);
-      expect(find.text('参与竞标申请 / 审核'), findsOneWidget);
+      expect(find.text('当前项目沟通'), findsOneWidget);
+      expect(find.text('重庆坤特展览展示有限公司申请查看该项目详情并参与竞标'), findsOneWidget);
+      expect(find.text('进入审核'), findsOneWidget);
       expect(find.text('订单状态'), findsOneWidget);
       expect(find.text('项目相册'), findsOneWidget);
-      expect(find.text('想跟TA说点什么...'), findsOneWidget);
+      expect(find.text('围绕当前项目说点什么...'), findsOneWidget);
 
-      await tester.tap(find.byType(CircleAvatar).first);
+      await tester.tap(find.text('江北嘴嘴帅').last);
       await tester.pumpAndSettle();
 
       expect(find.text('对方主体'), findsOneWidget);
@@ -1194,6 +1215,7 @@ void main() {
       expect(find.text('项目列表'), findsOneWidget);
       expect(find.text('已转订单'), findsOneWidget);
       expect(find.text('2 项业务'), findsOneWidget);
+      expect(find.text('发布时间：2026-05-01 18:00'), findsOneWidget);
       expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
       final maskedTitle = tester.widget<Text>(find.text('项目名称需申请查看').first);
       expect(maskedTitle.style?.color, const Color(0xFF1F7A3A));
@@ -1298,6 +1320,9 @@ void main() {
       expect(find.text('西洽会 - 泸州'), findsOneWidget);
       expect(find.text('西洽会 - 成都'), findsOneWidget);
       expect(find.text('进入后可继续项目聊天、订单入口和项目相册。'), findsNWidgets(2));
+      expect(find.text('发布时间：2026-05-01 18:00'), findsOneWidget);
+      expect(find.text('发布时间：2026-05-02 18:00'), findsOneWidget);
+      expect(find.text('未读 2'), findsOneWidget);
       expect(find.byIcon(Icons.lock_outline_rounded), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
       expect(
@@ -1311,9 +1336,29 @@ void main() {
         isEmpty,
       );
 
+      await tester.enterText(find.byType(TextField), '成都');
+      await tester.pumpAndSettle();
+      expect(find.text('西洽会 - 泸州'), findsNothing);
+      expect(find.text('西洽会 - 成都'), findsOneWidget);
+      expect(
+        transport.requests.where(
+          (request) =>
+              request.canonicalPath ==
+                  '/api/app/message/project-communication/thread' ||
+              request.canonicalPath ==
+                  '/api/app/message/project-communication/messages',
+        ),
+        isEmpty,
+      );
+      await tester.enterText(find.byType(TextField), '');
+      await tester.pumpAndSettle();
+      expect(find.text('西洽会 - 泸州'), findsOneWidget);
+      expect(find.text('西洽会 - 成都'), findsOneWidget);
+
       await _enterFirstProjectCommunication(tester);
 
       expect(find.text('西洽会 - 泸州'), findsOneWidget);
+      await _ensureVisible(tester, find.text('泸州项目消息'));
       expect(find.text('泸州项目消息'), findsOneWidget);
       expect(find.text('成都项目消息'), findsNothing);
       expect(seenThreadProjectIds, <String>['project-luzhou']);
@@ -1340,13 +1385,14 @@ void main() {
       expect(find.text('想跟TA说点什么...'), findsNothing);
 
       final secondProjectEntry = find
-          .widgetWithText(FilledButton, '进入此项目竞标沟通')
+          .widgetWithText(FilledButton, '进入沟通')
           .at(1);
       await _ensureVisible(tester, secondProjectEntry);
       await tester.tap(secondProjectEntry);
       await tester.pumpAndSettle();
 
       expect(find.text('西洽会 - 成都'), findsOneWidget);
+      await _ensureVisible(tester, find.text('成都项目消息'));
       expect(find.text('成都项目消息'), findsOneWidget);
       expect(find.text('泸州项目消息'), findsNothing);
       expect(seenThreadProjectIds, <String>[
@@ -1827,6 +1873,436 @@ void main() {
       expect(messageLoadCount, 2);
       expect(find.text('发送中...'), findsNothing);
       expect(find.text('在吗'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'project communication image button uploads file asset and sends image payload',
+    (WidgetTester tester) async {
+      var messageLoadCount = 0;
+      var postCount = 0;
+      var previewRequestCount = 0;
+      Object? postedBody;
+      ProjectAttachmentDebugOverrides.installPicker(
+        () async => const ProjectAttachmentDraft(
+          fileName: 'chat.png',
+          bytes: <int>[1, 2, 3, 4],
+        ),
+      );
+      final imagePayload = const <String, Object?>{
+        'attachment': <String, Object?>{
+          'fileAssetId': 'file-chat-1',
+          'fileName': 'chat.png',
+          'mimeType': 'image/png',
+          'size': 4,
+          'category': 'image',
+        },
+      };
+      final transport = FakeAppApiTransport(
+        uploadHandler: (AppApiUploadRequest request) async {
+          expect(request.url, 'https://upload.example.com/chat-1');
+          expect(request.bodyBytes, const <int>[1, 2, 3, 4]);
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          'GET /api/app/message/counterpart-conversation/detail':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _detailPayload(),
+                );
+              },
+          'GET /api/app/message/project-communication/thread':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _threadPayload(),
+                );
+              },
+          'GET /api/app/message/project-communication/messages':
+              (AppApiRequest request) async {
+                messageLoadCount += 1;
+                final items = messageLoadCount > 1
+                    ? <Object?>[
+                        _messagePayload(
+                          messageId: 'message-image-1',
+                          body: '现场照片',
+                          messageKind: 'image',
+                          payload: imagePayload,
+                        ),
+                      ]
+                    : <Object?>[];
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{'items': items, 'nextCursor': null},
+                );
+              },
+          'POST /api/app/file/upload/init': (AppApiRequest request) async {
+            expect(request.body, const <String, Object?>{
+              'businessType': 'project',
+              'businessId': 'project-1',
+              'fileKind': 'project_communication_attachment',
+              'mimeType': 'image/png',
+              'size': 4,
+              'checksum':
+                  '9f64a747e1b97f131fabb6b447296c9b6f0201e79fb3c5356e6c77e89b6a806a',
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'uploadSessionId': 'chat-session-1',
+                'directUpload': <String, Object?>{
+                  'url': 'https://upload.example.com/chat-1',
+                  'method': 'PUT',
+                  'headers': <String, Object?>{},
+                },
+                'confirm': <String, Object?>{
+                  'endpoint': '/api/app/file/upload/confirm',
+                },
+              },
+            );
+          },
+          'POST /api/app/file/upload/confirm': (AppApiRequest request) async {
+            expect(request.body, const <String, Object?>{
+              'uploadSessionId': 'chat-session-1',
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{'fileAssetId': 'file-chat-1'},
+            );
+          },
+          'POST /api/app/message/project-communication/messages':
+              (AppApiRequest request) async {
+                postCount += 1;
+                postedBody = request.body;
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: _messagePayload(
+                    messageId: 'message-image-1',
+                    body: '现场照片',
+                    messageKind: 'image',
+                    payload: imagePayload,
+                    clientMessageId:
+                        (request.body
+                                as Map<String, Object?>)['clientMessageId']
+                            as String?,
+                  ),
+                );
+              },
+          'GET /api/app/file/preview/access': (AppApiRequest request) async {
+            previewRequestCount += 1;
+            expect(request.uri.queryParameters, <String, String>{
+              'projectId': 'project-1',
+              'threadId': 'project-thread-1',
+              'fileAssetId': 'file-chat-1',
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'fileAssetId': 'file-chat-1',
+                'projectId': 'project-1',
+                'threadId': 'project-thread-1',
+                'previewType': 'image',
+                'canPreview': true,
+                'fileName': 'chat.png',
+                'mimeType': 'image/png',
+                'accessUrl': 'https://signed.example/chat.png',
+                'expiresAt': '2026-05-04T10:05:00Z',
+                'contentLengthBytes': 4,
+                'downloadAvailable': true,
+                'fallbackReason': null,
+              },
+            );
+          },
+          'POST /api/app/message/project-communication/read-cursor':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'threadId': 'project-thread-1',
+                    'projectId': 'project-1',
+                    'organizationId': 'org-owner',
+                    'lastReadMessageId': 'message-image-1',
+                    'lastReadAt': '2026-05-04T10:02:01Z',
+                    'updatedAt': '2026-05-04T10:02:01Z',
+                  },
+                );
+              },
+        },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
+      await tester.ensureVisible(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '现场照片');
+      await tester.tap(find.widgetWithText(TextButton, '图片'));
+      await tester.pumpAndSettle();
+
+      expect(postCount, 0);
+      expect(transport.uploads, isEmpty);
+      expect(find.text('发送这张图片？'), findsOneWidget);
+      expect(find.text('图片 · 4 B'), findsOneWidget);
+      await tester.tap(find.widgetWithText(FilledButton, '发送图片'));
+      await tester.pumpAndSettle();
+
+      expect(postCount, 1);
+      expect(transport.uploads, hasLength(1));
+      expect(
+        postedBody,
+        isA<Map<String, Object?>>()
+            .having(
+              (Map<String, Object?> body) => body['messageKind'],
+              'messageKind',
+              'image',
+            )
+            .having(
+              (Map<String, Object?> body) => body['payload'],
+              'payload',
+              imagePayload,
+            )
+            .having(
+              (Map<String, Object?> body) => body['body'],
+              'body',
+              '现场照片',
+            ),
+      );
+      await tester.pumpAndSettle();
+      expect(previewRequestCount, 1);
+      expect(find.text('chat.png'), findsNothing);
+      expect(find.text('chat.png · 4 B'), findsNothing);
+      final imageCard = find.byKey(
+        const ValueKey<String>(
+          'project-communication-image-attachment-file-chat-1',
+        ),
+      );
+      expect(imageCard, findsOneWidget);
+      await tester.tap(imageCard);
+      await tester.pumpAndSettle();
+      expect(find.text('图片预览'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'project communication confirmation action sends confirmation card payload',
+    (WidgetTester tester) async {
+      var messageLoadCount = 0;
+      var postCount = 0;
+      Object? postedBody;
+      final confirmationPayload = const <String, Object?>{
+        'confirmation': <String, Object?>{
+          'confirmationType': 'quote',
+          'title': '最终报价确认',
+          'summary': '总价 10000 元，包含基础搭建。',
+          'status': 'proposed',
+        },
+      };
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _detailPayload(),
+                    );
+                  },
+              'GET /api/app/message/project-communication/thread':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _threadPayload(),
+                    );
+                  },
+              'GET /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    messageLoadCount += 1;
+                    final items = messageLoadCount > 1
+                        ? <Object?>[
+                            _messagePayload(
+                              messageId: 'message-confirmation-1',
+                              body: '',
+                              messageKind: 'confirmation_card',
+                              payload: confirmationPayload,
+                            ),
+                          ]
+                        : <Object?>[];
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'items': items,
+                        'nextCursor': null,
+                      },
+                    );
+                  },
+              'POST /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    postCount += 1;
+                    postedBody = request.body;
+                    return AppApiResponse(
+                      statusCode: 202,
+                      uri: request.uri,
+                      body: _messagePayload(
+                        messageId: 'message-confirmation-1',
+                        body: '',
+                        messageKind: 'confirmation_card',
+                        payload: confirmationPayload,
+                        clientMessageId:
+                            (request.body
+                                    as Map<String, Object?>)['clientMessageId']
+                                as String?,
+                      ),
+                    );
+                  },
+              'POST /api/app/message/project-communication/read-cursor':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 202,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'threadId': 'project-thread-1',
+                        'projectId': 'project-1',
+                        'organizationId': 'org-owner',
+                        'lastReadMessageId': 'message-confirmation-1',
+                        'lastReadAt': '2026-05-04T10:02:01Z',
+                        'updatedAt': '2026-05-04T10:02:01Z',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
+      await tester.tap(find.widgetWithText(TextButton, '确认'));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).at(1), '最终报价确认');
+      await tester.enterText(
+        find.byType(TextField).at(2),
+        '总价 10000 元，包含基础搭建。',
+      );
+      await tester.tap(find.text('发送确认卡'));
+      await tester.pumpAndSettle();
+
+      expect(postCount, 1);
+      expect(
+        postedBody,
+        isA<Map<String, Object?>>()
+            .having(
+              (Map<String, Object?> body) => body['messageKind'],
+              'messageKind',
+              'confirmation_card',
+            )
+            .having(
+              (Map<String, Object?> body) => body['payload'],
+              'payload',
+              confirmationPayload,
+            )
+            .having((Map<String, Object?> body) => body['body'], 'body', ''),
+      );
+      expect(find.text('报价确认'), findsOneWidget);
+      expect(find.text('待确认'), findsOneWidget);
+      expect(find.text('最终报价确认'), findsOneWidget);
+      expect(find.text('总价 10000 元，包含基础搭建。'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'project communication contact soft prompt returns or continues before send',
+    (WidgetTester tester) async {
+      var postCount = 0;
+      Object? postedBody;
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _detailPayload(),
+                    );
+                  },
+              'GET /api/app/message/project-communication/thread':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _threadPayload(),
+                    );
+                  },
+              'GET /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'nextCursor': null,
+                      },
+                    );
+                  },
+              'POST /api/app/message/project-communication/messages':
+                  (AppApiRequest request) async {
+                    postCount += 1;
+                    postedBody = request.body;
+                    return AppApiResponse(
+                      statusCode: 202,
+                      uri: request.uri,
+                      body: _messagePayload(
+                        messageId: 'message-contact-1',
+                        body: '电话多少 18696563700',
+                        clientMessageId:
+                            (request.body
+                                    as Map<String, Object?>)['clientMessageId']
+                                as String?,
+                      ),
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterFirstProjectCommunication(tester);
+      await tester.ensureVisible(find.byType(TextField));
+      await tester.enterText(find.byType(TextField), '电话多少 18696563700');
+      await tester.tap(find.byIcon(Icons.send_rounded), warnIfMissed: false);
+      await tester.pumpAndSettle();
+
+      expect(find.text('建议优先在平台内继续沟通'), findsOneWidget);
+      expect(postCount, 0);
+
+      await tester.tap(find.text('返回修改'));
+      await tester.pumpAndSettle();
+      expect(postCount, 0);
+
+      await tester.tap(find.byIcon(Icons.send_rounded), warnIfMissed: false);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('继续发送'));
+      await tester.pumpAndSettle();
+
+      expect(postCount, 1);
+      expect(
+        postedBody,
+        isA<Map<String, Object?>>().having(
+          (Map<String, Object?> body) => body['body'],
+          'body',
+          '电话多少 18696563700',
+        ),
+      );
     },
   );
 

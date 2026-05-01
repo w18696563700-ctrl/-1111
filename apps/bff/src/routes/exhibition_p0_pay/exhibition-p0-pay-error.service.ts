@@ -19,6 +19,7 @@ type Operation =
   | 'pricing_summary'
   | 'project_authenticity_sincerity_create'
   | 'project_authenticity_sincerity_pay_init'
+  | 'project_authenticity_sincerity_refund'
   | 'project_authenticity_sincerity_status'
   | 'bid_service_fee_authorization_create'
   | 'bid_service_fee_authorization_freeze_init'
@@ -48,6 +49,7 @@ const OPERATION_CODES: Record<Operation, string> = {
   pricing_summary: 'PROJECT_PRICING_SUMMARY_UNAVAILABLE',
   project_authenticity_sincerity_create: 'PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED',
   project_authenticity_sincerity_pay_init: 'PROJECT_AUTHENTICITY_SINCERITY_PAY_INIT_REJECTED',
+  project_authenticity_sincerity_refund: 'PROJECT_AUTHENTICITY_SINCERITY_REFUND_REJECTED',
   project_authenticity_sincerity_status: 'PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND',
   bid_service_fee_authorization_create: 'BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED',
   bid_service_fee_authorization_freeze_init: 'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED',
@@ -136,6 +138,7 @@ export class ExhibitionP0PayErrorService {
       operation === 'inquiry_deposit_pay_init' ||
       operation === 'project_authenticity_sincerity_create' ||
       operation === 'project_authenticity_sincerity_pay_init' ||
+      operation === 'project_authenticity_sincerity_refund' ||
       operation === 'bid_service_fee_authorization_create' ||
       operation === 'bid_service_fee_authorization_freeze_init' ||
       operation === 'bid_service_fee_authorization_release' ||
@@ -174,6 +177,8 @@ export class ExhibitionP0PayErrorService {
         return '当前项目真实性诚意金订单暂不可创建，请稍后再试。';
       case 'project_authenticity_sincerity_pay_init':
         return '当前项目真实性诚意金支付暂不可拉起，请稍后再试。';
+      case 'project_authenticity_sincerity_refund':
+        return '当前项目真实性诚意金退款暂不可发起，请稍后再试。';
       case 'project_authenticity_sincerity_status':
         return '当前项目真实性诚意金状态暂不可用，请稍后再试。';
       case 'bid_service_fee_authorization_create':

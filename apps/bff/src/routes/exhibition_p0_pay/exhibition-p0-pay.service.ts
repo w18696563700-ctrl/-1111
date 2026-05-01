@@ -22,7 +22,9 @@ import {
   readPricingSummaryReadModel,
   readProjectAuthenticitySincerityOrderReadModel,
   readProjectAuthenticitySincerityPayInitReadModel,
+  readProjectAuthenticitySincerityRefundReadModel,
   readProjectAuthenticitySincerityStatusReadModel,
+  readProjectSettlementSummaryReadModel,
   readP0PayStateActionReadModel,
   readServiceFeeAuthorizationCreateReadModel,
   readServiceFeeAuthorizationStatusReadModel,
@@ -190,6 +192,38 @@ export class ExhibitionP0PayService {
     );
   }
 
+  initProjectAuthenticitySincerityRefund(
+    projectId: string | undefined,
+    orderId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+    idempotencyKey?: string,
+  ) {
+    const path = `${this.inquiryDepositPath(projectId)}/${this.id(orderId, 'orderId')}/refund-init`;
+    const body = this.payloads.toProjectAuthenticitySincerityRefundPayload(payload, idempotencyKey);
+    return this.post(
+      path,
+      body,
+      headers,
+      'project_authenticity_sincerity_refund',
+      readProjectAuthenticitySincerityRefundReadModel,
+    );
+  }
+
+  getProjectAuthenticitySincerityRefund(
+    projectId: string | undefined,
+    orderId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    const path = `${this.inquiryDepositPath(projectId)}/${this.id(orderId, 'orderId')}/refund`;
+    return this.get(
+      path,
+      headers,
+      'project_authenticity_sincerity_status',
+      readProjectAuthenticitySincerityRefundReadModel,
+    );
+  }
+
   createBidServiceFeeAuthorization(
     projectId: string | undefined,
     payload: Record<string, unknown>,
@@ -320,6 +354,24 @@ export class ExhibitionP0PayService {
   getProjectPricingSummary(projectId: string | undefined, headers: IncomingHttpHeaders) {
     const path = `/server/project/${this.id(projectId, 'projectId')}/pricing-summary`;
     return this.get(path, headers, 'pricing_summary', readPricingSummaryReadModel);
+  }
+
+  getProjectSettlementSummary(projectId: string | undefined, headers: IncomingHttpHeaders) {
+    const path = `/server/project/${this.id(projectId, 'projectId')}/settlement/summary`;
+    return this.get(path, headers, 'pricing_summary', readProjectSettlementSummaryReadModel);
+  }
+
+  createProjectSettlementBatchDraft(
+    projectId: string | undefined,
+    headers: IncomingHttpHeaders,
+  ) {
+    const path = `/server/project/${this.id(projectId, 'projectId')}/settlement/batch-draft`;
+    return this.post(path, {}, headers, 'pricing_summary', readProjectSettlementSummaryReadModel);
+  }
+
+  getProjectSettlementReconciliation(projectId: string | undefined, headers: IncomingHttpHeaders) {
+    const path = `/server/project/${this.id(projectId, 'projectId')}/settlement/reconciliation`;
+    return this.get(path, headers, 'pricing_summary', readProjectSettlementSummaryReadModel);
   }
 
   releaseNonWinning(

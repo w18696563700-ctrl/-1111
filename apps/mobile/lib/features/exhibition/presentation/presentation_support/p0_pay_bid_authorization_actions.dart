@@ -238,11 +238,7 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
   }
 
   Future<void> _openP0PayAuthorizationChannelPayload(Object? payload) async {
-    final url = _channelPayloadUrl(payload);
-    if (url == null) {
-      return;
-    }
-    await launchUrlString(url);
+    await _openPaymentChannelPayload(payload);
   }
 
   String? get _p0PayTaskIdForFixedPriceBid {
@@ -347,10 +343,10 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
     }
     final quotedAmount = _p0PayRequirementNumber(requirement, 'quotedAmount');
     final feeRate = _p0PayRequirementText(requirement, 'feeRate');
-    final estimatedFeeAmount = _p0PayRequirementText(
-      requirement,
-      'estimatedFeeAmount',
-    );
+    final estimatedFeeAmount =
+        _p0PayRequirementText(requirement, 'quotaAmount') ??
+        _p0PayRequirementText(requirement, 'authorizationQuotaAmount') ??
+        _p0PayRequirementText(requirement, 'estimatedFeeAmount');
     final currency = _p0PayRequirementText(requirement, 'currency') ?? 'CNY';
     if (quotedAmount == null || feeRate == null || estimatedFeeAmount == null) {
       return null;

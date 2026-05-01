@@ -15,6 +15,7 @@ export type ProjectCommunicationMessageCreatedEvent = {
   senderOrganizationId: string;
   messageKind: string;
   body: string;
+  payload: Record<string, unknown> | null;
   clientMessageId: string | null;
   createdAt: string;
 };
@@ -38,6 +39,7 @@ export class ProjectCommunicationRealtimeEventService {
       senderOrganizationId: message.senderOrganizationId,
       messageKind: message.messageKind,
       body: message.body,
+      payload: this.toPayload(message.payload),
       clientMessageId: message.clientMessageId,
       createdAt: message.createdAt.toISOString()
     };
@@ -77,5 +79,12 @@ export class ProjectCommunicationRealtimeEventService {
         'Project communication message-created event requires createdAt.'
       );
     }
+  }
+
+  private toPayload(payload: Record<string, unknown> | null | undefined) {
+    if (!payload || Object.keys(payload).length === 0) {
+      return null;
+    }
+    return payload;
   }
 }

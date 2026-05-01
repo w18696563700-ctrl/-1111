@@ -18,6 +18,13 @@ export type OrganizationJoinAcceptedViewModel = {
   traceId: string;
 };
 
+export type OrganizationLeaveAcceptedViewModel = {
+  leftOrganizationId: string;
+  nextOrganizationId: string | null;
+  shellBootstrapState: "authenticated" | "no_organization";
+  traceId: string;
+};
+
 export type ProfileShellContextCompatibleViewModel = {
   userId: string;
   organizationId: string;

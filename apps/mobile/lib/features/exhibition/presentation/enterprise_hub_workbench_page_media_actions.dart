@@ -236,34 +236,27 @@ extension _EnterpriseWorkbenchPageMediaActions
     required String defaultStem,
   }) async {
     try {
-      final file = await openFile(
-        acceptedTypeGroups: const <XTypeGroup>[
-          XTypeGroup(
-            label: '企业展示图片',
-            extensions: <String>[
-              'jpg',
-              'jpeg',
-              'png',
-              'webp',
-              'gif',
-              'heic',
-              'heif',
-            ],
-            uniformTypeIdentifiers: <String>['public.image'],
-          ),
-        ],
-        confirmButtonText: '选择图片',
+      final pickResult = await ProfileAvatarPicker.instance.pick(
+        source: ProfileAvatarPickSource.gallery,
       );
-      if (file == null) {
+      if (pickResult.cancelled) {
         return null;
       }
-      final bytes = await file.readAsBytes();
+      final picked = pickResult.file;
+      if (picked == null) {
+        _showWorkbenchMessage(pickResult.message ?? '当前没有读取到可用图片。');
+        return null;
+      }
+      final bytes = picked.bytes;
+      final fileName = picked.fileName.trim().isEmpty
+          ? '$defaultStem.jpg'
+          : picked.fileName.trim();
       if (bytes.isEmpty) {
         _showWorkbenchMessage('当前没有读取到可用图片。');
         return null;
       }
-      final mimeType = _workbenchImageMimeType(file.name);
-      if (mimeType == null) {
+      final mimeType = _workbenchImageMimeType(fileName) ?? picked.mimeType;
+      if (!mimeType.startsWith('image/')) {
         _showWorkbenchMessage('当前只支持常见图片格式。');
         return null;
       }
@@ -273,9 +266,7 @@ extension _EnterpriseWorkbenchPageMediaActions
       final edited = await openProfileAvatarEditConfirmationPage(
         context,
         file: ProfileAvatarPickedFile(
-          fileName: file.name.trim().isEmpty
-              ? '$defaultStem.jpg'
-              : file.name.trim(),
+          fileName: fileName,
           mimeType: mimeType,
           bytes: bytes,
         ),

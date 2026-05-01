@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:crypto/crypto.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
@@ -14,6 +15,8 @@ import 'package:mobile/features/exhibition/presentation/forum/forum_scaffold_wid
 import 'package:mobile/features/exhibition/presentation/forum/forum_state_widgets.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
+import 'package:mobile/shared/ui/app_visual_components.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 
 part 'forum_feed_pages.dart';
 part 'forum_feed_support.dart';

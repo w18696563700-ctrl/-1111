@@ -34,7 +34,7 @@ class AppShellScaffold extends StatelessWidget {
         .where(controller.snapshot.isBuildingVisible)
         .toList();
     final selectedIndex = visibleBottomBuildings.indexOf(currentBuilding);
-    final unreadBadgeLabel = shellContext.unreadSummaryBadgeLabel;
+    final unreadBadgeLabel = shellContext.messagesUnreadBadgeLabel;
     final theme = Theme.of(context);
     final appBarActions = <Widget>[
       ...this.appBarActions,

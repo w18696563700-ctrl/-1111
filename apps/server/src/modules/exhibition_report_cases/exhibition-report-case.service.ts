@@ -1,7 +1,7 @@
 import { randomUUID } from 'crypto';
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
@@ -15,7 +15,8 @@ import {
   readReportCaseId,
   toDecideCommand,
   toEscalateCommand,
-  toRequestExplanationCommand
+  toRequestExplanationCommand,
+  toSubmitCommand
 } from './exhibition-report-case.command-reader';
 import {
   exhibitionReportDecideInvalid,
@@ -28,6 +29,13 @@ import {
 import { ExhibitionReportCasePresenter } from './exhibition-report-case.presenter';
 import { ExhibitionReportCaseEntity } from './entities/exhibition-report-case.entity';
 
+const ACTIVE_REPORT_CASE_STATUSES = [
+  'submitted',
+  'under_review',
+  'explanation_requested',
+  'escalated'
+] as const;
+
 @Injectable()
 export class ExhibitionReportCaseService {
   constructor(
@@ -39,6 +47,92 @@ export class ExhibitionReportCaseService {
     private readonly dataSource: DataSource,
     private readonly presenter: ExhibitionReportCasePresenter
   ) {}
+
+  async submit(payload: Record<string, unknown>, context: RequestContext) {
+    const command = toSubmitCommand(payload, exhibitionReportInvalid);
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+
+    return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ExhibitionReportCaseEntity);
+      const existing = await repository.findOne({
+        where: {
+          reporterUserId: currentSession.userId,
+          targetType: command.targetType,
+          targetId: command.targetId,
+          reasonCode: command.reasonCode,
+          status: In([...ACTIVE_REPORT_CASE_STATUSES])
+        }
+      });
+      if (existing) {
+        return this.presenter.toSubmitResponse(existing, 'existing_active', context.traceId);
+      }
+
+      const now = new Date();
+      const reportCase = new ExhibitionReportCaseEntity();
+      reportCase.id = `report-case-${randomUUID().replace(/-/g, '').slice(0, 24)}`;
+      reportCase.targetType = command.targetType;
+      reportCase.targetId = command.targetId;
+      reportCase.reasonCode = command.reasonCode;
+      reportCase.reasonDetail = command.reasonDetail;
+      reportCase.reporterUserId = currentSession.userId;
+      reportCase.reporterOrganizationId = scope?.organization.id ?? null;
+      reportCase.status = 'submitted';
+      reportCase.temporaryRestrictionState = 'not_applied';
+      reportCase.reviewTaskId = null;
+      reportCase.governanceTicketRef = null;
+      reportCase.evidenceFileAssetIds = command.evidenceFileAssetIds;
+      reportCase.explanationRequestedAt = null;
+      reportCase.explanationDueAt = null;
+      reportCase.explanationReceivedAt = null;
+      reportCase.adjudicationResult = null;
+      reportCase.decisionNote = null;
+      reportCase.decidedAt = null;
+      reportCase.closedAt = null;
+      reportCase.metadata = {
+        source: 'app_exhibition_report_submit',
+        actorId: currentSession.actorId,
+        organizationId: scope?.organization.id ?? null,
+        roleKey: scope?.roleKeys[0] ?? null,
+        requestId: context.requestId,
+        traceId: context.traceId
+      };
+      reportCase.createdAt = now;
+      reportCase.updatedAt = now;
+      const saved = await repository.save(reportCase);
+
+      await this.auditService.record(
+        {
+          subjectType: 'exhibition_report_case',
+          subjectId: saved.id,
+          userId: saved.reporterUserId,
+          actorId: currentSession.actorId,
+          actorRole: scope?.roleKeys[0] ?? 'app_user',
+          action: 'exhibition_report_case_submit',
+          engineType: 'manual',
+          decision: saved.status,
+          reasonCode: saved.reasonCode,
+          reason: saved.reasonDetail,
+          matchedRuleIds: [],
+          metadata: {
+            reportCaseId: saved.id,
+            targetType: saved.targetType,
+            targetId: saved.targetId,
+            acceptMode: 'created',
+            evidenceFileAssetIds: saved.evidenceFileAssetIds
+          }
+        },
+        context,
+        manager
+      );
+
+      return this.presenter.toSubmitResponse(saved, 'created', context.traceId);
+    });
+  }
 
   async list(query: Record<string, unknown>, context: RequestContext) {
     await this.requireReviewer(context);

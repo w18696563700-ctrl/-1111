@@ -32,6 +32,7 @@ import { ProfilePersonalCertificationWriteService } from './profile-personal-cer
 import { ProfilePersonalWriteService } from './profile-personal.write.service';
 import { ProfileOrganizationMembersQueryService } from './profile-organization-members.query.service';
 import { ProfileOrganizationMembersWriteService } from './profile-organization-members.write.service';
+import { ProfileOrganizationSelfLeaveService } from './profile-organization-self-leave.service';
 import { ProfilePresenter } from './profile.presenter';
 import { ProfileQueryService } from './profile-query.service';
 import { ProfileSafetySubmissionEntity } from './entities/profile-safety-submission.entity';
@@ -97,6 +98,7 @@ import { OrganizationCertificationRevalidationAttemptEntity } from './entities/o
     ProfileGovernanceStatusQueryService,
     ProfileOrganizationMembersQueryService,
     ProfileOrganizationMembersWriteService,
+    ProfileOrganizationSelfLeaveService,
     ProfileSecurityQueryService,
     ProfileSecurityWriteService
   ],

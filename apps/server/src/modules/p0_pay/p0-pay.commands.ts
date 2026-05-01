@@ -72,6 +72,14 @@ export type ProjectAuthenticitySincerityPayInitCommand = {
   idempotencyKey: string;
 };
 
+export type ProjectAuthenticitySincerityRefundCommand = {
+  projectId: string;
+  orderId: string;
+  refundReasonCode: string;
+  refundReasonText: string;
+  idempotencyKey: string;
+};
+
 export type ContractConfirmationCommand = {
   taskId: string;
   selectedBidId: string | null;

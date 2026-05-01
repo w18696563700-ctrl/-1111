@@ -11,13 +11,37 @@ import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.da
 import 'package:mobile/features/exhibition/data/enterprise_hub_published_change_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_workbench_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/presentation_support/external_map_launcher.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_workbench_pages.dart';
-import 'package:mobile/features/exhibition/presentation/enterprise_hub_shared.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_workbench_widgets.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
 void main() {
+  test('external map candidates keep app schemes before web fallback', () {
+    final candidates = externalMapCandidateUrls(
+      latitude: 30.5728,
+      longitude: 104.0668,
+      address: '四川省成都市高新区天府大道 1 号',
+      mapLinkUrl: 'https://uri.amap.com/marker?position=104.0668,30.5728',
+    );
+
+    expect(candidates, isNotEmpty);
+    expect(
+      candidates.last,
+      'https://uri.amap.com/marker?position=104.0668,30.5728',
+    );
+    expect(
+      candidates.any(
+        (String candidate) =>
+            candidate.startsWith('geo:') ||
+            candidate.startsWith('maps://') ||
+            candidate.startsWith('http://maps.apple.com'),
+      ),
+      isTrue,
+    );
+  });
+
   tearDown(() {
     resetEnterpriseWorkbenchPlacemarkLookup();
     ChinaRegionCatalogLoader.reset();
@@ -198,29 +222,56 @@ void main() {
     };
   }
 
-  Future<List<String>> collectEnterpriseSectionTitles(
+  Future<void> scrollCompanyHomepageUntilVisible(
     WidgetTester tester,
-    List<String> expectedTitles,
-  ) async {
-    final scrollable = find.byType(Scrollable).first;
-    final collected = <String>[];
-    for (var index = 0; index < 20; index += 1) {
-      final visibleTitles = tester
-          .widgetList<EnterpriseSectionCard>(find.byType(EnterpriseSectionCard))
-          .map((card) => card.title)
-          .toList(growable: false);
-      for (final title in visibleTitles) {
-        if (!collected.contains(title)) {
-          collected.add(title);
-        }
-      }
-      if (expectedTitles.every(collected.contains)) {
-        break;
-      }
-      await tester.drag(scrollable, const Offset(0, -720));
-      await tester.pump(const Duration(milliseconds: 240));
+    Finder finder, {
+    Offset step = const Offset(0, -360),
+  }) async {
+    Finder homepageList = find.byKey(
+      const ValueKey<String>('company-workbench-homepage'),
+    );
+    if (homepageList.evaluate().isEmpty) {
+      homepageList = find.byKey(
+        const ValueKey<String>('factory-workbench-homepage'),
+      );
     }
-    return collected;
+    for (var index = 0; index < 12 && finder.evaluate().isEmpty; index += 1) {
+      await tester.drag(homepageList, step);
+      await tester.pump(const Duration(milliseconds: 100));
+    }
+    expect(finder, findsOneWidget);
+  }
+
+  Future<void> openCompanyWorkbenchModule(
+    WidgetTester tester,
+    String title,
+  ) async {
+    final moduleFinder = find.byKey(
+      ValueKey<String>('company-workbench-module-$title'),
+    );
+    await scrollCompanyHomepageUntilVisible(tester, moduleFinder);
+    await Scrollable.ensureVisible(
+      tester.element(moduleFinder),
+      alignment: 0.5,
+    );
+    await tester.pumpAndSettle();
+    await tester.tap(moduleFinder);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> openCompanyStatusModule(WidgetTester tester) async {
+    final statusFinder = find.byKey(
+      const ValueKey<String>('company-workbench-bottom-status'),
+    );
+    await tester.ensureVisible(statusFinder);
+    await tester.pumpAndSettle();
+    await tester.tap(statusFinder);
+    await tester.pumpAndSettle();
+  }
+
+  Future<void> popTopRoute(WidgetTester tester) async {
+    Navigator.of(tester.element(find.byType(Scaffold).last)).pop();
+    await tester.pumpAndSettle();
   }
 
   Map<String, Object?> buildCaseDetailPayload({
@@ -2689,9 +2740,15 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(
-        find.byKey(
-          const ValueKey<String>('enterprise-workbench-header-section'),
-        ),
+        find.byKey(const ValueKey<String>('company-workbench-homepage')),
+        findsOneWidget,
+      );
+      await scrollCompanyHomepageUntilVisible(
+        tester,
+        find.byKey(const ValueKey<String>('company-workbench-module-entries')),
+      );
+      expect(
+        find.byKey(const ValueKey<String>('company-workbench-module-entries')),
         findsOneWidget,
       );
       expect(find.text('公司展示工作台'), findsWidgets);
@@ -2702,39 +2759,10 @@ void main() {
             'enterprise-workbench-display-identification-section',
           ),
         ),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.text('公司名称'), findsOneWidget);
-      expect(find.text('公司位置'), findsOneWidget);
-      expect(find.text('公司信用评分（建设中）'), findsOneWidget);
-      final sectionTitles = await collectEnterpriseSectionTitles(
-        tester,
-        <String>[
-          '公司展示工作台',
-          '展示标识',
-          '企业画册',
-          '地图 / 位置',
-          '基础资料',
-          '联系人',
-          '案例库',
-          '提交申请',
-        ],
-      );
-      expect(
-        sectionTitles,
-        containsAllInOrder(<String>[
-          '公司展示工作台',
-          '展示标识',
-          '企业画册',
-          '地图 / 位置',
-          '基础资料',
-          '联系人',
-          '案例库',
-          '提交申请',
-        ]),
-      );
-      expect(sectionTitles, isNot(contains('上游真值')));
-      expect(sectionTitles, isNot(contains('认证摘要')));
+      expect(find.text('数据看板'), findsNothing);
+      expect(find.text('最新动态'), findsNothing);
       expect(find.text('服务城市（逗号分隔）'), findsNothing);
       expect(find.text('最大项目规模'), findsNothing);
       expect(find.text('资质说明'), findsNothing);
@@ -2757,6 +2785,19 @@ void main() {
       expect(find.textContaining('请先去我的公司'), findsNothing);
       expect(find.textContaining('请先完成企业认证信息补齐'), findsNothing);
       expect(find.textContaining('注册城市'), findsNothing);
+
+      await openCompanyWorkbenchModule(tester, '展示标识');
+      expect(
+        find.byKey(
+          const ValueKey<String>(
+            'enterprise-workbench-display-identification-section',
+          ),
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('公司名称'), findsOneWidget);
+      expect(find.text('公司位置'), findsOneWidget);
+      expect(find.text('公司信用评分（建设中）'), findsOneWidget);
     },
   );
 
@@ -2880,6 +2921,8 @@ void main() {
         await tester.pump(const Duration(milliseconds: 100));
       }
 
+      await openCompanyWorkbenchModule(tester, '基础资料');
+
       for (var index = 0; index < 20; index += 1) {
         if (find
             .byKey(const ValueKey<String>('enterprise-workbench-save-basic'))
@@ -2987,14 +3030,40 @@ void main() {
         ),
         findsNothing,
       );
+      expect(
+        find.byKey(const ValueKey<String>('supplier-workbench-homepage')),
+        findsOneWidget,
+      );
+      final serviceModuleFinder = find.byKey(
+        const ValueKey<String>('supplier-workbench-module-服务能力'),
+      );
+      await tester.scrollUntilVisible(
+        serviceModuleFinder,
+        220,
+        scrollable: find.byType(Scrollable).first,
+      );
+      await Scrollable.ensureVisible(
+        tester.element(serviceModuleFinder),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('模块管理'), findsOneWidget);
       expect(find.text('供应模式'), findsNothing);
       expect(find.text('当前主板块为供应商，重点维护品类、供应模式与响应能力。'), findsNothing);
 
-      await tester.tap(find.widgetWithText(FilterChip, '广告喷绘公司').first);
+      await tester.tap(serviceModuleFinder);
+      await tester.pumpAndSettle();
+
+      final newSupplierCategoryFinder = find
+          .widgetWithText(FilterChip, '广告喷绘公司')
+          .first;
+      await tester.ensureVisible(newSupplierCategoryFinder);
+      await tester.pumpAndSettle();
+      await tester.tap(newSupplierCategoryFinder);
       await tester.pumpAndSettle();
 
       final selectedNewChip = tester.widget<FilterChip>(
-        find.widgetWithText(FilterChip, '广告喷绘公司').first,
+        newSupplierCategoryFinder,
       );
       final deselectedOldChip = tester.widget<FilterChip>(
         find.widgetWithText(FilterChip, '桁架舞台搭建厂').first,
@@ -3048,6 +3117,16 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final dynamic state = tester.state(
+        find.byType(EnterpriseApplicationPage),
+      );
+      expect(
+        find.byKey(const ValueKey<String>('factory-workbench-homepage')),
+        findsOneWidget,
+      );
+      await openCompanyWorkbenchModule(tester, '展示标识');
+      await tester.pumpAndSettle();
+
       await tester.enterText(
         find.byKey(
           const ValueKey<String>('enterprise-workbench-factory-name-field'),
@@ -3056,9 +3135,6 @@ void main() {
       );
       await tester.pump();
 
-      final dynamic state = tester.state(
-        find.byType(EnterpriseApplicationPage),
-      );
       state.debugMarkProfileDraftDirtyForTest();
       state.debugHydrateBoardProfileFromWorkbenchForTest(<String, Object?>{
         'factoryName': '服务端回刷工厂',
@@ -3089,6 +3165,22 @@ void main() {
           ),
           bootstrapShellContext: buildEnterpriseShellContext(),
         ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(
+        find.byKey(const ValueKey<String>('factory-workbench-homepage')),
+        findsOneWidget,
+      );
+      await openCompanyWorkbenchModule(tester, '展示标识');
+      await tester.scrollUntilVisible(
+        find.byKey(
+          const ValueKey<String>(
+            'enterprise-workbench-factory-optional-section',
+          ),
+        ),
+        220,
+        scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
 
@@ -3664,7 +3756,12 @@ void main() {
       expect(state.debugIsPublishedChangeModeForTest, isTrue);
       expect(state.debugHasPublishedWorkbenchDataForTest, isTrue);
       expect(state.debugWorkbenchStateForTest, isNull);
-      expect(find.text('工厂展示变更工作台'), findsOneWidget);
+      expect(find.text('工厂展示变更工作台'), findsNothing);
+      expect(
+        find.byKey(const ValueKey<String>('factory-workbench-homepage')),
+        findsOneWidget,
+      );
+      await openCompanyStatusModule(tester);
       expect(
         find.byKey(
           const ValueKey<String>(
@@ -4182,7 +4279,13 @@ void main() {
         reason: state.debugPublishedWorkbenchMessageForTest,
       );
       expect(state.debugHasPublishedWorkbenchDataForTest, isTrue);
-      expect(find.text('公司展示变更工作台'), findsOneWidget);
+      expect(
+        find.byKey(const ValueKey<String>('company-workbench-homepage')),
+        findsOneWidget,
+      );
+      expect(find.text('公司展示变更工作台'), findsNothing);
+
+      await openCompanyStatusModule(tester);
       expect(
         find.byKey(
           const ValueKey<String>(
@@ -4225,34 +4328,55 @@ void main() {
         ),
         findsOneWidget,
       );
-      await tester.scrollUntilVisible(
-        find.byKey(
-          const ValueKey<String>('enterprise-published-live-preview-section'),
-        ),
-        180,
-        scrollable: find.byType(Scrollable).first,
+      await popTopRoute(tester);
+
+      final quickPreviewFinder = find.byKey(
+        const ValueKey<String>('company-workbench-quick-preview'),
       );
+      await scrollCompanyHomepageUntilVisible(
+        tester,
+        quickPreviewFinder,
+        step: const Offset(0, 360),
+      );
+      await Scrollable.ensureVisible(
+        tester.element(quickPreviewFinder),
+        alignment: 0.5,
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(quickPreviewFinder);
+      await tester.pumpAndSettle();
       expect(
         find.byKey(
           const ValueKey<String>('enterprise-published-live-preview-section'),
         ),
         findsOneWidget,
       );
-      expect(find.text('线上公开展示'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.byKey(
-          const ValueKey<String>('enterprise-published-change-preview-section'),
-        ),
-        180,
-        scrollable: find.byType(Scrollable).first,
+      expect(find.text('线上公开展示'), findsWidgets);
+      await popTopRoute(tester);
+
+      await scrollCompanyHomepageUntilVisible(
+        tester,
+        find.byKey(const ValueKey<String>('company-workbench-preview-summary')),
       );
+      await tester.ensureVisible(
+        find.byKey(
+          const ValueKey<String>('company-workbench-preview-draft-entry'),
+        ),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(
+        find.byKey(
+          const ValueKey<String>('company-workbench-preview-draft-entry'),
+        ),
+      );
+      await tester.pumpAndSettle();
       expect(
         find.byKey(
           const ValueKey<String>('enterprise-published-change-preview-section'),
         ),
         findsOneWidget,
       );
-      expect(find.text('当前变更稿预览'), findsOneWidget);
+      expect(find.text('当前变更稿预览'), findsWidgets);
       expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsNothing);
       final previewToggle = find.byKey(
         const ValueKey<String>('enterprise-published-change-preview-toggle'),
@@ -4263,31 +4387,10 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.textContaining('当前变更稿预览优先使用已解析到的 Logo'), findsOneWidget);
       expect(find.textContaining('待 apply'), findsNothing);
-      final sectionTitles = await collectEnterpriseSectionTitles(
-        tester,
-        <String>[
-          '当前变更稿预览',
-          '展示标识',
-          '企业画册',
-          '地图 / 位置',
-          '基础资料',
-          '联系人',
-          '案例库',
-          '提交变更',
-        ],
-      );
+      await popTopRoute(tester);
       expect(
-        sectionTitles,
-        containsAll(<String>[
-          '当前变更稿预览',
-          '展示标识',
-          '企业画册',
-          '地图 / 位置',
-          '基础资料',
-          '联系人',
-          '案例库',
-          '提交变更',
-        ]),
+        find.byKey(const ValueKey<String>('company-workbench-homepage')),
+        findsOneWidget,
       );
     },
   );
@@ -4348,6 +4451,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(EnterpriseApplicationPage), findsOneWidget);
+      await openCompanyWorkbenchModule(tester, '基础资料');
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey<String>('enterprise-workbench-save-basic')),
         220,
@@ -4503,6 +4607,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
 
+      await openCompanyStatusModule(tester);
       await tester.scrollUntilVisible(
         find.byKey(
           const ValueKey<String>('enterprise-workbench-submit-change'),
@@ -4560,6 +4665,7 @@ void main() {
       await tester.pump(const Duration(seconds: 1));
       await tester.pumpAndSettle();
 
+      await openCompanyStatusModule(tester);
       await tester.scrollUntilVisible(
         find.byKey(
           const ValueKey<String>('enterprise-workbench-submit-section'),
@@ -4729,6 +4835,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
 
+      await openCompanyWorkbenchModule(tester, '地址与服务区域');
       await tester.scrollUntilVisible(
         find.byKey(
           const ValueKey<String>(
@@ -4820,6 +4927,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
 
+      await openCompanyWorkbenchModule(tester, '地址与服务区域');
       await tester.scrollUntilVisible(
         find.byKey(
           const ValueKey<String>('enterprise-workbench-address-field'),
@@ -4912,6 +5020,7 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
 
+      await openCompanyWorkbenchModule(tester, '地址与服务区域');
       await tester.scrollUntilVisible(
         find.byKey(
           const ValueKey<String>(

@@ -42,7 +42,8 @@ export const PLATFORM_PRICING_PAYMENT_BUSINESS_TYPES = {
   projectAuthenticitySincerityRefund: 'project_authenticity_sincerity_refund',
   bidServiceFeeAuthorizationFreeze: 'bid_service_fee_authorization_freeze',
   bidServiceFeeAuthorizationRelease: 'bid_service_fee_authorization_release',
-  platformServiceFeeCharge: 'platform_service_fee_charge'
+  platformServiceFeeCharge: 'platform_service_fee_charge',
+  membershipDirectPurchase: 'membership_direct_purchase'
 } as const;
 
 export const PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS = {
@@ -58,6 +59,7 @@ export const PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS = {
 
 export const PLATFORM_PRICING_RESOURCE_TYPES = {
   projectAuthenticitySincerityOrder: 'project_authenticity_sincerity_order',
+  membershipOrder: 'membership_order',
   bidServiceFeeAuthorization: 'bid_service_fee_authorization',
   dealConfirmation: 'deal_confirmation',
   platformServiceFeeCharge: 'platform_service_fee_charge',

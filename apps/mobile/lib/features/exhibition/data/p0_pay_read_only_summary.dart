@@ -29,9 +29,16 @@ final class P0PayReadOnlySummaryView {
     required this.taskType,
     required this.platformServiceFeeStatus,
     required this.platformServiceFeeEstimatedAmount,
+    required this.platformServiceFeeBaseAmount,
+    required this.platformServiceFeeDiscountRate,
+    required this.platformServiceFeeCapAmount,
     required this.platformServiceFeeFinalAmount,
+    required this.platformServiceFeeMembershipTier,
+    required this.platformServiceFeeRuleLabel,
     required this.inquiryDepositStatus,
     required this.inquiryDepositAmount,
+    required this.inquiryDepositOrderId,
+    required this.inquiryDepositChannelCandidates,
     required this.contractConfirmationStatus,
     required this.statusTextKey,
     required this.routeTarget,
@@ -44,9 +51,16 @@ final class P0PayReadOnlySummaryView {
   final String? taskType;
   final String? platformServiceFeeStatus;
   final String? platformServiceFeeEstimatedAmount;
+  final String? platformServiceFeeBaseAmount;
+  final String? platformServiceFeeDiscountRate;
+  final String? platformServiceFeeCapAmount;
   final String? platformServiceFeeFinalAmount;
+  final String? platformServiceFeeMembershipTier;
+  final String? platformServiceFeeRuleLabel;
   final String? inquiryDepositStatus;
   final String? inquiryDepositAmount;
+  final String? inquiryDepositOrderId;
+  final List<String> inquiryDepositChannelCandidates;
   final String? contractConfirmationStatus;
   final String? statusTextKey;
   final P0PayReadOnlyRouteTargetView? routeTarget;
@@ -76,6 +90,31 @@ final class P0PayReadOnlySummaryView {
           label: '预授权额度',
           value: platformServiceFeeEstimatedAmount!,
         ),
+      if (platformServiceFeeRuleLabel != null)
+        P0PayReadOnlyStatusLine(
+          label: '服务费规则',
+          value: platformServiceFeeRuleLabel!,
+        ),
+      if (platformServiceFeeMembershipTier != null)
+        P0PayReadOnlyStatusLine(
+          label: '会员档位快照',
+          value: p0PayMembershipTierLabel(platformServiceFeeMembershipTier),
+        ),
+      if (platformServiceFeeBaseAmount != null)
+        P0PayReadOnlyStatusLine(
+          label: '服务费基础金额',
+          value: platformServiceFeeBaseAmount!,
+        ),
+      if (platformServiceFeeDiscountRate != null)
+        P0PayReadOnlyStatusLine(
+          label: '会员折扣',
+          value: p0PayMembershipDiscountLabel(platformServiceFeeDiscountRate),
+        ),
+      if (platformServiceFeeCapAmount != null)
+        P0PayReadOnlyStatusLine(
+          label: '服务费封顶',
+          value: platformServiceFeeCapAmount!,
+        ),
       if (platformServiceFeeFinalAmount != null)
         P0PayReadOnlyStatusLine(
           label: '最终服务费',
@@ -88,6 +127,8 @@ final class P0PayReadOnlySummaryView {
         ),
       if (inquiryDepositAmount != null)
         P0PayReadOnlyStatusLine(label: '诚意金金额', value: inquiryDepositAmount!),
+      if (inquiryDepositOrderId != null)
+        P0PayReadOnlyStatusLine(label: '诚意金订单', value: inquiryDepositOrderId!),
       if (contractConfirmationStatus != null)
         P0PayReadOnlyStatusLine(
           label: '合同确认',
@@ -112,6 +153,9 @@ P0PayReadOnlySummaryView? parseP0PayReadOnlySummary(Object? payload) {
   final platformServiceFee = _asMap(record['platformServiceFee']);
   final bidServiceFeeAuthorization = _asMap(
     record['bidServiceFeeAuthorization'],
+  );
+  final platformServiceFeeCharge = _asMap(
+    record['platformServiceFeeCharge'],
   );
   final inquiryDeposit = _asMap(record['inquiryDeposit']);
   final projectAuthenticitySincerity = _asMap(
@@ -159,13 +203,41 @@ P0PayReadOnlySummaryView? parseP0PayReadOnlySummary(Object? payload) {
         _readText(bidderPricing?['authorizationQuotaAmount']) ??
         _readText(bidServiceFeeAuthorization?['quotaAmount']) ??
         _readText(bidServiceFeeAuthorization?['authorizationQuotaAmount']) ??
+        _readText(platformServiceFee?['quotaAmount']) ??
+        _readText(platformServiceFee?['authorizationQuotaAmount']) ??
         _readText(platformServiceFee?['estimatedFeeAmount']) ??
         _readText(platformServiceFee?['estimatedAmount']),
+    platformServiceFeeBaseAmount:
+        _readText(record['platformServiceFeeBaseAmount']) ??
+        _readText(record['baseFeeAmount']) ??
+        _readText(platformServiceFeeCharge?['baseFeeAmount']) ??
+        _readText(platformServiceFee?['baseFeeAmount']),
+    platformServiceFeeDiscountRate:
+        _readText(record['platformServiceFeeDiscountRate']) ??
+        _readText(record['membershipDiscountRate']) ??
+        _readText(platformServiceFeeCharge?['membershipDiscountRate']) ??
+        _readText(platformServiceFee?['membershipDiscountRate']),
+    platformServiceFeeCapAmount:
+        _readText(record['platformServiceFeeCapAmount']) ??
+        _readText(record['capAmount']) ??
+        _readText(platformServiceFeeCharge?['capAmount']) ??
+        _readText(platformServiceFee?['capAmount']),
     platformServiceFeeFinalAmount:
         _readText(record['platformServiceFeeFinalAmount']) ??
         _readText(record['finalFeeAmount']) ??
+        _readText(platformServiceFeeCharge?['finalFeeAmount']) ??
         _readText(platformServiceFee?['finalFeeAmount']) ??
         _readText(platformServiceFee?['finalAmount']),
+    platformServiceFeeMembershipTier:
+        _readText(record['platformServiceFeeMembershipTier']) ??
+        _readText(record['membershipTierSnapshot']) ??
+        _readText(platformServiceFeeCharge?['membershipTierSnapshot']) ??
+        _readText(platformServiceFee?['membershipTierSnapshot']),
+    platformServiceFeeRuleLabel:
+        _readText(record['platformServiceFeeRuleLabel']) ??
+        _readText(record['feeRateLabel']) ??
+        _readText(platformServiceFeeCharge?['feeRateLabel']) ??
+        _readText(platformServiceFee?['feeRateLabel']),
     inquiryDepositStatus:
         _readText(record['inquiryDepositStatus']) ??
         _readText(record['authenticitySincerityStatus']) ??
@@ -180,6 +252,21 @@ P0PayReadOnlySummaryView? parseP0PayReadOnlySummary(Object? payload) {
         _readText(projectAuthenticitySincerity?['amount']) ??
         _readText(publisherPricing?['authenticitySincerityAmount']) ??
         _readText(inquiryDeposit?['amount']),
+    inquiryDepositOrderId:
+        _readText(record['inquiryDepositOrderId']) ??
+        _readText(record['authenticitySincerityOrderId']) ??
+        _readText(projectAuthenticitySincerity?['orderId']) ??
+        _readText(projectAuthenticitySincerity?['depositOrderId']) ??
+        _readText(publisherPricing?['authenticitySincerityOrderId']) ??
+        _readText(inquiryDeposit?['orderId']) ??
+        _readText(inquiryDeposit?['depositOrderId']),
+    inquiryDepositChannelCandidates: _readStringList(
+      record['inquiryDepositChannelCandidates'] ??
+          record['authenticitySincerityChannelCandidates'] ??
+          projectAuthenticitySincerity?['channelCandidates'] ??
+          publisherPricing?['authenticitySincerityChannelCandidates'] ??
+          inquiryDeposit?['channelCandidates'],
+    ),
     contractConfirmationStatus:
         _readText(record['contractConfirmationStatus']) ??
         _readText(record['dealStatus']) ??
@@ -252,6 +339,28 @@ String p0PayStatusTextKeyLabel(String? value) {
   };
 }
 
+String p0PayMembershipTierLabel(String? value) {
+  return switch (value) {
+    'none' => '未匹配付费会员',
+    'free_certified' => '免费认证版',
+    'standard' => '标准会员',
+    'professional' => '专业会员',
+    'ka' || 'flagship' => 'KA / 旗舰预留',
+    null => '未提供',
+    _ => value,
+  };
+}
+
+String p0PayMembershipDiscountLabel(String? value) {
+  return switch (value) {
+    '0.9000' || '0.9' => '9 折',
+    '0.8000' || '0.8' => '8 折',
+    '1.0000' || '1' => '无会员折扣',
+    null => '未提供',
+    _ => value,
+  };
+}
+
 P0PayReadOnlyRouteTargetView? _parseReadOnlyRouteTarget(Object? payload) {
   final record = _asMap(payload);
   if (record == null) {
@@ -287,4 +396,15 @@ String? _readText(Object? value) {
 
 bool? _readBool(Object? value) {
   return value is bool ? value : null;
+}
+
+List<String> _readStringList(Object? value) {
+  if (value is! Iterable) {
+    return const <String>[];
+  }
+  return value
+      .map(_readText)
+      .whereType<String>()
+      .where((String item) => item.isNotEmpty)
+      .toList(growable: false);
 }

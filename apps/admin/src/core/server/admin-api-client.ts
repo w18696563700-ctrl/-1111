@@ -5,5 +5,6 @@ export * from './admin-organization-review-api-client';
 export * from './admin-governance-api-client';
 export * from './admin-exhibition-report-case-api-client';
 export * from './admin-audit-api-client';
+export * from './admin-membership-api-client';
 export * from './admin-enterprise-hub-change-api-client';
 export * from './admin-enterprise-hub-application-review-api-client';

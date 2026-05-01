@@ -185,6 +185,8 @@ export class CounterpartConversationClarificationSource
         summary: trimConversationText(input.clarification.body),
         status: input.clarification.lifecycleState,
         updatedAt,
+        requesterCompanyName: null,
+        requesterOrganizationId: null,
         truthAnchor: {
           truthType: 'project_clarification' as const,
           projectId: input.clarification.projectId,

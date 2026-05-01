@@ -74,6 +74,7 @@ flutter:
     - assets/legal/privacy_policy.md
     - assets/legal/user_agreement.md
     - assets/location/china_province_city.json
+    - assets/exhibition/project_examples/
 
   # An image asset can refer to one or more resolution-specific "variants", see
   # https://flutter.dev/to/resolution-aware-images

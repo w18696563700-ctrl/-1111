@@ -147,6 +147,19 @@ Future<List<ForumPublishMediaDraft>> _pickForumPublishMedia(
     return override(type);
   }
 
+  if (type == ForumPublishMediaType.image) {
+    final image = await ImagePicker().pickImage(source: ImageSource.gallery);
+    if (image == null) {
+      return const <ForumPublishMediaDraft>[];
+    }
+    return <ForumPublishMediaDraft>[
+      ForumPublishMediaDraft(
+        fileName: _forumImagePickerFileName(image),
+        bytes: await image.readAsBytes(),
+      ),
+    ];
+  }
+
   final selected = await openFile(
     acceptedTypeGroups: <XTypeGroup>[
       switch (type) {
@@ -201,6 +214,24 @@ Future<List<ForumPublishMediaDraft>> _pickForumPublishMedia(
       bytes: await selected.readAsBytes(),
     ),
   ];
+}
+
+String _forumImagePickerFileName(XFile image) {
+  final normalizedName = image.name.trim();
+  if (normalizedName.isNotEmpty) {
+    return normalizedName;
+  }
+  final normalizedPath = image.path.trim();
+  if (normalizedPath.isNotEmpty) {
+    final separatorIndex = normalizedPath.lastIndexOf(Platform.pathSeparator);
+    final candidate = separatorIndex == -1
+        ? normalizedPath
+        : normalizedPath.substring(separatorIndex + 1);
+    if (candidate.trim().isNotEmpty) {
+      return candidate.trim();
+    }
+  }
+  return 'forum-image-${DateTime.now().millisecondsSinceEpoch}.jpg';
 }
 
 String _forumPickerOpenFailureMessage(ForumPublishMediaType type) {

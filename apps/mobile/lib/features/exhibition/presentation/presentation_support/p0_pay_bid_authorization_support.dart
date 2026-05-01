@@ -124,8 +124,16 @@ String _p0PayServiceFeeRequirementSummary(Object? payload) {
   if (requirement == null) {
     return '平台暂未返回服务费快照；请刷新或重新提交后以平台返回为准';
   }
-  final feeRate = _p0PayRequirementText(requirement, 'feeRate');
   final feeRateLabel = _p0PayRequirementText(requirement, 'feeRateLabel');
+  final baseFeeAmount = _p0PayRequirementText(requirement, 'baseFeeAmount');
+  final membershipDiscountRate = _p0PayRequirementText(
+    requirement,
+    'membershipDiscountRate',
+  );
+  final capAmount = _p0PayRequirementText(requirement, 'capAmount');
+  final finalFeeAmount =
+      _p0PayRequirementText(requirement, 'finalFeeAmount') ??
+      _p0PayRequirementText(requirement, 'estimatedFeeAmount');
   final feeRateSource = _p0PayFeeRateSourceDisplay(
     _p0PayRequirementText(requirement, 'feeRateSource'),
   );
@@ -146,8 +154,13 @@ String _p0PayServiceFeeRequirementSummary(Object? payload) {
   final ruleVersion = _p0PayRequirementText(requirement, 'feeRateRuleVersion');
   return <String>[
     '报价 $quotedAmount $currency',
-    '费率 ${_p0PayFeeRateDisplay(label: feeRateLabel, rate: feeRate)}',
+    '服务费规则 ${feeRateLabel ?? '待平台返回'}',
     if (membershipTier != null) '会员等级 $membershipTier',
+    if (baseFeeAmount != null) '基础服务费 $baseFeeAmount $currency',
+    if (membershipDiscountRate != null)
+      '会员折扣 ${_p0PayMembershipDiscountDisplay(membershipDiscountRate)}',
+    if (capAmount != null) '封顶 $capAmount $currency',
+    if (finalFeeAmount != null) '预计服务费 $finalFeeAmount $currency',
     if (feeRateSource != null) '来源 $feeRateSource',
     '预授权额度 $quotaAmount $currency',
     '状态 $authorizationStatus',
@@ -167,8 +180,13 @@ String _p0PayAuthorizationStatusText(ExhibitionLoadResult? result) {
       _normalizeDynamicText(payload?['authorizationStatus']) ??
       _normalizeDynamicText(payload?['status']) ??
       '已回读';
-  final feeRate = _normalizeDynamicText(payload?['feeRate']);
   final feeRateLabel = _normalizeDynamicText(payload?['feeRateLabel']);
+  final baseFeeAmount = _normalizeDynamicText(payload?['baseFeeAmount']);
+  final membershipDiscountRate = _normalizeDynamicText(
+    payload?['membershipDiscountRate'],
+  );
+  final capAmount = _normalizeDynamicText(payload?['capAmount']);
+  final estimatedFeeAmount = _normalizeDynamicText(payload?['estimatedFeeAmount']);
   final membershipTier = _p0PayMembershipTierDisplay(
     _normalizeDynamicText(payload?['membershipTierSnapshot']) ??
         _normalizeDynamicText(payload?['membershipTierAtAuthorization']),
@@ -181,9 +199,13 @@ String _p0PayAuthorizationStatusText(ExhibitionLoadResult? result) {
   final suffix = status == 'authorized' ? '；已预授权，不是已扣款' : '';
   return <String>[
     '状态：$status$suffix',
-    if (feeRate != null || feeRateLabel != null)
-      '费率：${_p0PayFeeRateDisplay(label: feeRateLabel, rate: feeRate)}',
+    if (feeRateLabel != null) '服务费规则：$feeRateLabel',
     if (membershipTier != null) '会员等级：$membershipTier',
+    if (baseFeeAmount != null) '基础服务费：$baseFeeAmount $currency',
+    if (membershipDiscountRate != null)
+      '会员折扣：${_p0PayMembershipDiscountDisplay(membershipDiscountRate)}',
+    if (capAmount != null) '封顶：$capAmount $currency',
+    if (estimatedFeeAmount != null) '预计服务费：$estimatedFeeAmount $currency',
     if (quotaAmount != null) '预授权额度：$quotaAmount $currency',
   ].join('；');
 }
@@ -267,4 +289,13 @@ String? _p0PayFeeRateSourceDisplay(String? value) {
     default:
       return value;
   }
+}
+
+String _p0PayMembershipDiscountDisplay(String value) {
+  return switch (value.trim()) {
+    '0.9000' || '0.9' => '9 折',
+    '0.8000' || '0.8' => '8 折',
+    '1.0000' || '1' => '无会员折扣',
+    _ => value,
+  };
 }

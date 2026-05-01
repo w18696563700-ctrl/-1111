@@ -219,6 +219,8 @@ export class CounterpartConversationBidThreadSource
           : `${counterpartDisplayName} 已对当前项目提交竞标。`,
         status: input.thread.lifecycleState,
         updatedAt,
+        requesterCompanyName: null,
+        requesterOrganizationId: null,
         truthAnchor: {
           truthType: 'bid_thread' as const,
           projectId: input.thread.projectId,

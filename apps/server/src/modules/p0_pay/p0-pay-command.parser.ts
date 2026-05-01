@@ -9,6 +9,7 @@ import {
   CreateInquiryDepositOrderCommand,
   CreateProjectAuthenticitySincerityOrderCommand,
   InquiryDepositPayInitCommand,
+  ProjectAuthenticitySincerityRefundCommand,
   ProjectAuthenticitySincerityPayInitCommand
 } from './p0-pay.commands';
 import { p0PayInvalid, pricingRuleVersionMismatch } from './p0-pay.errors';
@@ -111,6 +112,17 @@ export class P0PayCommandParser {
     } satisfies ProjectAuthenticitySincerityPayInitCommand;
   }
 
+  toProjectAuthenticitySincerityRefundCommand(projectId: string, orderId: string, payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    return {
+      projectId: this.readPathId(projectId, 'projectId'),
+      orderId: this.readPathId(orderId, 'orderId'),
+      refundReasonCode: this.readOptionalText(source.refundReasonCode, 'refundReasonCode') ?? 'project_publish_cancelled',
+      refundReasonText: this.readOptionalText(source.refundReasonText, 'refundReasonText') ?? '',
+      idempotencyKey: this.idempotencyService.normalizeKey(source.idempotencyKey)
+    } satisfies ProjectAuthenticitySincerityRefundCommand;
+  }
+
   toCreateBidServiceFeeAuthorizationCommand(projectId: string, payload: Record<string, unknown>) {
     const source = this.asRecord(payload);
     const command = {
@@ -195,6 +207,17 @@ export class P0PayCommandParser {
     }
     const normalized = value.trim();
     return normalized ? normalized : null;
+  }
+
+  private readOptionalText(value: unknown, field: string) {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    if (typeof value !== 'string') {
+      throw p0PayInvalid(`Field \`${field}\` must be a string when present.`);
+    }
+    const normalized = value.trim();
+    return normalized ? normalized.slice(0, 256) : null;
   }
 
   private readStringArray(value: unknown, field: string) {

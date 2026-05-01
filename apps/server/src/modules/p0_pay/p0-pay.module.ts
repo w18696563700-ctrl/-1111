@@ -26,9 +26,11 @@ import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayInquiryDepositService } from './p0-pay-inquiry-deposit.service';
 import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
 import { P0PayPresenter } from './p0-pay.presenter';
+import { P0PayRefundService } from './p0-pay-refund.service';
 import { P0PayServiceFeeAuthorizationService } from './p0-pay-service-fee-authorization.service';
 import { P0PayServiceFeeFactory } from './p0-pay-service-fee.factory';
 import { P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
+import { P0PaySettlementService } from './p0-pay-settlement.service';
 import { P0PayStateActionService } from './p0-pay-state-action.service';
 import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
 
@@ -64,9 +66,11 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
     P0PayInquiryDepositService,
     P0PayPaymentChannelService,
     P0PayPresenter,
+    P0PayRefundService,
     P0PayServiceFeeFactory,
     P0PayServiceFeeRatePolicy,
     P0PayServiceFeeAuthorizationService,
+    P0PaySettlementService,
     P0PayStateActionService,
     P0PayTradeTaskService
   ],
@@ -75,6 +79,8 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
     P0PayInquiryDepositService,
     P0PayStateActionService,
     P0PayTradeTaskService,
+    P0PayRefundService,
+    P0PaySettlementService,
     P0PayServiceFeeAuthorizationService
   ]
 })

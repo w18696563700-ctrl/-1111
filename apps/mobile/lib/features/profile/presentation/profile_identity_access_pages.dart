@@ -637,6 +637,10 @@ class _CertificationStatusPageState extends State<CertificationStatusPage> {
     final status =
         certification?.certificationStatus?.trim() ??
         currentOrganization.certificationStatus.trim();
+    final switchOrganizationButton = FilledButton.tonal(
+      onPressed: () => _openRoute(ProfileIdentityRoutes.organizationSwitch),
+      child: const Text('切换当前主体'),
+    );
     if (status == 'rejected' || status == 'expired') {
       return <Widget>[
         FilledButton(
@@ -644,6 +648,7 @@ class _CertificationStatusPageState extends State<CertificationStatusPage> {
               _openRoute(ProfileIdentityRoutes.certificationResubmit),
           child: const Text('重新提交认证'),
         ),
+        switchOrganizationButton,
       ];
     }
     if (status == 'approved') {
@@ -653,6 +658,7 @@ class _CertificationStatusPageState extends State<CertificationStatusPage> {
               _openRoute(ProfileIdentityRoutes.certificationRevalidate),
           child: const Text('更正认证资料'),
         ),
+        switchOrganizationButton,
         FilledButton.tonal(
           onPressed: () =>
               _openRoute(ProfileIdentityRoutes.organizationHandoff),
@@ -662,6 +668,7 @@ class _CertificationStatusPageState extends State<CertificationStatusPage> {
     }
     if (status == 'pending_review') {
       return <Widget>[
+        switchOrganizationButton,
         FilledButton.tonal(
           onPressed: () =>
               _openRoute(ProfileIdentityRoutes.organizationHandoff),
@@ -675,6 +682,7 @@ class _CertificationStatusPageState extends State<CertificationStatusPage> {
         onPressed: () => _openRoute(ProfileIdentityRoutes.certificationSubmit),
         child: const Text('提交认证'),
       ),
+      switchOrganizationButton,
     ];
   }
 

@@ -143,6 +143,7 @@ test('project/list forwards four filter queries and project/detail preserves dua
                 cityName: '乌鲁木齐',
                 plannedStartAt: '2026-05-01',
                 plannedEndAt: '2026-05-05',
+                publishedAt: '2026-04-30T08:15:00.000Z',
                 state: 'published',
                 summary: { teaser: 'summary' },
               },
@@ -175,6 +176,7 @@ test('project/list forwards four filter queries and project/detail preserves dua
           scopeSummary: null,
           plannedStartAt: '2026-06-01',
           plannedEndAt: '2026-06-03',
+          publishedAt: '2026-04-30T09:00:00.000Z',
           buildingTypeRemark: null,
           scheduleDetail: null,
           viewerProjectRelation: 'non_owner',
@@ -212,6 +214,7 @@ test('project/list forwards four filter queries and project/detail preserves dua
   assert.equal(listResponse.items[0].brandName, '品牌B');
   assert.equal(listResponse.items[0].plannedStartAt, '2026-05-01');
   assert.equal(listResponse.items[0].plannedEndAt, '2026-05-05');
+  assert.equal(listResponse.items[0].publishedAt, '2026-04-30T08:15:00.000Z');
   assert.deepEqual(listResponse.pagination, {
     page: 2,
     pageSize: 1,
@@ -247,6 +250,7 @@ test('project/list and project/detail keep legacy title-only fallback readable',
                 cityName: null,
                 plannedStartAt: null,
                 plannedEndAt: null,
+                publishedAt: '2026-04-30T08:15:00.000Z',
                 state: 'published',
                 summary: { teaser: 'legacy-summary' },
               },
@@ -279,6 +283,7 @@ test('project/list and project/detail keep legacy title-only fallback readable',
           scopeSummary: null,
           plannedStartAt: null,
           plannedEndAt: null,
+          publishedAt: '2026-04-30T08:15:00.000Z',
           buildingTypeRemark: null,
           scheduleDetail: null,
           viewerProjectRelation: 'owner',
@@ -300,4 +305,54 @@ test('project/list and project/detail keep legacy title-only fallback readable',
   assert.equal(detailResponse.title, '历史标题项目');
   assert.equal(detailResponse.exhibitionName, null);
   assert.equal(detailResponse.brandName, null);
+});
+
+test('project/list rejects server items without publishedAt', async () => {
+  const service = createService({
+    serverClient: {
+      async get(path) {
+        assert.equal(path, '/server/projects');
+        return {
+          items: [
+            {
+              projectId: 'project-without-published-at',
+              projectNo: 'PJ-MISSING-PUBLISHED',
+              title: '缺发布时间项目',
+              exhibitionName: '缺发布时间展会',
+              brandName: '缺发布时间品牌',
+              buildingType: 'exhibition',
+              budgetAmount: 90000,
+              areaSqm: 36,
+              provinceCode: '500000',
+              provinceName: '重庆市',
+              cityCode: '500100',
+              cityName: '重庆市',
+              plannedStartAt: '2026-05-01',
+              plannedEndAt: '2026-05-05',
+              state: 'published',
+              summary: { teaser: 'missing-publishedAt' },
+            },
+          ],
+          pagination: {
+            page: 1,
+            pageSize: 20,
+            total: 1,
+            hasMore: false,
+          },
+        };
+      },
+    },
+  });
+
+  await assert.rejects(
+    () => service.getProjectList({}, {}),
+    (error) => {
+      assert.equal(error.getStatus(), 502);
+      assert.match(
+        error.getResponse().details.message,
+        /Project list response is missing publishedAt/,
+      );
+      return true;
+    },
+  );
 });

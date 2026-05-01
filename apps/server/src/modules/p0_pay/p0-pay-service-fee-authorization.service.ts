@@ -21,6 +21,7 @@ import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayCommandParser } from './p0-pay-command.parser';
 import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
+import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
 import { P0PayPresenter } from './p0-pay.presenter';
 import { P0PayServiceFeeFactory } from './p0-pay-service-fee.factory';
 import {
@@ -47,6 +48,7 @@ export class P0PayServiceFeeAuthorizationService {
     private readonly commandParser: P0PayCommandParser,
     private readonly idempotencyService: P0PayIdempotencyService,
     private readonly idempotencyRecordService: P0PayIdempotencyRecordService,
+    private readonly paymentChannelService: P0PayPaymentChannelService,
     private readonly serviceFeeFactory: P0PayServiceFeeFactory,
     private readonly auditService: P0PayAuditService,
     private readonly presenter: P0PayPresenter
@@ -120,7 +122,10 @@ export class P0PayServiceFeeAuthorizationService {
       requestHash
     );
     if (existing) {
-      return this.presenter.toAuthorizeInitResponse(ownership.authorization, existing);
+      const action = this.paymentChannelService.buildChannelAction(
+        this.toChannelActionInput(existing, command.clientPlatform)
+      );
+      return this.presenter.toAuthorizeInitResponse(ownership.authorization, existing, action);
     }
 
     const result = await this.dataSource.transaction((manager) =>
@@ -131,7 +136,10 @@ export class P0PayServiceFeeAuthorizationService {
         context
       })
     );
-    return this.presenter.toAuthorizeInitResponse(result.authorization, result.order);
+    const action = this.paymentChannelService.buildChannelAction(
+      this.toChannelActionInput(result.order, command.clientPlatform)
+    );
+    return this.presenter.toAuthorizeInitResponse(result.authorization, result.order, action);
   }
 
   async getAuthorization(taskId: string, bidId: string, authorizationId: string, context: RequestContext) {
@@ -366,6 +374,17 @@ export class P0PayServiceFeeAuthorizationService {
 
   private buildCreateScopeKey(taskId: string, bidId: string, factoryOrganizationId: string) {
     return `task:${taskId}:bid:${bidId}:factory:${factoryOrganizationId}`;
+  }
+
+  private toChannelActionInput(order: PaymentOrderEntity, clientPlatform: string) {
+    return {
+      paymentOrderId: order.id,
+      merchantOrderNo: order.merchantOrderNo,
+      amount: order.amount,
+      currency: order.currency,
+      channel: order.paymentChannel,
+      clientPlatform
+    };
   }
 }
 

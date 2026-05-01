@@ -241,6 +241,31 @@ ExhibitionMobileApp _buildApp({
 }
 
 Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
+  final scrollable = find.byType(Scrollable).first;
+  for (
+    var attempt = 0;
+    attempt < 8 && finder.evaluate().isEmpty;
+    attempt += 1
+  ) {
+    await tester.drag(scrollable, const Offset(0, -260));
+    await tester.pumpAndSettle();
+  }
+  for (
+    var attempt = 0;
+    attempt < 8 && finder.evaluate().isEmpty;
+    attempt += 1
+  ) {
+    await tester.drag(scrollable, const Offset(0, 260));
+    await tester.pumpAndSettle();
+  }
+  for (
+    var attempt = 0;
+    attempt < 8 && finder.evaluate().isEmpty;
+    attempt += 1
+  ) {
+    await tester.drag(scrollable, const Offset(0, -260));
+    await tester.pumpAndSettle();
+  }
   await tester.scrollUntilVisible(
     finder,
     200,
@@ -250,15 +275,25 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
 }
 
 Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
-  await _scrollTo(tester, finder.first);
+  await _scrollTo(tester, finder);
   await tester.tap(finder.first);
   await tester.pumpAndSettle();
 }
 
 Future<void> _tapChoiceChipLabel(WidgetTester tester, String label) async {
   final chipFinder = find.widgetWithText(ChoiceChip, label);
-  await _scrollTo(tester, chipFinder.first);
+  await _scrollTo(tester, chipFinder);
   await tester.tap(chipFinder.first);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _tapWorkspaceSegment(WidgetTester tester, String label) async {
+  final segmentFinder = find.ancestor(
+    of: find.text(label),
+    matching: find.byType(InkWell),
+  );
+  await _scrollTo(tester, segmentFinder);
+  await tester.tap(segmentFinder.first);
   await tester.pumpAndSettle();
 }
 
@@ -431,7 +466,9 @@ Finder _entityCardByTitle(String title) {
   return find.ancestor(
     of: find.text(title),
     matching: find.byWidgetPredicate(
-      (Widget widget) => widget.runtimeType.toString() == '_EntityCard',
+      (Widget widget) =>
+          widget.runtimeType.toString() == '_EntityCard' ||
+          widget.runtimeType.toString() == '_MyProjectCompactCard',
     ),
   );
 }
@@ -441,19 +478,20 @@ Future<void> _tapEntityCardAction(
   required String title,
   required String actionLabel,
 }) async {
-  final cardFinder = _entityCardByTitle(title).first;
+  final cardFinder = _entityCardByTitle(title);
+  await _scrollTo(tester, cardFinder);
   final primaryButtonFinder = find.descendant(
-    of: cardFinder,
+    of: cardFinder.first,
     matching: find.widgetWithText(FilledButton, actionLabel),
   );
   final secondaryButtonFinder = find.descendant(
-    of: cardFinder,
+    of: cardFinder.first,
     matching: find.widgetWithText(OutlinedButton, actionLabel),
   );
   final buttonFinder = primaryButtonFinder.evaluate().isNotEmpty
       ? primaryButtonFinder
       : secondaryButtonFinder;
-  await _scrollTo(tester, buttonFinder.first);
+  await _scrollTo(tester, buttonFinder);
   await tester.tap(buttonFinder.first);
   await tester.pumpAndSettle();
 }
@@ -467,6 +505,7 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
   String? failingLifecycleCode,
   String? failingLifecycleMessage,
   List<String>? pricingCalls,
+  Set<String> projectsWithExistingSincerityOrder = const <String>{},
   void Function(String projectId)? onDelete,
 }) {
   Future<AppApiResponse> lifecycleSuccess(
@@ -737,7 +776,8 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
         (AppApiRequest request) async {
           final attachments =
               projectId == 'project-publish-flow' ||
-                  projectId == 'project-sincerity-pending'
+                  projectId == 'project-sincerity-pending' ||
+                  projectsWithExistingSincerityOrder.contains(projectId)
               ? <Map<String, Object?>>[
                   <String, Object?>{
                     'attachmentId': 'attachment-effect-1',
@@ -761,6 +801,9 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
     handlers['GET ${ExhibitionCanonicalPaths.projectPricingSummary(projectId)}'] =
         (AppApiRequest request) async {
           pricingCalls?.add(request.canonicalPath);
+          final hasExistingOrder = projectsWithExistingSincerityOrder.contains(
+            projectId,
+          );
           return AppApiResponse(
             statusCode: 200,
             uri: request.uri,
@@ -769,7 +812,15 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
               'publisherPricing': <String, Object?>{
                 'authenticitySincerityRequired': true,
                 'authenticitySincerityAmount': '200.00',
-                'authenticitySincerityStatus': null,
+                'authenticitySincerityStatus': hasExistingOrder
+                    ? 'pending_payment'
+                    : null,
+                if (hasExistingOrder)
+                  'authenticitySincerityOrderId': 'sincerity-$projectId',
+                if (hasExistingOrder)
+                  'authenticitySincerityChannelCandidates': const <Object?>[
+                    'alipay_candidate',
+                  ],
                 'publishGateStatus': 'required',
               },
               'readOnly': true,
@@ -855,20 +906,25 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    expect(find.text('草稿 · 1 个'), findsOneWidget);
-    expect(find.text('已归档 · 1 个'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '草稿 · 1'), findsNothing);
+    expect(find.text('当前展示：已接通内容'), findsWidgets);
+    await _scrollTo(tester, find.text('预发布列表 · 1'));
+    expect(find.textContaining('全部'), findsWidgets);
+    expect(find.widgetWithText(ChoiceChip, '草稿 · 1'), findsOneWidget);
     expect(find.text('预发布列表 · 1'), findsOneWidget);
     expect(find.text('竞标中 · 1'), findsOneWidget);
     expect(find.text('进行中 · 1'), findsOneWidget);
-    expect(find.textContaining('当前只显示预发布列表阶段'), findsOneWidget);
+    expect(find.textContaining('补齐资料后可确认发布'), findsWidgets);
+    await _scrollTo(tester, find.text('草稿 · 1 个'));
+    expect(find.text('草稿 · 1 个'), findsOneWidget);
+    expect(find.text('已归档 · 1 个'), findsOneWidget);
+
     await _tapVisible(tester, find.text('草稿 · 1 个'));
     expect(find.text('草稿列表'), findsOneWidget);
-    expect(find.textContaining('当前只显示草稿阶段'), findsOneWidget);
+    expect(find.textContaining('未完成项目收在低频入口'), findsWidgets);
     expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
 
     await _tapChoiceChipLabel(tester, '预发布列表 · 1');
-    expect(find.text('预发布项目'), findsOneWidget);
+    expect(find.text('预发布项目'), findsWidgets);
     expect(find.text('草稿项目'), findsNothing);
 
     await _tapChoiceChipLabel(tester, '竞标中 · 1');
@@ -876,8 +932,8 @@ void main() {
     expect(find.text('预发布项目'), findsNothing);
 
     await _tapChoiceChipLabel(tester, '进行中 · 1');
-    expect(find.text('进行中项目'), findsOneWidget);
-    expect(find.text('当前阶段：竞标中'), findsNothing);
+    expect(find.text('进行中'), findsWidgets);
+    expect(find.textContaining('查看详情，必要时补充资料'), findsNothing);
 
     await _tapVisible(tester, find.text('已归档 · 1 个'));
     expect(find.text('已归档列表'), findsOneWidget);
@@ -909,21 +965,22 @@ void main() {
     await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(ChoiceChip, '我的发布'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '我的竞标'), findsOneWidget);
+    expect(find.text('我的发布'), findsWidgets);
+    expect(find.text('我的竞标'), findsWidgets);
+    await _scrollTo(tester, find.text('草稿 · 1 个'));
     expect(find.text('草稿 · 1 个'), findsOneWidget);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, '我的竞标'));
-    await tester.pumpAndSettle();
+    await _tapWorkspaceSegment(tester, '我的竞标');
 
     expect(find.text('当前竞标列表暂未接通'), findsNothing);
+    await _scrollTo(tester, find.text('供应商竞标记录'));
     expect(find.text('供应商竞标记录'), findsOneWidget);
     expect(find.text('沟通与投标'), findsOneWidget);
     expect(find.text('草稿 · 1 个'), findsNothing);
 
-    await tester.tap(find.widgetWithText(ChoiceChip, '我的发布'));
-    await tester.pumpAndSettle();
+    await _tapWorkspaceSegment(tester, '我的发布');
 
+    await _scrollTo(tester, find.text('草稿 · 1 个'));
     expect(find.text('草稿 · 1 个'), findsOneWidget);
   });
 
@@ -954,9 +1011,34 @@ void main() {
     );
     await tester.pumpAndSettle();
 
+    await _scrollTo(tester, find.text('供应商竞标记录'));
     expect(find.text('供应商竞标记录'), findsOneWidget);
     expect(find.text('沟通与投标'), findsOneWidget);
     expect(find.text('草稿 · 1 个'), findsNothing);
+  });
+
+  testWidgets('我的项目路由可以直接钉到草稿阶段并高亮项目', (WidgetTester tester) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{
+        'project-draft-1': 'draft',
+        'project-submitted-1': 'submitted',
+      },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDraftboxWithProjectId(
+          'project-draft-1',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.text('草稿项目'));
+    expect(find.text('草稿项目'), findsWidgets);
+    expect(find.text('刚刚保存到草稿箱'), findsOneWidget);
+    expect(find.text('预发布项目'), findsNothing);
   });
 
   testWidgets('我的项目列表卡片显示阶段、下一步和归档只读说明', (WidgetTester tester) async {
@@ -975,29 +1057,44 @@ void main() {
 
     await _tapVisible(tester, find.text('草稿 · 1 个'));
     expect(find.text('草稿列表'), findsOneWidget);
-    expect(find.text('当前阶段：草稿'), findsOneWidget);
-    expect(find.text('当前下一步：继续编辑 / 删除此项目'), findsOneWidget);
+    expect(find.textContaining('项目阶段：草稿', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('下一步：继续编辑项目资料', findRichText: true),
+      findsOneWidget,
+    );
 
     await _tapChoiceChipLabel(tester, '预发布列表 · 1');
-    expect(find.text('当前阶段：预发布列表'), findsOneWidget);
     expect(
-      find.text('当前下一步：查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废删除'),
+      find.textContaining('项目阶段：预发布列表', findRichText: true),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('下一步：补齐资料后在详情页确认发布', findRichText: true),
       findsOneWidget,
     );
     expect(find.widgetWithText(FilledButton, '补资料后确认发布'), findsOneWidget);
 
     await _tapChoiceChipLabel(tester, '竞标中 · 1');
-    expect(find.text('当前阶段：竞标中'), findsOneWidget);
-    expect(find.text('当前下一步：查看详情 / 补充资料 / 撤回到预发布'), findsOneWidget);
+    expect(find.textContaining('项目阶段：竞标中', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('下一步：查看详情，必要时补充资料', findRichText: true),
+      findsOneWidget,
+    );
 
     await _tapChoiceChipLabel(tester, '进行中 · 1');
-    expect(find.text('当前阶段：进行中'), findsOneWidget);
-    expect(find.text('当前下一步：查看详情 / 发起取消 / 记录违约'), findsOneWidget);
+    expect(find.textContaining('项目阶段：进行中', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('下一步：进入详情查看履约承接', findRichText: true),
+      findsOneWidget,
+    );
 
     await _tapVisible(tester, find.text('已归档 · 1 个'));
     expect(find.text('已归档列表'), findsOneWidget);
-    expect(find.text('当前阶段：已归档'), findsOneWidget);
-    expect(find.text('当前下一步：查看详情 / 当前只读'), findsOneWidget);
+    expect(find.textContaining('项目阶段：已归档', findRichText: true), findsOneWidget);
+    expect(
+      find.textContaining('下一步：只读查看历史项目', findRichText: true),
+      findsOneWidget,
+    );
   });
 
   testWidgets('草稿详情显示继续编辑、删除并隐藏说明型区块', (WidgetTester tester) async {
@@ -1205,20 +1302,23 @@ void main() {
 
     expect(find.text('已正式发布'), findsOneWidget);
     expect(projectStates['project-publish-flow'], 'published');
-    expect(pricingCalls, <String>[
-      ExhibitionCanonicalPaths.projectPricingSummary('project-publish-flow'),
-      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
-        'project-publish-flow',
-      ),
-      ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
-        'project-publish-flow',
-        'sincerity-project-publish-flow',
-      ),
-      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
-        'project-publish-flow',
-        'sincerity-project-publish-flow',
-      ),
-    ]);
+    expect(
+      pricingCalls,
+      containsAllInOrder(<String>[
+        ExhibitionCanonicalPaths.projectPricingSummary('project-publish-flow'),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
+          'project-publish-flow',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
+          'project-publish-flow',
+          'sincerity-project-publish-flow',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
+          'project-publish-flow',
+          'sincerity-project-publish-flow',
+        ),
+      ]),
+    );
     expect(find.textContaining('竞标中', skipOffstage: false), findsWidgets);
   });
 
@@ -1248,24 +1348,94 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('项目真实性诚意金尚未完成冻结'), findsOneWidget);
+    expect(find.textContaining('云端暂未返回可打开的支付链接'), findsOneWidget);
     expect(projectStates['project-sincerity-pending'], 'submitted');
-    expect(pricingCalls, <String>[
-      ExhibitionCanonicalPaths.projectPricingSummary(
-        'project-sincerity-pending',
+    expect(
+      pricingCalls,
+      containsAllInOrder(<String>[
+        ExhibitionCanonicalPaths.projectPricingSummary(
+          'project-sincerity-pending',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
+          'project-sincerity-pending',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
+          'project-sincerity-pending',
+          'sincerity-project-sincerity-pending',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
+          'project-sincerity-pending',
+          'sincerity-project-sincerity-pending',
+        ),
+      ]),
+    );
+  });
+
+  testWidgets('预发布详情已有诚意金订单时显示进度和继续支付且不重复创建', (WidgetTester tester) async {
+    final projectStates = <String, String>{
+      'project-draft-1': 'draft',
+      'project-existing-sincerity-order': 'submitted',
+    };
+    final pricingCalls = <String>[];
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: projectStates,
+      pricingCalls: pricingCalls,
+      projectsWithExistingSincerityOrder: const <String>{
+        'project-existing-sincerity-order',
+      },
+    );
+
+    await tester.pumpWidget(_buildApp(exhibitionHandlers: handlers));
+    await tester.pumpAndSettle();
+
+    await _tapChoiceChipLabel(tester, '预发布列表 · 1');
+    await _tapEntityCardAction(
+      tester,
+      title: '项目 project-existing-sincerity-order',
+      actionLabel: '补资料后确认发布',
+    );
+    expect(find.text('发布进度'), findsOneWidget);
+    expect(find.text('项目真实性诚意金', skipOffstage: false), findsWidgets);
+    expect(
+      find.textContaining('不是押金、罚款或平台服务费', skipOffstage: false),
+      findsOneWidget,
+    );
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续支付诚意金'));
+    expect(find.widgetWithText(FilledButton, '继续支付诚意金'), findsOneWidget);
+
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
+    await tester.pumpAndSettle();
+
+    expect(projectStates['project-existing-sincerity-order'], 'published');
+    expect(
+      pricingCalls,
+      isNot(
+        contains(
+          ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
+            'project-existing-sincerity-order',
+          ),
+        ),
       ),
-      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
-        'project-sincerity-pending',
-      ),
-      ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
-        'project-sincerity-pending',
-        'sincerity-project-sincerity-pending',
-      ),
-      ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
-        'project-sincerity-pending',
-        'sincerity-project-sincerity-pending',
-      ),
-    ]);
+    );
+    expect(
+      pricingCalls,
+      containsAllInOrder(<String>[
+        ExhibitionCanonicalPaths.projectPricingSummary(
+          'project-existing-sincerity-order',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
+          'project-existing-sincerity-order',
+          'sincerity-project-existing-sincerity-order',
+        ),
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
+          'project-existing-sincerity-order',
+          'sincerity-project-existing-sincerity-order',
+        ),
+      ]),
+    );
   });
 
   testWidgets('预发布详情缺少必传效果图时拦截正式发布', (WidgetTester tester) async {

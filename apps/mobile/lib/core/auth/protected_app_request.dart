@@ -10,9 +10,14 @@ Future<AppApiResponse> runProtectedAppRequest(
     await AuthConsumerLayer.instance.refreshSession();
   }
 
+  final accessTokenBeforeSend = AppSessionStore.instance.snapshot.accessToken;
   final response = await send();
   if (response.statusCode != 401 || !AppSessionStore.instance.hasRefreshToken) {
     return response;
+  }
+
+  if (_accessTokenChangedSince(accessTokenBeforeSend)) {
+    return send();
   }
 
   final refreshResult = await AuthConsumerLayer.instance.refreshSession();
@@ -21,4 +26,14 @@ Future<AppApiResponse> runProtectedAppRequest(
   }
 
   return send();
+}
+
+bool _accessTokenChangedSince(String? previous) {
+  final current = AppSessionStore.instance.snapshot.accessToken;
+  return _normalizeToken(current) != _normalizeToken(previous);
+}
+
+String? _normalizeToken(String? value) {
+  final normalized = value?.trim();
+  return normalized == null || normalized.isEmpty ? null : normalized;
 }

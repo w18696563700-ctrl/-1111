@@ -30,6 +30,7 @@ export class ProjectCommunicationPresenter {
       senderOrganizationId: message.senderOrganizationId,
       messageKind: message.messageKind,
       body: message.body,
+      payload: this.toMessagePayload(message.payload),
       clientMessageId: message.clientMessageId,
       messageState: message.messageState,
       createdAt: message.createdAt.toISOString()
@@ -42,6 +43,13 @@ export class ProjectCommunicationPresenter {
       items: items.map((item) => this.toMessage(item)),
       nextCursor: last?.createdAt.toISOString() ?? null
     };
+  }
+
+  private toMessagePayload(payload: Record<string, unknown> | null | undefined) {
+    if (!payload || Object.keys(payload).length === 0) {
+      return null;
+    }
+    return payload;
   }
 
   toReadCursor(cursor: ProjectCommunicationReadCursorEntity) {

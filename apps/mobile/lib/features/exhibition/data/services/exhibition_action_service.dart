@@ -104,6 +104,15 @@ class _ExhibitionActionService {
     }
   }
 
+  Future<ExhibitionActionResult> submitExhibitionReport(
+    ExhibitionReportSubmitCommand command,
+  ) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.exhibitionReportSubmit,
+      body: command.toJson(),
+    );
+  }
+
   Future<ExhibitionActionResult> submitBid(BidSubmitCommand command) {
     return _submit(ExhibitionCanonicalPaths.bidSubmit, body: command.toJson());
   }

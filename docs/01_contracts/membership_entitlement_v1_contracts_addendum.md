@@ -142,17 +142,45 @@ layer: L2 Contracts
   - `certificationStatus`
   - organization role fields
   with paid-membership semantics.
+- `membershipStatus` is the existing Package 1 organization-membership field.
+  It is not a paid-membership state field and must not be used by `BFF` or
+  Flutter to label `我的会员` as opened.
+- Paid-membership display must use:
+  - `paidMembershipTier`
+  - `serviceFeeDiscountSummary`
+  - `paidMembershipEntitlementsSummary`
+  - `paidMembershipQuotaSummary`
+
+## Current Fee-display Freeze
+
+- Current formal service-fee discount display must align to:
+  - standard membership: `baseFeeAmount × 0.9`
+  - professional membership: `baseFeeAmount × 0.8`
+- The display object is `baseFeeAmount` from the current platform-pricing
+  master rule, not a fixed percentage of transaction amount.
+- The following values are historical candidate / deprecated planning
+  parameters only and must not be presented as current formal display or
+  calculation truth:
+  - `3.0%`
+  - `2.5%`
+  - `2.0%`
+  - `1.5%`
+- Legacy fields may remain nullable for backwards compatibility, but must not
+  carry deprecated fixed fee-rate values as current formal truth:
+  - `rateBand`
+  - `candidateDisplayRateBand`
 
 ## Membership Schema Freeze
 
 - `GET /api/app/profile/membership/current` must return:
   - `paidMembershipTier`
-  - `rateBand`
+  - `serviceFeeDiscountSummary`
   - `entitlementsSummary`
   - `quotaSummary`
   - `effectiveAt`
   - `expiresAt`
   - `nextRefreshAt`
+- `rateBand` may remain as a nullable legacy compatibility field only.
 - `GET /api/app/profile/membership/explanation` must return at minimum:
   - `tiers`
   - `entitlementNotes`
@@ -171,15 +199,23 @@ layer: L2 Contracts
   - `availableTiers`
   - `upgradeHighlights`
   - `commercialDisclosure`
+- One upgrade-guide tier item may return:
+  - `serviceFeeDiscountSummary`
+- `candidateDisplayPrice` and `candidateDisplayRateBand` may remain nullable
+  compatibility fields only. They must not carry deprecated fixed fee-rate
+  values as current formal truth.
 
 ## Candidate-commercial-display Boundary
 
-- Upgrade guidance may carry candidate commercial display copy.
+- Upgrade guidance may carry non-transactional service-fee discount guidance.
 - This package does not by itself freeze:
   - final launch price
-  - final fee rate
-  - final discount value
   - final payment execution path
+- This package does not freeze:
+  - membership purchase order path
+  - payment provider initialization path
+- Current service-fee discount display is limited to the formal platform-pricing
+  ruling above. It is not a purchase offer.
 - Therefore current commercial display must stay:
   - explanatory
   - non-transactional

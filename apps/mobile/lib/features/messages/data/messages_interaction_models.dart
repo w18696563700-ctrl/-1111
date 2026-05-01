@@ -13,6 +13,10 @@ final class MessagesCanonicalPaths {
       '/api/app/message/project-communication/messages';
   static const String projectCommunicationReadCursor =
       '/api/app/message/project-communication/read-cursor';
+  static const String projectCommunicationFilePreviewAccess =
+      '/api/app/file/preview/access';
+  static const String confirmationSoftLinkDetail =
+      '/api/app/confirmation/softlink/detail';
 
   static String projectAlbumPhotos(String projectId) =>
       '/api/app/project/${Uri.encodeComponent(projectId)}/album/photos';

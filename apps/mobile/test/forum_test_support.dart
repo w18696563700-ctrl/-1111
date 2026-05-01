@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
+import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
@@ -765,6 +766,28 @@ _forumHandlers() {
             'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
           },
         ),
+    'GET /api/app/forum/me/likes': (AppApiRequest request) async =>
+        AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: <String, Object?>{
+            'items': <Object?>[
+              <String, Object?>{
+                'postId': 'post-materials-1',
+                'topicId': 'expo-materials',
+                'topicTitle': '布展进场',
+                'excerpt': '我点过赞的一条帖子摘要',
+                'state': 'published',
+                'author': <String, Object?>{
+                  'authorId': 'member-1',
+                  'displayName': '赵工',
+                },
+                'publishedAt': '2026-03-27T09:30:00Z',
+              },
+            ],
+            'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+          },
+        ),
     'GET /api/app/forum/me/follows': (AppApiRequest request) async =>
         AppApiResponse(
           statusCode: 200,
@@ -821,6 +844,7 @@ ExhibitionMobileApp buildForumTestAppWithOverrides({
   Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
       profileGovernanceAppealHandlerOverrides =
       const <String, Future<AppApiResponse> Function(AppApiRequest request)>{},
+  AppSessionStore? sessionStore,
 }) {
   final manifest = AppConfigManifest.bootstrapDefaults();
   final forumHandlers =
@@ -953,5 +977,6 @@ ExhibitionMobileApp buildForumTestAppWithOverrides({
         ),
       ),
     ),
+    sessionStore: sessionStore,
   );
 }

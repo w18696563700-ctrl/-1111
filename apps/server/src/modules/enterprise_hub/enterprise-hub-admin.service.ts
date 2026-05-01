@@ -3,6 +3,9 @@ import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
+import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
+import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import {
   duplicateRecommendationSlot,
   enterpriseNotApproved,
@@ -23,10 +26,13 @@ export class EnterpriseHubAdminService {
     private readonly listingRepository: Repository<EnterpriseListingEntity>,
     @InjectRepository(EnterpriseRecommendationSlotEntity)
     private readonly recommendationSlotRepository: Repository<EnterpriseRecommendationSlotEntity>,
-    private readonly presenter: EnterpriseHubPresenter
+    private readonly presenter: EnterpriseHubPresenter,
+    private readonly currentSessionVerificationService: CurrentSessionVerificationService,
+    private readonly eligibilityService: CurrentActorEligibilityService,
   ) {}
 
   async publishListing(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
+    await this.requireReviewer(context);
     const listing = await this.requireListing(enterpriseId);
     const latestApproved = await this.applicationRepository.findOne({
       where: { enterpriseId, applicationStatus: 'approved' },
@@ -46,6 +52,7 @@ export class EnterpriseHubAdminService {
   }
 
   async offlineListing(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
+    await this.requireReviewer(context);
     const listing = await this.requireListing(enterpriseId);
     if (!this.readText(payload.reason)) {
       throw invalidStateTransition('reason is required for enterprise hub offline.');
@@ -58,6 +65,7 @@ export class EnterpriseHubAdminService {
   }
 
   async freezeListing(enterpriseId: string, payload: Record<string, unknown>, context: RequestContext) {
+    await this.requireReviewer(context);
     const listing = await this.requireListing(enterpriseId);
     if (!this.readText(payload.reason)) {
       throw invalidStateTransition('reason is required for enterprise hub freeze.');
@@ -69,7 +77,8 @@ export class EnterpriseHubAdminService {
     return { ok: true, traceId: context.traceId };
   }
 
-  async listRecommendationSlots(query: Record<string, unknown>) {
+  async listRecommendationSlots(query: Record<string, unknown>, context: RequestContext) {
+    await this.requireReviewer(context);
     const where: Record<string, unknown> = {};
     if (typeof query.boardType === 'string' && query.boardType.trim().length > 0) {
       where.boardType = query.boardType.trim();
@@ -87,6 +96,7 @@ export class EnterpriseHubAdminService {
   }
 
   async createRecommendationSlot(payload: Record<string, unknown>, context: RequestContext) {
+    await this.requireReviewer(context);
     const boardType = this.readText(payload.boardType);
     const slotPosition = this.readPositiveInt(payload.slotPosition, 1, 3);
     const enterpriseId = this.readText(payload.enterpriseId);
@@ -153,6 +163,14 @@ export class EnterpriseHubAdminService {
       throw enterpriseNotFound();
     }
     return listing;
+  }
+
+  private async requireReviewer(context: RequestContext) {
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService,
+    );
+    return this.eligibilityService.requireReviewer(currentSession);
   }
 
   private readText(value: unknown) {

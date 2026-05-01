@@ -28,6 +28,7 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool _loading = false;
   bool _p0PaySummaryLoading = false;
   bool _requestingNameAccess = false;
+  bool _submittingReport = false;
   int _p0PaySummaryLoadToken = 0;
 
   @override
@@ -123,38 +124,45 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   }) {
     showModalBottomSheet<void>(
       context: context,
-      showDragHandle: true,
+      showDragHandle: false,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      barrierColor: Colors.black.withValues(alpha: 0.32),
+      constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width),
       builder: (BuildContext sheetContext) {
-        return ProjectNameAccessPermissionSheet(
-          projectMap: projectMap,
-          requesting: _requestingNameAccess,
-          onRequest: () async {
-            final succeeded = await _requestProjectNameAccess(projectId);
-            if (succeeded && sheetContext.mounted) {
+        return FractionallySizedBox(
+          widthFactor: 1,
+          child: ProjectNameAccessPermissionSheet(
+            projectMap: projectMap,
+            requesting: _requestingNameAccess,
+            onRequest: () async {
+              final succeeded = await _requestProjectNameAccess(projectId);
+              if (succeeded && sheetContext.mounted) {
+                Navigator.of(sheetContext).maybePop();
+              }
+            },
+            onOpenStatus: () {
+              final requestId = _projectNameAccessRequestId(projectMap);
+              if (requestId == null) {
+                return;
+              }
               Navigator.of(sheetContext).maybePop();
-            }
-          },
-          onOpenStatus: () {
-            final requestId = _projectNameAccessRequestId(projectMap);
-            if (requestId == null) {
-              return;
-            }
-            Navigator.of(sheetContext).maybePop();
-            Navigator.of(context).pushNamed(
-              ExhibitionRoutes.bidParticipationThreadWithIds(
-                threadId: requestId,
-                projectId: projectId,
-                requestId: requestId,
-              ),
-            );
-          },
-          onRefresh: () async {
-            await _load(forceRefresh: true);
-            if (sheetContext.mounted) {
-              Navigator.of(sheetContext).maybePop();
-            }
-          },
+              Navigator.of(context).pushNamed(
+                ExhibitionRoutes.bidParticipationThreadWithIds(
+                  threadId: requestId,
+                  projectId: projectId,
+                  requestId: requestId,
+                ),
+              );
+            },
+            onRefresh: () async {
+              await _load(forceRefresh: true);
+              if (sheetContext.mounted) {
+                Navigator.of(sheetContext).maybePop();
+              }
+            },
+          ),
         );
       },
     );

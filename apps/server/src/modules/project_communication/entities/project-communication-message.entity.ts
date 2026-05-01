@@ -31,6 +31,9 @@ export class ProjectCommunicationMessageEntity {
   @Column({ type: 'text' })
   body!: string;
 
+  @Column({ type: 'jsonb', default: () => "'{}'::jsonb" })
+  payload!: Record<string, unknown>;
+
   @Column({ name: 'client_message_id', type: 'varchar', length: 96, nullable: true })
   clientMessageId!: string | null;
 

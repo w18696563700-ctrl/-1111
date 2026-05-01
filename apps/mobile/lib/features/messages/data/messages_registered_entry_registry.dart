@@ -220,10 +220,9 @@ String? _singleParamRouteLocation({
 }
 
 String? _counterpartConversationRouteLocation(Map<String, String> routeParams) {
-  if (routeParams.length != 2 ||
-      !routeParams.containsKey('conversationId') ||
+  if (!routeParams.containsKey('conversationId') ||
       !routeParams.containsKey('projectId')) {
-    return 'routeTarget.routeParams must include only "conversationId" and "projectId"';
+    return 'routeTarget.routeParams must include "conversationId" and "projectId"';
   }
   final conversationId = routeParams['conversationId'];
   final projectId = routeParams['projectId'];

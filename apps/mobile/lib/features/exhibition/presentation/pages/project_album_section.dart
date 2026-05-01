@@ -113,7 +113,7 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
       _uploading = true;
       _feedback = '正在选择项目相册图片。';
     });
-    final draft = await _pickProjectAttachmentDraft();
+    final draft = await _pickProjectAttachmentDraft(imageOnly: true);
     if (!mounted) {
       return;
     }

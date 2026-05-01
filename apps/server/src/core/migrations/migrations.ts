@@ -1753,11 +1753,12 @@ export const projectCommunicationAlbumMigrations = [
         sender_organization_id varchar(64) NOT NULL,
         message_kind varchar(32) NOT NULL DEFAULT 'text',
         body text NOT NULL,
+        payload jsonb NOT NULL DEFAULT '{}'::jsonb,
         client_message_id varchar(96),
         message_state varchar(32) NOT NULL DEFAULT 'active',
         created_at timestamptz NOT NULL DEFAULT now(),
         CONSTRAINT chk_project_communication_messages_kind
-          CHECK (message_kind IN ('text')),
+          CHECK (message_kind IN ('text', 'image', 'file', 'confirmation_card')),
         CONSTRAINT chk_project_communication_messages_state
           CHECK (message_state IN ('active', 'removed'))
       )`,
@@ -1803,6 +1804,89 @@ export const projectCommunicationAlbumMigrations = [
       `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_album_photos_active_file_asset
        ON project_album_photos (project_id, file_asset_id)
        WHERE photo_state = 'active'`
+    ]
+  }
+];
+
+export const projectConversationWorkbenchV1Migrations = [
+  {
+    key: '20260501_project_conversation_workbench_v1_messages',
+    statements: [
+      `ALTER TABLE project_communication_messages
+       ADD COLUMN IF NOT EXISTS payload jsonb NOT NULL DEFAULT '{}'::jsonb`,
+      `DO $$
+       BEGIN
+         ALTER TABLE project_communication_messages DROP CONSTRAINT IF EXISTS chk_project_communication_messages_kind;
+         ALTER TABLE project_communication_messages
+           ADD CONSTRAINT chk_project_communication_messages_kind
+           CHECK (message_kind IN ('text', 'image', 'file', 'confirmation_card'));
+       END $$`
+    ]
+  }
+];
+
+export const projectCommunicationNotificationPreviewV1Migrations = [
+  {
+    key: '20260501_project_communication_notification_preview_v1_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS app_notifications (
+        id varchar(64) PRIMARY KEY,
+        user_id varchar(64) NOT NULL DEFAULT '',
+        organization_id varchar(64) NOT NULL DEFAULT '',
+        type varchar(64) NOT NULL,
+        source varchar(64) NOT NULL,
+        title varchar(160) NOT NULL,
+        body text,
+        project_id varchar(64),
+        thread_id varchar(64),
+        route_target jsonb NOT NULL DEFAULT '{}'::jsonb,
+        read_at timestamptz,
+        notification_state varchar(32) NOT NULL DEFAULT 'active',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_app_notifications_user_created
+       ON app_notifications (user_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_app_notifications_org_created
+       ON app_notifications (organization_id, created_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_app_notifications_project_thread
+       ON app_notifications (project_id, thread_id)`,
+      `CREATE TABLE IF NOT EXISTS device_push_tokens (
+        id varchar(64) PRIMARY KEY,
+        user_id varchar(64) NOT NULL,
+        organization_id varchar(64) NOT NULL DEFAULT '',
+        platform varchar(32) NOT NULL,
+        provider varchar(32) NOT NULL,
+        device_token text NOT NULL,
+        app_installation_id varchar(128) NOT NULL,
+        app_version varchar(64),
+        device_label varchar(128),
+        token_state varchar(32) NOT NULL DEFAULT 'active',
+        last_registered_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_device_push_tokens_installation_provider
+       ON device_push_tokens (app_installation_id, provider)`,
+      `CREATE INDEX IF NOT EXISTS idx_device_push_tokens_user
+       ON device_push_tokens (user_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_device_push_tokens_org
+       ON device_push_tokens (organization_id)`,
+      `CREATE TABLE IF NOT EXISTS push_delivery_attempts (
+        id varchar(64) PRIMARY KEY,
+        notification_id varchar(64) NOT NULL,
+        device_token_id varchar(64),
+        provider varchar(32) NOT NULL,
+        attempt_status varchar(32) NOT NULL,
+        error_code varchar(96),
+        error_message text,
+        attempted_at timestamptz NOT NULL,
+        created_at timestamptz NOT NULL DEFAULT now()
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_push_delivery_attempts_notification
+       ON push_delivery_attempts (notification_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_push_delivery_attempts_token
+       ON push_delivery_attempts (device_token_id)`
     ]
   }
 ];
@@ -2343,6 +2427,125 @@ export const p0PayMigrations = [
            ));
        END $$`
     ]
+  },
+  {
+    key: '20260605_p0_pay_membership_discount_snapshot_truth',
+    statements: [
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS base_fee_amount numeric(12,2)`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS membership_discount_rate numeric(8,4)`,
+      `ALTER TABLE platform_service_fee_authorizations
+       ADD COLUMN IF NOT EXISTS cap_amount numeric(12,2)`,
+      `UPDATE platform_service_fee_authorizations
+       SET fee_rate_label = '基础平台定价规则'
+       WHERE fee_rate_label IN ('默认费率 3.0%', '免费认证企业 3.0%')`,
+      `UPDATE platform_service_fee_authorizations
+       SET fee_rate_label = '标准会员 9折（作用于 baseFeeAmount）'
+       WHERE fee_rate_label = '标准会员 2.5%'`,
+      `UPDATE platform_service_fee_authorizations
+       SET fee_rate_label = '专业会员 8折（作用于 baseFeeAmount）'
+       WHERE fee_rate_label = '专业会员 2.0%'`,
+      `UPDATE platform_service_fee_charges
+       SET fee_rate_label = '基础平台定价规则'
+       WHERE fee_rate_label IN ('默认费率 3.0%', '免费认证企业 3.0%')`,
+      `UPDATE platform_service_fee_charges
+       SET fee_rate_label = '标准会员 9折（作用于 baseFeeAmount）'
+       WHERE fee_rate_label = '标准会员 2.5%'`,
+      `UPDATE platform_service_fee_charges
+       SET fee_rate_label = '专业会员 8折（作用于 baseFeeAmount）'
+       WHERE fee_rate_label = '专业会员 2.0%'`
+    ]
+  }
+];
+
+export const membershipPurchaseMigrations = [
+  {
+    key: '20260501_membership_direct_purchase_minimum_loop',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS membership_orders (
+        id varchar(64) PRIMARY KEY,
+        organization_id varchar(64) NOT NULL,
+        created_by_user_id varchar(64) NOT NULL,
+        sku_code varchar(64) NOT NULL,
+        sku_name varchar(128) NOT NULL,
+        membership_tier varchar(32) NOT NULL,
+        duration_months integer NOT NULL,
+        payable_amount numeric(12,2) NOT NULL,
+        currency varchar(8) NOT NULL DEFAULT 'CNY',
+        order_status varchar(32) NOT NULL,
+        payment_status varchar(32) NOT NULL,
+        entitlement_status varchar(32) NOT NULL,
+        payment_order_id varchar(64),
+        paid_membership_id varchar(64),
+        order_expires_at timestamptz,
+        effective_at timestamptz,
+        expires_at timestamptz,
+        failure_reason_code varchar(96) NOT NULL DEFAULT '',
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_membership_orders_tier
+          CHECK (membership_tier IN ('standard', 'professional')),
+        CONSTRAINT chk_membership_orders_currency
+          CHECK (currency = 'CNY'),
+        CONSTRAINT chk_membership_orders_order_status
+          CHECK (order_status IN (
+            'created',
+            'pending_pay',
+            'paying',
+            'paid',
+            'granting',
+            'active',
+            'closed',
+            'failed'
+          )),
+        CONSTRAINT chk_membership_orders_payment_status
+          CHECK (payment_status IN (
+            'not_started',
+            'pending',
+            'succeeded',
+            'failed',
+            'closed',
+            'unknown'
+          )),
+        CONSTRAINT chk_membership_orders_entitlement_status
+          CHECK (entitlement_status IN (
+            'not_granted',
+            'granting',
+            'active',
+            'grant_failed',
+            'expired'
+          ))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_membership_orders_org_updated
+       ON membership_orders (organization_id, updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_membership_orders_status_updated
+       ON membership_orders (order_status, updated_at DESC)`,
+      `CREATE INDEX IF NOT EXISTS idx_membership_orders_payment_order
+       ON membership_orders (payment_order_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_membership_orders_paid_membership
+       ON membership_orders (paid_membership_id)`,
+      `DO $$
+       BEGIN
+         IF to_regclass('payment_orders') IS NOT NULL THEN
+           ALTER TABLE payment_orders DROP CONSTRAINT IF EXISTS chk_payment_orders_business_type;
+           ALTER TABLE payment_orders
+             ADD CONSTRAINT chk_payment_orders_business_type
+             CHECK (business_type IN (
+               'project_authenticity_sincerity_payment',
+               'project_authenticity_sincerity_refund',
+               'bid_service_fee_authorization_freeze',
+               'bid_service_fee_authorization_release',
+               'platform_service_fee_charge',
+               'platform_service_fee_authorization',
+               'inquiry_deposit',
+               'membership_direct_purchase'
+             ));
+         END IF;
+       END $$`
+    ]
   }
 ];
 
@@ -2425,7 +2628,10 @@ export const serverMigrations = [
   ...projectNameAccessRequestMigrations,
   ...bidParticipationRequestMigrations,
   ...projectCommunicationAlbumMigrations,
+  ...projectConversationWorkbenchV1Migrations,
+  ...projectCommunicationNotificationPreviewV1Migrations,
   ...projectCounterpartyRatingMigrations,
   ...projectExitGovernancePhase1Migrations,
-  ...p0PayMigrations
+  ...p0PayMigrations,
+  ...membershipPurchaseMigrations
 ];

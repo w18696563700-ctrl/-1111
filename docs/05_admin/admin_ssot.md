@@ -10,6 +10,8 @@ layer: L3 Admin
 ## Formal truth files for Admin
 - `docs/05_admin/admin_ssot.md`
 - `docs/05_admin/admin_governance_surface_matrix.md`
+- `docs/00_ssot/admin_session_carrier_login_truth_addendum.md`
+- `docs/00_ssot/admin_login_truth_drift_cleanup_plan_addendum.md`
 - relevant contract truth from `docs/01_contracts/*.yaml`
 - relevant governance and backend truth from `docs/02_backend/*.md`
 - relevant domain truth from `docs/00_ssot/*.md`

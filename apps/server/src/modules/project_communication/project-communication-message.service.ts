@@ -4,9 +4,11 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, MoreThan, Repository } from 'typeorm';
 import { RequestContext } from '../../shared/request-context';
 import { ProjectPublishAuditService } from '../audit/project-publish-audit.service';
+import { NotificationService } from '../notifications/notification.service';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
 import { ProjectCommunicationReadCursorEntity } from './entities/project-communication-read-cursor.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
+import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
 import {
   projectCommunicationInvalid,
@@ -18,7 +20,9 @@ import { ProjectCommunicationRealtimeEventService } from './project-communicatio
 type SendMessageCommand = {
   threadId: string;
   projectId: string;
+  messageKind: ProjectCommunicationMessageKind;
   body: string;
+  payload: Record<string, unknown>;
   clientMessageId: string | null;
 };
 
@@ -31,6 +35,25 @@ type MarkReadCommand = {
 const MESSAGE_LIMIT_DEFAULT = 50;
 const MESSAGE_LIMIT_MAX = 100;
 const MESSAGE_BODY_MAX = 2000;
+const MESSAGE_CONFIRMATION_TITLE_MAX = 80;
+const MESSAGE_CONFIRMATION_SUMMARY_MAX = 500;
+const PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND = 'project_communication_attachment';
+
+type ProjectCommunicationMessageKind = 'text' | 'image' | 'file' | 'confirmation_card';
+type ProjectCommunicationConfirmationType = 'quote' | 'material_process' | 'schedule';
+
+const MESSAGE_KINDS = new Set<ProjectCommunicationMessageKind>([
+  'text',
+  'image',
+  'file',
+  'confirmation_card'
+]);
+
+const CONFIRMATION_TYPES = new Set<ProjectCommunicationConfirmationType>([
+  'quote',
+  'material_process',
+  'schedule'
+]);
 
 @Injectable()
 export class ProjectCommunicationMessageService {
@@ -41,7 +64,8 @@ export class ProjectCommunicationMessageService {
     private readonly accessService: ProjectCommunicationAccessService,
     private readonly auditService: ProjectPublishAuditService,
     private readonly presenter: ProjectCommunicationPresenter,
-    private readonly realtimeEvents: ProjectCommunicationRealtimeEventService
+    private readonly realtimeEvents: ProjectCommunicationRealtimeEventService,
+    private readonly notifications?: NotificationService
   ) {}
 
   async getOrCreateThread(query: Record<string, unknown>, context: RequestContext) {
@@ -132,6 +156,7 @@ export class ProjectCommunicationMessageService {
       if (existing) {
         return this.presenter.toMessage(existing);
       }
+      await this.ensureMessagePayload(command, actor.organizationId, thread.projectId, manager);
 
       const message = messageRepository.create({
         id: randomUUID(),
@@ -140,8 +165,9 @@ export class ProjectCommunicationMessageService {
         senderUserId: actor.currentSession.userId,
         senderActorId: actor.currentSession.actorId || null,
         senderOrganizationId: actor.organizationId,
-        messageKind: 'text',
+        messageKind: command.messageKind,
         body: command.body,
+        payload: command.payload,
         clientMessageId: command.clientMessageId,
         messageState: 'active'
       });
@@ -173,10 +199,19 @@ export class ProjectCommunicationMessageService {
           payload: {
             threadId: thread.id,
             projectId: thread.projectId,
-            senderOrganizationId: actor.organizationId
+            senderOrganizationId: actor.organizationId,
+            messageKind: message.messageKind,
+            attachmentFileAssetId: this.readPayloadAttachmentFileAssetId(message.payload),
+            confirmationType: this.readPayloadConfirmationType(message.payload)
           }
         },
         context,
+        manager
+      );
+      await this.notifications?.createProjectCommunicationMessageNotification(
+        message,
+        thread,
+        actor.organizationId,
         manager
       );
       createdMessage = message;
@@ -275,16 +310,140 @@ export class ProjectCommunicationMessageService {
 
   private toSendMessageCommand(payload: Record<string, unknown>) {
     const source = this.asRecord(payload);
-    const body = this.readRequiredString(source.body, 'body');
-    if (body.length > MESSAGE_BODY_MAX) {
-      throw projectCommunicationInvalid(`Field \`body\` must be ${MESSAGE_BODY_MAX} chars or less.`);
-    }
+    const messageKind = this.readMessageKind(source.messageKind);
+    const messagePayload = this.readMessagePayload(messageKind, source.payload);
+    const body = this.readMessageBody(messageKind, source.body, messagePayload);
     return {
       threadId: this.readRequiredString(source.threadId, 'threadId'),
       projectId: this.readRequiredString(source.projectId, 'projectId'),
+      messageKind,
       body,
+      payload: messagePayload,
       clientMessageId: this.readOptionalString(source.clientMessageId)
     } satisfies SendMessageCommand;
+  }
+
+  private readMessageKind(value: unknown): ProjectCommunicationMessageKind {
+    const normalized = value === undefined || value === null ? 'text' : this.readRequiredString(value, 'messageKind');
+    if (MESSAGE_KINDS.has(normalized as ProjectCommunicationMessageKind)) {
+      return normalized as ProjectCommunicationMessageKind;
+    }
+    throw projectCommunicationInvalid('Field `messageKind` is not supported for project communication.');
+  }
+
+  private readMessagePayload(kind: ProjectCommunicationMessageKind, value: unknown) {
+    if (kind === 'text') {
+      if (value === undefined || value === null) {
+        return {};
+      }
+      const payload = this.asRecord(value);
+      if (Object.keys(payload).length > 0) {
+        throw projectCommunicationInvalid('Text project communication messages do not accept payload.');
+      }
+      return {};
+    }
+    if (kind === 'image' || kind === 'file') {
+      return { attachment: this.readAttachmentPayload(kind, value) };
+    }
+    return { confirmation: this.readConfirmationPayload(value) };
+  }
+
+  private readAttachmentPayload(kind: 'image' | 'file', value: unknown) {
+    const payload = this.asRecord(value);
+    const attachment = this.asRecord(payload.attachment);
+    const category = this.readRequiredString(attachment.category, 'payload.attachment.category');
+    if (category !== kind) {
+      throw projectCommunicationInvalid('Field `payload.attachment.category` must match messageKind.');
+    }
+    const mimeType = this.readRequiredString(attachment.mimeType, 'payload.attachment.mimeType');
+    if (kind === 'image' && !mimeType.toLowerCase().startsWith('image/')) {
+      throw projectCommunicationInvalid('Image project communication message requires image mimeType.');
+    }
+    return {
+      fileAssetId: this.readRequiredString(attachment.fileAssetId, 'payload.attachment.fileAssetId'),
+      fileName: this.readBoundedString(attachment.fileName, 'payload.attachment.fileName', 180),
+      mimeType,
+      size: this.readPositiveInteger(attachment.size, 'payload.attachment.size'),
+      category
+    };
+  }
+
+  private readConfirmationPayload(value: unknown) {
+    const payload = this.asRecord(value);
+    const confirmation = this.asRecord(payload.confirmation);
+    const confirmationType = this.readRequiredString(
+      confirmation.confirmationType,
+      'payload.confirmation.confirmationType'
+    );
+    if (!CONFIRMATION_TYPES.has(confirmationType as ProjectCommunicationConfirmationType)) {
+      throw projectCommunicationInvalid('Field `payload.confirmation.confirmationType` is not supported.');
+    }
+    const status = this.readOptionalString(confirmation.status) ?? 'proposed';
+    if (status !== 'proposed') {
+      throw projectCommunicationInvalid('Field `payload.confirmation.status` is not supported.');
+    }
+    return {
+      confirmationType,
+      title: this.readBoundedString(confirmation.title, 'payload.confirmation.title', MESSAGE_CONFIRMATION_TITLE_MAX),
+      summary: this.readBoundedString(
+        confirmation.summary,
+        'payload.confirmation.summary',
+        MESSAGE_CONFIRMATION_SUMMARY_MAX
+      ),
+      status
+    };
+  }
+
+  private readMessageBody(
+    kind: ProjectCommunicationMessageKind,
+    value: unknown,
+    payload: Record<string, unknown>
+  ) {
+    if (kind === 'text') {
+      return this.readBodyText(this.readRequiredString(value, 'body'));
+    }
+    const optional = this.readOptionalString(value);
+    if (kind === 'confirmation_card') {
+      return this.readBodyText(optional ?? this.readPayloadConfirmationTitle(payload));
+    }
+    return this.readBodyText(optional ?? '');
+  }
+
+  private readBodyText(value: string) {
+    if (value.length > MESSAGE_BODY_MAX) {
+      throw projectCommunicationInvalid(`Field \`body\` must be ${MESSAGE_BODY_MAX} chars or less.`);
+    }
+    return value;
+  }
+
+  private async ensureMessagePayload(
+    command: SendMessageCommand,
+    senderOrganizationId: string,
+    projectId: string,
+    manager = this.dataSource.manager
+  ) {
+    if (command.messageKind !== 'image' && command.messageKind !== 'file') {
+      return;
+    }
+    const attachment = this.asRecord(command.payload.attachment);
+    const fileAssetId = this.readRequiredString(attachment.fileAssetId, 'payload.attachment.fileAssetId');
+    const fileAsset = await manager.getRepository(FileAssetEntity).findOneBy({ id: fileAssetId });
+    if (!fileAsset) {
+      throw projectCommunicationInvalid('Current FileAsset truth is unavailable for project communication message.');
+    }
+    if (
+      fileAsset.businessType !== 'project' ||
+      fileAsset.businessId !== projectId ||
+      fileAsset.fileKind !== PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND ||
+      fileAsset.organizationId !== senderOrganizationId ||
+      fileAsset.mimeType !== attachment.mimeType ||
+      fileAsset.size !== attachment.size
+    ) {
+      throw projectCommunicationInvalid('Current FileAsset truth is not aligned with project communication message.');
+    }
+    if (command.messageKind === 'image' && !fileAsset.mimeType.toLowerCase().startsWith('image/')) {
+      throw projectCommunicationInvalid('Current FileAsset truth is not an image.');
+    }
   }
 
   private toMarkReadCommand(payload: Record<string, unknown>) {
@@ -346,6 +505,44 @@ export class ProjectCommunicationMessageService {
       throw projectCommunicationInvalid('Field `limit` must be a positive integer.');
     }
     return Math.min(parsed, MESSAGE_LIMIT_MAX);
+  }
+
+  private readBoundedString(value: unknown, field: string, maxLength: number) {
+    const normalized = this.readRequiredString(value, field);
+    if (normalized.length > maxLength) {
+      throw projectCommunicationInvalid(`Field \`${field}\` must be ${maxLength} chars or less.`);
+    }
+    return normalized;
+  }
+
+  private readPositiveInteger(value: unknown, field: string) {
+    const parsed = typeof value === 'number' ? value : Number(value);
+    if (!Number.isInteger(parsed) || parsed <= 0) {
+      throw projectCommunicationInvalid(`Field \`${field}\` must be a positive integer.`);
+    }
+    return parsed;
+  }
+
+  private readPayloadConfirmationTitle(payload: Record<string, unknown>) {
+    const confirmation = this.asRecord(payload.confirmation);
+    return this.readRequiredString(confirmation.title, 'payload.confirmation.title');
+  }
+
+  private readPayloadAttachmentFileAssetId(payload: Record<string, unknown>) {
+    const attachment = this.readOptionalRecord(payload.attachment);
+    return typeof attachment?.fileAssetId === 'string' ? attachment.fileAssetId : null;
+  }
+
+  private readPayloadConfirmationType(payload: Record<string, unknown>) {
+    const confirmation = this.readOptionalRecord(payload.confirmation);
+    return typeof confirmation?.confirmationType === 'string' ? confirmation.confirmationType : null;
+  }
+
+  private readOptionalRecord(value: unknown) {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      return null;
+    }
+    return value as Record<string, unknown>;
   }
 
   private isUniqueViolation(error: unknown) {

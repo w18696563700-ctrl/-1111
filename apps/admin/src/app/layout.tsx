@@ -7,13 +7,14 @@ export const metadata = {
 };
 
 const links = [
-  { href: '/review', label: '审核' },
+  { href: '/review', label: '审核任务' },
   { href: '/review/change_requests', label: '展示变更' },
-  { href: '/governance', label: '治理' },
-  { href: '/project_review', label: '项目审核' },
-  { href: '/template_config', label: '模板配置' },
-  { href: '/audit', label: '审计' },
-  { href: '/ticketing', label: '工单' },
+  { href: '/governance', label: '治理处罚' },
+  { href: '/project_review', label: '举报案件' },
+  { href: '/template_config', label: '模板治理' },
+  { href: '/audit', label: '审计日志' },
+  { href: '/membership', label: '会员只读' },
+  { href: '/ticketing', label: '工单占位' },
 ];
 
 export default function RootLayout({
@@ -28,7 +29,7 @@ export default function RootLayout({
           <header className="topbar">
             <div>
               <p className="eyebrow">管理后台</p>
-              <strong>受控的服务端管理接口</strong>
+              <strong>Server Admin API 治理台</strong>
             </div>
             <nav>
               {links.map((link) => (

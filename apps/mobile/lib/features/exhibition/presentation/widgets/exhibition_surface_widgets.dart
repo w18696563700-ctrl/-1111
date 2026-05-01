@@ -98,6 +98,7 @@ class _ActionCard extends StatelessWidget {
     this.tone = _ActionCardTone.standard,
     this.eyebrow,
     this.titleColor,
+    this.titleTrailing,
     this.summaryStyle,
   });
 
@@ -107,6 +108,7 @@ class _ActionCard extends StatelessWidget {
   final _ActionCardTone tone;
   final String? eyebrow;
   final Color? titleColor;
+  final Widget? titleTrailing;
   final TextStyle? summaryStyle;
 
   @override
@@ -139,12 +141,23 @@ class _ActionCard extends StatelessWidget {
               _SectionEyebrow(label: eyebrow!),
               const SizedBox(height: 12),
             ],
-            Text(
-              title,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: titleColor,
-              ),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    title,
+                    style: theme.textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: titleColor,
+                    ),
+                  ),
+                ),
+                if (titleTrailing != null) ...<Widget>[
+                  const SizedBox(width: 10),
+                  Flexible(child: titleTrailing!),
+                ],
+              ],
             ),
             if (summary != null) ...<Widget>[
               const SizedBox(height: 10),

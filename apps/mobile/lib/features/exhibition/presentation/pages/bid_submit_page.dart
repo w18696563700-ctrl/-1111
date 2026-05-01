@@ -447,11 +447,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   Future<void> _openBidServiceFeeAuthorizationChannelPayload(
     Object? payload,
   ) async {
-    final url = _channelPayloadUrl(payload);
-    if (url == null) {
-      return;
-    }
-    await launchUrlString(url);
+    await _openPaymentChannelPayload(payload);
   }
 
   String? _bidSubmitFinalSubmitDisabledMessage() {

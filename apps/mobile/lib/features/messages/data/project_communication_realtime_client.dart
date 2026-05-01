@@ -41,6 +41,8 @@ final class ProjectCommunicationMessageCreatedEvent {
     required this.body,
     required this.clientMessageId,
     required this.createdAt,
+    this.attachment,
+    this.confirmation,
   });
 
   final String eventId;
@@ -50,6 +52,8 @@ final class ProjectCommunicationMessageCreatedEvent {
   final String senderOrganizationId;
   final String messageKind;
   final String body;
+  final ProjectCommunicationAttachmentView? attachment;
+  final ProjectCommunicationConfirmationView? confirmation;
   final String? clientMessageId;
   final String createdAt;
 
@@ -63,6 +67,8 @@ final class ProjectCommunicationMessageCreatedEvent {
       senderOrganizationId: senderOrganizationId,
       messageKind: messageKind,
       body: body,
+      attachment: attachment,
+      confirmation: confirmation,
       clientMessageId: clientMessageId,
       messageState: 'active',
       createdAt: createdAt,
@@ -162,9 +168,48 @@ ProjectCommunicationMessageCreatedEvent? _parseMessageCreatedEvent(
     projectId: _requiredString(map, 'projectId'),
     senderOrganizationId: _requiredString(map, 'senderOrganizationId'),
     messageKind: _requiredString(map, 'messageKind'),
-    body: _requiredString(map, 'body'),
+    body: _bodyString(map, 'body'),
+    attachment: _parseAttachment(map['payload']),
+    confirmation: _parseConfirmation(map['payload']),
     clientMessageId: _nullableString(map['clientMessageId']),
     createdAt: _requiredString(map, 'createdAt'),
+  );
+}
+
+ProjectCommunicationAttachmentView? _parseAttachment(Object? payload) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload);
+  final attachment = map['attachment'];
+  if (attachment == null) {
+    return null;
+  }
+  final attachmentMap = _requiredMap(attachment);
+  return ProjectCommunicationAttachmentView(
+    fileAssetId: _requiredString(attachmentMap, 'fileAssetId'),
+    fileName: _requiredString(attachmentMap, 'fileName'),
+    mimeType: _requiredString(attachmentMap, 'mimeType'),
+    size: _requiredInt(attachmentMap, 'size'),
+    category: _requiredString(attachmentMap, 'category'),
+  );
+}
+
+ProjectCommunicationConfirmationView? _parseConfirmation(Object? payload) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload);
+  final confirmation = map['confirmation'];
+  if (confirmation == null) {
+    return null;
+  }
+  final confirmationMap = _requiredMap(confirmation);
+  return ProjectCommunicationConfirmationView(
+    confirmationType: _requiredString(confirmationMap, 'confirmationType'),
+    title: _requiredString(confirmationMap, 'title'),
+    summary: _requiredString(confirmationMap, 'summary'),
+    status: _nullableString(confirmationMap['status']) ?? 'proposed',
   );
 }
 
@@ -187,6 +232,22 @@ String _requiredString(Map<String, Object?> payload, String field) {
     throw FormatException('field "$field" must be a non-empty string');
   }
   return normalized;
+}
+
+String _bodyString(Map<String, Object?> payload, String field) {
+  final value = payload[field];
+  if (value is! String) {
+    throw FormatException('field "$field" must be a string');
+  }
+  return value;
+}
+
+int _requiredInt(Map<String, Object?> payload, String field) {
+  final value = payload[field];
+  if (value is int) {
+    return value;
+  }
+  throw FormatException('field "$field" must be an int');
 }
 
 String? _nullableString(Object? value) {

@@ -54,7 +54,84 @@ class ProfilePrivacyPermissionInfoPage extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        _ProfileListSection(
+          title: '客服、注销与上架说明',
+          children: <Widget>[
+            _ProfileActionRow(
+              title: '客服与投诉',
+              subtitle: '客服邮箱：182401625@qq.com；客服电话暂未公示',
+              leadingIcon: Icons.support_agent_outlined,
+              onTap: () => _showProfileComplianceInfoSheet(
+                context,
+                title: '客服与投诉',
+                message:
+                    '如需咨询产品服务、账号登录、企业认证、举报处理、隐私权利或投诉事项，请通过客服邮箱 182401625@qq.com 联系平台。',
+              ),
+            ),
+            _ProfileActionRow(
+              title: '账号注销 / 删除账号',
+              subtitle: '通过客服邮箱受理申请；不承诺一键自助注销',
+              leadingIcon: Icons.delete_outline_rounded,
+              onTap: () => _showProfileComplianceInfoSheet(
+                context,
+                title: '账号注销 / 删除账号受理说明',
+                message:
+                    '当前阶段不提供一键自助注销。你可以通过客服邮箱 182401625@qq.com 提交账号注销或个人信息删除申请；平台会先核验身份、处理未完结项目/举报/争议/合规留痕，再在符合法律法规和平台规则的范围内处理。',
+              ),
+            ),
+            const _ProfileValueRow(
+              title: 'SDK 与第三方能力',
+              value:
+                  '当前说明覆盖短信、图片/文件选择、图片裁剪、定位/地理编码、对象存储、OCR 与支付唤起等能力；正式上架前需与应用商店 SDK 清单逐项核对。',
+            ),
+            const _ProfileValueRow(
+              title: '支付说明',
+              value: '如页面出现支付、预授权或诚意金说明，以对应项目页面和平台规则展示为准；设置页不发起支付，也不修改资金真值。',
+            ),
+          ],
+        ),
       ],
     );
   }
+}
+
+Future<void> _showProfileComplianceInfoSheet(
+  BuildContext context, {
+  required String title,
+  required String message,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (BuildContext sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                title,
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 12),
+              Text(message, style: Theme.of(sheetContext).textTheme.bodyMedium),
+              const SizedBox(height: 18),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(
+                  onPressed: () => Navigator.of(sheetContext).pop(),
+                  child: const Text('我知道了'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

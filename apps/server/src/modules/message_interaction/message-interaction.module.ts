@@ -10,6 +10,7 @@ import { OrganizationEntity } from '../organization/entities/organization.entity
 import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
 import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectCommunicationModule } from '../project_communication/project-communication.module';
 import { ProjectNameAccessModule } from '../project_name_access/project-name-access.module';
 import { ProjectNameAccessRequestEntity } from '../project_name_access/entities/project-name-access-request.entity';
 import { BidThreadMessageEntity } from '../trading_im/entities/bid-thread-message.entity';
@@ -45,6 +46,7 @@ import { MessageInteractionQueryService } from './message-interaction.query.serv
     ]),
     AuthModule,
     OrganizationModule,
+    ProjectCommunicationModule,
     ProjectNameAccessModule,
     UploadModule,
   ],

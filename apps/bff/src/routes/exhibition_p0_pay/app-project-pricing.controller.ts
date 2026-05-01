@@ -57,6 +57,33 @@ export class AppProjectPricingController {
     return this.service.getProjectAuthenticitySincerityOrder(projectId, orderId, headers);
   }
 
+  @Post(':projectId/authenticity-sincerity/orders/:orderId/refund-init')
+  @HttpCode(HttpStatus.ACCEPTED)
+  initProjectAuthenticitySincerityRefund(
+    @Param('projectId') projectId: string,
+    @Param('orderId') orderId: string,
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+    @Headers('x-idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.service.initProjectAuthenticitySincerityRefund(
+      projectId,
+      orderId,
+      payload,
+      headers,
+      idempotencyKey,
+    );
+  }
+
+  @Get(':projectId/authenticity-sincerity/orders/:orderId/refund')
+  getProjectAuthenticitySincerityRefund(
+    @Param('projectId') projectId: string,
+    @Param('orderId') orderId: string,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.service.getProjectAuthenticitySincerityRefund(projectId, orderId, headers);
+  }
+
   @Post(':projectId/bid-service-fee-authorizations')
   @HttpCode(HttpStatus.ACCEPTED)
   createBidServiceFeeAuthorization(
@@ -136,5 +163,30 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
   ) {
     return this.service.getDealConfirmation(projectId, dealConfirmationId, headers);
+  }
+
+  @Get(':projectId/settlement/summary')
+  getProjectSettlementSummary(
+    @Param('projectId') projectId: string,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.service.getProjectSettlementSummary(projectId, headers);
+  }
+
+  @Post(':projectId/settlement/batch-draft')
+  @HttpCode(HttpStatus.ACCEPTED)
+  createProjectSettlementBatchDraft(
+    @Param('projectId') projectId: string,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.service.createProjectSettlementBatchDraft(projectId, headers);
+  }
+
+  @Get(':projectId/settlement/reconciliation')
+  getProjectSettlementReconciliation(
+    @Param('projectId') projectId: string,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.service.getProjectSettlementReconciliation(projectId, headers);
   }
 }

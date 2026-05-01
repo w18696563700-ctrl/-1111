@@ -18,68 +18,142 @@ class ProjectNameAccessPermissionSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final status = _projectNameAccessStatus(projectMap);
     final canRequest = _projectCanRequestNameAccess(projectMap);
     final requestId = _projectNameAccessRequestId(projectMap);
     return SafeArea(
       top: false,
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(
-          20,
-          4,
-          20,
-          20 + MediaQuery.paddingOf(context).bottom,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppVisualTokens.cardBackground,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+          boxShadow: AppVisualTokens.shadowFloating(opacity: 0.1),
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              '参与竞标申请',
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w900,
+        child: SingleChildScrollView(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            14,
+            24,
+            24 + MediaQuery.paddingOf(context).bottom,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Center(
+                child: Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppVisualTokens.textTertiary.withValues(alpha: 0.55),
+                    borderRadius: AppVisualTokens.radiusPillBorder,
+                  ),
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                _StatusPill(
-                  label: _projectNameAccessStatusLabel(status),
-                  tone: _ActionCardTone.muted,
+              const SizedBox(height: 26),
+              Text(
+                '参与竞标申请',
+                style: AppTextTokens.pageTitle.copyWith(
+                  fontSize: 25,
+                  height: 1.16,
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _StateMessage(
-              title: '当前说明',
-              body: _projectNameAccessStatusBody(projectMap),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: <Widget>[
-                FilledButton(
-                  onPressed: canRequest && !requesting ? onRequest : null,
-                  child: Text(
-                    requesting
-                        ? '提交中...'
-                        : _projectNameAccessActionLabel(projectMap),
-                  ),
+              ),
+              const SizedBox(height: 14),
+              AppStatusBadge(
+                label: _projectNameAccessStatusLabel(status),
+                tone: AppStatusTone.warning,
+              ),
+              const SizedBox(height: 26),
+              Text('当前说明', style: AppTextTokens.sectionTitle),
+              const SizedBox(height: 10),
+              Text(
+                _projectNameAccessStatusBody(projectMap),
+                style: AppTextTokens.bodyStrong.copyWith(
+                  fontSize: 16,
+                  height: 1.5,
                 ),
-                if (requestId != null)
-                  OutlinedButton(
-                    onPressed: onOpenStatus,
-                    child: const Text('查看申请状态'),
-                  ),
-                OutlinedButton(onPressed: onRefresh, child: const Text('刷新状态')),
-              ],
-            ),
-          ],
+              ),
+              const SizedBox(height: 28),
+              LayoutBuilder(
+                builder: (BuildContext context, BoxConstraints constraints) {
+                  final compact = constraints.maxWidth < 390;
+                  final primaryButton = FilledButton.icon(
+                    onPressed: canRequest && !requesting ? onRequest : null,
+                    icon: Icon(
+                      canRequest
+                          ? Icons.hourglass_bottom_rounded
+                          : Icons.check_circle_outline_rounded,
+                    ),
+                    label: Text(
+                      requesting
+                          ? '提交中...'
+                          : _projectNameAccessActionLabel(projectMap),
+                    ),
+                    style: FilledButton.styleFrom(
+                      minimumSize: const Size(
+                        0,
+                        AppVisualTokens.primaryButtonHeight,
+                      ),
+                      backgroundColor: AppVisualTokens.brandGoldLight,
+                      foregroundColor: AppVisualTokens.brandGoldDark,
+                      disabledBackgroundColor: const Color(0xFFF4F0EC),
+                      disabledForegroundColor: AppVisualTokens.textSecondary,
+                      textStyle: AppTextTokens.buttonText,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: AppVisualTokens.radiusPillBorder,
+                      ),
+                    ),
+                  );
+                  final primary = compact
+                      ? SizedBox(width: double.infinity, child: primaryButton)
+                      : primaryButton;
+                  final actions = <Widget>[
+                    primary,
+                    if (requestId != null)
+                      OutlinedButton.icon(
+                        onPressed: onOpenStatus,
+                        icon: const Icon(Icons.rule_rounded),
+                        label: const Text('查看申请状态'),
+                        style: _sheetSecondaryButtonStyle(),
+                      ),
+                    OutlinedButton.icon(
+                      onPressed: onRefresh,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: const Text('刷新状态'),
+                      style: _sheetSecondaryButtonStyle(),
+                    ),
+                  ];
+                  if (compact) {
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: actions
+                          .map(
+                            (Widget action) => Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: action,
+                            ),
+                          )
+                          .toList(),
+                    );
+                  }
+                  return Wrap(spacing: 12, runSpacing: 12, children: actions);
+                },
+              ),
+            ],
+          ),
         ),
+      ),
+    );
+  }
+
+  ButtonStyle _sheetSecondaryButtonStyle() {
+    return OutlinedButton.styleFrom(
+      minimumSize: const Size(0, AppVisualTokens.primaryButtonHeight),
+      foregroundColor: AppVisualTokens.textPrimary,
+      side: const BorderSide(color: AppVisualTokens.borderSoft),
+      textStyle: AppTextTokens.buttonText,
+      shape: RoundedRectangleBorder(
+        borderRadius: AppVisualTokens.radiusPillBorder,
       ),
     );
   }

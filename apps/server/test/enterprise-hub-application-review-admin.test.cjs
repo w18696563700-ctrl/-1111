@@ -53,6 +53,32 @@ test('applications controller routes list/detail/review through bounded services
   }
 });
 
+test('recommendation slots list controller forwards resolved request context', async () => {
+  const calls = [];
+  const controller = new EnterpriseHubAdminController(
+    {},
+    {},
+    {
+      async listRecommendationSlots(query, context) {
+        calls.push({ query, context });
+        return { items: [] };
+      },
+    },
+    {},
+  );
+
+  const result = await controller.listRecommendationSlots({ boardType: 'company' }, createHeaderBag());
+
+  assert.deepEqual(result, { items: [] });
+  assert.equal(calls.length, 1);
+  assert.deepEqual(calls[0].query, { boardType: 'company' });
+  assert.equal(calls[0].context.authorization, 'Bearer reviewer');
+  assert.equal(calls[0].context.actorId, 'spoofed-header-actor');
+  assert.equal(calls[0].context.actorRole, 'platform_reviewer');
+  assert.equal(calls[0].context.requestId, 'request-1');
+  assert.equal(calls[0].context.traceId, 'trace-1');
+});
+
 test('applications list fails closed without a carrier before any repository read', async () => {
   const service = createQueryService({
     verificationService: createVerificationService(),

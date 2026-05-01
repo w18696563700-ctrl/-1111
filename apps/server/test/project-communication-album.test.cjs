@@ -27,6 +27,10 @@ function createPresenter() {
         senderOrganizationId: message.senderOrganizationId,
         messageKind: message.messageKind,
         body: message.body,
+        payload:
+          message.payload && Object.keys(message.payload).length > 0
+            ? message.payload
+            : null,
         clientMessageId: message.clientMessageId,
         messageState: message.messageState,
         createdAt: message.createdAt.toISOString(),
@@ -177,9 +181,292 @@ test('project communication send publishes bounded realtime message event', asyn
   assert.equal(events[0].senderOrganizationId, 'owner-org');
   assert.equal(events[0].messageKind, 'text');
   assert.equal(events[0].body, 'realtime message');
+  assert.equal(events[0].payload, null);
   assert.equal(events[0].clientMessageId, 'client-1');
   assert.equal(events[0].createdAt, '2026-05-19T10:00:00.000Z');
   assert.match(events[0].eventId, /^[0-9a-f-]{36}$/);
+});
+
+test('project communication image message stores dedicated FileAsset payload', async () => {
+  const {
+    ProjectCommunicationMessageService,
+  } = require('../dist/modules/project_communication/project-communication-message.service.js');
+  const {
+    ProjectCommunicationRealtimeEventService,
+  } = require('../dist/modules/project_communication/project-communication-realtime-event.service.js');
+  const { FileAssetEntity } = require('../dist/modules/upload/entities/file-asset.entity.js');
+  const savedMessages = [];
+  const realtimeEvents = new ProjectCommunicationRealtimeEventService();
+  const thread = {
+    id: 'thread-1',
+    projectId: 'project-1',
+    ownerOrganizationId: 'owner-org',
+    counterpartOrganizationId: 'counterpart-org',
+    lastMessageId: null,
+    lastMessageAt: null,
+  };
+  const messageRepository = {
+    create(value) {
+      return {
+        ...value,
+        createdAt: new Date('2026-05-19T10:00:00.000Z'),
+      };
+    },
+    async save(message) {
+      savedMessages.push(message);
+      return message;
+    },
+    async findOneBy() {
+      return null;
+    },
+  };
+  const fileAssetRepository = {
+    async findOneBy() {
+      return {
+        id: 'file-1',
+        businessType: 'project',
+        businessId: 'project-1',
+        fileKind: 'project_communication_attachment',
+        organizationId: 'owner-org',
+        mimeType: 'image/png',
+        size: 128,
+      };
+    },
+  };
+  const manager = {
+    getRepository(entity) {
+      if (entity === FileAssetEntity) {
+        return fileAssetRepository;
+      }
+      if (String(entity?.name).includes('ProjectCommunicationMessageEntity')) {
+        return messageRepository;
+      }
+      return {
+        async save(value) {
+          return value;
+        },
+      };
+    },
+  };
+  const service = new ProjectCommunicationMessageService(
+    {},
+    {
+      async transaction(callback) {
+        return callback(manager);
+      },
+    },
+    {},
+    { async record() {} },
+    createPresenter(),
+    realtimeEvents,
+  );
+  service.requireThreadParticipant = async () => ({
+    actor: {
+      currentSession: {
+        userId: 'user-1',
+        actorId: 'actor-1',
+      },
+      organizationId: 'owner-org',
+    },
+    thread,
+  });
+
+  const result = await service.sendMessage(
+    {
+      threadId: 'thread-1',
+      projectId: 'project-1',
+      messageKind: 'image',
+      body: '现场照片',
+      payload: {
+        attachment: {
+          fileAssetId: 'file-1',
+          fileName: 'booth.png',
+          mimeType: 'image/png',
+          size: 128,
+          category: 'image',
+        },
+      },
+      clientMessageId: 'client-image-1',
+    },
+    createContext(),
+  );
+  const events = realtimeEvents.listThreadEvents('thread-1', 'project-1', null);
+
+  assert.equal(result.messageKind, 'image');
+  assert.equal(result.payload.attachment.fileAssetId, 'file-1');
+  assert.equal(savedMessages[0].payload.attachment.category, 'image');
+  assert.equal(events[0].payload.attachment.fileName, 'booth.png');
+});
+
+test('project communication attachment rejects cross-project FileAsset', async () => {
+  const {
+    ProjectCommunicationMessageService,
+  } = require('../dist/modules/project_communication/project-communication-message.service.js');
+  const { FileAssetEntity } = require('../dist/modules/upload/entities/file-asset.entity.js');
+  const thread = {
+    id: 'thread-1',
+    projectId: 'project-1',
+    ownerOrganizationId: 'owner-org',
+    counterpartOrganizationId: 'counterpart-org',
+  };
+  const manager = {
+    getRepository(entity) {
+      if (entity === FileAssetEntity) {
+        return {
+          async findOneBy() {
+            return {
+              id: 'file-1',
+              businessType: 'project',
+              businessId: 'other-project',
+              fileKind: 'project_communication_attachment',
+              organizationId: 'owner-org',
+              mimeType: 'application/pdf',
+              size: 256,
+            };
+          },
+        };
+      }
+      return {
+        async findOneBy() {
+          return null;
+        },
+      };
+    },
+  };
+  const service = new ProjectCommunicationMessageService(
+    {},
+    {
+      async transaction(callback) {
+        return callback(manager);
+      },
+    },
+    {},
+    { async record() {} },
+    createPresenter(),
+    { publishMessageCreated() {} },
+  );
+  service.requireThreadParticipant = async () => ({
+    actor: {
+      currentSession: {
+        userId: 'user-1',
+        actorId: 'actor-1',
+      },
+      organizationId: 'owner-org',
+    },
+    thread,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage(
+        {
+          threadId: 'thread-1',
+          projectId: 'project-1',
+          messageKind: 'file',
+          payload: {
+            attachment: {
+              fileAssetId: 'file-1',
+              fileName: 'quote.pdf',
+              mimeType: 'application/pdf',
+              size: 256,
+              category: 'file',
+            },
+          },
+        },
+        createContext(),
+      ),
+    (error) => {
+      assert.equal(error?.response?.code, 'PROJECT_COMMUNICATION_INVALID');
+      return true;
+    },
+  );
+});
+
+test('project communication confirmation card stores whitelisted payload', async () => {
+  const {
+    ProjectCommunicationMessageService,
+  } = require('../dist/modules/project_communication/project-communication-message.service.js');
+  const realtimeEvents = {
+    publishMessageCreated() {},
+  };
+  const savedMessages = [];
+  const thread = {
+    id: 'thread-1',
+    projectId: 'project-1',
+    ownerOrganizationId: 'owner-org',
+    counterpartOrganizationId: 'counterpart-org',
+    lastMessageId: null,
+    lastMessageAt: null,
+  };
+  const messageRepository = {
+    create(value) {
+      return {
+        ...value,
+        createdAt: new Date('2026-05-19T10:00:00.000Z'),
+      };
+    },
+    async save(message) {
+      savedMessages.push(message);
+      return message;
+    },
+    async findOneBy() {
+      return null;
+    },
+  };
+  const service = new ProjectCommunicationMessageService(
+    {},
+    {
+      async transaction(callback) {
+        return callback({
+          getRepository(entity) {
+            if (String(entity?.name).includes('ProjectCommunicationMessageEntity')) {
+              return messageRepository;
+            }
+            return {
+              async save(value) {
+                return value;
+              },
+            };
+          },
+        });
+      },
+    },
+    {},
+    { async record() {} },
+    createPresenter(),
+    realtimeEvents,
+  );
+  service.requireThreadParticipant = async () => ({
+    actor: {
+      currentSession: {
+        userId: 'user-1',
+        actorId: 'actor-1',
+      },
+      organizationId: 'owner-org',
+    },
+    thread,
+  });
+
+  const result = await service.sendMessage(
+    {
+      threadId: 'thread-1',
+      projectId: 'project-1',
+      messageKind: 'confirmation_card',
+      payload: {
+        confirmation: {
+          confirmationType: 'quote',
+          title: '报价确认',
+          summary: '确认当前报价为 12000 元。',
+        },
+      },
+    },
+    createContext(),
+  );
+
+  assert.equal(result.messageKind, 'confirmation_card');
+  assert.equal(result.body, '报价确认');
+  assert.equal(result.payload.confirmation.status, 'proposed');
+  assert.equal(savedMessages[0].payload.confirmation.confirmationType, 'quote');
 });
 
 test('project communication clientMessageId dedupe returns truth without duplicate realtime event', async () => {
@@ -297,6 +584,7 @@ test('project communication thread open rejects owner-side generic DM without pr
         return { id: 'project-1', organizationId: 'owner-org' };
       },
     },
+    { async countBy() { return 0; } },
     { async countBy() { return 0; } },
     { async countBy() { return 0; } },
     { async countBy() { return 0; } },

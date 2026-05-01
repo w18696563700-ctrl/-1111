@@ -314,6 +314,285 @@ class _MessagesProjectCommunicationSection extends StatelessWidget {
   }
 }
 
+class _MessagesNotificationCenterSection extends StatelessWidget {
+  const _MessagesNotificationCenterSection({
+    required this.loading,
+    required this.expanded,
+    required this.result,
+    required this.onToggleExpanded,
+    required this.onOpen,
+    required this.onRetry,
+  });
+
+  final bool loading;
+  final bool expanded;
+  final AppNotificationListResult? result;
+  final VoidCallback onToggleExpanded;
+  final ValueChanged<AppNotificationItemView> onOpen;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final items = result?.data?.items ?? const <AppNotificationItemView>[];
+    return Material(
+      color: theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTap: onToggleExpanded,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 4,
+                  vertical: 10,
+                ),
+                child: Row(
+                  children: <Widget>[
+                    DecoratedBox(
+                      decoration: BoxDecoration(
+                        color: theme.colorScheme.primaryContainer.withValues(
+                          alpha: 0.58,
+                        ),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(10),
+                        child: Icon(
+                          Icons.notifications_none_rounded,
+                          color: theme.colorScheme.primary,
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            '消息中心',
+                            style: theme.textTheme.titleMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '重要通知、项目沟通等消息',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Icon(
+                      expanded
+                          ? Icons.keyboard_arrow_up_rounded
+                          : Icons.keyboard_arrow_down_rounded,
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            if (expanded) ...<Widget>[
+              const SizedBox(height: 12),
+              if (loading)
+                const LinearProgressIndicator(minHeight: 5)
+              else if (_notificationFailed(result)) ...<Widget>[
+                _MessagesInlinePanel(
+                  title: '消息中心暂不可用',
+                  body: result?.message ?? '请稍后再试。',
+                  trailing: FilledButton.tonal(
+                    onPressed: onRetry,
+                    child: const Text('重试'),
+                  ),
+                ),
+              ] else if (items.isEmpty)
+                const _MessagesInlinePanel(
+                  title: '暂无新的消息',
+                  body: '项目沟通、论坛互动和系统提醒会汇总在这里。',
+                )
+              else
+                ...items
+                    .take(5)
+                    .map(
+                      (AppNotificationItemView item) => Padding(
+                        padding: const EdgeInsets.only(bottom: 10),
+                        child: _MessagesNotificationCard(
+                          item: item,
+                          onOpen: () => onOpen(item),
+                        ),
+                      ),
+                    ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  bool _notificationFailed(AppNotificationListResult? result) {
+    final state = result?.state;
+    return state == AppPageState.errorRetryable ||
+        state == AppPageState.errorNonRetryable ||
+        state == AppPageState.unauthorized ||
+        state == AppPageState.forbidden ||
+        state == AppPageState.notFound;
+  }
+}
+
+class _MessagesNotificationCard extends StatelessWidget {
+  const _MessagesNotificationCard({required this.item, required this.onOpen});
+
+  final AppNotificationItemView item;
+  final VoidCallback onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Material(
+      color: item.unread
+          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.14)
+          : theme.colorScheme.surface,
+      shape: RoundedRectangleBorder(
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onOpen,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: <Widget>[
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: theme.colorScheme.primaryContainer.withValues(
+                    alpha: 0.42,
+                  ),
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(9),
+                  child: Icon(
+                    _notificationIcon(item.source),
+                    size: 22,
+                    color: theme.colorScheme.primary,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    _MessagesMetaPill(label: _notificationSource(item.source)),
+                    const SizedBox(height: 6),
+                    Text(
+                      item.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    if (item.body != null) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Text(
+                        item.body!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    color: theme.colorScheme.onSurfaceVariant,
+                  ),
+                  if (_relativeCreatedAt(item.createdAt) != null) ...<Widget>[
+                    const SizedBox(height: 16),
+                    Text(
+                      _relativeCreatedAt(item.createdAt)!,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  IconData _notificationIcon(String source) {
+    return switch (source) {
+      'project_communication' => Icons.forum_outlined,
+      'forum_interaction' => Icons.dynamic_feed_outlined,
+      _ => Icons.notifications_none_rounded,
+    };
+  }
+
+  String _notificationSource(String source) {
+    return switch (source) {
+      'project_communication' => '项目沟通',
+      'forum_interaction' => '论坛互动',
+      _ => '系统提醒',
+    };
+  }
+
+  String? _relativeCreatedAt(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return null;
+    }
+    final createdAt = DateTime.tryParse(raw.trim());
+    if (createdAt == null) {
+      return null;
+    }
+    final now = DateTime.now();
+    final delta = now.difference(createdAt.toLocal());
+    if (delta.inMinutes < 1) {
+      return '刚刚';
+    }
+    if (delta.inMinutes < 60) {
+      return '${delta.inMinutes} 分钟前';
+    }
+    if (delta.inHours < 24) {
+      return '${delta.inHours} 小时前';
+    }
+    if (delta.inDays < 7) {
+      return '${delta.inDays} 天前';
+    }
+    return '${createdAt.month}月${createdAt.day}日';
+  }
+}
+
 class _MessagesProjectCommunicationCard extends StatelessWidget {
   const _MessagesProjectCommunicationCard({
     required this.item,

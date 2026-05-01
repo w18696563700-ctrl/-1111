@@ -25,7 +25,8 @@ export function readProjectCommunicationMessageReadModel(value: unknown) {
     senderActorId: readNullableString(source.senderActorId),
     senderOrganizationId: readString(source.senderOrganizationId, 'senderOrganizationId'),
     messageKind: readString(source.messageKind, 'messageKind'),
-    body: readString(source.body, 'body'),
+    body: readBodyString(source.body, 'body'),
+    payload: readNullableRecord(source.payload),
     clientMessageId: readNullableString(source.clientMessageId),
     messageState: readString(source.messageState, 'messageState'),
     createdAt: readString(source.createdAt, 'createdAt')
@@ -75,6 +76,13 @@ function readString(value: unknown, field: string) {
   return value.trim();
 }
 
+function readBodyString(value: unknown, field: string) {
+  if (typeof value !== 'string') {
+    throw new Error(`Field \`${field}\` is required in project communication response.`);
+  }
+  return value;
+}
+
 function readNullableString(value: unknown) {
   if (value === undefined || value === null) {
     return null;
@@ -84,4 +92,14 @@ function readNullableString(value: unknown) {
   }
   const normalized = value.trim();
   return normalized ? normalized : null;
+}
+
+function readNullableRecord(value: unknown) {
+  if (value === undefined || value === null) {
+    return null;
+  }
+  if (!value || Array.isArray(value) || typeof value !== 'object') {
+    throw new Error('Field `payload` must be an object or null in project communication response.');
+  }
+  return value as Payload;
 }

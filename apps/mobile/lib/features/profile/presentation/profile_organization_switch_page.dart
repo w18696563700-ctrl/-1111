@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
+import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_capability_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_organization_scope_visibility.dart';
+import 'package:mobile/features/profile/presentation/profile_organization_switch_widgets.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 
@@ -16,9 +18,11 @@ class OrganizationSwitchPage extends StatefulWidget {
 
 class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
   bool _loading = true;
+  bool _leavingCurrentOrganization = false;
   String? _switchingOrganizationId;
   ProfileIdentityResult<MyOrganizationsView>? _result;
   ProfileIdentityResult<AppShellContextData>? _switchResult;
+  ProfileIdentityResult<OrganizationLeaveAcceptedView>? _leaveResult;
 
   @override
   void initState() {
@@ -44,9 +48,24 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
   }
 
   Future<void> _switchOrganization(MyOrganizationItemView item) async {
+    final currentOrganizationId = AppShellScope.of(
+      context,
+    ).snapshot.shellContext.organizationId?.trim();
+    if (_switchingOrganizationId != null ||
+        item.current ||
+        item.organizationId == currentOrganizationId) {
+      return;
+    }
+
+    final confirmed = await _confirmSwitchOrganization(item);
+    if (!mounted || !confirmed) {
+      return;
+    }
+
     setState(() {
       _switchingOrganizationId = item.organizationId;
       _switchResult = null;
+      _leaveResult = null;
     });
 
     final result = await ProfileIdentityConsumerLayer.instance
@@ -116,57 +135,202 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
         current?.organizationId == targetOrganizationId;
   }
 
+  Future<bool> _confirmSwitchOrganization(MyOrganizationItemView item) async {
+    final organizationName = profileDisplayOrganizationName(item.name);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('确认切换当前主体'),
+          content: Text(
+            '确认切换到“$organizationName”吗？切换后，项目、认证、竞标和消息都会按这个主体继续展示。',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('确认切换'),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
+  }
+
+  Future<void> _leaveCurrentOrganization(MyOrganizationItemView current) async {
+    if (_leavingCurrentOrganization || _switchingOrganizationId != null) {
+      return;
+    }
+
+    final confirmed = await _confirmLeaveCurrentOrganization(current);
+    if (!mounted || !confirmed) {
+      return;
+    }
+
+    setState(() {
+      _leavingCurrentOrganization = true;
+      _leaveResult = null;
+      _switchResult = null;
+    });
+
+    final result = await ProfileIdentityConsumerLayer.instance
+        .leaveCurrentOrganization();
+    if (!mounted) {
+      return;
+    }
+
+    if (result.state == AppPageState.content && result.data != null) {
+      await AppShellScope.read(context).bootstrapAfterLogin(
+        shellBootstrapState: result.data!.shellBootstrapState,
+      );
+      if (!mounted) {
+        return;
+      }
+      await _load();
+      if (!mounted) {
+        return;
+      }
+    }
+
+    setState(() {
+      _leavingCurrentOrganization = false;
+      _leaveResult = result;
+    });
+  }
+
+  Future<bool> _confirmLeaveCurrentOrganization(
+    MyOrganizationItemView current,
+  ) async {
+    final organizationName = profileDisplayOrganizationName(current.name);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('确认退出当前组织'),
+          content: Text(
+            '确认退出“$organizationName”吗？退出后不能再以该组织身份管理项目、认证、竞标和消息；公司、认证资料和历史记录不会被删除。',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('确认退出'),
+            ),
+          ],
+        );
+      },
+    );
+    return confirmed == true;
+  }
+
   @override
   Widget build(BuildContext context) {
     final shellContext = AppShellScope.of(context).snapshot.shellContext;
     final items = _result?.data?.items ?? const <MyOrganizationItemView>[];
     final current = _resolveCurrent(items, shellContext.organizationId);
-    final switchable = items
-        .where(
-          (MyOrganizationItemView item) =>
-              item.organizationId != current?.organizationId &&
-              profileCanSwitchToOrganization(item),
-        )
+    final currentOrganizationId = current?.organizationId;
+    final visibleItems = items
+        .where((MyOrganizationItemView item) {
+          final isCurrent =
+              item.current || item.organizationId == currentOrganizationId;
+          return isCurrent || profileCanSwitchToOrganization(item);
+        })
         .toList(growable: false);
+    final hasSwitchTarget = visibleItems.any(
+      (MyOrganizationItemView item) =>
+          item.organizationId != currentOrganizationId &&
+          !item.current &&
+          profileCanSwitchToOrganization(item),
+    );
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
       children: <Widget>[
-        _OrganizationSwitchCurrentBanner(
+        OrganizationSwitchCurrentBanner(
           title: _currentTitle(current),
           subtitle: _currentSubtitle(current),
           supportingText: _currentSupportingText(current),
         ),
         const SizedBox(height: 16),
         if (_switchResult != null)
-          _OrganizationSwitchCard(
+          OrganizationSwitchCard(
             title: _switchResult!.state == AppPageState.content
                 ? '切换成功'
                 : '切换当前未完成',
             child: Text(_switchResultMessage(_switchResult!)),
           )
         else if (_loading)
-          const _OrganizationSwitchCard(
+          const OrganizationSwitchCard(
             title: '正在读取组织列表',
             child: Text('正在同步当前主体与可切换列表。'),
           )
         else if (_result?.state == AppPageState.content &&
-            switchable.isNotEmpty)
-          _OrganizationSwitchCard(
-            title: '可切换主体',
-            child: _OrganizationSwitchList(
-              items: switchable,
-              switchingOrganizationId: _switchingOrganizationId,
-              onSwitch: _switchOrganization,
+            visibleItems.isNotEmpty)
+          OrganizationSwitchCard(
+            title: hasSwitchTarget ? '我的主体列表' : '当前没有其他主体可切换',
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                OrganizationSwitchList(
+                  items: visibleItems,
+                  currentOrganizationId: currentOrganizationId,
+                  switchingOrganizationId: _switchingOrganizationId,
+                  onSwitch: _switchOrganization,
+                ),
+                if (!hasSwitchTarget) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    '当前账号没有其他可切换的公司/组织，或其他组织暂不具备 App 可用身份。',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+          )
+        else if (_result?.state == AppPageState.content && current == null)
+          OrganizationSwitchCard(
+            title: '当前还没有公司/组织',
+            child: NoCurrentOrganizationAction(
+              onOpenOrganizationHub: () => Navigator.of(
+                context,
+              ).pushNamed(ProfileIdentityRoutes.organizationHandoff),
             ),
           )
         else
-          _OrganizationSwitchCard(
+          OrganizationSwitchCard(
             title: '当前没有其他主体可切换',
             child: Text(
               _organizationSwitchMessage(_result?.state, _result?.message),
             ),
           ),
+        if (_leaveResult != null) ...<Widget>[
+          const SizedBox(height: 16),
+          OrganizationSwitchCard(
+            title: _leaveResult!.state == AppPageState.content
+                ? '已退出当前组织'
+                : '退出组织未完成',
+            child: Text(_leaveResultMessage(_leaveResult!)),
+          ),
+        ],
+        if (!_loading &&
+            _result?.state == AppPageState.content &&
+            current != null) ...<Widget>[
+          const SizedBox(height: 16),
+          OrganizationLeaveActionCard(
+            current: current,
+            leaving: _leavingCurrentOrganization,
+            onLeave: () => _leaveCurrentOrganization(current),
+          ),
+        ],
       ],
     );
   }
@@ -243,201 +407,17 @@ class _OrganizationSwitchPageState extends State<OrganizationSwitchPage> {
     }
     return _organizationSwitchMessage(result.state, result.message);
   }
-}
 
-class _OrganizationSwitchCard extends StatelessWidget {
-  const _OrganizationSwitchCard({this.title, required this.child});
-
-  final String? title;
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) {
-    final resolvedTitle = title?.trim();
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            if (resolvedTitle != null && resolvedTitle.isNotEmpty) ...<Widget>[
-              Text(
-                resolvedTitle,
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 14),
-            ],
-            child,
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OrganizationSwitchCurrentBanner extends StatelessWidget {
-  const _OrganizationSwitchCurrentBanner({
-    required this.title,
-    required this.subtitle,
-    required this.supportingText,
-  });
-
-  final String title;
-  final String? subtitle;
-  final String supportingText;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text(
-              title,
-              style: theme.textTheme.titleMedium?.copyWith(
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            if (subtitle != null && subtitle!.trim().isNotEmpty) ...<Widget>[
-              const SizedBox(height: 4),
-              Text(
-                subtitle!,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ],
-            const SizedBox(height: 8),
-            Text(
-              supportingText,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _OrganizationSwitchList extends StatelessWidget {
-  const _OrganizationSwitchList({
-    required this.items,
-    required this.switchingOrganizationId,
-    required this.onSwitch,
-  });
-
-  final List<MyOrganizationItemView> items;
-  final String? switchingOrganizationId;
-  final ValueChanged<MyOrganizationItemView> onSwitch;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Column(
-        children: <Widget>[
-          for (var index = 0; index < items.length; index++) ...<Widget>[
-            _OrganizationSwitchRow(
-              item: items[index],
-              switching: switchingOrganizationId == items[index].organizationId,
-              onTap: () => onSwitch(items[index]),
-            ),
-            if (index != items.length - 1)
-              Divider(height: 1, color: theme.colorScheme.outlineVariant),
-          ],
-        ],
-      ),
-    );
-  }
-}
-
-class _OrganizationSwitchRow extends StatelessWidget {
-  const _OrganizationSwitchRow({
-    required this.item,
-    required this.switching,
-    required this.onTap,
-  });
-
-  final MyOrganizationItemView item;
-  final bool switching;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final subtitleStyle = theme.textTheme.bodySmall?.copyWith(
-      color: theme.colorScheme.onSurfaceVariant,
-      height: 1.35,
-    );
-    return InkWell(
-      borderRadius: BorderRadius.circular(18),
-      onTap: switching ? null : onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    profileDisplayOrganizationName(item.name),
-                    style: theme.textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '能力：${profileDisplayOrganizationCapabilitySummary(item.organizationType, roleKeys: item.roleKeys)}；'
-                    '企业认证：${profileDisplayCertificationStatus(item.certificationStatus)}；'
-                    '成员：${profileDisplayMembershipStatus(item.membershipStatus)}',
-                    style: subtitleStyle,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 12),
-            switching
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: <Widget>[
-                      Text(
-                        '切换',
-                        style: theme.textTheme.labelLarge?.copyWith(
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                      const SizedBox(width: 2),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        color: theme.colorScheme.primary,
-                      ),
-                    ],
-                  ),
-          ],
-        ),
-      ),
-    );
+  static String _leaveResultMessage(
+    ProfileIdentityResult<OrganizationLeaveAcceptedView> result,
+  ) {
+    if (result.state == AppPageState.content && result.data != null) {
+      if (result.data!.nextOrganizationId != null) {
+        return '已退出当前组织，并切换到下一个可用主体。页面已重新读取当前组织上下文。';
+      }
+      return '已退出当前组织。当前账号没有其他可用组织，可前往公司与组织创建或加入组织。';
+    }
+    return _organizationSwitchMessage(result.state, result.message);
   }
 }
 

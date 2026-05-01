@@ -92,6 +92,19 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
+    ExhibitionCanonicalPaths.exhibitionReportSubmit =>
+      _validateRequiredFieldsPayload(
+        canonicalPath,
+        payload,
+        fields: const <String>[
+          'reportCaseId',
+          'targetType',
+          'targetId',
+          'status',
+          'acceptMode',
+        ],
+        sanitizedPayload: payload,
+      ),
     ExhibitionCanonicalPaths.bidAward ||
     ExhibitionCanonicalPaths.bidSelectAndCreateOrder =>
       _validateBidAwardAcceptedPayload(canonicalPath, payload),

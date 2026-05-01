@@ -28,6 +28,7 @@ class AuthConsumerLayer {
   }
 
   final AppApiClient _client;
+  Future<AuthActionResult<SessionEnvelope>>? _refreshInFlight;
 
   Future<AuthActionResult<OtpSendView>> sendOtp({
     required String mobile,
@@ -145,6 +146,22 @@ class AuthConsumerLayer {
   }
 
   Future<AuthActionResult<SessionEnvelope>> refreshSession() async {
+    final existing = _refreshInFlight;
+    if (existing != null) {
+      return existing;
+    }
+
+    late final Future<AuthActionResult<SessionEnvelope>> inFlight;
+    inFlight = _refreshSessionOnce().whenComplete(() {
+      if (identical(_refreshInFlight, inFlight)) {
+        _refreshInFlight = null;
+      }
+    });
+    _refreshInFlight = inFlight;
+    return inFlight;
+  }
+
+  Future<AuthActionResult<SessionEnvelope>> _refreshSessionOnce() async {
     final refreshToken = AppSessionStore.instance.refreshToken;
     if (refreshToken == null) {
       return const AuthActionResult<SessionEnvelope>(
@@ -179,11 +196,16 @@ class AuthConsumerLayer {
       if (passwordSetupPromptDismissed) {
         AppSessionStore.instance.markPasswordSetupPromptDismissed();
       }
-    } else if (result.state == AppPageState.unauthorized) {
+    } else if (result.state == AppPageState.unauthorized &&
+        _isRefreshTokenStillCurrent(refreshToken)) {
       AppSessionStore.instance.clearSession();
     }
 
     return result;
+  }
+
+  bool _isRefreshTokenStillCurrent(String refreshToken) {
+    return AppSessionStore.instance.refreshToken == refreshToken;
   }
 
   Future<AuthActionResult<ActionAckView>> logout({

@@ -485,6 +485,77 @@ test('session carrier verification probes Server Admin API before cookie write',
   assert.equal(calls[0].options.headers['x-actor-id'], undefined);
 });
 
+test('admin runtime prefers admin_session over incoming Authorization', async () => {
+  const calls = installRuntime({ items: [], count: 0, traceId: 'trace-cookie-first' }, {
+    sessionCarrier: 'opaque-access-carrier',
+    incomingHeaders: new Headers([
+      ['authorization', 'Bearer stale-incoming-carrier'],
+      ['x-request-id', 'request-cookie-first'],
+    ]),
+  });
+
+  await client.fetchContentSafetyReviewTasks();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.headers.authorization, 'Bearer opaque-access-carrier');
+  assert.equal(calls[0].options.headers['x-request-id'], 'request-cookie-first');
+});
+
+test('admin runtime does not promote incoming Authorization without admin_session', async () => {
+  const calls = installRuntime({ items: [], count: 0, traceId: 'trace-no-cookie' }, {
+    sessionCarrier: null,
+    incomingHeaders: new Headers([
+      ['authorization', 'Bearer stale-incoming-carrier'],
+      ['x-request-id', 'request-no-cookie'],
+    ]),
+  });
+
+  await client.fetchContentSafetyReviewTasks();
+
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].options.headers.authorization, undefined);
+  assert.equal(calls[0].options.headers['x-request-id'], 'request-no-cookie');
+});
+
+test('membership admin transport stays read-only on Server Admin API', async () => {
+  const calls = installRuntime({
+    items: [],
+    pagination: { page: 1, pageSize: 20, total: 0, hasMore: false },
+    readOnly: true,
+    writeActionsEnabled: false,
+  });
+
+  await client.fetchAdminMembershipOrders({
+    organizationId: 'org-1',
+    orderStatus: 'active',
+    paymentStatus: 'succeeded',
+    entitlementStatus: 'active',
+    page: 1,
+    pageSize: 20,
+  });
+  await client.fetchAdminMembershipOrder('membership-order-1');
+  await client.fetchAdminMembershipStatus('org-1');
+
+  assert.equal(calls.length, 3);
+  assert.equal(
+    calls[0].url,
+    'http://server.test/server/admin/membership/orders?organizationId=org-1&orderStatus=active&paymentStatus=succeeded&entitlementStatus=active&page=1&pageSize=20',
+  );
+  assert.equal(
+    calls[1].url,
+    'http://server.test/server/admin/membership/orders/membership-order-1',
+  );
+  assert.equal(
+    calls[2].url,
+    'http://server.test/server/admin/membership/organizations/org-1/status',
+  );
+  assertForwardedCarrierHeaders(calls[0].options.headers);
+  assert.equal(calls[0].options.method, 'GET');
+  assert.equal(calls[1].options.method, 'GET');
+  assert.equal(calls[2].options.method, 'GET');
+  assert.equal(calls[0].options.body, undefined);
+});
+
 function installRuntime(responseBody, overrides = {}) {
   const calls = [];
   client.setAdminApiRuntimeForTest(async () => ({

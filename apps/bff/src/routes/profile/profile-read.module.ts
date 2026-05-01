@@ -7,8 +7,12 @@ import { ProfileCreditConstraintsErrorService } from './profile-credit-constrain
 import { ProfileCreditConstraintsService } from './profile-credit-constraints.service';
 import { ProfileOrganizationCreditScoringErrorService } from './profile-organization-credit-scoring-error.service';
 import { ProfileOrganizationCreditScoringService } from './profile-organization-credit-scoring.service';
+import { ProfileOrganizationLeaveErrorService } from './profile-organization-leave-error.service';
+import { ProfileOrganizationLeaveService } from './profile-organization-leave.service';
 import { ProfilePaymentBillingStatusErrorService } from './profile-payment-billing-status-error.service';
 import { ProfilePaymentBillingStatusService } from './profile-payment-billing-status.service';
+import { ProfileMembershipPurchaseErrorService } from './profile-membership-purchase-error.service';
+import { ProfileMembershipPurchaseService } from './profile-membership-purchase.service';
 import { ProfileMembershipErrorService } from './profile-membership-error.service';
 import { ProfileMembershipService } from './profile-membership.service';
 import { ProfileGovernanceAppealsErrorService } from './profile-governance-appeals.error.service';
@@ -44,10 +48,14 @@ import { ProfileSecurityService } from './profile-security.service';
     ProfileCreditConstraintsErrorService,
     ProfileOrganizationCreditScoringService,
     ProfileOrganizationCreditScoringErrorService,
+    ProfileOrganizationLeaveService,
+    ProfileOrganizationLeaveErrorService,
     ProfilePaymentBillingStatusService,
     ProfilePaymentBillingStatusErrorService,
     ProfileMembershipService,
     ProfileMembershipErrorService,
+    ProfileMembershipPurchaseService,
+    ProfileMembershipPurchaseErrorService,
     ProfileCommandService,
     ProfileCommandErrorService,
     ProfileSafetyService,

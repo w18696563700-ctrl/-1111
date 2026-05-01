@@ -45,7 +45,7 @@ export class PlatformServiceFeeChargeEntity {
   @Column({ name: 'released_remainder_amount', type: 'numeric', precision: 12, scale: 2, nullable: true })
   releasedRemainderAmount!: string | number | null;
 
-  @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '默认费率 3.0%' })
+  @Column({ name: 'fee_rate_label', type: 'varchar', length: 64, default: '基础平台定价规则' })
   feeRateLabel!: string;
 
   @Column({ name: 'fee_rate_source', type: 'varchar', length: 32, default: 'legacy_fixed_default' })

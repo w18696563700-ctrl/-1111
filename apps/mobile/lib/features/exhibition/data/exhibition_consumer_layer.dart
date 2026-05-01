@@ -18,6 +18,7 @@ part 'commands/milestone_submit_command.dart';
 part 'commands/order_completion_command.dart';
 part 'commands/project_attachment_bind_command.dart';
 part 'commands/project_create_command.dart';
+part 'commands/exhibition_report_submit_command.dart';
 part 'commands/project_lifecycle_action_command.dart';
 part 'commands/p0_pay_commands.dart';
 part 'commands/project_save_command.dart';
@@ -499,6 +500,30 @@ class ExhibitionConsumerLayer {
 
   Future<ExhibitionActionResult> submitBid(BidSubmitCommand command) {
     return _actionService.submitBid(command);
+  }
+
+  Future<ExhibitionActionResult> submitExhibitionReport({
+    required String? projectId,
+    String reasonCode = 'fabricated_project',
+    String? reasonDetail,
+    List<String> evidenceFileAssetIds = const <String>[],
+  }) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return _missingProjectActionResult(
+        path: ExhibitionCanonicalPaths.exhibitionReportSubmit,
+      );
+    }
+
+    return _actionService.submitExhibitionReport(
+      ExhibitionReportSubmitCommand(
+        targetType: 'project',
+        targetId: normalizedProjectId,
+        reasonCode: reasonCode,
+        reasonDetail: reasonDetail,
+        evidenceFileAssetIds: evidenceFileAssetIds,
+      ),
+    );
   }
 
   Future<ExhibitionActionResult> lockBidSeat({

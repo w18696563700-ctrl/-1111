@@ -91,6 +91,7 @@ export class CounterpartConversationBidParticipationSource
         continue;
       }
       const isOwnerViewer = project.organizationId === viewerOrganizationId;
+      organizationIds.add(request.requesterOrganizationId);
       organizationIds.add(
         isOwnerViewer ? request.requesterOrganizationId : project.organizationId,
       );
@@ -142,6 +143,12 @@ export class CounterpartConversationBidParticipationSource
       approvedLegalNameByOrganizationId:
         input.counterpart.approvedLegalNameByOrganizationId,
     });
+    const requesterCompanyName = this.displayNameService.resolveCompanyName({
+      organizationId: input.request.requesterOrganizationId,
+      organizationMap: input.counterpart.organizationMap,
+      approvedLegalNameByOrganizationId:
+        input.counterpart.approvedLegalNameByOrganizationId,
+    });
     const counterpartDisplayName = counterpartCompanyName;
     const requesterOrganizationName =
       input.request.requesterOrganizationId === counterpartOrganizationId
@@ -179,6 +186,8 @@ export class CounterpartConversationBidParticipationSource
         }),
         status: input.request.state,
         updatedAt,
+        requesterCompanyName,
+        requesterOrganizationId: input.request.requesterOrganizationId,
         truthAnchor: {
           truthType: 'bid_participation_request' as const,
           projectId: input.request.projectId,

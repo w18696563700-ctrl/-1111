@@ -140,7 +140,28 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _uploadMessage = append ? '正在继续选择报价依据资料' : '正在选择报价依据资料';
     });
 
-    final draft = await _pickProjectAttachmentDraft();
+    final source = await _resolveProjectAttachmentPickSource(
+      context: context,
+      attachmentKind: _selectedAttachmentKind,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (source == null) {
+      setState(() {
+        _uploadStatus = _selectedDrafts.isEmpty
+            ? _ProjectAttachmentUploadUiStatus.idle
+            : _ProjectAttachmentUploadUiStatus.selectedReady;
+        _uploadMessage = _selectedDrafts.isEmpty
+            ? '当前没有选择新附件，可稍后重新选择。'
+            : '当前没有继续添加新附件，已选中的 ${_selectedDrafts.length} 个附件仍可继续上传。';
+      });
+      return;
+    }
+
+    final draft = await _pickProjectAttachmentDraft(
+      imageOnly: source == ProjectAttachmentPickSource.photo,
+    );
     if (!mounted) {
       return;
     }

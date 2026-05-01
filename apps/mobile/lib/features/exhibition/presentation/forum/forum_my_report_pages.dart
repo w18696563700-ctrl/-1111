@@ -38,7 +38,7 @@ class _ForumMyReportListPageState extends State<ForumMyReportListPage> {
     return ForumPageFrame(
       eyebrow: '我的论坛',
       title: '我的举报记录',
-      summary: '只展示当前账号提交过的论坛举报记录与 BFF 回读状态，不提供后续治理操作。',
+      summary: '查看已提交的论坛举报记录与处理状态。',
       scopeLabel: 'reports/mine',
       routeLabel: ExhibitionRoutes.forumMeReports,
       showRouteMeta: false,
@@ -62,7 +62,7 @@ class _ForumMyReportListPageState extends State<ForumMyReportListPage> {
           ForumSectionCard(
             eyebrow: '只读记录',
             title: '最近提交',
-            summary: '这里按 BFF 返回结果展示本人举报记录，不在本地判断处理结论。',
+            summary: '这里集中展示本人提交过的论坛举报，不提供处理动作。',
             children: _reportCards(context, reports),
           ),
       ],
@@ -90,15 +90,15 @@ class _ForumMyReportListPageState extends State<ForumMyReportListPage> {
             summary: _reportTicketSummary(item),
             meta:
                 '状态：${_reportStatusLabel(item.status)} | 提交：${_compactPublishedAt(item.submittedAt)}',
-            footer: '编号：${item.reportTicketId}',
+            footer: '记录编号：${item.reportTicketId}',
             actions: <Widget>[
-              FilledButton(
+              AppPrimaryButton(
+                label: '查看详情',
                 onPressed: () => Navigator.of(context).pushNamed(
                   ExhibitionRoutes.forumMeReportDetailWithTicketId(
                     item.reportTicketId,
                   ),
                 ),
-                child: const Text('查看详情'),
               ),
             ],
           ),
@@ -148,7 +148,7 @@ class _ForumMyReportDetailPageState extends State<ForumMyReportDetailPage> {
     return ForumPageFrame(
       eyebrow: '我的论坛',
       title: '举报详情',
-      summary: '只展示该举报记录的 BFF 回读内容，不提供处理动作。',
+      summary: '查看本条举报记录的提交内容和当前处理状态。',
       scopeLabel: 'reports/mine/detail',
       routeLabel: ExhibitionRoutes.forumMeReportDetailWithTicketId(
         widget.ticketId,
@@ -222,7 +222,7 @@ String _reportDetailTitle(ForumMyReportTicketDetailView detail) {
 }
 
 String _reportDetailSummary(ForumMyReportTicketDetailView detail) {
-  return '状态：${_reportStatusLabel(detail.status)} | 编号：${detail.reportTicketId}';
+  return '状态：${_reportStatusLabel(detail.status)} | 记录编号：${detail.reportTicketId}';
 }
 
 String _snapshotSummary(ForumMyReportTargetSnapshotView snapshot) {
@@ -241,7 +241,7 @@ String _reportTargetLabel(String targetType) {
   return switch (targetType.trim()) {
     'post' => '帖子',
     'comment' => '评论',
-    _ => '对象回读：$targetType',
+    _ => '对象：$targetType',
   };
 }
 
@@ -251,13 +251,15 @@ String _reportReasonLabel(String reasonCode) {
       return option.label;
     }
   }
-  return '原因回读：$reasonCode';
+  return '原因：$reasonCode';
 }
 
 String _reportStatusLabel(String status) {
   final value = status.trim();
   return switch (value) {
     'submitted' => '已提交',
-    _ => '状态回读：$value',
+    'processing' || 'under_review' || 'reviewing' => '处理中',
+    'resolved' || 'closed' || 'handled' => '已处理',
+    _ => '状态：$value',
   };
 }
