@@ -33,8 +33,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('举报帖子'), 200);
-    await tester.tap(find.text('举报帖子'));
+    _openPostReportSheet(tester);
     await tester.pumpAndSettle();
 
     await tester.tap(find.text('刷屏 / 灌水'));
@@ -172,8 +171,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('举报帖子'), 200);
-    await tester.tap(find.text('举报帖子'));
+    _openPostReportSheet(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.text('其他'));
     await tester.pumpAndSettle();
@@ -209,8 +207,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('举报帖子'), 200);
-    await tester.tap(find.text('举报帖子'));
+    _openPostReportSheet(tester);
     await tester.pumpAndSettle();
     await tester.tap(find.text('广告 / 导流'));
     await tester.pumpAndSettle();
@@ -221,4 +218,11 @@ void main() {
     expect(find.text('举报已提交'), findsNothing);
     expect(find.textContaining('reportId'), findsNothing);
   });
+}
+
+void _openPostReportSheet(WidgetTester tester) {
+  final reportAction = find
+      .ancestor(of: find.text('举报'), matching: find.byType(InkWell))
+      .last;
+  tester.widget<InkWell>(reportAction).onTap?.call();
 }

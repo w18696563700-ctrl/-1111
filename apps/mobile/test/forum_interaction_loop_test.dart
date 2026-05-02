@@ -81,7 +81,7 @@ void main() {
 
       expect(requestedPageSizes.first, '10');
       expect(find.text('查看全部评论'), findsNothing);
-      await tester.tap(find.text('评论').first);
+      await tester.tap(find.textContaining('评论').first);
       await tester.pumpAndSettle();
       expect(find.text('写评论'), findsOneWidget);
       await tester.enterText(find.byType(TextField).first, '详情页内联评论');
@@ -91,10 +91,15 @@ void main() {
       await tester.pumpAndSettle();
       expect(submittedBodies, contains('详情页内联评论'));
 
-      await tester.scrollUntilVisible(find.text('查看更多评论'), 500);
-      await tester.ensureVisible(find.text('查看更多评论'));
+      final loadMoreAction = find.text('查看更多评论').last;
+      await tester.scrollUntilVisible(
+        loadMoreAction,
+        500,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.ensureVisible(loadMoreAction);
       await tester.pumpAndSettle();
-      await tester.tap(find.text('查看更多评论'));
+      await tester.tap(loadMoreAction);
       await tester.pumpAndSettle();
       expect(requestedCursors, contains('cursor-2'));
       expect(requestedPageSizes, everyElement('10'));
@@ -192,6 +197,11 @@ void main() {
           },
           'content': '正式帖子正文',
           'attachmentRefs': const <Object?>[],
+          'engagement': <String, Object?>{
+            'replyCount': 0,
+            'likeCount': likeCount,
+            'viewCount': 0,
+          },
           'publishedAt': '2026-03-27T09:30:00Z',
           'viewerHasLiked': liked,
           'viewerHasBookmarked': false,
@@ -226,8 +236,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('点赞'), 200);
-    await tester.tap(find.text('点赞'));
+    final likeAction = find.textContaining('点赞').first;
+    await tester.ensureVisible(likeAction);
+    await tester.tap(likeAction);
     await tester.pumpAndSettle();
 
     expect(find.text('已点赞'), findsWidgets);
@@ -253,6 +264,11 @@ void main() {
           },
           'content': '正式帖子正文',
           'attachmentRefs': const <Object?>[],
+          'engagement': const <String, Object?>{
+            'replyCount': 0,
+            'likeCount': 0,
+            'viewCount': 0,
+          },
           'publishedAt': '2026-03-27T09:30:00Z',
           'viewerHasLiked': false,
           'viewerHasBookmarked': bookmarked,
@@ -286,8 +302,9 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.scrollUntilVisible(find.text('收藏'), 200);
-    await tester.tap(find.text('收藏'));
+    final bookmarkAction = find.textContaining('收藏').first;
+    await tester.ensureVisible(bookmarkAction);
+    await tester.tap(bookmarkAction);
     await tester.pumpAndSettle();
 
     expect(find.text('已收藏'), findsWidgets);
@@ -454,6 +471,11 @@ Map<String, Object?> _detailBody() {
     'author': <String, Object?>{'authorId': 'member-1', 'displayName': '赵工'},
     'content': '正式帖子正文',
     'attachmentRefs': <Object?>[],
+    'engagement': <String, Object?>{
+      'replyCount': 10,
+      'likeCount': 0,
+      'viewCount': 0,
+    },
     'publishedAt': '2026-03-27T09:30:00Z',
     'viewerHasLiked': false,
     'viewerHasBookmarked': false,

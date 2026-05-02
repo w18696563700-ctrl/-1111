@@ -346,6 +346,11 @@ _forumHandlers() {
               'mimeType': 'application/pdf',
             },
           ],
+          'engagement': <String, Object?>{
+            'replyCount': 2,
+            'likeCount': 1,
+            'viewCount': 32,
+          },
           'publishedAt': '2026-03-27T09:30:00Z',
           'viewerHasLiked': true,
           'viewerHasBookmarked': false,

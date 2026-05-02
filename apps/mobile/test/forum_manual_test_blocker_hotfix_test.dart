@@ -19,6 +19,11 @@ Map<String, Object?> _detailBody({
     'author': <String, Object?>{'authorId': 'member-1', 'displayName': '赵工'},
     'content': '正式帖子正文',
     'attachmentRefs': <Object?>[],
+    'engagement': <String, Object?>{
+      'replyCount': 0,
+      'likeCount': viewerHasLiked ? 1 : 0,
+      'viewCount': 0,
+    },
     'publishedAt': '2026-03-27T09:30:00Z',
     if (includeViewerFlags) 'viewerHasLiked': viewerHasLiked,
     if (includeViewerFlags) 'viewerHasBookmarked': viewerHasBookmarked,
@@ -78,11 +83,11 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('点赞'));
+      await tester.tap(find.textContaining('点赞').first);
       await tester.pumpAndSettle();
       expect(find.text('已点赞'), findsWidgets);
 
-      await tester.tap(find.text('收藏'));
+      await tester.tap(find.textContaining('收藏').first);
       await tester.pumpAndSettle();
       expect(find.text('已收藏'), findsWidgets);
     },
