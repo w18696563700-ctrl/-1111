@@ -41,7 +41,7 @@ Widget _buildBidSubmitMaterialSection({
   final result = bidMaterialResult;
   if (result == null || result.state == AppPageState.loading) {
     return const _ActionCard(
-      title: '第二步 查看报价依据资料',
+      title: '查看报价依据资料',
       summary: '这里只读展示发布方上传的五类报价依据资料，不提供上传、删除或绑定动作。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
@@ -56,7 +56,7 @@ Widget _buildBidSubmitMaterialSection({
   if (result.state != AppPageState.content &&
       result.state != AppPageState.empty) {
     return _ActionCard(
-      title: '第二步 查看报价依据资料',
+      title: '查看报价依据资料',
       summary: '这里只读展示发布方上传的五类报价依据资料，不提供上传、删除或绑定动作。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
@@ -84,7 +84,7 @@ Widget _buildBidSubmitMaterialSection({
   }
 
   return _ActionCard(
-    title: '第二步 查看报价依据资料',
+    title: '查看报价依据资料',
     summary: '这里只读展示发布方上传的五类报价依据资料，不提供上传、删除或绑定动作。',
     tone: _ActionCardTone.emphasis,
     children: <Widget>[

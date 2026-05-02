@@ -345,13 +345,12 @@ Widget _buildProjectDetailP0PayReadOnlyCard({
   final routeTarget = summary?.routeTarget;
   return _ActionCard(
     title: '平台收费只读状态',
-    summary: '这里只展示 BFF/Server 聚合后的收费与预授权状态，不执行支付、不修改资金状态、不裁定扣费。',
+    summary: '这里只展示当前项目的诚意金、竞标预授权和成交确认状态；资金状态以平台记录为准。',
     tone: _ActionCardTone.muted,
     children: <Widget>[
       const _StateMessage(
-        title: '只读边界',
-        body:
-            '项目详情只承接 200 元项目真实性诚意金、4000 元竞标服务费预授权额度、成交确认 handoff 的只读摘要；Flutter 不接收支付回调，也不生成资金真相。',
+        title: '资金状态说明',
+        body: '本页仅用于查看 200 元项目真实性诚意金、4000 元竞标服务费预授权额度和后续成交确认进度，不在这里裁定扣费。',
       ),
       if (loading) ...<Widget>[
         const SizedBox(height: 12),
@@ -367,9 +366,9 @@ Widget _buildProjectDetailP0PayReadOnlyCard({
       if (!loading && routeTarget != null) ...<Widget>[
         const SizedBox(height: 8),
         _DetailLine(
-          label: '只读 routeTarget',
+          label: '后续入口',
           value: routeTarget.displayText.isEmpty
-              ? 'BFF 已返回只读 handoff'
+              ? '已返回后续处理入口'
               : routeTarget.displayText,
         ),
       ],
@@ -400,8 +399,8 @@ String? _projectDetailP0PayFailureText(ExhibitionLoadResult? result) {
   }
   return switch (result.errorCode) {
     'AUTH_SESSION_INVALID' => '登录状态失效后不能读取资金状态，请重新登录。',
-    'TRADE_TASK_INVALID_STATE' => '当前交易任务状态暂不可读取 P0-Pay 摘要。',
-    'P0_PAY_SUMMARY_UNAVAILABLE' => '当前 P0-Pay 摘要暂不可用，请稍后刷新。',
-    _ => result.message ?? result.errorCode ?? '当前 P0-Pay 摘要暂不可用。',
+    'TRADE_TASK_INVALID_STATE' => '当前项目状态暂不能读取收费状态。',
+    'P0_PAY_SUMMARY_UNAVAILABLE' => '当前收费状态暂不可用，请稍后刷新。',
+    _ => result.message ?? result.errorCode ?? '当前收费状态暂不可用。',
   };
 }

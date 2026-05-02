@@ -8,6 +8,11 @@ import { CurrentActorEligibilityService } from '../organization/current-actor-el
 import { authPermissionInsufficient } from '../organization/organization-auth.errors';
 import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
 import { projectAuthenticitySincerityRequired } from '../p0_pay/p0-pay.errors';
+import {
+  PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
+  PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
+  projectAuthenticitySincerityInternalTestNoFreezeEnabled,
+} from '../p0_pay/p0-pay-internal-test-no-freeze.policy';
 import { VerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { ProjectEntity } from './entities/project.entity';
@@ -218,7 +223,7 @@ export class ProjectWriteService {
       if (project.state !== PROJECT_SUBMITTED_STATE) {
         throw projectInvalidState('Only submitted projects may be published.');
       }
-      await this.requirePaidPricingGate(manager, project, auditContext);
+      const pricingGate = await this.requirePaidPricingGate(manager, project, auditContext);
 
       project.state = PROJECT_PUBLISHED_STATE;
       project.summary = this.buildProjectSummary(PROJECT_PUBLISHED_STATE);
@@ -234,7 +239,9 @@ export class ProjectWriteService {
             publishedAt: project.publishedAt?.toISOString() ?? null,
             pricingGateApplied: true,
             authenticitySincerityRequired: true,
-            authenticitySincerityStatus: 'paid',
+            authenticitySincerityStatus: pricingGate.authenticitySincerityStatus,
+            authenticitySincerityGateResult: pricingGate.authenticitySincerityGateResult,
+            authenticitySincerityOrderId: pricingGate.orderId,
           },
         },
         auditContext,
@@ -259,7 +266,45 @@ export class ProjectWriteService {
       order: { updatedAt: 'DESC' },
     });
     if (order) {
-      return order;
+      return {
+        orderId: order.id,
+        authenticitySincerityStatus: 'paid',
+        authenticitySincerityGateResult: 'paid',
+      };
+    }
+
+    const latestOrder = await manager.getRepository(InquiryQuoteDepositEntity).findOne({
+      where: {
+        taskId: project.id,
+        publisherOrganizationId: project.organizationId,
+      },
+      order: { updatedAt: 'DESC' },
+    });
+    if (
+      projectAuthenticitySincerityInternalTestNoFreezeEnabled() &&
+      latestOrder?.paymentOrderId
+    ) {
+      await this.auditService.record(
+        {
+          aggregateType: 'project',
+          aggregateId: project.id,
+          eventType: 'project_publish_pricing_gate_internal_test_no_freeze',
+          payload: {
+            pricingGateApplied: true,
+            authenticitySincerityRequired: true,
+            authenticitySincerityStatus: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
+            authenticitySincerityGateResult: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
+            authenticitySincerityOrderId: latestOrder.id,
+          },
+        },
+        auditContext,
+        manager
+      );
+      return {
+        orderId: latestOrder.id,
+        authenticitySincerityStatus: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
+        authenticitySincerityGateResult: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
+      };
     }
 
     await this.auditService.record(

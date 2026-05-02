@@ -996,7 +996,7 @@ class _CounterpartConversationPageState
     final orderTarget =
         orderCard?.detailRouteTarget ?? _fallbackOrderTarget(group);
     if (orderTarget == null) {
-      _showSnack('当前项目暂时没有可打开的订单状态。');
+      _showSnack('当前项目暂时没有可打开的后续承接状态。');
       return;
     }
     Navigator.of(context).pushNamed(orderTarget.routeLocation);

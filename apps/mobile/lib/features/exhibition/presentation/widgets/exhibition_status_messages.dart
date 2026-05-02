@@ -3,7 +3,7 @@ part of '../exhibition_trade_pages.dart';
 String _frontStageStateLabel(String state) {
   return switch (state) {
     'published' => '竞标中',
-    'bidding_closed' => '投标已结束',
+    'bidding_closed' => '竞标已结束',
     'awarded' => '已授标',
     'converted_to_order' => '已被承接',
     'available' => '可锁定',
@@ -308,11 +308,11 @@ String? _controlledBusinessFailureMessage({
       '当前项目真实性诚意金状态暂不允许继续发布，请完成冻结后再试。',
     'PROJECT_AUTHENTICITY_SINCERITY_RESULT_UNAVAILABLE' =>
       '项目真实性诚意金结果暂不可用，请稍后刷新。',
-    'P0_PAY_INVALID' => '当前 P0-Pay 请求参数未通过校验，请刷新页面后再继续。',
-    'P0_PAY_RESOURCE_UNAVAILABLE' => '当前 P0-Pay 资源暂不可用，请刷新页面后再继续。',
-    'P0_PAY_PERMISSION_DENIED' => '当前账号没有权限操作这笔 P0-Pay 资源，请确认是否使用所属组织账号进入。',
-    'P0_PAY_STATE_CONFLICT' => '当前 P0-Pay 状态暂不允许继续，请刷新页面确认最新状态后再试。',
-    'P0_PAY_IDEMPOTENCY_CONFLICT' => '当前 P0-Pay 请求已被处理或正在处理，请刷新状态后再判断是否需要继续。',
+    'P0_PAY_INVALID' => '当前平台收费规则请求参数未通过校验，请刷新页面后再继续。',
+    'P0_PAY_RESOURCE_UNAVAILABLE' => '当前平台收费规则资源暂不可用，请刷新页面后再继续。',
+    'P0_PAY_PERMISSION_DENIED' => '当前账号没有权限操作这笔平台收费规则资源，请确认是否使用所属组织账号进入。',
+    'P0_PAY_STATE_CONFLICT' => '当前平台收费规则状态暂不允许继续，请刷新页面确认最新状态后再试。',
+    'P0_PAY_IDEMPOTENCY_CONFLICT' => '当前平台收费规则请求已被处理或正在处理，请刷新状态后再判断是否需要继续。',
     'PRICING_RULE_VERSION_MISMATCH' => '当前收费规则版本已更新，请刷新页面后再继续。',
     'BID_DUPLICATE_SUBMISSION' => '当前项目已提交过竞标，本页不再重复提交。请回到项目详情查看最新竞标状态。',
     'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED' =>

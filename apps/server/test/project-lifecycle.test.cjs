@@ -159,6 +159,16 @@ function createHarness() {
         updatedAt: new Date('2026-04-29T00:00:00.000Z'),
       });
     },
+    markSincerityPayInitStarted(projectId) {
+      sincerityOrders.push({
+        id: `sincerity-${projectId}`,
+        taskId: projectId,
+        publisherOrganizationId: 'buyer-org',
+        status: 'pending_payment',
+        paymentOrderId: `payment-${projectId}`,
+        updatedAt: new Date('2026-04-29T00:00:00.000Z'),
+      });
+    },
     auditLogs,
     writeService: new ProjectWriteService(
       repository,
@@ -282,6 +292,49 @@ test('project publish fail-closes until 200 project authenticity sincerity is pa
   assert.equal(harness.auditLogs.at(-1)?.eventType, 'project_publish_blocked_by_pricing_gate');
   assert.equal(harness.auditLogs.at(-1)?.payload.requiredOrderStatus, 'paid');
   assert.equal(harness.auditLogs.at(-1)?.payload.pricingErrorCode, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
+});
+
+test('project publish allows internal-test no-freeze gate without marking sincerity paid', async () => {
+  const oldValue = process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE;
+  delete process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE;
+  try {
+    const harness = createHarness();
+    const created = await harness.writeService.createProject(
+      createPayload(),
+      createContext('project-create-internal-no-freeze'),
+    );
+    await harness.writeService.submitProject(
+      { projectId: created.projectId },
+      createContext('project-submit-internal-no-freeze'),
+    );
+
+    harness.markSincerityPayInitStarted(created.projectId);
+    const published = await harness.writeService.publishProject(
+      { projectId: created.projectId },
+      createContext('project-publish-internal-no-freeze'),
+    );
+
+    assert.equal(published.state, 'published');
+    assert.equal(harness.sincerityOrders[0].status, 'pending_payment');
+    assert.equal(
+      harness.auditLogs.at(-2)?.eventType,
+      'project_publish_pricing_gate_internal_test_no_freeze',
+    );
+    assert.equal(
+      harness.auditLogs.at(-2)?.payload.authenticitySincerityStatus,
+      'internal_test_no_freeze_required',
+    );
+    assert.equal(
+      harness.auditLogs.at(-1)?.payload.authenticitySincerityGateResult,
+      'internal_test_no_freeze_allowed',
+    );
+  } finally {
+    if (oldValue === undefined) {
+      delete process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE;
+    } else {
+      process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE = oldValue;
+    }
+  }
 });
 
 test('project lifecycle allows owner to delete draft project only and records audit', async () => {

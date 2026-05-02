@@ -509,8 +509,8 @@ String _projectNameAccessReviewStatusLabel(String requestStatus) {
 
 String _bidParticipationThreadBody(String requestStatus) {
   return switch (requestStatus) {
-    'pending' => '当前申请仍在等待发布方审批；通过后，申请方可查看项目名称、报价依据资料并继续提交竞标。',
-    'approved' => '当前申请已经审批通过；申请方可从消息楼或项目详情继续提交竞标。',
+    'pending' => '当前申请仍在等待发布方审批；通过后，申请方可查看项目名称、报价依据资料并提交竞标。',
+    'approved' => '当前申请已经审批通过；申请方可从消息楼或项目详情立即参与竞标。',
     'rejected' => '当前申请已经被拒绝；申请方暂不能查看报价依据资料或提交竞标。',
     _ => '当前申请状态暂不可识别，请刷新后再试。',
   };

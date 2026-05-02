@@ -98,7 +98,7 @@ String _tradingImAttachmentText(List<String> fileAssetIds) {
 String _tradingImRoleLabel(String role) {
   return switch (role) {
     'project_owner' => '项目方',
-    'bidder' => '投标方',
+    'bidder' => '竞标方',
     'viewer' => '查看方',
     'system_seed' => '系统消息',
     _ => role,

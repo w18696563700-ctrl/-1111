@@ -93,6 +93,10 @@ final class ExhibitionCanonicalPaths {
     return '${projectAuthenticitySincerityOrders(projectId)}/${Uri.encodeComponent(orderId)}';
   }
 
+  static String projectAuthenticitySincerityFreezeFeedback(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/authenticity-sincerity/freeze-feedback';
+  }
+
   static String projectAuthenticitySincerityRefundInit(
     String projectId,
     String orderId,

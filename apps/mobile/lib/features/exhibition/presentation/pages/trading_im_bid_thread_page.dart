@@ -17,7 +17,8 @@ class _BidThreadPageState extends State<BidThreadPage> {
   final List<String> _attachmentFileAssetIds = <String>[];
   TradingImResult<BidThreadDetailView>? _result;
   final Map<String, TradingImResult<TradingImParticipantCardView>>
-  _participantCardResults = <String, TradingImResult<TradingImParticipantCardView>>{};
+  _participantCardResults =
+      <String, TradingImResult<TradingImParticipantCardView>>{};
   TradingImResult<BidThreadMessageView>? _lastMessageResult;
   TradingImResult<ConfirmationCardView>? _lastConfirmationResult;
   String _confirmationType = 'quote';
@@ -81,11 +82,12 @@ class _BidThreadPageState extends State<BidThreadPage> {
     }
     final entries = await Future.wait(
       missing.map((String participantOrganizationId) async {
-        final result = await TradingImConsumerLayer.instance.loadParticipantCard(
-          projectId: projectId,
-          bidId: bidId,
-          participantOrganizationId: participantOrganizationId,
-        );
+        final result = await TradingImConsumerLayer.instance
+            .loadParticipantCard(
+              projectId: projectId,
+              bidId: bidId,
+              participantOrganizationId: participantOrganizationId,
+            );
         return MapEntry(participantOrganizationId, result);
       }),
     );
@@ -203,7 +205,9 @@ class _BidThreadPageState extends State<BidThreadPage> {
     );
   }
 
-  Future<void> _openParticipantCard(BidThreadParticipantView participant) async {
+  Future<void> _openParticipantCard(
+    BidThreadParticipantView participant,
+  ) async {
     await _showTradingImParticipantCardSheet(
       context,
       projectId: _projectId,
@@ -235,14 +239,24 @@ class _BidThreadPageState extends State<BidThreadPage> {
           children: <Widget>[
             const SizedBox(height: 8),
             _ActionCard(
-              title: '沟通与投标',
-              summary: '当前页只承接一个项目与一个投标之间的私密沟通。',
+              title: '竞标沟通',
+              summary: '当前页承接当前项目下的竞标沟通、资料核对和结果通知。',
               tone: _ActionCardTone.emphasis,
               children: <Widget>[
-                _DetailLine(label: '项目 ID', value: _projectId ?? '未承接'),
-                _DetailLine(label: '投标 ID', value: _bidId ?? '未承接'),
+                _DetailLine(
+                  label: '项目',
+                  value: _projectId == null ? '未承接' : '已承接',
+                ),
+                _DetailLine(
+                  label: '竞标记录',
+                  value: _bidId == null ? '未承接' : '已承接',
+                ),
                 if (data != null)
-                  _DetailLine(label: '线程状态', value: data.state, highlight: true),
+                  _DetailLine(
+                    label: '沟通状态',
+                    value: data.state,
+                    highlight: true,
+                  ),
               ],
             ),
             const SizedBox(height: 16),
@@ -253,7 +267,7 @@ class _BidThreadPageState extends State<BidThreadPage> {
                 title: result?.message ?? '当前沟通线程暂不可用',
                 children: <Widget>[
                   _StateMessage(
-                    title: '受控状态',
+                    title: '当前状态',
                     body:
                         result?.errorCode ??
                         result?.state.contractName ??
@@ -325,8 +339,9 @@ class _BidThreadPageState extends State<BidThreadPage> {
             children: <Widget>[
               CircleAvatar(
                 radius: 22,
-                backgroundImage:
-                    avatarUrl == null ? null : NetworkImage(avatarUrl),
+                backgroundImage: avatarUrl == null
+                    ? null
+                    : NetworkImage(avatarUrl),
                 child: avatarUrl == null
                     ? Text(
                         title.trim().isEmpty
@@ -427,7 +442,7 @@ class _BidThreadPageState extends State<BidThreadPage> {
         !_creatingConfirmation &&
         _sourceMessageId != null;
     return _ActionCard(
-      title: '最小确认卡',
+      title: '确认事项',
       children: <Widget>[
         DropdownButtonFormField<String>(
           initialValue: _confirmationType,
@@ -460,7 +475,10 @@ class _BidThreadPageState extends State<BidThreadPage> {
           ),
         ),
         const SizedBox(height: 12),
-        _DetailLine(label: '来源消息', value: _sourceMessageId ?? '请先选择消息'),
+        _DetailLine(
+          label: '关联消息',
+          value: _sourceMessageId == null ? '请先选择消息' : '已选择',
+        ),
         if (_lastConfirmationResult != null &&
             !_lastConfirmationResult!.isSuccess) ...<Widget>[
           const SizedBox(height: 8),
@@ -475,7 +493,7 @@ class _BidThreadPageState extends State<BidThreadPage> {
         FilledButton.icon(
           onPressed: canCreate ? _createConfirmation : null,
           icon: const Icon(Icons.fact_check_rounded),
-          label: Text(_creatingConfirmation ? '创建中...' : '创建确认卡'),
+          label: Text(_creatingConfirmation ? '创建中...' : '发送确认事项'),
         ),
       ],
     );
@@ -493,8 +511,8 @@ class _BidThreadPageState extends State<BidThreadPage> {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 12),
                 child: _ActionCard(
-                  title: '系统消息',
-                  summary: '投标方已提交当前竞标，可以先查看摘要，再决定是否继续沟通。',
+                  title: '竞标通知',
+                  summary: '竞标方已提交当前竞标，可以先查看摘要，再决定是否继续沟通。',
                   tone: _ActionCardTone.emphasis,
                   children: <Widget>[
                     _DetailLine(label: '内容', value: message.body),
@@ -504,12 +522,13 @@ class _BidThreadPageState extends State<BidThreadPage> {
                       onPressed: message.systemSeedAction == null
                           ? null
                           : () => _openBidSubmissionSnapshot(message),
-                      child: const Text('点击查看'),
+                      child: const Text('查看竞标摘要'),
                     ),
                     if (bidderParticipant != null) ...<Widget>[
                       const SizedBox(height: 10),
                       OutlinedButton.icon(
-                        onPressed: () => _openParticipantCard(bidderParticipant),
+                        onPressed: () =>
+                            _openParticipantCard(bidderParticipant),
                         icon: const Icon(Icons.badge_outlined),
                         label: const Text('查看竞标方'),
                       ),
@@ -540,7 +559,7 @@ class _BidThreadPageState extends State<BidThreadPage> {
                     onPressed: () =>
                         setState(() => _sourceMessageId = message.messageId),
                     icon: const Icon(Icons.check_circle_outline_rounded),
-                    label: Text(selected ? '已选为确认来源' : '用于确认卡'),
+                    label: Text(selected ? '已选为确认来源' : '用于确认事项'),
                   ),
                 ],
               ),

@@ -48,6 +48,20 @@ export class AppProjectPricingController {
     );
   }
 
+  @Post(':projectId/authenticity-sincerity/freeze-feedback')
+  @HttpCode(HttpStatus.ACCEPTED)
+  submitProjectAuthenticitySincerityFreezeFeedback(
+    @Param('projectId') projectId: string,
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.service.submitProjectAuthenticitySincerityFreezeFeedback(
+      projectId,
+      payload,
+      headers,
+    );
+  }
+
   @Get(':projectId/authenticity-sincerity/orders/:orderId')
   getProjectAuthenticitySincerityOrder(
     @Param('projectId') projectId: string,

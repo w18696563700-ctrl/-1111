@@ -50,6 +50,7 @@ const p0PayPostRoutes = [
 const projectPricingPostRoutes = [
   '/api/app/project/project-1/authenticity-sincerity/orders',
   '/api/app/project/project-1/authenticity-sincerity/orders/order-1/pay-init',
+  '/api/app/project/project-1/authenticity-sincerity/freeze-feedback',
   '/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund-init',
   '/api/app/project/project-1/bid-service-fee-authorizations',
   '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/freeze-init',
@@ -204,6 +205,15 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
         orderStatus: 'paid',
       };
     },
+    submitProjectAuthenticitySincerityFreezeFeedback(projectId) {
+      calls.push(['sincerityFeedback', projectId]);
+      return {
+        projectId,
+        myChoice: 'support_freeze',
+        supportFreezeCount: 1,
+        opposeFreezeCount: 0,
+      };
+    },
     initProjectAuthenticitySincerityRefund(projectId, orderId) {
       calls.push(['sincerityRefund', projectId, orderId]);
       return {
@@ -321,6 +331,17 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     assert.equal(sincerityResponse.status, 200);
     assert.equal((await sincerityResponse.json()).orderStatus, 'paid');
 
+    const feedbackResponse = await fetch(
+      `${url}/api/app/project/project-1/authenticity-sincerity/freeze-feedback`,
+      {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ choice: 'support_freeze' }),
+      },
+    );
+    assert.equal(feedbackResponse.status, 202);
+    assert.equal((await feedbackResponse.json()).supportFreezeCount, 1);
+
     const refundResponse = await fetch(
       `${url}/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund-init`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
@@ -369,6 +390,7 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     ['authInit', 'task-1', 'bid-1', 'auth-1'],
     ['pricingSummary', 'project-1'],
     ['sincerityStatus', 'project-1', 'order-1'],
+    ['sincerityFeedback', 'project-1'],
     ['sincerityRefund', 'project-1', 'order-1'],
     ['bidAuthCreate', 'project-1'],
     ['dealDetail', 'project-1', 'deal-1'],
@@ -622,7 +644,7 @@ test('P0-Pay idempotent command conflicts are normalized to controlled 409', asy
 test('pricing summary is read-only and no longer exposes old P0-Pay authority shape', async () => {
   const service = createService({
     async get(pathName) {
-      assert.equal(pathName, '/server/project/task-1/pricing-summary');
+      assert.equal(pathName, '/server/projects/task-1/pricing-summary');
       return {
         projectId: 'task-1',
         pricingRuleVersion: 'platform_pricing_rules_master_v1',
@@ -709,11 +731,52 @@ test('pricing summary is read-only and no longer exposes old P0-Pay authority sh
   assert.equal(result.inquiryDeposit, undefined);
 });
 
-test('project pricing canonical routes forward 4000 authorization and deal confirmation without local fee truth', async () => {
+test('project pricing canonical routes forward 4000 authorization, sincerity feedback and deal confirmation without local fee truth', async () => {
   const calls = [];
   const service = createService({
     async post(pathName, body, options) {
       calls.push({ method: 'POST', pathName, body, headers: options.headers });
+      if (pathName.endsWith('/authenticity-sincerity/orders')) {
+        assert.deepEqual(body, {
+          expectedAmount: '200',
+          expectedCurrency: 'CNY',
+          ruleVersion: 'project_authenticity_sincerity_v1',
+          ruleSnapshotHash: 'hash-sincerity',
+          idempotencyKey: 'idem-sincerity',
+        });
+        return {
+          orderId: 'sincerity-1',
+          orderStatus: 'pending_payment',
+          amount: '200.00',
+          currency: 'CNY',
+          updatedAt: '2026-06-01T09:59:00.000Z',
+        };
+      }
+      if (pathName.endsWith('/authenticity-sincerity/orders/sincerity-1/pay-init')) {
+        assert.deepEqual(body, {
+          payChannel: 'alipay_candidate',
+          clientPlatform: 'flutter',
+          idempotencyKey: 'idem-sincerity-pay',
+        });
+        return {
+          paymentInitStatus: 'pending_user_confirm',
+          orderId: 'sincerity-1',
+          paymentReferenceId: 'P0PAY_DEP_1',
+          channelActionType: 'unavailable',
+          callbackAwaiting: true,
+          updatedAt: '2026-06-01T09:59:30.000Z',
+        };
+      }
+      if (pathName.endsWith('/authenticity-sincerity/freeze-feedback')) {
+        assert.deepEqual(body, { choice: 'support_freeze' });
+        return {
+          projectId: 'project-1',
+          myChoice: 'support_freeze',
+          supportFreezeCount: 4,
+          opposeFreezeCount: 2,
+          updatedAt: '2026-06-01T09:59:40.000Z',
+        };
+      }
       if (pathName.endsWith('/bid-service-fee-authorizations')) {
         assert.deepEqual(body, {
           bidParticipationRequestId: 'request-1',
@@ -867,6 +930,28 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
     },
     {},
   );
+  const sincerity = await service.createProjectAuthenticitySincerityOrder(
+    'project-1',
+    {
+      expectedAmount: 200,
+      expectedCurrency: 'CNY',
+      ruleVersion: 'project_authenticity_sincerity_v1',
+      ruleSnapshotHash: 'hash-sincerity',
+      idempotencyKey: 'idem-sincerity',
+    },
+    {},
+  );
+  const sincerityPay = await service.initProjectAuthenticitySincerityPayment(
+    'project-1',
+    'sincerity-1',
+    { payChannel: 'alipay_candidate', clientPlatform: 'flutter', idempotencyKey: 'idem-sincerity-pay' },
+    {},
+  );
+  const feedback = await service.submitProjectAuthenticitySincerityFreezeFeedback(
+    'project-1',
+    { choice: 'support_freeze' },
+    {},
+  );
   const freeze = await service.initBidServiceFeeAuthorizationFreeze(
     'project-1',
     'auth-1',
@@ -917,6 +1002,9 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
   const reconciliation = await service.getProjectSettlementReconciliation('project-1', {});
 
   assert.equal(created.authorizationQuotaAmount, '4000.00');
+  assert.equal(sincerity.orderStatus, 'pending_payment');
+  assert.equal(sincerityPay.channelActionType, 'unavailable');
+  assert.equal(feedback.supportFreezeCount, 4);
   assert.equal(freeze.freezeInitStatus, 'pending_user_confirm');
   assert.equal(status.authorizationStatus, 'frozen');
   assert.equal(released.bidSubmissionEligible, false);
@@ -929,6 +1017,9 @@ test('project pricing canonical routes forward 4000 authorization and deal confi
   assert.equal(reconciliation.reconciliationSummary.status, 'balanced');
   assert.deepEqual(calls.map((item) => [item.method, item.pathName]), [
     ['POST', '/server/projects/project-1/bid-service-fee-authorizations'],
+    ['POST', '/server/projects/project-1/authenticity-sincerity/orders'],
+    ['POST', '/server/projects/project-1/authenticity-sincerity/orders/sincerity-1/pay-init'],
+    ['POST', '/server/projects/project-1/authenticity-sincerity/freeze-feedback'],
     ['POST', '/server/projects/project-1/bid-service-fee-authorizations/auth-1/freeze-init'],
     ['GET', '/server/projects/project-1/bid-service-fee-authorizations/auth-1'],
     ['POST', '/server/projects/project-1/bid-service-fee-authorizations/auth-1/release'],

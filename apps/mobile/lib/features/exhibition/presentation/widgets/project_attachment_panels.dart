@@ -135,20 +135,77 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final uploadedKinds = attachments
-        .map((ProjectAttachmentReadModel item) => item.attachmentKind)
-        .toSet();
-    final uploadedCount = _projectAttachmentKindOptions
-        .where(
-          (_ProjectAttachmentKindOption item) =>
-              uploadedKinds.contains(item.value),
-        )
-        .length;
-    return _StateMessage(
-      title: '附件要求',
-      body: uploadedCount >= _projectAttachmentKindOptions.length
-          ? '五类报价依据资料已补充；接单方将在竞标提交第二步查看。'
-          : '请尽量补齐效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单，方便接单方准确报价。',
+    final countsByKind = <String, int>{
+      for (final option in _projectAttachmentKindOptions) option.value: 0,
+    };
+    for (final attachment in attachments) {
+      final current = countsByKind[attachment.attachmentKind];
+      if (current != null) {
+        countsByKind[attachment.attachmentKind] = current + 1;
+      }
+    }
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '报价依据资料 checklist',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 10),
+            ..._projectAttachmentKindOptions.map((
+              _ProjectAttachmentKindOption option,
+            ) {
+              final count = countsByKind[option.value] ?? 0;
+              final satisfied = count > 0;
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  children: <Widget>[
+                    Icon(
+                      satisfied
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                      size: 18,
+                      color: satisfied
+                          ? Theme.of(context).colorScheme.primary
+                          : Theme.of(context).colorScheme.outline,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        option.label,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      satisfied ? '已上传 $count' : '待补充',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: satisfied
+                            ? Theme.of(context).colorScheme.primary
+                            : Theme.of(context).colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -442,6 +499,12 @@ class _ProjectAttachmentFormalRecordCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isImage = _projectAttachmentIsImageMimeType(attachment.mimeType);
+    final meta = <String>[
+      _projectAttachmentMimeTypeLabel(attachment.mimeType),
+      _projectAttachmentTimestampLabel(attachment.createdAt),
+    ].join(' · ');
+
     return SizedBox(
       width: double.infinity,
       child: DecoratedBox(
@@ -457,39 +520,48 @@ class _ProjectAttachmentFormalRecordCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                _projectAttachmentKindLabel(attachment.attachmentKind),
-                style: Theme.of(
-                  context,
-                ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                attachment.fileName,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w700,
-                  height: 1.35,
-                ),
-              ),
-              const SizedBox(height: 8),
-              _DetailLine(
-                label: '资料名称',
-                value: _projectAttachmentKindLabel(attachment.attachmentKind),
-                highlight: true,
-              ),
-              _DetailLine(label: '文件名', value: attachment.fileName),
-              _DetailLine(
-                label: '文件类型',
-                value: _projectAttachmentMimeTypeLabel(attachment.mimeType),
-              ),
-              _DetailLine(
-                label: '可见范围',
-                value: _projectAttachmentVisibilityLabel(attachment.visibility),
-              ),
-              _DetailLine(label: '排序序号', value: '${attachment.sortOrder}'),
-              _DetailLine(
-                label: '创建时间',
-                value: _projectAttachmentTimestampLabel(attachment.createdAt),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  _ProjectAttachmentThumbnail(attachment: attachment),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Text(
+                          _projectAttachmentKindLabel(
+                            attachment.attachmentKind,
+                          ),
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          isImage ? '图片资料' : '文件资料',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w700,
+                              ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          meta,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                height: 1.35,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               Wrap(
@@ -526,8 +598,136 @@ class _ProjectAttachmentFormalRecordCard extends StatelessWidget {
                   ),
                 ],
               ),
+              const SizedBox(height: 6),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                childrenPadding: EdgeInsets.zero,
+                title: Text(
+                  '高级信息',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                children: <Widget>[
+                  _DetailLine(label: '完整文件名', value: attachment.fileName),
+                  _DetailLine(
+                    label: 'FileAsset',
+                    value: attachment.fileAssetId,
+                  ),
+                  _DetailLine(label: '文件类型', value: attachment.mimeType),
+                  _DetailLine(
+                    label: '可见范围',
+                    value: _projectAttachmentVisibilityLabel(
+                      attachment.visibility,
+                    ),
+                  ),
+                  _DetailLine(label: '排序序号', value: '${attachment.sortOrder}'),
+                  _DetailLine(label: '创建时间', value: attachment.createdAt),
+                  if (attachment.createdBy != null)
+                    _DetailLine(label: '创建人', value: attachment.createdBy!),
+                ],
+              ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectAttachmentThumbnail extends StatefulWidget {
+  const _ProjectAttachmentThumbnail({required this.attachment});
+
+  final ProjectAttachmentReadModel attachment;
+
+  @override
+  State<_ProjectAttachmentThumbnail> createState() =>
+      _ProjectAttachmentThumbnailState();
+}
+
+class _ProjectAttachmentThumbnailState
+    extends State<_ProjectAttachmentThumbnail> {
+  late Future<List<int>?> _imageBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageBytes = _loadImageBytes();
+  }
+
+  @override
+  void didUpdateWidget(_ProjectAttachmentThumbnail oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.attachment.fileAssetId != widget.attachment.fileAssetId ||
+        oldWidget.attachment.mimeType != widget.attachment.mimeType) {
+      _imageBytes = _loadImageBytes();
+    }
+  }
+
+  Future<List<int>?> _loadImageBytes() async {
+    if (!_projectAttachmentIsImageMimeType(widget.attachment.mimeType)) {
+      return null;
+    }
+    final result = await ExhibitionConsumerLayer.instance
+        .requestProjectAttachmentAccess(
+          fileAssetId: widget.attachment.fileAssetId,
+          mode: 'preview',
+        );
+    if (!result.isSuccess) {
+      return null;
+    }
+    final access = _projectAttachmentFileAccessFromPayload(result.payload);
+    if (access == null) {
+      return null;
+    }
+    return _loadProjectAttachmentRemoteImageBytes(access.accessUrl);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isImage = _projectAttachmentIsImageMimeType(
+      widget.attachment.mimeType,
+    );
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainerHighest,
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: isImage
+              ? FutureBuilder<List<int>?>(
+                  future: _imageBytes,
+                  builder:
+                      (
+                        BuildContext context,
+                        AsyncSnapshot<List<int>?> snapshot,
+                      ) {
+                        final bytes = snapshot.data;
+                        if (bytes != null && bytes.isNotEmpty) {
+                          return Image.memory(
+                            Uint8List.fromList(bytes),
+                            fit: BoxFit.cover,
+                          );
+                        }
+                        return Icon(
+                          snapshot.connectionState == ConnectionState.waiting
+                              ? Icons.image_search_outlined
+                              : Icons.image_outlined,
+                          color: colorScheme.onSurfaceVariant,
+                        );
+                      },
+                )
+              : Icon(
+                  Icons.insert_drive_file_outlined,
+                  color: colorScheme.onSurfaceVariant,
+                ),
         ),
       ),
     );

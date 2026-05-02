@@ -17,6 +17,8 @@ final class _ProjectAuthenticitySinceritySnapshot {
     required this.orderId,
     required this.channelCandidates,
     required this.updatedAt,
+    required this.policyNotice,
+    required this.freezeFeedback,
   });
 
   final bool required;
@@ -26,6 +28,8 @@ final class _ProjectAuthenticitySinceritySnapshot {
   final String? orderId;
   final List<String> channelCandidates;
   final String? updatedAt;
+  final String? policyNotice;
+  final _ProjectAuthenticitySincerityFreezeFeedbackSummary? freezeFeedback;
 
   bool get satisfied {
     return switch (status) {
@@ -33,6 +37,8 @@ final class _ProjectAuthenticitySinceritySnapshot {
       'frozen' ||
       'succeeded' ||
       'satisfied' ||
+      'internal_test_no_freeze_required' ||
+      'internal_test_no_freeze_allowed' ||
       'not_required' => true,
       _ => false,
     };
@@ -71,6 +77,8 @@ final class _ProjectAuthenticitySinceritySnapshot {
       'pending_payment' => '待支付',
       'pending' => '待处理',
       'pending_user_confirm' => '等待确认',
+      'internal_test_no_freeze_required' ||
+      'internal_test_no_freeze_allowed' => '内测暂不冻结',
       'processing' => '处理中',
       'paid' || 'frozen' || 'succeeded' || 'satisfied' => '已完成',
       'refund_pending' => '退款中',
@@ -88,19 +96,37 @@ final class _ProjectAuthenticitySinceritySnapshot {
       return '当前项目真实性诚意金已退回；如需再次正式发布，需要重新完成当前项目诚意金。';
     }
     if (status == 'refund_pending') {
-      return '当前项目真实性诚意金正在退款中；Flutter 只展示云端状态，不判断到账。';
+      return '当前项目真实性诚意金正在退款中；退款进度以平台记录为准。';
     }
     if (satisfied) {
+      if (status == 'internal_test_no_freeze_required' ||
+          status == 'internal_test_no_freeze_allowed') {
+        return '内测期间暂不冻结真实资金，平台已保留当前流程记录，可继续提交发布。';
+      }
       return '当前项目的项目真实性诚意金已完成，可以继续确认发布。';
     }
     if (canContinuePayment) {
       return '当前项目已有一笔进行中的 $amountLabel 项目真实性诚意金订单，可继续支付或刷新状态。';
     }
     if (pendingPayment) {
-      return '当前项目真实性诚意金处于$statusLabel，但云端暂未返回可继续支付的订单编号。';
+      return '当前项目真实性诚意金处于$statusLabel，但暂未取得可继续支付的订单编号。';
     }
     return '当前项目还需要完成 $amountLabel 项目真实性诚意金后，才能正式发布。';
   }
+}
+
+final class _ProjectAuthenticitySincerityFreezeFeedbackSummary {
+  const _ProjectAuthenticitySincerityFreezeFeedbackSummary({
+    required this.supportFreezeCount,
+    required this.opposeFreezeCount,
+    required this.myChoice,
+    required this.updatedAt,
+  });
+
+  final int supportFreezeCount;
+  final int opposeFreezeCount;
+  final String? myChoice;
+  final String? updatedAt;
 }
 
 final class _ProjectPublishProgressNode {
@@ -444,6 +470,8 @@ class _ProjectSincerityStatusCard extends StatelessWidget {
     required this.continuing,
     required this.onRefresh,
     required this.onContinuePayment,
+    required this.submittingFeedbackChoice,
+    required this.onFeedbackChoice,
   });
 
   final _ProjectAuthenticitySinceritySnapshot? snapshot;
@@ -451,23 +479,16 @@ class _ProjectSincerityStatusCard extends StatelessWidget {
   final bool continuing;
   final VoidCallback? onRefresh;
   final VoidCallback? onContinuePayment;
+  final String? submittingFeedbackChoice;
+  final ValueChanged<String>? onFeedbackChoice;
 
   @override
   Widget build(BuildContext context) {
     final current = snapshot;
     return _ActionCard(
       title: '项目真实性诚意金',
-      summary: '这笔 200 元只属于当前项目；支付是否完成以云端回读为准。',
+      summary: '这笔 200 元只属于当前项目；支付是否完成以平台记录为准。',
       children: <Widget>[
-        Text(
-          '这 200 元为当前项目的项目真实性诚意金，不是押金、罚款或平台服务费。项目成交成立或合规正式撤回后，将按云端退款状态进入原路退回流程；退款中和已退回状态均以云端回读为准，不承诺即时到账。若存在虚假发布、恶意发布或长期不处理结果，平台可按规则处理。',
-          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-            color: Theme.of(context).colorScheme.error,
-            fontWeight: FontWeight.w700,
-            height: 1.45,
-          ),
-        ),
-        const SizedBox(height: 12),
         if (loading)
           const _DetailLine(label: '当前状态', value: '正在读取云端费用状态...')
         else if (current == null)
@@ -483,6 +504,20 @@ class _ProjectSincerityStatusCard extends StatelessWidget {
             _DetailLine(label: '订单状态', value: current.summary),
           if (current.orderId == null && !current.satisfied)
             _DetailLine(label: '下一步', value: current.summary),
+        ],
+        const SizedBox(height: 10),
+        _StateMessage(
+          title: '内测说明',
+          body: current?.policyNotice ??
+              '内测期间暂不需要真实支付；页面仍按平台返回状态走完整流程，不在本地改写支付结果。',
+        ),
+        if (current?.freezeFeedback != null) ...<Widget>[
+          const SizedBox(height: 10),
+          _SincerityFreezeFeedbackStrip(
+            summary: current!.freezeFeedback!,
+            submittingChoice: submittingFeedbackChoice,
+            onChoice: onFeedbackChoice,
+          ),
         ],
         const SizedBox(height: 12),
         Wrap(
@@ -508,7 +543,141 @@ class _ProjectSincerityStatusCard extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 8),
+        ExpansionTile(
+          tilePadding: EdgeInsets.zero,
+          childrenPadding: const EdgeInsets.only(bottom: 4),
+          title: Text(
+            '查看诚意金规则说明',
+            style: Theme.of(
+              context,
+            ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+          ),
+          children: <Widget>[
+            Text(
+              '这 200 元为当前项目的项目真实性诚意金，不是押金、罚款或平台服务费。项目成交成立或合规正式撤回后，将按云端退款状态进入原路退回流程；退款中和已退回状态均以平台记录为准，不承诺即时到账。若存在虚假发布、恶意发布或长期不处理结果，平台可按规则处理。',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
+          ],
+        ),
       ],
+    );
+  }
+}
+
+class _SincerityFreezeFeedbackStrip extends StatelessWidget {
+  const _SincerityFreezeFeedbackStrip({
+    required this.summary,
+    required this.submittingChoice,
+    required this.onChoice,
+  });
+
+  final _ProjectAuthenticitySincerityFreezeFeedbackSummary summary;
+  final String? submittingChoice;
+  final ValueChanged<String>? onChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '用户征集',
+              style: theme.textTheme.labelLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              '你更支持正式期恢复冻结，还是继续降低发布门槛？当前反馈只做统计，不影响本次发布。',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.42,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: <Widget>[
+                _SincerityFreezeFeedbackButton(
+                  label: '支持冻结 ${summary.supportFreezeCount}',
+                  choice: 'support_freeze',
+                  selected: summary.myChoice == 'support_freeze',
+                  submittingChoice: submittingChoice,
+                  onChoice: onChoice,
+                ),
+                _SincerityFreezeFeedbackButton(
+                  label: '反对冻结 ${summary.opposeFreezeCount}',
+                  choice: 'oppose_freeze',
+                  selected: summary.myChoice == 'oppose_freeze',
+                  submittingChoice: submittingChoice,
+                  onChoice: onChoice,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SincerityFreezeFeedbackButton extends StatelessWidget {
+  const _SincerityFreezeFeedbackButton({
+    required this.label,
+    required this.choice,
+    required this.selected,
+    required this.submittingChoice,
+    required this.onChoice,
+  });
+
+  final String label;
+  final String choice;
+  final bool selected;
+  final String? submittingChoice;
+  final ValueChanged<String>? onChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    final loading = submittingChoice == choice;
+    final disabled = submittingChoice != null || onChoice == null;
+    if (selected) {
+      return FilledButton.tonalIcon(
+        onPressed: disabled ? null : () => onChoice?.call(choice),
+        icon: loading
+            ? const SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.check_rounded),
+        label: Text(label),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: disabled ? null : () => onChoice?.call(choice),
+      icon: loading
+          ? const SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            )
+          : const Icon(Icons.how_to_vote_outlined),
+      label: Text(label),
     );
   }
 }
@@ -604,6 +773,9 @@ _projectAuthenticitySinceritySnapshotFromPayload(Object? payload) {
         sincerity?['channelCandidates'] ??
         source['channelCandidates'],
   );
+  final feedbackSummary = _projectAuthenticitySincerityFreezeFeedbackFromPayload(
+    publisherPricing?['freezeFeedbackSummary'],
+  );
   if (!required && status == null && orderId == null && amount == null) {
     return null;
   }
@@ -615,7 +787,38 @@ _projectAuthenticitySinceritySnapshotFromPayload(Object? payload) {
     orderId: orderId,
     channelCandidates: channels,
     updatedAt: updatedAt,
+    policyNotice: _normalizeDynamicText(
+      publisherPricing?['sincerityFreezePolicyNotice'],
+    ),
+    freezeFeedback: feedbackSummary,
   );
+}
+
+_ProjectAuthenticitySincerityFreezeFeedbackSummary?
+_projectAuthenticitySincerityFreezeFeedbackFromPayload(Object? value) {
+  final record = _payloadMap(value);
+  if (record == null) {
+    return null;
+  }
+  return _ProjectAuthenticitySincerityFreezeFeedbackSummary(
+    supportFreezeCount: _normalizeDynamicInt(record['supportFreezeCount']) ?? 0,
+    opposeFreezeCount: _normalizeDynamicInt(record['opposeFreezeCount']) ?? 0,
+    myChoice: _normalizeDynamicText(record['myChoice']),
+    updatedAt: _normalizeDynamicText(record['updatedAt']),
+  );
+}
+
+int? _normalizeDynamicInt(Object? value) {
+  if (value is int) {
+    return value;
+  }
+  if (value is num) {
+    return value.toInt();
+  }
+  if (value is String) {
+    return int.tryParse(value.trim());
+  }
+  return null;
 }
 
 List<String> _stringListFromPayload(Object? value) {

@@ -499,8 +499,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
-    expect(find.text('报价依据资料'), findsOneWidget);
+    await _scrollTo(tester, find.text('报价依据资料').last);
+    expect(find.text('报价依据资料'), findsWidgets);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.textContaining('当前只对 owner 私域可见'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
@@ -513,9 +513,10 @@ void main() {
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
     expect(find.textContaining('展馆和展位图'), findsNothing);
     expect(find.textContaining('展商手册'), findsNothing);
-    expect(find.text('现场效果图.png'), findsOneWidget);
-    expect(find.text('资料名称：效果图'), findsOneWidget);
-    expect(find.text('文件名：现场效果图.png'), findsOneWidget);
+    expect(find.text('现场效果图.png'), findsNothing);
+    expect(find.text('效果图'), findsWidgets);
+    await _tapVisible(tester, find.text('高级信息').first);
+    expect(find.text('完整文件名：现场效果图.png'), findsOneWidget);
     expect(find.textContaining('接单方在竞标第二步查看'), findsOneWidget);
     await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
     expect(find.text('图片预览'), findsOneWidget);
@@ -531,8 +532,7 @@ void main() {
     await _tapVisible(tester, find.text('选择尺寸图 / 施工图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
-    await _scrollTo(tester, find.text('construction-plan.docx'));
-    expect(find.text('construction-plan.docx'), findsWidgets);
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '预览文件'));
     await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览文件'));
     expect(
       openedAttachmentUri?.toString(),
@@ -545,8 +545,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('construction-plan.docx'), findsNothing);
-    expect(find.text('现场效果图.png'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '预览文件'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
 
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
@@ -671,7 +671,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '服务清单'));
     expect(find.textContaining('全格式文件'), findsOneWidget);
 
@@ -680,9 +680,9 @@ void main() {
     expect(find.textContaining('ZIP 压缩包'), findsOneWidget);
 
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
-    await _scrollTo(tester, find.text('服务清单资料.zip'));
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '下载文件'));
 
-    expect(find.text('资料名称：服务清单'), findsOneWidget);
+    expect(find.text('服务清单'), findsWidgets);
     expect(find.widgetWithText(OutlinedButton, '下载文件'), findsOneWidget);
   });
 
@@ -745,7 +745,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('效果图样张.png'), findsOneWidget);
 
@@ -831,7 +831,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('报价依据资料'));
+      await _scrollTo(tester, find.text('报价依据资料').last);
       await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
       expect(find.text('当前资料读取服务暂不可用，请稍后再试。'), findsOneWidget);
       expect(find.textContaining('unrecognized error code'), findsNothing);
@@ -932,7 +932,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
 
     expect(
@@ -1078,7 +1078,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('待上传附件（1）'), findsOneWidget);
     expect(find.text('效果图_A.png'), findsOneWidget);
@@ -1090,8 +1090,8 @@ void main() {
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
     expect(attachments, hasLength(2));
-    expect(find.text('效果图_A.png'), findsOneWidget);
-    expect(find.text('效果图_B.webp'), findsOneWidget);
+    expect(find.text('已上传 2'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsWidgets);
   });
 
   testWidgets(
@@ -1195,7 +1195,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('报价依据资料'));
+      await _scrollTo(tester, find.text('报价依据资料').last);
       await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
       await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
@@ -1306,7 +1306,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('报价依据资料'));
+      await _scrollTo(tester, find.text('报价依据资料').last);
       await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
       await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
@@ -1423,11 +1423,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
-    expect(find.text('效果图云端现状.jpg'), findsWidgets);
+    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
     expect(find.text('正式附件绑定未完成'), findsNothing);
     expect(find.textContaining('contract drift'), findsNothing);
   });
@@ -1541,13 +1541,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
     await _tapVisible(tester, find.text('选择材质图 / 材料样板', skipOffstage: false));
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
-    await _scrollTo(tester, find.text('brand-board.webp'));
-    expect(find.text('brand-board.webp'), findsWidgets);
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '预览图片'));
+    expect(find.text('材质图 / 材料样板'), findsWidgets);
 
     await _tapVisible(
       tester,
@@ -1555,7 +1555,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('brand-board.webp'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsNothing);
     expect(find.text('当前还没有报价依据资料'), findsOneWidget);
   });
 
@@ -1610,11 +1610,13 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('报价依据资料'));
+      await _scrollTo(tester, find.text('报价依据资料').last);
+      await _scrollTo(tester, find.text('报价依据资料列表'));
       expect(find.text('当前说明'), findsNothing);
       expect(find.textContaining('upload confirm 只确认 FileAsset'), findsNothing);
       expect(find.textContaining('用于补充效果图或展示图'), findsNothing);
-      expect(find.text('edit-effect-preview.png'), findsOneWidget);
+      expect(find.text('edit-effect-preview.png'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
     },
   );
@@ -1671,8 +1673,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await _scrollTo(tester, find.text('报价依据资料'));
-    expect(find.text('报价依据资料'), findsOneWidget);
+    await _scrollTo(tester, find.text('报价依据资料').last);
+    expect(find.text('报价依据资料'), findsWidgets);
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
     expect(find.text('当前暂无可下载的公共资源'), findsOneWidget);
@@ -1823,7 +1825,6 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
       expect(find.text('公开资料边界'), findsNothing);
       expect(find.text('报价依据资料'), findsNothing);
       expect(find.text('公共资源下载区'), findsNothing);

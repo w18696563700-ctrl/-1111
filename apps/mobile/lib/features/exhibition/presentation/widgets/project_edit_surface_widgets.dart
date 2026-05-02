@@ -145,7 +145,7 @@ class MyProjectDetailHeaderTitle extends StatelessWidget {
       valueListenable: _projectEditHeaderStatusNotifierFor(normalizedProjectId),
       builder: (BuildContext context, String? value, Widget? child) {
         final stageTitle = switch (value) {
-          'submitted' => '（预发布补齐资料并发布页）',
+          'submitted' => '（预发布补资料并发布页）',
           'published' => '（已发布页）',
           _ => null,
         };

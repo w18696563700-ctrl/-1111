@@ -443,7 +443,7 @@ Finder _textFieldByLabel(String label) {
 }
 
 Future<void> _expandBidSubmitFlowIfNeeded(WidgetTester tester) async {
-  final continueFinder = find.widgetWithText(FilledButton, '继续竞标');
+  final continueFinder = find.widgetWithText(FilledButton, '查看报价依据资料');
   if (continueFinder.evaluate().isEmpty) {
     return;
   }
@@ -3943,7 +3943,7 @@ void main() {
     await tester.pumpAndSettle();
 
     await _expectVisibleText(tester, '当前项目暂不可参与竞标');
-    await _expectVisibleText(tester, '当前项目投标已结束，暂时不能继续提交竞标。');
+    await _expectVisibleText(tester, '当前项目竞标已结束，暂时不能提交竞标。');
     expect(find.widgetWithText(FilledButton, '回到项目详情'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '提交竞标'), findsNothing);
   });
@@ -5336,27 +5336,27 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('竞标提交'), findsWidgets);
-      expect(find.text('第一步 核对项目'), findsOneWidget);
+      expect(find.text('已承接项目'), findsOneWidget);
       await _expandBidSubmitFlowIfNeeded(tester);
-      expect(find.textContaining('项目核对已完成'), findsOneWidget);
-      final reopenProjectReview = find.widgetWithText(OutlinedButton, '重新展开核对');
+      expect(find.textContaining('项目信息已承接'), findsOneWidget);
+      final reopenProjectReview = find.widgetWithText(OutlinedButton, '复核项目信息');
       expect(reopenProjectReview, findsOneWidget);
       tester.widget<OutlinedButton>(reopenProjectReview).onPressed!.call();
       await tester.pumpAndSettle();
       await _expectVisibleText(tester, '核心信息');
       await _expectVisibleText(tester, '地点与安排');
-      expect(find.widgetWithText(OutlinedButton, '收起核对信息'), findsOneWidget);
-      await _expectVisibleText(tester, '第二步 查看报价依据资料');
-      await _expectVisibleText(tester, '第三步 填写竞标价格与服务费确认');
+      expect(find.widgetWithText(OutlinedButton, '收起项目信息'), findsOneWidget);
+      await _expectVisibleText(tester, '查看报价依据资料');
+      await _expectVisibleText(tester, '填写报价与预授权确认');
       await _expectVisibleText(tester, '平台成交服务费确认');
       await _expectVisibleTextContaining(tester, '本页不本地计算正式金额');
       await _expectVisibleText(tester, '你需要做什么');
       await _expectVisibleText(tester, '48小时');
-      await _expectVisibleText(tester, '第四步 上传文档和方案说明');
+      await _expectVisibleText(tester, '上传方案');
       final fourthStepIndex = tester.allWidgets
           .toList(growable: false)
           .indexWhere(
-            (Widget widget) => widget is Text && widget.data == '第四步 上传文档和方案说明',
+            (Widget widget) => widget is Text && widget.data == '上传方案',
           );
       final proposalFieldIndex = _textFieldIndexByLabel(tester, '方案说明');
       expect(fourthStepIndex, isNonNegative);
@@ -5827,12 +5827,9 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _expectVisibleText(tester, '竞标服务费预授权确认');
+    await _expectVisibleText(tester, '竞标服务费预授权额度确认');
     expect(find.textContaining('固定 4000 元', findRichText: true), findsWidgets);
-    expect(
-      find.textContaining('Flutter 不本地计算服务费', findRichText: true),
-      findsWidgets,
-    );
+    expect(find.textContaining('成交后以平台记录处理', findRichText: true), findsWidgets);
     await _expectVisibleText(tester, '48小时');
     expect(find.textContaining('成交金额的 3%'), findsNothing);
     expect(find.text('含税'), findsNothing);

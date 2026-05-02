@@ -4,12 +4,17 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { createSign, generateKeyPairSync } = require('node:crypto');
 
-test('P0-Pay migration registers inquiry deposit, callback, contract confirmation and charge truth', () => {
+test('P0-Pay migration registers inquiry deposit, internal-test feedback, callback, contract confirmation and charge truth', () => {
   const { p0PayMigrations } = require('../dist/core/migrations/migrations.js');
   const sql = p0PayMigrations.flatMap((item) => item.statements).join('\n');
 
   assert.ok(p0PayMigrations.some((item) => item.key === '20260604_platform_pricing_sp1_kernel_normalization'));
+  assert.ok(p0PayMigrations.some((item) => item.key === '20260606_project_authenticity_sincerity_internal_test_feedback'));
   assert.match(sql, /CREATE TABLE IF NOT EXISTS inquiry_quote_deposits/);
+  assert.match(sql, /CREATE TABLE IF NOT EXISTS project_authenticity_sincerity_freeze_feedback/);
+  assert.match(sql, /idx_project_auth_sincerity_feedback_user_project/);
+  assert.match(sql, /support_freeze/);
+  assert.match(sql, /oppose_freeze/);
   assert.match(sql, /amount numeric\(12,2\) NOT NULL DEFAULT 200/);
   assert.match(sql, /CREATE TABLE IF NOT EXISTS payment_callback_events/);
   assert.match(sql, /verification_status/);
@@ -157,8 +162,13 @@ test('P0-Pay server exposes BFF-forwarded trade task routes and controlled state
     "Post('server/exhibition/trade-tasks/:taskId/fixed-price-bids')",
     "Post('server/exhibition/trade-tasks/:taskId/inquiry-quotations')",
     "Post('server/exhibition/trade-tasks/:taskId/inquiry-result')",
+    "Post('server/projects/:projectId/authenticity-sincerity/orders')",
+    "Post('server/projects/:projectId/authenticity-sincerity/orders/:orderId/pay-init')",
+    "Get('server/projects/:projectId/authenticity-sincerity/orders/:orderId')",
+    "Post('server/projects/:projectId/authenticity-sincerity/freeze-feedback')",
     "Get('server/exhibition/trade-tasks/:taskId/p0-pay-summary')",
     "Get('server/project/:projectId/pricing-summary')",
+    "Get('server/projects/:projectId/pricing-summary')",
     "Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/release-non-winning')",
     "Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/publisher-breach-release')",
     "Post('server/exhibition/trade-tasks/:taskId/p0-pay-actions/factory-refusal-breach-hold')",

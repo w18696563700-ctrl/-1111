@@ -19,6 +19,7 @@ class _LoadPageFrame extends StatelessWidget {
     this.recoveryRouteOverride,
     this.recoveryButtonLabelOverride,
     this.resultSectionsBuilder,
+    this.bottomPinnedBuilder,
   });
 
   final String title;
@@ -39,11 +40,16 @@ class _LoadPageFrame extends StatelessWidget {
   final String? recoveryButtonLabelOverride;
   final List<Widget> Function(ExhibitionLoadResult result)?
   resultSectionsBuilder;
+  final Widget? Function(ExhibitionLoadResult result)? bottomPinnedBuilder;
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 28),
+    final loadResult = result;
+    final bottomPinned = !loading && loadResult != null
+        ? bottomPinnedBuilder?.call(loadResult)
+        : null;
+    final listView = ListView(
+      padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPinned == null ? 28 : 142),
       children: <Widget>[
         if (showPageSummaryCard)
           _SummaryCard(
@@ -90,17 +96,36 @@ class _LoadPageFrame extends StatelessWidget {
           const SizedBox(height: 16),
         if (loading)
           const _ContractLoadingCard()
-        else if (result != null) ...<Widget>[
-          if (result!.state != AppPageState.content || showContentStateCard)
+        else if (loadResult != null) ...<Widget>[
+          if (loadResult.state != AppPageState.content || showContentStateCard)
             _LoadStateCard(
-              result: result!,
+              result: loadResult,
               onRetry: onRetry,
               showTechnicalDisclosure: showTechnicalDisclosure,
               recoveryRouteOverride: recoveryRouteOverride,
               recoveryButtonLabelOverride: recoveryButtonLabelOverride,
             ),
-          if (resultSectionsBuilder != null) ...resultSectionsBuilder!(result!),
+          if (resultSectionsBuilder != null)
+            ...resultSectionsBuilder!(loadResult),
         ],
+      ],
+    );
+    if (bottomPinned == null) {
+      return listView;
+    }
+    return Stack(
+      children: <Widget>[
+        listView,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: SafeArea(
+            top: false,
+            minimum: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+            child: bottomPinned,
+          ),
+        ),
       ],
     );
   }

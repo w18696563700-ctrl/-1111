@@ -143,8 +143,8 @@ List<Widget> _buildBidSubmitBody({
     ),
     const SizedBox(height: 16),
     _ActionCard(
-      title: '第三步 填写竞标价格与服务费确认',
-      summary: '先填写本次竞标报价，再核对平台成交服务费说明和确认项。',
+      title: '填写报价与预授权确认',
+      summary: '先填写本次竞标报价，再核对竞标服务费预授权额度和确认项。',
       children: <Widget>[
         _InputField(
           controller: quoteAmountController,
@@ -161,7 +161,7 @@ List<Widget> _buildBidSubmitBody({
     ),
     const SizedBox(height: 16),
     _ActionCard(
-      title: '第四步 上传文档和方案说明',
+      title: '上传方案',
       summary: '方案说明是接单方给发布方的总体概述；项目理解、报价表和进度安排均为必传附件。',
       children: <Widget>[
         _InputField(
@@ -204,19 +204,19 @@ Widget _buildBidSubmitProjectOverviewSection({
   final result = projectDetailResult;
   if (routeProjectId == null) {
     return const _ActionCard(
-      title: '第一步 核对项目',
-      summary: '进入竞标前先确认当前要处理的项目。',
+      title: '已承接项目',
+      summary: '提交竞标前先承接当前要处理的项目。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
-        _EmptyNotice(title: '当前还没有承接到项目', message: '请先从项目详情进入当前项目，再继续提交竞标。'),
+        _EmptyNotice(title: '当前还没有承接到项目', message: '请先从项目详情选择立即参与竞标，再进入本页。'),
       ],
     );
   }
 
   if (result == null || result.state == AppPageState.loading) {
     return _ActionCard(
-      title: '第一步 核对项目',
-      summary: '进入竞标前先确认当前要处理的项目。',
+      title: '已承接项目',
+      summary: '正在承接当前要处理的项目。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         _InstanceSummaryLine(title: '当前项目 ID', value: routeProjectId),
@@ -228,8 +228,8 @@ Widget _buildBidSubmitProjectOverviewSection({
 
   if (result.state != AppPageState.content) {
     return _ActionCard(
-      title: '第一步 核对项目',
-      summary: '进入竞标前先确认当前要处理的项目。',
+      title: '已承接项目',
+      summary: '当前项目承接信息暂不可读。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         _InstanceSummaryLine(title: '当前项目 ID', value: routeProjectId),
@@ -294,11 +294,11 @@ Widget _buildBidSubmitProjectOverviewSection({
 
   if (flowExpanded && !projectReviewExpanded) {
     return _ActionCard(
-      title: '第一步 核对项目',
-      summary: '项目核对已完成，下面继续查看材料、填写报价、上传方案并提交竞标；需要复核时可重新展开。',
+      title: '已承接项目',
+      summary: '项目信息已承接，下面查看报价依据资料、填写报价、上传方案并提交竞标；需要时可复核。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
-        const _DetailLine(label: '核对状态', value: '已确认当前项目无误', highlight: true),
+        const _DetailLine(label: '承接状态', value: '已承接当前项目', highlight: true),
         _DetailLine(label: '项目名称', value: headline),
         if (projectNo != null) _DetailLine(label: '项目编号', value: projectNo),
         if (state != null)
@@ -315,17 +315,17 @@ Widget _buildBidSubmitProjectOverviewSection({
         OutlinedButton.icon(
           onPressed: onToggleProjectReview,
           icon: const Icon(Icons.unfold_more),
-          label: const Text('重新展开核对'),
+          label: const Text('复核项目信息'),
         ),
       ],
     );
   }
 
   return _ActionCard(
-    title: '第一步 核对项目',
+    title: '已承接项目',
     summary: flowExpanded
-        ? '先确认当前参与竞标的项目无误，再继续查看材料、填写报价和上传方案。'
-        : '先确认当前参与竞标的项目无误；点击“继续竞标”后再查看项目材料、填写报价和上传方案。',
+        ? '当前参与竞标的项目已承接，可继续查看材料、填写报价和上传方案。'
+        : '当前参与竞标的项目已承接；点击“查看报价依据资料”后再查看材料、填写报价和上传方案。',
     tone: _ActionCardTone.emphasis,
     children: <Widget>[
       _ActionCard(
@@ -423,11 +423,11 @@ Widget _buildBidSubmitProjectOverviewSection({
         const SizedBox(height: 16),
         FilledButton(
           onPressed: canContinueBidFlow ? onContinueBidFlow : null,
-          child: const Text('继续竞标'),
+          child: const Text('查看报价依据资料'),
         ),
         if (!canContinueBidFlow) ...<Widget>[
           const SizedBox(height: 8),
-          const Text('项目核对完成后，当前按钮才会开放。'),
+          const Text('项目信息承接完成后，当前按钮才会开放。'),
         ],
       ],
       if (flowExpanded && projectReviewExpanded) ...<Widget>[
@@ -435,7 +435,7 @@ Widget _buildBidSubmitProjectOverviewSection({
         OutlinedButton.icon(
           onPressed: onToggleProjectReview,
           icon: const Icon(Icons.unfold_less),
-          label: const Text('收起核对信息'),
+          label: const Text('收起项目信息'),
         ),
       ],
     ],

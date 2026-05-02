@@ -11,16 +11,16 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
     final canSelect = _canSelectProjectBid(state, selection);
 
     return _ActionCard(
-      title: '发布方选择合作方',
+      title: '竞标候选与合作确认',
       tone: canSelect ? _ActionCardTone.emphasis : _ActionCardTone.muted,
       children: <Widget>[
         if (selection != null) ...<Widget>[
           if (selection.winningBidId != null)
-            _DetailLine(label: '已选投标', value: selection.winningBidId!),
+            const _DetailLine(label: '已选竞标', value: '已确认'),
           if (selection.orderId != null)
-            _DetailLine(label: '订单 ID', value: selection.orderId!),
+            const _DetailLine(label: '后续承接锚点', value: '已生成'),
           if (selection.contractId != null)
-            _DetailLine(label: '合同 ID', value: selection.contractId!),
+            const _DetailLine(label: '合同记录', value: '已生成'),
         ],
         const SizedBox(height: 12),
         if (candidates.isEmpty)
@@ -48,12 +48,9 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
       widgets.add(
         _EntityCard(
           title: candidate.bidderTitle,
-          description: candidate.proposalSummary ?? '当前竞标方暂未返回方案摘要。',
+          description: _bidCandidateSummaryText(candidate),
           statusLabel: candidate.stateLabel,
           detailLines: <Widget>[
-            _DetailLine(label: '投标 ID', value: candidate.bidId),
-            if (candidate.bidNo != null)
-              _DetailLine(label: '投标编号', value: candidate.bidNo!),
             if (candidate.quoteAmount != null)
               _DetailLine(
                 label: '报价',
@@ -63,7 +60,7 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
             if (candidate.submittedAt != null)
               _DetailLine(label: '提交时间', value: candidate.submittedAt!),
           ],
-          actionLabel: canSelect ? '选择为合作方' : null,
+          actionLabel: canSelect ? '确认合作并生成订单' : null,
           onPressed: canSelect
               ? () => _showBidSelectionConfirmSheet(
                   projectId: projectId,
@@ -79,6 +76,18 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
       );
     }
     return widgets;
+  }
+
+  String _bidCandidateSummaryText(_ProjectBidCandidate candidate) {
+    final summary = candidate.proposalSummary;
+    if (summary == null || summary.trim().isEmpty) {
+      return '竞标方已提交报价方案，建议先沟通核对资料与报价。';
+    }
+    final normalized = summary.trim().replaceAll(RegExp(r'\s+'), ' ');
+    if (normalized.length <= 72) {
+      return normalized;
+    }
+    return '${normalized.substring(0, 72)}...';
   }
 
   void _openBidCandidateThread({
@@ -147,7 +156,7 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
   @override
   void initState() {
     super.initState();
-    _reasonTextController.text = '发布方选择该竞标方作为当前项目合作方。';
+    _reasonTextController.text = '发布方确认与该竞标方继续合作，并生成后续订单/合同承接锚点。';
   }
 
   @override
@@ -218,17 +227,13 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               _ActionCard(
-                title: '确认选择合作方',
-                summary:
-                    '提交后由 Server 生成订单锚点。Flutter 只提交 projectId、winningBidId、reasonCode、reasonText。',
+                title: '发起合作确认',
+                summary: '确认后将生成后续订单/合同承接锚点；这不等于成交成立。',
                 tone: _ActionCardTone.emphasis,
                 children: <Widget>[
-                  _InstanceSummaryLine(title: '项目 ID', value: widget.projectId),
+                  const _InstanceSummaryLine(title: '项目记录', value: '已承接'),
                   const SizedBox(height: 10),
-                  _InstanceSummaryLine(
-                    title: '投标 ID',
-                    value: widget.candidate.bidId,
-                  ),
+                  const _InstanceSummaryLine(title: '竞标记录', value: '已选择'),
                   if (widget.candidate.bidderOrganizationName !=
                       null) ...<Widget>[
                     const SizedBox(height: 10),
@@ -253,14 +258,14 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
                     controller: _reasonTextController,
                     label: '原因说明',
                     maxLines: 3,
-                    helperText: '原因会随选择合作方命令提交给 BFF/Server。',
+                    helperText: '原因将随本次合作确认提交并留痕。',
                   ),
                   const SizedBox(height: 12),
                   FilledButton.icon(
                     key: const ValueKey<String>('project_bid_select_submit'),
                     onPressed: _submitting ? null : _submit,
                     icon: const Icon(Icons.handshake_rounded),
-                    label: Text(_submitting ? '提交中...' : '确认选择合作方'),
+                    label: Text(_submitting ? '提交中...' : '确认合作并生成订单'),
                   ),
                 ],
               ),
@@ -288,19 +293,19 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
     final contractId = _contractIdFromPayload(result.payload);
     final winningBidId = _normalizeId(payload?['winningBidId'] as String?);
     return _ActionCard(
-      title: '合作方选择已受理',
-      summary: '后续页面只根据返回的订单锚点继续，不在本页展开订单工作台。',
+      title: '合作确认已受理',
+      summary: '后续请按返回的承接入口继续确认；本页不展开完整订单工作台。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         if (winningBidId != null)
-          _InstanceSummaryLine(title: '已选投标 ID', value: winningBidId),
+          const _InstanceSummaryLine(title: '已选竞标', value: '已确认'),
         if (orderId != null) ...<Widget>[
           const SizedBox(height: 10),
-          _InstanceSummaryLine(title: '订单 ID', value: orderId),
+          const _InstanceSummaryLine(title: '后续承接锚点', value: '已生成'),
         ],
         if (contractId != null) ...<Widget>[
           const SizedBox(height: 10),
-          _InstanceSummaryLine(title: '合同 ID', value: contractId),
+          const _InstanceSummaryLine(title: '合同记录', value: '已生成'),
         ],
         if (orderId != null) ...<Widget>[
           const SizedBox(height: 12),
@@ -309,7 +314,7 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
               context,
             ).pushNamed(ExhibitionRoutes.orderDetailWithOrderId(orderId)),
             icon: const Icon(Icons.receipt_long_rounded),
-            label: const Text('查看订单详情'),
+            label: const Text('查看后续承接状态'),
           ),
         ],
       ],

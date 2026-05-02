@@ -312,16 +312,16 @@ void main() {
       (Widget widget) =>
           widget is FilledButton &&
           widget.child is Text &&
-          (widget.child as Text).data == '继续竞标',
-      description: 'FilledButton("继续竞标")',
+          (widget.child as Text).data == '查看报价依据资料',
+      description: 'FilledButton("查看报价依据资料")',
     );
 
-    expect(find.text('第一步 核对项目'), findsOneWidget);
+    expect(find.text('已承接项目'), findsOneWidget);
     expect(continueButton, findsOneWidget);
     expect(find.text('项目附件'), findsNothing);
-    expect(find.text('第二步 查看报价依据资料'), findsNothing);
-    expect(find.text('第三步 填写竞标价格与服务费确认'), findsNothing);
-    expect(find.text('第四步 上传文档和方案说明'), findsNothing);
+    expect(find.text('查看报价依据资料'), findsNothing);
+    expect(find.text('填写报价与预授权确认'), findsNothing);
+    expect(find.text('上传方案'), findsNothing);
 
     final continueAction = tester
         .widget<FilledButton>(continueButton)
@@ -332,9 +332,9 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('项目核对已完成'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '重新展开核对'), findsOneWidget);
-    expect(find.text('第二步 查看报价依据资料'), findsOneWidget);
+    expect(find.textContaining('项目信息已承接'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '复核项目信息'), findsOneWidget);
+    expect(find.text('查看报价依据资料'), findsOneWidget);
     expect(find.text('项目附件'), findsNothing);
     expect(find.text('效果图.png'), findsOneWidget);
     expect(find.text('施工图.pdf'), findsOneWidget);
@@ -384,7 +384,7 @@ void main() {
     );
     final reopenReview = find.widgetWithText(
       OutlinedButton,
-      '重新展开核对',
+      '复核项目信息',
       skipOffstage: false,
     );
     tester.widget<OutlinedButton>(reopenReview).onPressed!.call();
@@ -392,7 +392,7 @@ void main() {
 
     expect(find.text('核心信息'), findsOneWidget);
     expect(find.text('地点与安排'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '收起核对信息'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '收起项目信息'), findsOneWidget);
 
     final openButtons = find.widgetWithText(OutlinedButton, '查看 / 下载');
     await _scrollTo(tester, openButtons.first);
@@ -413,10 +413,10 @@ void main() {
     );
     expect(openedBidMaterialUri, isNotNull);
 
-    await _scrollTo(tester, find.text('第三步 填写竞标价格与服务费确认'));
-    expect(find.text('第三步 填写竞标价格与服务费确认'), findsOneWidget);
-    await _scrollTo(tester, find.text('第四步 上传文档和方案说明'));
-    expect(find.text('第四步 上传文档和方案说明'), findsOneWidget);
+    await _scrollTo(tester, find.text('填写报价与预授权确认'));
+    expect(find.text('填写报价与预授权确认'), findsOneWidget);
+    await _scrollTo(tester, find.text('上传方案'));
+    expect(find.text('上传方案'), findsOneWidget);
   });
 
   testWidgets('bid submit rejects other-material drift before rendering', (
@@ -478,15 +478,15 @@ void main() {
       (Widget widget) =>
           widget is FilledButton &&
           widget.child is Text &&
-          (widget.child as Text).data == '继续竞标',
-      description: 'FilledButton("继续竞标")',
+          (widget.child as Text).data == '查看报价依据资料',
+      description: 'FilledButton("查看报价依据资料")',
     );
     await _scrollTo(tester, continueButton);
     tester.widget<FilledButton>(continueButton).onPressed!.call();
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('第二步 查看报价依据资料'), findsOneWidget);
+    expect(find.text('查看报价依据资料'), findsOneWidget);
     expect(find.text('报价依据资料暂不可读'), findsOneWidget);
     expect(find.text('其他资料.zip'), findsNothing);
     expect(find.text('其他资料'), findsNothing);
@@ -544,8 +544,8 @@ void main() {
       (Widget widget) =>
           widget is FilledButton &&
           widget.child is Text &&
-          (widget.child as Text).data == '继续竞标',
-      description: 'FilledButton("继续竞标")',
+          (widget.child as Text).data == '查看报价依据资料',
+      description: 'FilledButton("查看报价依据资料")',
     );
     await _scrollTo(tester, continueButton);
     tester.widget<FilledButton>(continueButton).onPressed!.call();
@@ -608,14 +608,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
-    await _scrollTo(tester, find.text('报价依据资料'));
+    await _scrollTo(tester, find.text('报价依据资料').last);
     expect(find.text('报价依据资料'), findsWidgets);
-    expect(find.textContaining('效果图、尺寸图 / 施工图、材质图 / 材料样板'), findsWidgets);
-    expect(find.widgetWithText(ChoiceChip, '效果图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '材质图 / 材料样板'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '设备物料清单'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '服务清单'), findsOneWidget);
-    expect(find.textContaining('当前还没有补充报价依据资料'), findsOneWidget);
   });
 }

@@ -21,6 +21,7 @@ import {
   readInquiryResultReadModel,
   readPricingSummaryReadModel,
   readProjectAuthenticitySincerityOrderReadModel,
+  readProjectAuthenticitySincerityFreezeFeedbackReadModel,
   readProjectAuthenticitySincerityPayInitReadModel,
   readProjectAuthenticitySincerityRefundReadModel,
   readProjectAuthenticitySincerityStatusReadModel,
@@ -128,7 +129,7 @@ export class ExhibitionP0PayService {
     headers: IncomingHttpHeaders,
     idempotencyKey?: string,
   ) {
-    const path = this.inquiryDepositPath(projectId);
+    const path = this.projectAuthenticitySincerityPath(projectId);
     const body = this.payloads.toInquiryDepositOrderPayload(payload, idempotencyKey);
     return this.post(
       path,
@@ -158,7 +159,7 @@ export class ExhibitionP0PayService {
     headers: IncomingHttpHeaders,
     idempotencyKey?: string,
   ) {
-    const path = `${this.inquiryDepositPath(projectId)}/${this.id(orderId, 'orderId')}/pay-init`;
+    const path = `${this.projectAuthenticitySincerityPath(projectId)}/${this.id(orderId, 'orderId')}/pay-init`;
     const body = this.payloads.toPayInitPayload(payload, idempotencyKey);
     return this.post(
       path,
@@ -183,12 +184,28 @@ export class ExhibitionP0PayService {
     orderId: string | undefined,
     headers: IncomingHttpHeaders,
   ) {
-    const path = `${this.inquiryDepositPath(projectId)}/${this.id(orderId, 'orderId')}`;
+    const path = `${this.projectAuthenticitySincerityPath(projectId)}/${this.id(orderId, 'orderId')}`;
     return this.get(
       path,
       headers,
       'project_authenticity_sincerity_status',
       readProjectAuthenticitySincerityStatusReadModel,
+    );
+  }
+
+  submitProjectAuthenticitySincerityFreezeFeedback(
+    projectId: string | undefined,
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+  ) {
+    const path = `${this.projectAuthenticitySincerityBasePath(projectId)}/freeze-feedback`;
+    const body = this.payloads.toProjectAuthenticitySincerityFreezeFeedbackPayload(payload);
+    return this.post(
+      path,
+      body,
+      headers,
+      'project_authenticity_sincerity_freeze_feedback',
+      readProjectAuthenticitySincerityFreezeFeedbackReadModel,
     );
   }
 
@@ -352,7 +369,7 @@ export class ExhibitionP0PayService {
   }
 
   getProjectPricingSummary(projectId: string | undefined, headers: IncomingHttpHeaders) {
-    const path = `/server/project/${this.id(projectId, 'projectId')}/pricing-summary`;
+    const path = `/server/projects/${this.id(projectId, 'projectId')}/pricing-summary`;
     return this.get(path, headers, 'pricing_summary', readPricingSummaryReadModel);
   }
 
@@ -449,6 +466,14 @@ export class ExhibitionP0PayService {
 
   private inquiryDepositPath(taskId: string | undefined) {
     return `/server/exhibition/trade-tasks/${this.id(taskId, 'taskId')}/inquiry-deposit/orders`;
+  }
+
+  private projectAuthenticitySincerityBasePath(projectId: string | undefined) {
+    return `/server/projects/${this.id(projectId, 'projectId')}/authenticity-sincerity`;
+  }
+
+  private projectAuthenticitySincerityPath(projectId: string | undefined) {
+    return `${this.projectAuthenticitySincerityBasePath(projectId)}/orders`;
   }
 
   private bidServiceFeeAuthorizationPath(projectId: string | undefined) {

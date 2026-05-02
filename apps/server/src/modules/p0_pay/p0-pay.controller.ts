@@ -4,6 +4,7 @@ import type { HeaderBag } from '../../shared/request-context';
 import { resolveRequestContext } from '../../shared/request-context';
 import { P0PayCallbackService } from './p0-pay-callback.service';
 import { P0PayContractConfirmationService } from './p0-pay-contract-confirmation.service';
+import { P0PayInternalTestNoFreezeService } from './p0-pay-internal-test-no-freeze.service';
 import { P0PayInquiryDepositService } from './p0-pay-inquiry-deposit.service';
 import { P0PayRefundService } from './p0-pay-refund.service';
 import { P0PayServiceFeeAuthorizationService } from './p0-pay-service-fee-authorization.service';
@@ -16,6 +17,7 @@ export class P0PayController {
     private readonly authorizationService: P0PayServiceFeeAuthorizationService,
     private readonly tradeTaskService: P0PayTradeTaskService,
     private readonly inquiryDepositService: P0PayInquiryDepositService,
+    private readonly internalTestNoFreezeService: P0PayInternalTestNoFreezeService,
     private readonly contractConfirmationService: P0PayContractConfirmationService,
     private readonly refundService: P0PayRefundService,
     private readonly settlementService: P0PaySettlementService,
@@ -130,6 +132,21 @@ export class P0PayController {
     );
   }
 
+  @Post('server/projects/:projectId/authenticity-sincerity/orders')
+  @HttpCode(201)
+  createProjectAuthenticitySincerityOrder(
+    @Param('projectId') projectId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.inquiryDepositService.createOrder(
+      projectId,
+      body,
+      this.context(headers, request)
+    );
+  }
+
   @Post('server/exhibition/trade-tasks/:taskId/inquiry-deposit/orders/:depositOrderId/pay-init')
   @HttpCode(202)
   inquiryDepositPayInit(
@@ -147,6 +164,23 @@ export class P0PayController {
     );
   }
 
+  @Post('server/projects/:projectId/authenticity-sincerity/orders/:orderId/pay-init')
+  @HttpCode(202)
+  projectAuthenticitySincerityPayInit(
+    @Param('projectId') projectId: string,
+    @Param('orderId') orderId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.inquiryDepositService.payInit(
+      projectId,
+      orderId,
+      body,
+      this.context(headers, request)
+    );
+  }
+
   @Get('server/exhibition/trade-tasks/:taskId/inquiry-deposit/orders/:depositOrderId')
   getInquiryDepositOrder(
     @Param('taskId') taskId: string,
@@ -157,6 +191,35 @@ export class P0PayController {
     return this.inquiryDepositService.getOrder(
       taskId,
       depositOrderId,
+      this.context(headers, request)
+    );
+  }
+
+  @Get('server/projects/:projectId/authenticity-sincerity/orders/:orderId')
+  getProjectAuthenticitySincerityOrder(
+    @Param('projectId') projectId: string,
+    @Param('orderId') orderId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.inquiryDepositService.getOrder(
+      projectId,
+      orderId,
+      this.context(headers, request)
+    );
+  }
+
+  @Post('server/projects/:projectId/authenticity-sincerity/freeze-feedback')
+  @HttpCode(202)
+  submitProjectAuthenticitySincerityFreezeFeedback(
+    @Param('projectId') projectId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.internalTestNoFreezeService.submitFeedback(
+      projectId,
+      body,
       this.context(headers, request)
     );
   }
@@ -240,6 +303,15 @@ export class P0PayController {
 
   @Get('server/project/:projectId/pricing-summary')
   getProjectPricingSummary(
+    @Param('projectId') projectId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.tradeTaskService.getP0PaySummary(projectId, this.context(headers, request));
+  }
+
+  @Get('server/projects/:projectId/pricing-summary')
+  getCanonicalProjectPricingSummary(
     @Param('projectId') projectId: string,
     @Headers() headers: HeaderBag,
     @Req() request: Request

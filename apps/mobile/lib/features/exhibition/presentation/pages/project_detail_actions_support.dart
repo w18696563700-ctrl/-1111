@@ -270,7 +270,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
         else if (canContinueBid && participationApproved)
           FilledButton(
             onPressed: () => _continueBidWithGuard(projectId),
-            child: const Text('继续提交竞标'),
+            child: const Text('立即参与竞标'),
           )
         else if (canContinueBid && canRequestParticipation)
           FilledButton(
@@ -336,8 +336,8 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
       return _projectNameAccessStatusBody(projectMap);
     }
     return switch (state) {
-      'published' => '当前项目正在竞标中，可继续提交竞标资料。',
-      'bidding_closed' => '当前项目投标已结束。',
+      'published' => '当前项目正在竞标中，可立即参与竞标并提交资料。',
+      'bidding_closed' => '当前项目竞标已结束。',
       'awarded' => '当前项目已授标。',
       'converted_to_order' => '当前项目已被承接。',
       _ => '当前项目暂不开放参与竞标。',

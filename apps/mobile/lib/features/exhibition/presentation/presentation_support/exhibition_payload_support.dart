@@ -19,15 +19,15 @@ List<Widget> _routeOnlyControls({
 
 String _instanceTitleForLabel(String label) {
   return switch (label) {
-    'projectId' => '当前项目 ID',
-    'bidId' => '当前竞标 ID',
-    'bidAwardId' => '当前定标 ID',
-    'orderId' => '当前订单 ID',
-    'contractId' => '当前合同 ID',
-    'milestoneId' => '当前里程碑 ID',
-    'inspectionId' => '当前验收 ID',
-    'ratingId' => '当前评价 ID',
-    'disputeId' => '当前争议 ID',
+    'projectId' => '当前项目',
+    'bidId' => '当前竞标',
+    'bidAwardId' => '当前合作确认',
+    'orderId' => '当前订单',
+    'contractId' => '当前合同',
+    'milestoneId' => '当前里程碑',
+    'inspectionId' => '当前验收',
+    'ratingId' => '当前评价',
+    'disputeId' => '当前争议',
     _ => '当前实例 $label',
   };
 }
@@ -169,24 +169,20 @@ String _p0PayPaymentPollResultText(P0PayPaymentPollResult result) {
   }
 
   final prefix = switch (result.kind) {
-    P0PayPaymentKind.inquiryDeposit => '发单诚意金',
+    P0PayPaymentKind.inquiryDeposit => '项目真实性诚意金',
     P0PayPaymentKind.projectAuthenticitySincerity => '项目真实性诚意金',
     P0PayPaymentKind.serviceFeeAuthorization => '平台服务费预授权',
   };
 
   return switch (result.outcome) {
-    P0PayPaymentOutcome.pending =>
-      '$prefix 仍在等待支付通道确认，状态 $status；Flutter 只读取 BFF 状态，不接收回调真相。',
-    P0PayPaymentOutcome.success =>
-      '$prefix 已确认，状态 $status；该结果来自 BFF/Server 只读回读。',
-    P0PayPaymentOutcome.charged =>
-      '$prefix 已扣取，状态 $status；合同确认后扣费真相以 Server 为准。',
-    P0PayPaymentOutcome.released => '$prefix 已释放，状态 $status；Flutter 只展示只读结果。',
-    P0PayPaymentOutcome.refunded => '$prefix 已退回，状态 $status；Flutter 不裁定退款。',
-    P0PayPaymentOutcome.deducted =>
-      '$prefix 已按规则处理为扣除状态 $status；Flutter 不裁定扣除。',
-    P0PayPaymentOutcome.held => '$prefix 处于挂起状态 $status；Flutter 不裁定资金状态。',
-    P0PayPaymentOutcome.processing => '$prefix 处于处理中状态 $status；请以 BFF 后续回读为准。',
+    P0PayPaymentOutcome.pending => '$prefix 仍在等待支付通道确认，状态 $status；请刷新状态查看最新结果。',
+    P0PayPaymentOutcome.success => '$prefix 已确认，状态 $status；请以平台记录为准。',
+    P0PayPaymentOutcome.charged => '$prefix 已扣取，状态 $status；合同确认后扣费结果以平台记录为准。',
+    P0PayPaymentOutcome.released => '$prefix 已释放，状态 $status；请以平台记录为准。',
+    P0PayPaymentOutcome.refunded => '$prefix 已退回，状态 $status；请以平台记录为准。',
+    P0PayPaymentOutcome.deducted => '$prefix 已按规则处理为扣除状态 $status；请以平台记录为准。',
+    P0PayPaymentOutcome.held => '$prefix 处于挂起状态 $status；请以平台记录为准。',
+    P0PayPaymentOutcome.processing => '$prefix 处于处理中状态 $status；请稍后刷新状态。',
     P0PayPaymentOutcome.failed ||
     P0PayPaymentOutcome.cancelled ||
     P0PayPaymentOutcome.expired ||
@@ -208,7 +204,7 @@ String _p0PayControlledFailureText({
     'PROJECT_AUTHENTICITY_SINCERITY_RESULT_UNAVAILABLE' =>
       '项目真实性诚意金结果暂不可用，请稍后刷新。',
     'SERVICE_FEE_AUTHORIZATION_RESULT_UNAVAILABLE' => '平台服务费预授权结果暂不可用，请稍后刷新。',
-    'INQUIRY_DEPOSIT_RESULT_UNAVAILABLE' => '发单诚意金结果暂不可用，请稍后刷新。',
+    'INQUIRY_DEPOSIT_RESULT_UNAVAILABLE' => '项目真实性诚意金结果暂不可用，请稍后刷新。',
     'PAYMENT_CHANNEL_UNAVAILABLE' => '支付通道暂不可用，请稍后重试。',
     'PAYMENT_CHANNEL_CONSTRAINT_REQUIRES_REVERIFICATION' => '支付通道要求重新核验，请重新拉起。',
     'IDEMPOTENCY_KEY_CONFLICT' => '检测到重复提交冲突，请先刷新状态。',

@@ -502,7 +502,25 @@ class AppRouter {
       _ => '展览',
     };
 
-    final appBarActions = const <Widget>[];
+    final previewProjectId = routePath == ExhibitionRoutes.myProjectDetail
+        ? routeUri.queryParameters['projectId']?.trim()
+        : null;
+    final appBarActions = <Widget>[
+      if (previewProjectId != null && previewProjectId.isNotEmpty)
+        Builder(
+          builder: (BuildContext context) {
+            return TextButton.icon(
+              onPressed: () {
+                Navigator.of(context).pushNamed(
+                  ExhibitionRoutes.projectDetailWithProjectId(previewProjectId),
+                );
+              },
+              icon: const Icon(Icons.visibility_outlined, size: 18),
+              label: const Text('预览项目'),
+            );
+          },
+        ),
+    ];
     final titleContent = switch (routePath) {
       ExhibitionRoutes.myProjectDetail => MyProjectDetailHeaderTitle(
         projectId: routeUri.queryParameters['projectId'],

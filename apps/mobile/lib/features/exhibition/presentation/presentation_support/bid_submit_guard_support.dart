@@ -42,8 +42,7 @@ _BidAccessGuard? _deriveBidAccessGuard({
     return const _BidAccessGuard(
       controlledState: AppPageState.forbidden,
       title: '当前组织类型未开放竞标资格',
-      message:
-          '当前主体还不是可参与竞标的供应商或需求方/供应商组织。请先进入公司与组织切换到可参与竞标的主体，再继续当前项目。',
+      message: '当前主体还不是可参与竞标的供应商或需求方/供应商组织。请先进入公司与组织切换到可参与竞标的主体，再继续当前项目。',
       actionLabel: '前往公司与组织',
       actionRouteName: ProfileIdentityRoutes.organizationHandoff,
     );
@@ -55,8 +54,7 @@ _BidAccessGuard? _deriveBidAccessGuard({
     return const _BidAccessGuard(
       controlledState: AppPageState.forbidden,
       title: '当前企业认证未通过',
-      message:
-          '参与竞标或查看竞标结果前，需要企业认证和我的认证同时通过。请先进入公司认证与我的身份完成企业认证。',
+      message: '参与竞标或查看竞标结果前，需要企业认证和我的认证同时通过。请先进入公司认证与我的身份完成企业认证。',
       actionLabel: '前往公司认证与我的身份',
       actionRouteName: ProfileIdentityRoutes.certificationCurrent,
     );
@@ -214,7 +212,7 @@ _BidAccessGuard _bidProjectReadFailureGuard({
 
 String _bidProjectStateBlockedMessage(String? projectState) {
   return switch (projectState) {
-    'bidding_closed' => '当前项目投标已结束，暂时不能继续提交竞标。',
+    'bidding_closed' => '当前项目竞标已结束，暂时不能提交竞标。',
     'awarded' => '当前项目已授标，公开竞标入口不再继续后续私域动作。',
     'converted_to_order' => '当前项目已被承接，当前不再开放参与竞标。',
     _ => '当前项目暂不处于参与竞标阶段，请先回到项目详情确认当前状态。',
@@ -267,7 +265,7 @@ bool _canReadBidResultFromProjectState(String? projectState) {
 String _bidResultStateBlockedMessage(String? projectState) {
   return switch (projectState) {
     'published' => '当前项目仍处于竞标中，竞标结果尚未开放查看。',
-    'bidding_closed' => '当前项目投标已结束，竞标结果尚未回读。',
+    'bidding_closed' => '当前项目竞标已结束，竞标结果尚未回读。',
     _ => '当前项目暂不处于可查看竞标结果阶段，请先回到项目详情确认当前状态。',
   };
 }

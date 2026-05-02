@@ -19,6 +19,7 @@ const MATERIAL_TYPES = new Set([
 const PAY_CHANNELS = new Set(['alipay_candidate', 'wechat_candidate', 'other_candidate']);
 const RESULT_ACTIONS = new Set(['select_factory', 'close_without_deal', 'cancel_project']);
 const CONFIRMATION_ROLES = new Set(['publisher', 'factory']);
+const FREEZE_FEEDBACK_CHOICES = new Set(['support_freeze', 'oppose_freeze']);
 
 @Injectable()
 export class ExhibitionP0PayPayloadService {
@@ -136,6 +137,13 @@ export class ExhibitionP0PayPayloadService {
       ruleVersion: this.readString(source.ruleVersion, 'ruleVersion'),
       ruleSnapshotHash: this.readString(source.ruleSnapshotHash, 'ruleSnapshotHash'),
       idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
+    };
+  }
+
+  toProjectAuthenticitySincerityFreezeFeedbackPayload(value: unknown) {
+    const source = this.requireRecord(value);
+    return {
+      choice: this.readEnum(source.choice, FREEZE_FEEDBACK_CHOICES, 'choice'),
     };
   }
 

@@ -189,8 +189,8 @@ Future<void> _expandBidSubmitFlowIfNeeded(WidgetTester tester) async {
     (Widget widget) =>
         widget is FilledButton &&
         widget.child is Text &&
-        (widget.child as Text).data == '继续竞标',
-    description: 'FilledButton("继续竞标")',
+        (widget.child as Text).data == '查看报价依据资料',
+    description: 'FilledButton("查看报价依据资料")',
   );
   if (continueFinder.evaluate().isEmpty) {
     return;
@@ -1048,7 +1048,7 @@ void main() {
       await _tapVisible(tester, find.text('首发项目'));
 
       expect(find.text('项目详情'), findsWidgets);
-      await _tapVisible(tester, find.widgetWithText(FilledButton, '继续提交竞标'));
+      await _tapVisible(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
 
       expect(find.text('竞标提交'), findsWidgets);
       await _enterVisibleBidTextField(tester, label: '竞标报价', value: '1200');

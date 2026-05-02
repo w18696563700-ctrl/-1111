@@ -16,6 +16,7 @@ import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PaymentTransactionEntity } from './entities/payment-transaction.entity';
 import { PlatformServiceFeeChargeEntity } from './entities/platform-service-fee-charge.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
+import { ProjectAuthenticitySincerityFreezeFeedbackEntity } from './entities/project-authenticity-sincerity-freeze-feedback.entity';
 import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayCallbackService } from './p0-pay-callback.service';
 import { P0PayCommandParser } from './p0-pay-command.parser';
@@ -23,6 +24,7 @@ import { P0PayContractConfirmationService } from './p0-pay-contract-confirmation
 import { P0PayController } from './p0-pay.controller';
 import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
+import { P0PayInternalTestNoFreezeService } from './p0-pay-internal-test-no-freeze.service';
 import { P0PayInquiryDepositService } from './p0-pay-inquiry-deposit.service';
 import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
 import { P0PayPresenter } from './p0-pay.presenter';
@@ -49,6 +51,7 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
       PaymentTransactionEntity,
       PaymentCallbackEventEntity,
       PaymentIdempotencyRecordEntity,
+      ProjectAuthenticitySincerityFreezeFeedbackEntity,
       BidEntity,
       ProjectEntity,
       FileAssetEntity,
@@ -63,6 +66,7 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
     P0PayContractConfirmationService,
     P0PayIdempotencyRecordService,
     P0PayIdempotencyService,
+    P0PayInternalTestNoFreezeService,
     P0PayInquiryDepositService,
     P0PayPaymentChannelService,
     P0PayPresenter,
@@ -81,7 +85,8 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
     P0PayTradeTaskService,
     P0PayRefundService,
     P0PaySettlementService,
-    P0PayServiceFeeAuthorizationService
+    P0PayServiceFeeAuthorizationService,
+    P0PayInternalTestNoFreezeService
   ]
 })
 export class P0PayModule {}

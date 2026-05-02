@@ -234,6 +234,18 @@ export function readProjectAuthenticitySincerityStatusReadModel(value: unknown) 
   };
 }
 
+export function readProjectAuthenticitySincerityFreezeFeedbackReadModel(value: unknown) {
+  const record = requireRecord(value, 'Project authenticity sincerity freeze feedback response must be an object.');
+  return {
+    projectId: record.projectId,
+    myChoice: record.myChoice,
+    supportFreezeCount: readFirst(record.supportFreezeCount, 0),
+    opposeFreezeCount: readFirst(record.opposeFreezeCount, 0),
+    updatedAt: record.updatedAt,
+    traceId: readFirst(record.traceId, null),
+  };
+}
+
 export function readProjectAuthenticitySincerityRefundReadModel(value: unknown) {
   const record = requireRecord(value, 'Project authenticity sincerity refund response must be an object.');
   return {

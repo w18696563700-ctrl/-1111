@@ -258,7 +258,7 @@ Map<String, Object?> _threadDetailPayload({required String requestStatus}) {
               'actionKey': 'bid_submit.open',
               'objectType': 'bid_submit',
               'canonicalPath': '/api/app/bid/submit',
-              'label': '继续提交竞标',
+              'label': '立即参与竞标',
               'params': <String, Object?>{'projectId': 'project-1'},
             }
           : const <String, Object?>{

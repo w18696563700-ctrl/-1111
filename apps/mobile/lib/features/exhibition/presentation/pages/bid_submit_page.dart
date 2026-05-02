@@ -182,7 +182,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           path: ExhibitionCanonicalPaths.bidSubmit,
           isSuccess: false,
           controlledState: AppPageState.errorNonRetryable,
-          message: '请先补充方案说明，再继续提交竞标。',
+          message: '请先补充方案说明，再提交竞标。',
         );
       });
       return;
@@ -206,7 +206,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           path: ExhibitionCanonicalPaths.bidSubmit,
           isSuccess: false,
           controlledState: AppPageState.errorNonRetryable,
-          message: '请先完成并确认附件：${missingAttachments.join('、')}，再继续提交竞标。',
+          message: '请先完成并确认附件：${missingAttachments.join('、')}，再提交竞标。',
         );
       });
       return;
@@ -332,7 +332,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           isSuccess: false,
           controlledState: AppPageState.errorNonRetryable,
           errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND',
-          message: 'BFF 未返回竞标服务费预授权编号，暂不能提交竞标。',
+          message: '暂未取得竞标服务费预授权编号，当前不能提交竞标。',
         );
       });
       return false;
@@ -382,7 +382,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
         controlledState: AppPageState.errorNonRetryable,
         errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED',
         message:
-            '竞标服务费预授权额度尚未完成冻结，当前状态：${_bidServiceFeeAuthorizationStatus(poll.result.payload) ?? '未返回'}。完成冻结后再提交竞标。',
+            '竞标服务费预授权额度尚未完成，当前状态：${_bidServiceFeeAuthorizationStatus(poll.result.payload) ?? '未返回'}。完成后再提交竞标。',
       );
     });
     return false;
@@ -513,7 +513,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     return _SubmissionPageFrame(
       title: '竞标提交',
-      summary: '这里是当前项目下的竞标提交页，按核对项目、查看材料、填写报价、上传方案和最终提交依次完成。',
+      summary: '这里是当前项目下的竞标提交页，按已承接项目、查看报价依据资料、填写报价与预授权确认、上传方案和最终提交依次完成。',
       canonicalPath: ExhibitionCanonicalPaths.bidSubmit,
       submitting: _submitting || _p0PaySubmitting,
       lastResult: _lastResult,
@@ -584,8 +584,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     return _LoadPageFrame(
       title: '竞标结果',
-      summary:
-          '这里读取当前项目下的最小竞标结果出口，只消费 bidId、state、result、reason 与 decidedAt，不扩成供应商工作台。',
+      summary: '这里展示当前项目的竞标结果和后续处理入口，不展开完整候选比较台。',
       loading: _resultLoading || _resultGuardLoading,
       result: effectiveResult,
       onRetry: () {
@@ -623,8 +622,8 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
               tone: _ActionCardTone.emphasis,
               children: <Widget>[
                 const _DetailLine(
-                  label: '守卫说明',
-                  value: '查看竞标结果前，会先检查当前登录、组织类型、双重认证和项目状态；最终业务权限仍以后端判定为准。',
+                  label: '查看条件',
+                  value: '查看竞标结果前，会先核对登录状态、组织身份和项目状态；最终是否可见以平台记录为准。',
                 ),
                 const SizedBox(height: 12),
                 FilledButton(
@@ -656,14 +655,13 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           const SizedBox(height: 16),
           _ActionCard(
             title: '当前竞标结果',
-            summary:
-                '当前页只承接当前 actor 的最小 result outlet，不扩 compare board 或供应商工作台。',
+            summary: '当前页只展示本次竞标结果和必要原因，不展开完整候选比较台。',
             tone: _ActionCardTone.emphasis,
             children: <Widget>[
-              _InstanceSummaryLine(title: '当前项目 ID', value: routeProjectId),
+              const _InstanceSummaryLine(title: '当前项目', value: '已承接'),
               if (bidId != null) ...<Widget>[
                 const SizedBox(height: 12),
-                _InstanceSummaryLine(title: '当前竞标 ID', value: bidId),
+                _InstanceSummaryLine(title: '当前竞标', value: bidId),
               ],
               if (state != null) ...<Widget>[
                 const SizedBox(height: 12),

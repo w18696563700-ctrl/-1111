@@ -8,7 +8,7 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
   List<Widget> _buildP0PayFixedPriceBidAuthorizationFields() {
     return <Widget>[
       Text(
-        '竞标服务费预授权确认',
+        '竞标服务费预授权额度确认',
         style: Theme.of(
           context,
         ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
@@ -19,7 +19,7 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
         value: '固定 4000 元竞标服务费预授权额度',
         highlight: true,
       ),
-      _DetailLine(label: '预计服务费', value: _p0PayEstimatedFeeText()),
+      _DetailLine(label: '平台规则说明', value: _p0PayEstimatedFeeText()),
       const _StateMessage(
         title: '你需要做什么',
         body: '选择报价有效期，核对 4000 元竞标服务费预授权额度，并勾选规则确认。提交前会以平台记录确认预授权状态。',
@@ -109,7 +109,7 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
     if (quoteAmount == null || quoteAmount <= 0) {
       return '固定 4000 元；成交后按平台规则扣取服务费，剩余额度原路释放';
     }
-    return '固定 4000 元；当前报价仅用于竞标材料，Flutter 不本地计算服务费';
+    return '固定 4000 元；当前报价仅用于竞标材料，成交后以平台记录处理';
   }
 }
 
@@ -159,7 +159,7 @@ String _p0PayServiceFeeRequirementSummary(Object? payload) {
     if (membershipDiscountRate != null)
       '会员折扣 ${_p0PayMembershipDiscountDisplay(membershipDiscountRate)}',
     if (capAmount != null) '封顶 $capAmount $currency',
-    if (finalFeeAmount != null) '预计服务费 $finalFeeAmount $currency',
+    if (finalFeeAmount != null) '平台记录金额 $finalFeeAmount $currency',
     if (feeRateSource != null) '来源 $feeRateSource',
     '预授权额度 $quotaAmount $currency',
     '状态 $authorizationStatus',
@@ -206,7 +206,7 @@ String _p0PayAuthorizationStatusText(ExhibitionLoadResult? result) {
     if (membershipDiscountRate != null)
       '会员折扣：${_p0PayMembershipDiscountDisplay(membershipDiscountRate)}',
     if (capAmount != null) '封顶：$capAmount $currency',
-    if (estimatedFeeAmount != null) '预计服务费：$estimatedFeeAmount $currency',
+    if (estimatedFeeAmount != null) '平台记录金额：$estimatedFeeAmount $currency',
     if (quotaAmount != null) '预授权额度：$quotaAmount $currency',
   ].join('；');
 }

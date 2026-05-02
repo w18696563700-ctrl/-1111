@@ -783,8 +783,8 @@ void main() {
       expect(find.text('想跟TA说点什么...'), findsNothing);
 
       await _enterFirstProjectCommunication(tester);
-      await _ensureVisible(tester, find.widgetWithText(FilledButton, '订单状态'));
-      expect(find.widgetWithText(FilledButton, '订单状态'), findsOneWidget);
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '后续承接状态'));
+      expect(find.widgetWithText(FilledButton, '后续承接状态'), findsOneWidget);
       expect(find.text('当前账号仅可查看'), findsNothing);
       expect(find.text('申请完工'), findsNothing);
       expect(find.text('确认完成'), findsNothing);
@@ -903,8 +903,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await _enterFirstProjectCommunication(tester);
-      await _ensureVisible(tester, find.widgetWithText(FilledButton, '订单状态'));
-      await tester.tap(find.widgetWithText(FilledButton, '订单状态'));
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '后续承接状态'));
+      await tester.tap(find.widgetWithText(FilledButton, '后续承接状态'));
       await tester.pumpAndSettle();
 
       await _ensureVisible(tester, find.text('申请完工'));
@@ -1096,8 +1096,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await _enterFirstProjectCommunication(tester);
-      await _ensureVisible(tester, find.widgetWithText(FilledButton, '订单状态'));
-      await tester.tap(find.widgetWithText(FilledButton, '订单状态'));
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '后续承接状态'));
+      await tester.tap(find.widgetWithText(FilledButton, '后续承接状态'));
       await tester.pumpAndSettle();
 
       await _ensureVisible(tester, find.text('确认完成'));
@@ -1177,7 +1177,7 @@ void main() {
       expect(find.text('当前项目沟通'), findsOneWidget);
       expect(find.text('重庆坤特展览展示有限公司申请查看该项目详情并参与竞标'), findsOneWidget);
       expect(find.text('进入审核'), findsOneWidget);
-      expect(find.text('订单状态'), findsOneWidget);
+      expect(find.text('后续承接状态'), findsOneWidget);
       expect(find.text('项目相册'), findsOneWidget);
       expect(find.text('围绕当前项目说点什么...'), findsOneWidget);
 
@@ -1219,8 +1219,8 @@ void main() {
       expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
       final maskedTitle = tester.widget<Text>(find.text('项目名称需申请查看').first);
       expect(maskedTitle.style?.color, const Color(0xFF1F7A3A));
-      expect(find.text('进入后可处理参与竞标申请，并继续项目聊天、订单入口和项目相册。'), findsOneWidget);
-      expect(find.text('进入后才加载此项目聊天、订单入口和项目相册入口。'), findsNothing);
+      expect(find.text('进入后可处理参与竞标申请，并继续项目聊天、后续承接入口和项目相册。'), findsOneWidget);
+      expect(find.text('进入后才加载此项目聊天、后续承接入口和项目相册入口。'), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
     },
   );
@@ -1319,7 +1319,7 @@ void main() {
       expect(find.text('项目列表'), findsOneWidget);
       expect(find.text('西洽会 - 泸州'), findsOneWidget);
       expect(find.text('西洽会 - 成都'), findsOneWidget);
-      expect(find.text('进入后可继续项目聊天、订单入口和项目相册。'), findsNWidgets(2));
+      expect(find.text('进入后可继续项目聊天、后续承接入口和项目相册。'), findsNWidgets(2));
       expect(find.text('发布时间：2026-05-01 18:00'), findsOneWidget);
       expect(find.text('发布时间：2026-05-02 18:00'), findsOneWidget);
       expect(find.text('未读 2'), findsOneWidget);
@@ -1462,12 +1462,12 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('项目列表'), findsOneWidget);
-      expect(find.text('订单状态'), findsNothing);
+      expect(find.text('后续承接状态'), findsNothing);
 
       await _enterFirstProjectCommunication(tester);
-      expect(find.text('订单状态'), findsOneWidget);
+      expect(find.text('后续承接状态'), findsOneWidget);
 
-      final openOrderButton = find.widgetWithText(FilledButton, '订单状态');
+      final openOrderButton = find.widgetWithText(FilledButton, '后续承接状态');
       await _ensureVisible(tester, openOrderButton);
       await tester.tap(openOrderButton);
       await tester.pumpAndSettle();

@@ -102,7 +102,7 @@ String? _bidSubmitAttachmentSubmitDisabledMessage(
   if (missingLabels.isEmpty) {
     return null;
   }
-  return '请先完成并确认附件：${missingLabels.join('、')}，再继续提交竞标。';
+  return '请先完成并确认附件：${missingLabels.join('、')}，再提交竞标。';
 }
 
 class _BidSubmitAttachmentSlotConfig {

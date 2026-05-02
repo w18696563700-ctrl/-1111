@@ -14,6 +14,12 @@ import { InquiryQuoteDepositEntity } from './entities/inquiry-quote-deposit.enti
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
 import { p0PayInvalid, p0PayPermissionDenied, p0PayResourceUnavailable } from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
+import { P0PayInternalTestNoFreezeService } from './p0-pay-internal-test-no-freeze.service';
+import {
+  PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
+  PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
+  projectAuthenticitySincerityInternalTestNoFreezeEnabled,
+} from './p0-pay-internal-test-no-freeze.policy';
 import { P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
 import { P0PayStateActionService } from './p0-pay-state-action.service';
 
@@ -32,6 +38,7 @@ export class P0PayTradeTaskService {
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly auditService: P0PayAuditService,
+    private readonly internalTestNoFreezeService: P0PayInternalTestNoFreezeService,
     private readonly stateActions: P0PayStateActionService,
     private readonly bidSubmittedSeedService: BidSubmittedSeedService,
     private readonly feeRatePolicy: P0PayServiceFeeRatePolicy
@@ -239,7 +246,7 @@ export class P0PayTradeTaskService {
   async getP0PaySummary(taskId: string, context: RequestContext) {
     const project = await this.requireProject(taskId);
     await this.assertRelatedScope(project, context);
-    return this.toPricingSummary(project);
+    return this.toPricingSummary(project, context);
   }
 
   async releaseNonWinning(taskId: string, payload: Record<string, unknown>, context: RequestContext) {
@@ -266,14 +273,51 @@ export class P0PayTradeTaskService {
     }
   }
 
-  private async toPricingSummary(project: ProjectEntity) {
+  private async toPricingSummary(project: ProjectEntity, context: RequestContext) {
     const [authorization, deposit] = await Promise.all([
       this.authorizationRepository.findOne({ where: { taskId: project.id }, order: { updatedAt: 'DESC' } }),
       this.depositRepository.findOne({ where: { taskId: project.id }, order: { updatedAt: 'DESC' } })
     ]);
+    const internalTestNoFreezeAllowed =
+      projectAuthenticitySincerityInternalTestNoFreezeEnabled() &&
+      Boolean(deposit?.paymentOrderId) &&
+      deposit?.status !== 'paid';
+    const sincerityStatus = internalTestNoFreezeAllowed
+      ? PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS
+      : deposit?.status ?? null;
+    const publishGateStatus = deposit?.status === 'paid'
+      ? 'satisfied'
+      : internalTestNoFreezeAllowed
+        ? PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS
+        : 'required';
+    const freezeFeedbackSummary =
+      await this.internalTestNoFreezeService.buildFeedbackSummary(project.id, context);
     return {
       projectId: project.id,
       pricingRuleVersion: authorization?.ruleVersion ?? deposit?.ruleVersion ?? null,
+      publisherPricing: {
+        authenticitySincerityRequired: true,
+        authenticitySincerityAmount: deposit?.amount ?? '200.00',
+        authenticitySincerityStatus: sincerityStatus,
+        authenticitySincerityOrderId: deposit?.id ?? null,
+        authenticitySincerityCurrency: deposit?.currency ?? 'CNY',
+        authenticitySincerityChannelCandidates: ['alipay_candidate', 'wechat_candidate', 'other_candidate'],
+        authenticitySincerityExpiresAt: null,
+        publishGateStatus,
+        formalResultProcessingRequired: true,
+        nextAction: {
+          objectType: 'project_pricing',
+          actionKey: publishGateStatus === 'satisfied' || publishGateStatus === PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS
+            ? 'project_publish.open'
+            : 'project_authenticity_sincerity.open',
+          canonicalPath: `/api/app/project/${project.id}/pricing-summary`,
+          params: { projectId: project.id }
+        },
+        sincerityFreezePolicyNotice: projectAuthenticitySincerityInternalTestNoFreezeEnabled()
+          ? this.internalTestNoFreezeService.policyNotice
+          : null,
+        freezeFeedbackSummary
+      },
       bidServiceFeeAuthorization: authorization
         ? {
             authorizationId: authorization.id,
@@ -288,7 +332,7 @@ export class P0PayTradeTaskService {
       projectAuthenticitySincerity: deposit
         ? {
             orderId: deposit.id,
-            status: deposit.status,
+            status: sincerityStatus,
             amount: deposit.amount,
             currency: deposit.currency,
             channelCandidates: ['alipay_candidate', 'wechat_candidate', 'other_candidate']

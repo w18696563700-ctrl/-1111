@@ -30,6 +30,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   bool _summaryExpanded = false;
   bool _pricingSummaryLoading = false;
   bool _continuingSincerityPayment = false;
+  String? _submittingSincerityFeedbackChoice;
   _MyProjectLifecycleActionKind? _submittingLifecycleAction;
   ExhibitionLoadResult? _pricingSummaryResult;
 
@@ -83,8 +84,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final result = snapshot?.result;
 
     return _LoadPageFrame(
-      title: '项目详情',
-      summary: '查看当前项目已保存的信息、所在阶段和下一步能做什么。',
+      title: '我的项目详情（预发布补资料并发布页）',
+      summary: '按预发布要求补齐关键资料，确认无误后再走真实发布流程。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -96,6 +97,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       showTechnicalDisclosure: false,
       showPageSummaryCard: false,
       showContentStateCard: false,
+      bottomPinnedBuilder: _buildBottomPublishCta,
       resultSectionsBuilder: (ExhibitionLoadResult result) {
         if (result.state != AppPageState.content) {
           return const <Widget>[];
@@ -193,6 +195,12 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                       _pricingSummaryResult?.payload,
                     )
                   : null,
+              submittingFeedbackChoice: _submittingSincerityFeedbackChoice,
+              onFeedbackChoice: (String choice) =>
+                  _submitProjectAuthenticitySincerityFreezeFeedback(
+                    projectId,
+                    choice,
+                  ),
             ),
           ],
           const SizedBox(height: 16),
@@ -234,6 +242,88 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     );
   }
 
+  Widget? _buildBottomPublishCta(ExhibitionLoadResult result) {
+    if (result.state != AppPageState.content) {
+      return null;
+    }
+    final payload = _payloadMap(result.payload);
+    final publicProject = _payloadMap(payload?['publicProject']);
+    if (publicProject == null) {
+      return null;
+    }
+    final projectId =
+        _normalizeId(publicProject['projectId'] as String?) ??
+        _normalizeId(widget.projectId);
+    final state = _normalizeId(publicProject['state'] as String?);
+    final viewerProjectRelation = _normalizeId(
+      publicProject['viewerProjectRelation'] as String?,
+    );
+    final canSubmit =
+        projectId != null &&
+        viewerProjectRelation == 'owner' &&
+        _snapshot?.isDemo != true &&
+        _myProjectStageBucketFromState(state) ==
+            _MyProjectStageBucket.submitted &&
+        _myProjectCanPublish(state);
+    if (!canSubmit) {
+      return null;
+    }
+
+    final submitting =
+        _submittingLifecycleAction == _MyProjectLifecycleActionKind.publish;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.12),
+            blurRadius: 22,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _submittingLifecycleAction == null
+                    ? () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.publish,
+                        projectId: projectId,
+                      )
+                    : null,
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(48),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+                child: Text(submitting ? '发布中...' : '资料已补齐，提交发布'),
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '提交后按平台发布规则处理，结果以云端项目状态为准。',
+              textAlign: TextAlign.center,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSavedSummaryCard({
     required String? title,
     required String? projectNo,
@@ -270,13 +360,12 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             privateMap['formalCompletionStatus'] as String?,
           ),
         ),
-      ],
-      if (showContinueAttachmentAction) ...<Widget>[
-        const _DetailLine(
-          label: '报价依据资料',
-          value: '请补充五类报价依据资料，接单方会在竞标提交第二步查看。',
-          highlight: true,
-        ),
+        if (showContinueAttachmentAction)
+          const _DetailLine(
+            label: '报价依据资料',
+            value: '请补充五类报价依据资料，接单方会在竞标提交第二步查看。',
+            highlight: true,
+          ),
       ],
       const SizedBox(height: 8),
       Align(
@@ -295,7 +384,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                     ? Icons.expand_less_rounded
                     : Icons.expand_more_rounded,
               ),
-              label: Text(_summaryExpanded ? '收起项目基础信息' : '展开项目基础信息'),
+              label: Text(_summaryExpanded ? '收起全部信息' : '展开全部信息'),
             ),
             if (showContinueAttachmentAction)
               FilledButton(
@@ -308,7 +397,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     ];
 
     return _ActionCard(
-      title: '已保存的项目基础信息摘要',
+      title: '项目基础信息',
       tone: _ActionCardTone.emphasis,
       children: children,
     );
@@ -369,51 +458,55 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         );
       case _MyProjectStageBucket.submitted:
         children.add(
-          FilledButton(
-            onPressed: !canRunLifecycleActions || !_myProjectCanPublish(state)
-                ? null
-                : () => _runLifecycleAction(
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: <Widget>[
+              FilledButton(
+                onPressed:
+                    !canRunLifecycleActions || !_myProjectCanPublish(state)
+                    ? null
+                    : () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.publish,
+                        projectId: projectId,
+                      ),
+                child: Text(
+                  _buttonLabelForLifecycleAction(
                     _MyProjectLifecycleActionKind.publish,
-                    projectId: projectId,
                   ),
-            child: Text(
-              _buttonLabelForLifecycleAction(
-                _MyProjectLifecycleActionKind.publish,
+                ),
               ),
-            ),
-          ),
-        );
-        children.add(const SizedBox(height: 12));
-        children.add(
-          OutlinedButton(
-            onPressed: !canRunLifecycleActions || !_myProjectCanWithdraw(state)
-                ? null
-                : () => _runLifecycleAction(
+              OutlinedButton(
+                onPressed:
+                    !canRunLifecycleActions || !_myProjectCanWithdraw(state)
+                    ? null
+                    : () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.withdraw,
+                        projectId: projectId,
+                      ),
+                child: Text(
+                  _buttonLabelForLifecycleAction(
                     _MyProjectLifecycleActionKind.withdraw,
-                    projectId: projectId,
                   ),
-            child: Text(
-              _buttonLabelForLifecycleAction(
-                _MyProjectLifecycleActionKind.withdraw,
+                ),
               ),
-            ),
-          ),
-        );
-        children.add(const SizedBox(height: 12));
-        children.add(
-          OutlinedButton(
-            onPressed:
-                !canRunLifecycleActions || !_myProjectCanDiscardSubmitted(state)
-                ? null
-                : () => _runLifecycleAction(
+              OutlinedButton(
+                style: _dangerOutlinedButtonStyle(context),
+                onPressed:
+                    !canRunLifecycleActions ||
+                        !_myProjectCanDiscardSubmitted(state)
+                    ? null
+                    : () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.discardSubmitted,
+                        projectId: projectId,
+                      ),
+                child: Text(
+                  _buttonLabelForLifecycleAction(
                     _MyProjectLifecycleActionKind.discardSubmitted,
-                    projectId: projectId,
                   ),
-            child: Text(
-              _buttonLabelForLifecycleAction(
-                _MyProjectLifecycleActionKind.discardSubmitted,
+                ),
               ),
-            ),
+            ],
           ),
         );
       case _MyProjectStageBucket.published:
@@ -515,6 +608,14 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return _myProjectLifecycleActionOption(kind).loadingLabel;
     }
     return _myProjectLifecycleActionOption(kind).buttonLabel;
+  }
+
+  ButtonStyle _dangerOutlinedButtonStyle(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return OutlinedButton.styleFrom(
+      foregroundColor: colorScheme.error,
+      side: BorderSide(color: colorScheme.error.withValues(alpha: 0.55)),
+    );
   }
 
   Future<void> _runLifecycleAction(
@@ -671,7 +772,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     }
     final orderId = _projectAuthenticitySincerityOrderId(sourcePayload);
     if (orderId == null) {
-      _showPageMessage('云端暂未返回当前项目的诚意金订单编号，请先刷新状态，不要重复创建。');
+      _showPageMessage('暂未取得当前项目的诚意金订单编号，请先刷新状态，不要重复创建。');
       return false;
     }
 
@@ -704,8 +805,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
           _channelPayloadAlipayOrderString(initResult.payload) != null;
       _showPageMessage(
         hasAlipaySdkPayload
-            ? '支付宝 APP 支付参数已返回；当前运行环境暂不能拉起支付宝 SDK，请在 Android 真机验证。'
-            : '支付通道已创建，但云端暂未返回可打开的支付链接。正在刷新当前订单状态。',
+            ? '支付参数已返回；当前设备暂不能直接打开支付宝，请换用已支持环境或稍后重试。'
+            : '支付通道已创建，但暂未取得可打开的支付链接。正在刷新当前订单状态。',
       );
     }
 
@@ -733,10 +834,40 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       opened
           ? _projectAuthenticitySincerityPendingMessage(pollResult)
           : _channelPayloadAlipayOrderString(initResult.payload) != null
-          ? '当前运行环境不能直接拉起支付宝 APP 支付；诚意金仍未完成，请在 Android 真机或正式包继续验证。'
-          : '云端暂未返回可打开的支付链接；当前诚意金仍未完成，请刷新状态或稍后再试。',
+          ? '当前设备暂不能直接打开支付宝；诚意金仍未完成，请换用已支持环境或稍后重试。'
+          : '暂未取得可打开的支付链接；当前诚意金仍未完成，请刷新状态或稍后再试。',
     );
     return false;
+  }
+
+  Future<void> _submitProjectAuthenticitySincerityFreezeFeedback(
+    String projectId,
+    String choice,
+  ) async {
+    if (_submittingSincerityFeedbackChoice != null) {
+      return;
+    }
+    setState(() => _submittingSincerityFeedbackChoice = choice);
+    final result = await ExhibitionConsumerLayer.instance
+        .submitProjectAuthenticitySincerityFreezeFeedback(
+          projectId: projectId,
+          command: ProjectAuthenticitySincerityFreezeFeedbackCommand(
+            choice: choice,
+          ),
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _submittingSincerityFeedbackChoice = null);
+    if (!result.isSuccess) {
+      _showPageMessage(_userFacingActionFailureMessage(result));
+      return;
+    }
+    await _loadProjectPricingSummary(projectId, forceRefresh: true);
+    if (!mounted) {
+      return;
+    }
+    _showPageMessage('反馈已记录，仅用于内测统计。');
   }
 
   Future<bool> _openProjectPricingChannelPayload(Object? payload) async {
@@ -776,6 +907,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       'frozen' ||
       'succeeded' ||
       'satisfied' ||
+      'internal_test_no_freeze_required' ||
+      'internal_test_no_freeze_allowed' ||
       'not_required' => true,
       _ => false,
     };
@@ -875,7 +1008,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     if (status == null) {
       return '项目真实性诚意金状态暂不可用，请稍后刷新后再发布。';
     }
-    return '项目真实性诚意金尚未完成冻结，当前状态：$status。完成支付后再点击发布。';
+    return '项目真实性诚意金尚未完成支付，当前状态：$status。完成后再点击发布。';
   }
 
   Future<void> _openProjectEdit(String projectId) async {

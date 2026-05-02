@@ -493,15 +493,15 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('发布方选择合作方'));
+      await _scrollTo(tester, find.text('竞标候选与合作确认'));
       expect(find.text('重庆海川展览工厂'), findsOneWidget);
       await _scrollTo(tester, find.widgetWithText(OutlinedButton, '进入沟通'));
       expect(find.widgetWithText(OutlinedButton, '进入沟通'), findsOneWidget);
-      await _scrollTo(tester, find.widgetWithText(FilledButton, '选择为合作方'));
-      await tester.tap(find.widgetWithText(FilledButton, '选择为合作方'));
+      await _scrollTo(tester, find.widgetWithText(FilledButton, '确认合作并生成订单'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认合作并生成订单'));
       await tester.pumpAndSettle();
 
-      expect(find.text('确认选择合作方'), findsWidgets);
+      expect(find.text('确认合作并生成订单'), findsWidgets);
       await tester.tap(
         find.byKey(const ValueKey<String>('project_bid_select_submit')),
       );
@@ -512,11 +512,11 @@ void main() {
         'projectId': 'project-1',
         'winningBidId': 'bid-1',
         'reasonCode': 'publisher_selected_partner',
-        'reasonText': '发布方选择该竞标方作为当前项目合作方。',
+        'reasonText': '发布方确认与该竞标方继续合作，并进入订单与合同承接。',
       });
       expect(projectDetailRequestCount, 2);
       expect(myProjectListRequestCount, 1);
-      expect(find.text('合作方选择已受理'), findsOneWidget);
+      expect(find.text('合作确认已受理'), findsOneWidget);
       await _scrollTo(tester, find.text('完工处理'));
       expect(find.text('完工处理'), findsOneWidget);
       expect(find.text('订单状态：进行中'), findsWidgets);
@@ -577,9 +577,9 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollTo(tester, find.text('发布方选择合作方'));
-      await _scrollTo(tester, find.widgetWithText(FilledButton, '选择为合作方'));
-      await tester.tap(find.widgetWithText(FilledButton, '选择为合作方'));
+      await _scrollTo(tester, find.text('竞标候选与合作确认'));
+      await _scrollTo(tester, find.widgetWithText(FilledButton, '确认合作并生成订单'));
+      await tester.tap(find.widgetWithText(FilledButton, '确认合作并生成订单'));
       await tester.pumpAndSettle();
       await tester.tap(
         find.byKey(const ValueKey<String>('project_bid_select_submit')),
@@ -712,10 +712,10 @@ void main() {
       await tester.pump(const Duration(milliseconds: 100));
       await tester.pumpAndSettle();
       expect(find.text('竞标结果'), findsWidgets);
-      await _scrollTo(tester, find.textContaining('当前项目 ID：project-1'));
-      expect(find.textContaining('当前项目 ID：project-1'), findsWidgets);
-      await _scrollTo(tester, find.textContaining('当前竞标 ID：bid-1'));
-      expect(find.textContaining('当前竞标 ID：bid-1'), findsOneWidget);
+      await _scrollTo(tester, find.textContaining('当前项目：project-1'));
+      expect(find.textContaining('当前项目：project-1'), findsWidgets);
+      await _scrollTo(tester, find.textContaining('当前竞标：bid-1'));
+      expect(find.textContaining('当前竞标：bid-1'), findsOneWidget);
       await _scrollTo(tester, find.textContaining('原因编码：commercial_fit'));
       expect(find.textContaining('原因编码：commercial_fit'), findsOneWidget);
       await _scrollTo(tester, find.textContaining('原因说明：综合报价与交付能力最优'));

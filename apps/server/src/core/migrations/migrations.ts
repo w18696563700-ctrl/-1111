@@ -2456,6 +2456,31 @@ export const p0PayMigrations = [
        SET fee_rate_label = '专业会员 8折（作用于 baseFeeAmount）'
        WHERE fee_rate_label = '专业会员 2.0%'`
     ]
+  },
+  {
+    key: '20260606_project_authenticity_sincerity_internal_test_feedback',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_authenticity_sincerity_freeze_feedback (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        user_id varchar(64) NOT NULL,
+        organization_id varchar(64) NOT NULL DEFAULT '',
+        actor_role varchar(64) NOT NULL DEFAULT '',
+        choice varchar(32) NOT NULL,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_auth_sincerity_freeze_feedback_choice
+          CHECK (choice IN ('support_freeze', 'oppose_freeze'))
+      )`,
+      `CREATE INDEX IF NOT EXISTS idx_project_auth_sincerity_feedback_project
+       ON project_authenticity_sincerity_freeze_feedback (project_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_auth_sincerity_feedback_project_choice
+       ON project_authenticity_sincerity_freeze_feedback (project_id, choice)`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_auth_sincerity_feedback_user_project
+       ON project_authenticity_sincerity_freeze_feedback (project_id, user_id)`
+    ]
   }
 ];
 

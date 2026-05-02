@@ -211,6 +211,7 @@ Future<ProjectAttachmentPickSource?> _resolveProjectAttachmentPickSource({
       !_projectAttachmentKindSupportsPhotoSource(attachmentKind)) {
     return ProjectAttachmentPickSource.file;
   }
+  final attachmentLabel = _projectAttachmentKindLabel(attachmentKind);
 
   return showModalBottomSheet<ProjectAttachmentPickSource>(
     context: context,
@@ -225,14 +226,14 @@ Future<ProjectAttachmentPickSource?> _resolveProjectAttachmentPickSource({
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               Text(
-                '选择效果图来源',
+                '选择$attachmentLabel来源',
                 style: theme.textTheme.titleMedium?.copyWith(
                   fontWeight: FontWeight.w900,
                 ),
               ),
               const SizedBox(height: 6),
               Text(
-                '效果图可以是手机照片，也可以是 PDF、图纸或其他资料文件。',
+                '$attachmentLabel 可以从手机相册选择照片，也可以从文件中选择 PDF、图纸、文档或其他资料。',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: theme.colorScheme.onSurfaceVariant,
                   height: 1.4,
@@ -263,7 +264,14 @@ Future<ProjectAttachmentPickSource?> _resolveProjectAttachmentPickSource({
 }
 
 bool _projectAttachmentKindSupportsPhotoSource(String attachmentKind) {
-  return attachmentKind == _projectAttachmentKindEffectImage;
+  return switch (attachmentKind) {
+    _projectAttachmentKindEffectImage ||
+    _projectAttachmentKindConstructionDoc ||
+    _projectAttachmentKindMaterialSample ||
+    _projectAttachmentKindEquipmentMaterialList ||
+    _projectAttachmentKindServiceList => true,
+    _ => false,
+  };
 }
 
 _ResolvedProjectAttachmentDraft? _resolveProjectAttachmentDraft(
@@ -679,6 +687,13 @@ Future<bool> _openProjectAttachmentUrl(String accessUrl) async {
   }
 
   try {
+    final opened = await launchUrlString(
+      uri.toString(),
+      mode: LaunchMode.externalApplication,
+    );
+    if (opened) {
+      return true;
+    }
     if (Platform.isMacOS) {
       final result = await Process.run('open', <String>[uri.toString()]);
       return result.exitCode == 0;

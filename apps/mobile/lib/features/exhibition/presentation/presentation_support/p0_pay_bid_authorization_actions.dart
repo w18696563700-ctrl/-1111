@@ -16,7 +16,7 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
               : ExhibitionCanonicalPaths.p0PayFixedPriceBids(taskId),
           isSuccess: false,
           controlledState: AppPageState.errorNonRetryable,
-          message: blocker ?? '当前没有可用于明价竞标单的交易任务 ID。',
+          message: blocker ?? '当前没有可用于竞标承接的记录。',
         );
       });
       return;
@@ -80,8 +80,8 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
               isSuccess: false,
               controlledState: AppPageState.errorNonRetryable,
               message: bidId == null
-                  ? 'BFF 未返回 bidId，无法创建平台服务费预授权订单。'
-                  : 'BFF 未返回完整 platformServiceFeeRequirement，Flutter 不本地计算预计服务费。',
+                  ? '暂未取得竞标记录，无法创建竞标服务费预授权记录。'
+                  : '暂未取得完整服务费规则，无法回读平台规则说明。',
             );
           }
           _p0PaySubmitting = false;
@@ -160,7 +160,7 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
       const SizedBox(height: 12),
       if (bidResult != null)
         _DetailLine(
-          label: '明价竞标报价',
+          label: '竞标报价',
           value: bidResult.isSuccess
               ? '已提交：${_bidIdFromPayload(bidResult.payload) ?? '待回读'}'
               : bidResult.message ?? '提交失败',
@@ -168,13 +168,13 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
         ),
       if (bidResult?.isSuccess == true)
         _DetailLine(
-          label: 'BFF 预计服务费',
+          label: '平台规则说明',
           value: _p0PayServiceFeeRequirementSummary(bidResult!.payload),
           highlight: true,
         ),
       if (authorizationResult != null)
         _DetailLine(
-          label: '平台服务费预授权订单',
+          label: '竞标服务费预授权记录',
           value: authorizationResult.isSuccess
               ? '已创建：${_authorizationIdFromPayload(authorizationResult.payload) ?? '待回读'}'
               : authorizationResult.message ?? '创建失败',
@@ -262,7 +262,7 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
       return _accessGuard!.message;
     }
     if (_p0PayTaskIdForFixedPriceBid == null) {
-      return '当前没有可用于明价竞标单的交易任务 ID。';
+      return '当前没有可用于竞标承接的记录。';
     }
     if (double.tryParse(_quoteAmountController.text.trim()) == null) {
       return '请先填写有效的竞标报价。';

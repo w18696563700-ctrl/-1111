@@ -87,6 +87,16 @@ extension ExhibitionP0PayConsumerActions on ExhibitionConsumerLayer {
     );
   }
 
+  Future<ExhibitionActionResult> submitProjectAuthenticitySincerityFreezeFeedback({
+    required String projectId,
+    required ProjectAuthenticitySincerityFreezeFeedbackCommand command,
+  }) {
+    return _actionService.submitProjectAuthenticitySincerityFreezeFeedback(
+      projectId: projectId,
+      command: command,
+    );
+  }
+
   Future<ExhibitionLoadResult> loadProjectAuthenticitySincerityOrderStatus({
     required String projectId,
     required String orderId,
@@ -326,6 +336,16 @@ extension _ExhibitionP0PayActionService on _ExhibitionActionService {
         projectId,
         orderId,
       ),
+      body: command.toJson(),
+    );
+  }
+
+  Future<ExhibitionActionResult> submitProjectAuthenticitySincerityFreezeFeedback({
+    required String projectId,
+    required ProjectAuthenticitySincerityFreezeFeedbackCommand command,
+  }) {
+    return _submitProtected(
+      ExhibitionCanonicalPaths.projectAuthenticitySincerityFreezeFeedback(projectId),
       body: command.toJson(),
     );
   }

@@ -1030,13 +1030,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     final isInquiry = _p0PayTaskType == _projectQuoteIntentionInquiry;
 
     return _ActionCard(
-      title: 'P0-Pay 交易任务',
-      summary: '当前只创建展览交易任务和订单级支付/预授权 handoff，不做钱包、余额、保证金或资金池。',
+      title: '发布收费承接',
+      summary: '当前入口仅保留为历史兼容承接；普通项目发布请按预发布流程补资料，并完成项目真实性诚意金。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
         const _StateMessage(
-          title: '发布类型与真实性入口',
-          body: '展开后选择明价竞标单或询价报价单，补充真实性材料 FileAsset ID，并按询价报价单规则拉起 200 元发单诚意金。',
+          title: '真实性资料与费用',
+          body: '展开后补充项目真实性资料，并按平台规则继续处理当前项目的 200 元项目真实性诚意金。',
         ),
         ExpansionTile(
           initiallyExpanded:
@@ -1046,18 +1046,18 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               _p0PayDepositStatusResult != null,
           tilePadding: EdgeInsets.zero,
           childrenPadding: EdgeInsets.zero,
-          title: const Text('展开 P0-Pay 发布承接'),
+          title: const Text('展开发布收费承接'),
           children: <Widget>[
             SegmentedButton<String>(
               segments: const <ButtonSegment<String>>[
                 ButtonSegment<String>(
                   value: _projectQuoteIntentionFixedPrice,
-                  label: Text('明价竞标单'),
+                  label: Text('公开竞标'),
                   icon: Icon(Icons.gavel_outlined),
                 ),
                 ButtonSegment<String>(
                   value: _projectQuoteIntentionInquiry,
-                  label: Text('询价报价单'),
+                  label: Text('报价咨询'),
                   icon: Icon(Icons.request_quote_outlined),
                 ),
               ],
@@ -1072,9 +1072,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               inputKey: const ValueKey<String>(
                 'p0-pay-authenticity-material-ids',
               ),
-              label: '真实性材料 FileAsset ID',
+              label: '真实性材料编号',
               hintText: '例如：file-1,file-2',
-              helperText: '只填写已 confirmed 的 FileAsset ID；objectKey 不作为真实性材料真相。',
+              helperText: '只填写已完成上传的资料编号，不填写存储路径。',
               maxLines: 2,
               onChanged: (_) => setState(() {}),
             ),
@@ -1090,7 +1090,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               controller: _p0PayContactIdController,
               inputKey: const ValueKey<String>('p0-pay-contact-id'),
               label: '联系人 ID',
-              helperText: '当前只作为 BFF/Server 业务锚点透传，Flutter 不持有联系人真相。',
+              helperText: '用于项目发布后的联系承接，不在本页展示联系人详情。',
               onChanged: (_) => setState(() {}),
             ),
             const SizedBox(height: 8),
@@ -1127,9 +1127,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
             if (isInquiry) ...<Widget>[
               const SizedBox(height: 12),
               const _StateMessage(
-                title: '发单诚意金',
+                title: '项目真实性诚意金',
                 body:
-                    '询价报价单需支付 200 元发单诚意金，用于约束发布方完成结果处理；合规选择、关闭说明或合理取消后退回。逾期不处理、恶意询价、虚假发布或绕单成立时，可按规则扣除并记录信用影响。',
+                    '这 200 元为当前项目的项目真实性诚意金，不是押金、罚款或平台服务费。项目成交成立或合规正式撤回后，将按平台记录进入原路退回流程。',
               ),
             ],
             const SizedBox(height: 12),
@@ -1143,12 +1143,12 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
                   : const Icon(Icons.send_outlined),
-              label: Text(isInquiry ? '创建询价报价单并拉起发单诚意金' : '创建明价竞标单'),
+              label: Text(isInquiry ? '创建报价咨询并继续诚意金' : '创建公开竞标'),
             ),
             if (!canSubmit && !_p0PaySubmitting) ...<Widget>[
               const SizedBox(height: 8),
               _StateMessage(
-                title: 'P0-Pay 提交条件未完成',
+                title: '提交条件未完成',
                 body:
                     _p0PayTradeTaskBlockerMessage() ?? '请先补齐真实性材料，并勾选全部真实性声明。',
               ),
@@ -1192,7 +1192,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       const SizedBox(height: 12),
       if (taskResult != null)
         _DetailLine(
-          label: '交易任务',
+          label: '项目承接记录',
           value: taskResult.isSuccess
               ? '已创建：${_taskIdFromPayload(taskResult.payload) ?? '待回读'}'
               : taskResult.message ?? '创建失败',
@@ -1200,7 +1200,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         ),
       if (depositResult != null)
         _DetailLine(
-          label: '发单诚意金订单',
+          label: '项目真实性诚意金订单',
           value: depositResult.isSuccess
               ? '已创建：${_depositOrderIdFromPayload(depositResult.payload) ?? '待回读'}'
               : depositResult.message ?? '创建失败',
@@ -1273,7 +1273,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       return '请先选择项目所在省 / 市。';
     }
     if (_parseAreaSqmInput(_areaSqmController.text.trim()) == null) {
-      return 'P0-Pay 交易任务需要填写项目面积。';
+      return '当前项目需要填写项目面积。';
     }
     if (double.tryParse(_budgetAmountController.text.trim()) == null) {
       return '请先填写有效预算金额。';
@@ -1291,7 +1291,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       return '请先填写联系人 ID。';
     }
     if (_p0PayMaterialFileAssetIds().isEmpty) {
-      return '请先填写至少一个已 confirmed 的真实性材料 FileAsset ID。';
+      return '请先填写至少一个真实性材料编号。';
     }
     if (!_p0PayDeclarationsCompleted) {
       return '请先勾选全部真实性声明。';

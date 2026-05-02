@@ -149,6 +149,18 @@ class ProjectPricingPayInitCommand {
   };
 }
 
+class ProjectAuthenticitySincerityFreezeFeedbackCommand {
+  const ProjectAuthenticitySincerityFreezeFeedbackCommand({
+    required this.choice,
+  });
+
+  final String choice;
+
+  Map<String, Object?> toJson() => <String, Object?>{
+    'choice': choice,
+  };
+}
+
 class ProjectAuthenticitySincerityRefundCommand {
   ProjectAuthenticitySincerityRefundCommand({
     this.refundReasonCode = 'project_publish_cancelled',

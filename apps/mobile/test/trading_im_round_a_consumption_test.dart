@@ -349,7 +349,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(FilledButton, '继续提交竞标'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
     expect(find.text('先参与竞标'), findsNothing);
     expect(find.text('项目沟通'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '项目澄清'), findsNothing);

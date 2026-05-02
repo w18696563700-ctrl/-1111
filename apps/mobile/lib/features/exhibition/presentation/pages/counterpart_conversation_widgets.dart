@@ -274,7 +274,7 @@ class _ProjectConversationHeaderCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   const _ConversationPill(
-                    label: '投标沟通中',
+                    label: '竞标沟通中',
                     foregroundColor: Color(0xFF2E6F43),
                     backgroundColor: Color(0xFFE7F5EA),
                   ),
@@ -285,7 +285,7 @@ class _ProjectConversationHeaderCard extends StatelessWidget {
             Expanded(
               child: _ConversationPartyBlock(
                 name: bidderName,
-                roleLabel: '投标方',
+                roleLabel: '竞标方',
                 avatarUrl: bidderAvatar,
                 badgeColor: const Color(0xFFE7F5EA),
                 badgeTextColor: const Color(0xFF2E6F43),
@@ -689,8 +689,8 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
             const SizedBox(height: 6),
             Text(
               maskedTitle
-                  ? '进入后可处理参与竞标申请，并继续项目聊天、订单入口和项目相册。'
-                  : '进入后可继续项目聊天、订单入口和项目相册。',
+                  ? '进入后可处理参与竞标申请，并继续项目聊天、后续承接入口和项目相册。'
+                  : '进入后可继续项目聊天、后续承接入口和项目相册。',
               style: theme.textTheme.bodyMedium?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
                 height: 1.35,
@@ -850,7 +850,7 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
             Expanded(
               child: _ProjectBusinessEntryButton(
                 icon: Icons.receipt_long_outlined,
-                label: '订单状态',
+                label: '后续承接状态',
                 enabled: orderId != null,
                 disabledMessage: '',
                 onPressed: orderId == null ? null : onOpenOrder,
@@ -871,7 +871,7 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
         if (orderId == null) ...<Widget>[
           const SizedBox(height: 8),
           Text(
-            '当前项目暂无订单状态入口。',
+            '当前项目暂无后续承接入口。',
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),

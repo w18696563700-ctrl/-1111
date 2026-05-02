@@ -1138,7 +1138,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.textContaining('预发布补齐资料并发布页', findRichText: true),
+      find.textContaining('预发布补资料并发布页', findRichText: true),
       findsOneWidget,
     );
     await _scrollTo(tester, find.text('当前阶段动作'));
@@ -1169,13 +1169,14 @@ void main() {
     expect(find.textContaining('已发布页', findRichText: true), findsOneWidget);
     expect(find.text('项目沟通'), findsNothing);
     expect(find.text('项目澄清'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '展开项目基础信息'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '展开全部信息'), findsOneWidget);
     expect(find.textContaining('正式完结补充'), findsNothing);
-    expect(find.textContaining('请补充五类报价依据资料'), findsOneWidget);
-    await tester.tap(find.widgetWithText(OutlinedButton, '展开项目基础信息'));
+    expect(find.textContaining('请补充五类报价依据资料'), findsNothing);
+    await tester.tap(find.widgetWithText(OutlinedButton, '展开全部信息'));
     await tester.pumpAndSettle();
-    expect(find.widgetWithText(OutlinedButton, '收起项目基础信息'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '收起全部信息'), findsOneWidget);
     expect(find.textContaining('正式完结补充'), findsOneWidget);
+    expect(find.textContaining('请补充五类报价依据资料'), findsOneWidget);
     await _scrollTo(tester, find.text('当前阶段动作'));
     expect(find.text('当前阶段动作'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '补充报价依据资料'), findsOneWidget);
@@ -1239,6 +1240,7 @@ void main() {
 
     expect(find.text('已撤回到草稿'), findsOneWidget);
     expect(projectStates['project-withdraw-flow'], 'draft');
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续编辑'));
     expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '删除此项目'), findsOneWidget);
   });
@@ -1348,7 +1350,7 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('云端暂未返回可打开的支付链接'), findsOneWidget);
+    expect(find.textContaining('暂未取得可打开的支付链接'), findsOneWidget);
     expect(projectStates['project-sincerity-pending'], 'submitted');
     expect(
       pricingCalls,
@@ -1396,10 +1398,7 @@ void main() {
     );
     expect(find.text('发布进度'), findsOneWidget);
     expect(find.text('项目真实性诚意金', skipOffstage: false), findsWidgets);
-    expect(
-      find.textContaining('不是押金、罚款或平台服务费', skipOffstage: false),
-      findsOneWidget,
-    );
+    expect(find.text('查看诚意金规则说明', skipOffstage: false), findsOneWidget);
     await _scrollTo(tester, find.widgetWithText(FilledButton, '继续支付诚意金'));
     expect(find.widgetWithText(FilledButton, '继续支付诚意金'), findsOneWidget);
 

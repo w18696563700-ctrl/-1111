@@ -194,7 +194,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
       return '发布方';
     }
     if (senderOrganizationId == thread.counterpartOrganizationId) {
-      return '投标方';
+      return '竞标方';
     }
     return _isMine(senderOrganizationId) ? '我方' : '对方';
   }
