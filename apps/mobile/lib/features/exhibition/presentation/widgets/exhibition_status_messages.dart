@@ -74,7 +74,8 @@ String _frontStageSuccessMessage({required String path}) {
     ExhibitionCanonicalPaths.projectClose => '项目已经下架关闭，后续只保留归档查看入口。',
     ExhibitionCanonicalPaths.projectWithdrawPublished =>
       '项目已经撤回到预发布列表，并退出公域展示。',
-    ExhibitionCanonicalPaths.projectDiscardSubmitted => '项目已经作废删除，后续只保留归档查看入口。',
+    ExhibitionCanonicalPaths.projectDiscardSubmitted =>
+      '项目已经作废并归档，后续只保留归档查看入口。',
     ExhibitionCanonicalPaths.projectCancellationRequest => '取消申请已受理，等待对方确认。',
     ExhibitionCanonicalPaths.projectCancellationRespond => '取消响应已受理。',
     ExhibitionCanonicalPaths.projectPublisherBreachRecord ||
@@ -292,7 +293,7 @@ String? _controlledBusinessFailureMessage({
     'PROJECT_CLOSE_INVALID' => '当前项目状态暂不支持下架关闭。',
     'PROJECT_EXIT_INVALID_STATE' => '当前项目状态暂不支持这个退出动作。',
     'PROJECT_WITHDRAW_PUBLISHED_INVALID' => '竞标中撤回参数无效，请检查后再试。',
-    'PROJECT_SUBMITTED_DISCARD_INVALID' => '预发布作废删除参数无效，请检查后再试。',
+    'PROJECT_SUBMITTED_DISCARD_INVALID' => '预发布作废归档参数无效，请检查后再试。',
     'PROJECT_CANCELLATION_REQUEST_INVALID' => '取消申请参数无效，请检查后再试。',
     'PROJECT_CANCELLATION_RESPONSE_INVALID' => '取消响应参数无效，请检查后再试。',
     'PROJECT_BREACH_RECORD_INVALID' => '违约记录参数无效，请检查后再试。',

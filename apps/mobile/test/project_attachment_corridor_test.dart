@@ -304,14 +304,22 @@ void main() {
         sortOrder: 2,
       ),
     ];
-    Uri? openedUri;
+    String? downloadedAccessUrl;
+    ProjectPublicResourceDownloadedFile? downloadedResourceFile;
     Uri? openedAttachmentUri;
     Uri? loadedImageUri;
-    ProjectPublicResourceDebugOverrides.installExternalUrlOpener((
-      Uri uri,
+    ProjectPublicResourceDebugOverrides.installLocalDownloader((
+      ProjectPublicResourceFileAccessReadModel access,
+      ProjectPublicResourceReadModel resource,
     ) async {
-      openedUri = uri;
-      return true;
+      downloadedAccessUrl = access.accessUrl;
+      downloadedResourceFile = ProjectPublicResourceDownloadedFile(
+        path: '/tmp/${access.fileName ?? resource.fileName}',
+        fileName: access.fileName ?? resource.fileName,
+        mimeType: access.mimeType ?? resource.mimeType,
+        sizeBytes: access.contentLengthBytes ?? 1024,
+      );
+      return downloadedResourceFile;
     });
     ProjectAttachmentDebugOverrides.installExternalUrlOpener((Uri uri) async {
       openedAttachmentUri = uri;
@@ -358,6 +366,10 @@ void main() {
           final mode = request.uri.queryParameters['mode'];
           if (fileAssetId == 'file-resource-contract-1') {
             expect(mode, 'download');
+            expect(
+              request.uri.queryParameters['accessScope'],
+              'public_resource',
+            );
             return AppApiResponse(
               statusCode: 200,
               uri: request.uri,
@@ -539,17 +551,19 @@ void main() {
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
     expect(find.text('可下载平台共享模板与公共资料。'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '合同模板'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '流程图与说明'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '公共资料'), findsOneWidget);
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '合同模板'));
+    expect(find.widgetWithText(ChoiceChip, '合同模板 · 1'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '流程图与说明 · 1'), findsOneWidget);
+    expect(find.widgetWithText(ChoiceChip, '公共资料 · 1'), findsOneWidget);
+    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '合同模板 · 1'));
     expect(find.text('标准合同模板'), findsOneWidget);
     await _tapVisible(tester, find.widgetWithText(FilledButton, '下载资料'));
-    expect(find.text('已开始下载资料。'), findsOneWidget);
+    expect(find.text('资料已下载到 App 本地。'), findsOneWidget);
+    expect(find.text('下载完成'), findsOneWidget);
     expect(
-      openedUri?.toString(),
+      downloadedAccessUrl,
       'https://files.example.com/public-resource-contract-1.pdf',
     );
+    expect(downloadedResourceFile?.fileName, 'standard-contract-template.pdf');
   });
 
   testWidgets('project attachment accepts full-format zip for service list', (

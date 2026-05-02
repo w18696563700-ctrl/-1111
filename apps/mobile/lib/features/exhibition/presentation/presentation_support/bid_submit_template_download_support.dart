@@ -65,13 +65,26 @@ class _BidSubmitTemplateDownloadSectionState
       return;
     }
 
-    final opened = await _openProjectPublicResourceUrl(access.accessUrl);
+    final downloaded = await _downloadProjectPublicResourceFile(
+      access: access,
+      resource: resource,
+    );
     if (!mounted) {
       return;
     }
 
     setState(() => _downloadingResourceId = null);
-    _showMessage(opened ? '已开始下载资料。' : '下载链接已生成，但当前设备未能直接打开，请稍后重试。');
+    if (downloaded == null) {
+      _showMessage('资料文件暂不可下载，请稍后重试。');
+      return;
+    }
+
+    _showMessage('资料已下载到 App 本地。');
+    await _showProjectPublicResourceDownloadedSheet(
+      context: context,
+      file: downloaded,
+      onMessage: _showMessage,
+    );
   }
 
   void _showMessage(String message) {

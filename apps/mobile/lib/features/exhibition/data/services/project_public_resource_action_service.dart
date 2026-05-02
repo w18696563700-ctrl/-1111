@@ -22,6 +22,7 @@ extension _ProjectPublicResourceActionService on _ExhibitionActionService {
           queryParameters: <String, String>{
             'fileAssetId': normalizedFileAssetId,
             'mode': 'download',
+            'accessScope': 'public_resource',
           },
         ),
       );

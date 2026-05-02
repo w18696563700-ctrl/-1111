@@ -504,7 +504,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     return _ActionCard(
       title: '当前阶段动作',
       summary: stage.value == _MyProjectStageBucket.submitted
-          ? '先补资料后确认发布；返回草稿和作废删除继续使用受控动作。'
+          ? '先补资料后确认发布；返回草稿和作废并归档继续使用受控动作。'
           : '动作区严格跟随当前阶段，不再混放跨阶段入口。',
       children: children,
     );

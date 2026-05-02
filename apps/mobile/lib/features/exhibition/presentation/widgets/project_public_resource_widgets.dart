@@ -73,13 +73,26 @@ class _ProjectPublicResourceSectionState
       return;
     }
 
-    final opened = await _openProjectPublicResourceUrl(access.accessUrl);
+    final downloaded = await _downloadProjectPublicResourceFile(
+      access: access,
+      resource: resource,
+    );
     if (!mounted) {
       return;
     }
 
     setState(() => _downloadingResourceId = null);
-    widget.onMessage(opened ? '已开始下载资料。' : '下载链接已生成，但当前设备未能直接打开，请稍后重试。');
+    if (downloaded == null) {
+      widget.onMessage('资料文件暂不可下载，请稍后重试。');
+      return;
+    }
+
+    widget.onMessage('资料已下载到 App 本地。');
+    await _showProjectPublicResourceDownloadedSheet(
+      context: context,
+      file: downloaded,
+      onMessage: widget.onMessage,
+    );
   }
 
   @override
@@ -95,6 +108,7 @@ class _ProjectPublicResourceSectionState
               item.resourceCategory == _selectedCategory,
         )
         .toList(growable: false);
+    final categoryCounts = _projectPublicResourceCategoryCounts(allResources);
     final selectedOption = _projectPublicResourceCategoryOptions.firstWhere(
       (_ProjectPublicResourceCategoryOption item) =>
           item.value == _selectedCategory,
@@ -107,6 +121,7 @@ class _ProjectPublicResourceSectionState
       children: <Widget>[
         _ProjectPublicResourceCategoryPicker(
           selectedValue: _selectedCategory,
+          categoryCounts: categoryCounts,
           onChanged: (String value) {
             setState(() => _selectedCategory = value);
           },
@@ -130,10 +145,12 @@ class _ProjectPublicResourceSectionState
 class _ProjectPublicResourceCategoryPicker extends StatelessWidget {
   const _ProjectPublicResourceCategoryPicker({
     required this.selectedValue,
+    required this.categoryCounts,
     required this.onChanged,
   });
 
   final String selectedValue;
+  final Map<String, int> categoryCounts;
   final ValueChanged<String> onChanged;
 
   @override
@@ -155,7 +172,7 @@ class _ProjectPublicResourceCategoryPicker extends StatelessWidget {
             _ProjectPublicResourceCategoryOption item,
           ) {
             return ChoiceChip(
-              label: Text(item.label),
+              label: Text('${item.label} · ${categoryCounts[item.value] ?? 0}'),
               selected: item.value == selectedValue,
               onSelected: (_) => onChanged(item.value),
             );
@@ -246,8 +263,8 @@ class _ProjectPublicResourceListPanel extends StatelessWidget {
 
     if (resources.isEmpty) {
       return const _EmptyNotice(
-        title: '当前分类暂无资料',
-        message: '可以切换到其他分类，继续查看可下载的共享资料。',
+        title: '当前暂无该类资料',
+        message: '可以切换到其他分类，继续查看平台共享资料。',
       );
     }
 
@@ -312,26 +329,11 @@ class _ProjectPublicResourceRecordCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             _DetailLine(
-              label: '资料分类',
-              value: _projectPublicResourceCategoryLabel(
-                resource.resourceCategory,
-              ),
-              highlight: true,
-            ),
-            _DetailLine(
-              label: '摘要说明',
-              value: resource.summary ?? '当前资料未提供摘要说明。',
-            ),
-            _DetailLine(label: '文件名称', value: resource.fileName),
-            _DetailLine(
               label: '文件类型',
               value: _projectAttachmentMimeTypeLabel(resource.mimeType),
+              highlight: true,
             ),
-            _DetailLine(
-              label: '可见范围',
-              value: _projectPublicResourceVisibilityLabel(resource.visibility),
-            ),
-            _DetailLine(label: '排序序号', value: '${resource.sortOrder}'),
+            const _DetailLine(label: '文件大小', value: '下载后确认'),
             _DetailLine(
               label: '发布时间',
               value: _projectAttachmentTimestampLabel(resource.publishedAt),
@@ -350,6 +352,38 @@ class _ProjectPublicResourceRecordCard extends StatelessWidget {
                     : const Icon(Icons.download_rounded),
                 label: Text(downloading ? '下载中...' : '下载资料'),
               ),
+            ),
+            const SizedBox(height: 6),
+            ExpansionTile(
+              tilePadding: EdgeInsets.zero,
+              childrenPadding: EdgeInsets.zero,
+              title: Text(
+                '更多信息',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              children: <Widget>[
+                _DetailLine(
+                  label: '资料分类',
+                  value: _projectPublicResourceCategoryLabel(
+                    resource.resourceCategory,
+                  ),
+                ),
+                _DetailLine(
+                  label: '摘要说明',
+                  value: resource.summary ?? '当前资料未提供摘要说明。',
+                ),
+                _DetailLine(label: '文件名称', value: resource.fileName),
+                _DetailLine(
+                  label: '可见范围',
+                  value: _projectPublicResourceVisibilityLabel(
+                    resource.visibility,
+                  ),
+                ),
+                _DetailLine(label: '排序序号', value: '${resource.sortOrder}'),
+              ],
             ),
           ],
         ),

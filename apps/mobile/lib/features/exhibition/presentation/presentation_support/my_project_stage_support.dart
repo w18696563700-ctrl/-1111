@@ -120,7 +120,7 @@ const List<_MyProjectStageOption> _myProjectPrimaryStageOptions =
         value: _MyProjectStageBucket.submitted,
         label: '预发布列表',
         description: '项目已经进入发布前核对阶段，当前应先补充报价依据资料，再检查无误并正式发布。',
-        cardNextStep: '查看详情 / 先补资料后确认发布 / 返回草稿继续编辑 / 作废删除',
+        cardNextStep: '补资料后确认发布 / 返回草稿继续编辑 / 作废并归档',
         detailNextStep: '当前应先补充报价依据资料，再检查无误并正式发布。',
         emptyTitle: '当前没有预发布项目',
         emptyMessage: '还没有进入预发布列表的项目。',
@@ -183,24 +183,25 @@ const _MyProjectLifecycleActionOption _withdrawLifecycleAction =
 const _MyProjectLifecycleActionOption _discardSubmittedLifecycleAction =
     _MyProjectLifecycleActionOption(
       kind: _MyProjectLifecycleActionKind.discardSubmitted,
-      buttonLabel: '作废删除',
-      confirmTitle: '作废删除预发布项目',
+      buttonLabel: '作废并归档',
+      confirmTitle: '作废并归档预发布项目',
       confirmMessage: '预发布项目不会被硬删除，确认后会作废归档并退出当前活跃流转；历史记录和附件审计仍由后端保留。',
-      confirmLabel: '确认作废',
-      successMessage: '已作废删除',
+      confirmLabel: '确认作废并归档',
+      successMessage: '已作废并归档',
       loadingLabel: '作废中...',
     );
 
-const _MyProjectLifecycleActionOption _withdrawPublishedLifecycleAction =
-    _MyProjectLifecycleActionOption(
-      kind: _MyProjectLifecycleActionKind.withdrawPublished,
-      buttonLabel: '撤回到预发布',
-      confirmTitle: '撤回到预发布',
-      confirmMessage: '确认后，项目会下架公域展示并回到预发布列表；已产生的竞标记录保留为历史，不会自动扣钱。',
-      confirmLabel: '确认撤回',
-      successMessage: '已撤回到预发布',
-      loadingLabel: '撤回中...',
-    );
+const _MyProjectLifecycleActionOption
+_withdrawPublishedLifecycleAction = _MyProjectLifecycleActionOption(
+  kind: _MyProjectLifecycleActionKind.withdrawPublished,
+  buttonLabel: '撤回到预发布',
+  confirmTitle: '撤回到预发布',
+  confirmMessage:
+      '确认后，项目会下架公域展示并回到预发布列表；已产生的竞标记录保留为历史。该动作可能影响竞标方判断，后续按平台信用规则可能产生信用分扣减；本轮仅提示风险，不在前端伪造扣分。',
+  confirmLabel: '确认撤回',
+  successMessage: '已撤回到预发布',
+  loadingLabel: '撤回中...',
+);
 
 const _MyProjectLifecycleActionOption _requestCancellationLifecycleAction =
     _MyProjectLifecycleActionOption(

@@ -10,6 +10,7 @@ import { CurrentActorEligibilityService } from '../organization/current-actor-el
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ProjectAttachmentEntity } from './entities/project-attachment.entity';
+import { ProjectPublicResourceEntity } from './entities/project-public-resource.entity';
 import { ProjectEntity } from './entities/project.entity';
 import {
   fileAccessInvalid,
@@ -19,19 +20,38 @@ import {
 } from './project-attachment-file-access.errors';
 
 type FileAccessMode = 'preview' | 'download';
-type FileAccessScope = 'owner_private' | 'bid_material';
+type FileAccessScope = 'owner_private' | 'bid_material' | 'public_resource';
 
 const OWNER_PRIVATE_VISIBILITY = 'owner_private';
+const APP_SHARED_VISIBILITY = 'app_shared';
+const PUBLIC_RESOURCE_SCOPE = 'public_resource';
 const PROJECT_UPLOAD_BUSINESS_TYPE = 'project';
 const PROJECT_UPLOAD_FILE_KIND = 'project_attachment';
 const FILE_ACCESS_MODES = new Set<FileAccessMode>(['preview', 'download']);
-const FILE_ACCESS_SCOPES = new Set<FileAccessScope>(['owner_private', 'bid_material']);
+const FILE_ACCESS_SCOPES = new Set<FileAccessScope>([
+  'owner_private',
+  'bid_material',
+  PUBLIC_RESOURCE_SCOPE
+]);
 const BID_MATERIAL_ATTACHMENT_KINDS = new Set([
   'effect_image',
   'construction_doc',
   'material_sample',
   'equipment_material_list',
   'service_list'
+]);
+const PUBLIC_RESOURCE_CATEGORIES = new Set([
+  'contract_template',
+  'process_guide',
+  'other_resource'
+]);
+const PUBLIC_RESOURCE_ALLOWED_MIME_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'application/pdf',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
 ]);
 
 @Injectable()
@@ -43,6 +63,8 @@ export class ProjectAttachmentFileAccessService {
     private readonly attachmentRepository: Repository<ProjectAttachmentEntity>,
     @InjectRepository(ProjectEntity)
     private readonly projectRepository: Repository<ProjectEntity>,
+    @InjectRepository(ProjectPublicResourceEntity)
+    private readonly publicResourceRepository: Repository<ProjectPublicResourceEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly publicUrlService: UploadPublicUrlService,
@@ -53,6 +75,7 @@ export class ProjectAttachmentFileAccessService {
   async getAccess(query: Record<string, unknown>, context: RequestContext) {
     const fileAssetId = this.readRequiredString(query.fileAssetId, 'fileAssetId');
     const mode = this.readMode(query.mode);
+    const hasExplicitAccessScope = this.hasExplicitAccessScope(query.accessScope);
     const accessScope = this.readAccessScope(query.accessScope);
     const requestedProjectId = this.readOptionalString(query.projectId);
     const currentSession = await requireVerifiedCurrentSessionContext(
@@ -64,8 +87,23 @@ export class ProjectAttachmentFileAccessService {
     if (!fileAsset) {
       throw fileAccessNotFound('Current FileAsset is unavailable for file access.');
     }
+
+    if (accessScope === PUBLIC_RESOURCE_SCOPE) {
+      return this.getPublicResourceAccess(fileAsset, mode, currentSession);
+    }
+
     const attachment = await this.attachmentRepository.findOneBy({ fileAssetId: fileAsset.id });
     if (!attachment || this.normalizeText(attachment.visibility) !== OWNER_PRIVATE_VISIBILITY) {
+      if (!hasExplicitAccessScope) {
+        const publicResourceAccess = await this.tryGetPublicResourceAccess(
+          fileAsset,
+          mode,
+          currentSession
+        );
+        if (publicResourceAccess) {
+          return publicResourceAccess;
+        }
+      }
       throw fileAccessNotFound('Current project attachment binding is unavailable for file access.');
     }
     const project = await this.projectRepository.findOneBy({ id: attachment.projectId });
@@ -97,6 +135,66 @@ export class ProjectAttachmentFileAccessService {
       expiresAt: this.buildExpiresAt(),
       contentLengthBytes: fileAsset.size
     };
+  }
+
+  private async getPublicResourceAccess(
+    fileAsset: FileAssetEntity,
+    mode: FileAccessMode,
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>
+  ) {
+    const result = await this.tryGetPublicResourceAccess(fileAsset, mode, currentSession);
+    if (!result) {
+      throw fileAccessNotFound('Current public resource binding is unavailable for file access.');
+    }
+    return result;
+  }
+
+  private async tryGetPublicResourceAccess(
+    fileAsset: FileAssetEntity,
+    mode: FileAccessMode,
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>
+  ) {
+    if (mode !== 'download') {
+      throw fileAccessInvalid('public_resource access only supports download mode.');
+    }
+
+    const publicResource = await this.publicResourceRepository.findOneBy({
+      fileAssetId: fileAsset.id
+    });
+    if (!publicResource || !this.isReadablePublicResource(publicResource, fileAsset)) {
+      return null;
+    }
+
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
+    if (!accessUrl) {
+      throw fileAccessUnavailable('Current public resource access URL is unavailable.');
+    }
+
+    return {
+      fileAssetId: fileAsset.id,
+      mode,
+      accessUrl,
+      fileName: publicResource.fileName,
+      mimeType: this.normalizeMimeType(fileAsset.mimeType),
+      expiresAt: this.buildExpiresAt(),
+      contentLengthBytes: fileAsset.size
+    };
+  }
+
+  private isReadablePublicResource(
+    resource: ProjectPublicResourceEntity,
+    fileAsset: FileAssetEntity
+  ) {
+    const resourceMimeType = this.normalizeMimeType(resource.mimeType);
+    return (
+      this.normalizeText(resource.visibility) === APP_SHARED_VISIBILITY &&
+      resource.publishedAt instanceof Date &&
+      !Number.isNaN(resource.publishedAt.getTime()) &&
+      PUBLIC_RESOURCE_CATEGORIES.has(this.normalizeText(resource.resourceCategory)) &&
+      PUBLIC_RESOURCE_ALLOWED_MIME_TYPES.has(resourceMimeType) &&
+      resourceMimeType === this.normalizeMimeType(fileAsset.mimeType)
+    );
   }
 
   private ensureProjectAttachmentFileAsset(fileAsset: FileAssetEntity, project: ProjectEntity) {
@@ -157,9 +255,13 @@ export class ProjectAttachmentFileAccessService {
     }
     const scope = this.readRequiredString(value, 'accessScope') as FileAccessScope;
     if (!FILE_ACCESS_SCOPES.has(scope)) {
-      throw fileAccessInvalid('accessScope must be owner_private or bid_material.');
+      throw fileAccessInvalid('accessScope must be owner_private, bid_material, or public_resource.');
     }
     return scope;
+  }
+
+  private hasExplicitAccessScope(value: unknown) {
+    return value !== undefined && value !== null && value !== '';
   }
 
   private readOptionalString(value: unknown) {
@@ -193,5 +295,9 @@ export class ProjectAttachmentFileAccessService {
 
   private normalizeText(value: string | null | undefined) {
     return value?.trim() ?? '';
+  }
+
+  private normalizeMimeType(value: string | null | undefined) {
+    return this.normalizeText(value).toLowerCase();
   }
 }

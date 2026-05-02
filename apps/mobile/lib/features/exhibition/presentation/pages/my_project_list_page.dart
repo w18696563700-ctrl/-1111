@@ -333,14 +333,10 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
               ),
               actionLabel: actionLabel,
               onPressed: () => _openRoute(routeName),
-              secondaryActionLabel:
-                  stage.value == _MyProjectStageBucket.draft ||
-                      stage.value == _MyProjectStageBucket.submitted
+              secondaryActionLabel: stage.value == _MyProjectStageBucket.draft
                   ? '查看详情'
                   : null,
-              onSecondaryPressed:
-                  stage.value == _MyProjectStageBucket.draft ||
-                      stage.value == _MyProjectStageBucket.submitted
+              onSecondaryPressed: stage.value == _MyProjectStageBucket.draft
                   ? () => _openRoute(detailRouteName)
                   : null,
               highlighted: highlighted,

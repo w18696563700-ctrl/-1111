@@ -10600,11 +10600,14 @@ components:
       enum:
         - owner_private
         - bid_material
+        - public_resource
       description: >
         Shared app-facing file access permission scope. Omitted value is
         `owner_private`. `bid_material` is the dedicated Quote Basis Material
         Package V1 bidder-access branch and must validate bidder eligibility
-        without opening all owner-private file assets.
+        without opening all owner-private file assets. `public_resource` is the
+        bounded public-resource download branch and only resolves published
+        app-shared resources from `project_public_resources`.
     FileAccessResponse:
       type: object
       required:

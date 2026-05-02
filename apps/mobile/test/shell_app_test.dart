@@ -5402,12 +5402,18 @@ void main() {
   testWidgets('bid submit keeps compact template download actions available', (
     WidgetTester tester,
   ) async {
-    Uri? openedUri;
-    ProjectPublicResourceDebugOverrides.installExternalUrlOpener((
-      Uri uri,
+    String? downloadedAccessUrl;
+    ProjectPublicResourceDebugOverrides.installLocalDownloader((
+      ProjectPublicResourceFileAccessReadModel access,
+      ProjectPublicResourceReadModel resource,
     ) async {
-      openedUri = uri;
-      return true;
+      downloadedAccessUrl = access.accessUrl;
+      return ProjectPublicResourceDownloadedFile(
+        path: '/tmp/${access.fileName ?? resource.fileName}',
+        fileName: access.fileName ?? resource.fileName,
+        mimeType: access.mimeType ?? resource.mimeType,
+        sizeBytes: access.contentLengthBytes ?? 2048,
+      );
     });
 
     final resources = <Map<String, Object?>>[
@@ -5476,6 +5482,7 @@ void main() {
             'file-resource-contract-1',
           );
           expect(request.uri.queryParameters['mode'], 'download');
+          expect(request.uri.queryParameters['accessScope'], 'public_resource');
           return AppApiResponse(
             statusCode: 200,
             uri: request.uri,
@@ -5543,10 +5550,11 @@ void main() {
     );
 
     expect(
-      openedUri?.toString(),
+      downloadedAccessUrl,
       'https://files.example.com/public-resource-contract-1.pdf',
     );
-    expect(find.text('已开始下载资料。'), findsOneWidget);
+    expect(find.text('资料已下载到 App 本地。'), findsOneWidget);
+    expect(find.text('下载完成'), findsOneWidget);
   });
 
   testWidgets('bid submit service fee uses fixed validity and user-facing copy', (

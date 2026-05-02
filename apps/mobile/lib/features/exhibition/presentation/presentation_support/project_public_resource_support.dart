@@ -1,6 +1,26 @@
 part of '../exhibition_trade_pages.dart';
 
-typedef ProjectPublicResourceExternalUrlOpener = Future<bool> Function(Uri uri);
+typedef ProjectPublicResourceLocalDownloader =
+    Future<ProjectPublicResourceDownloadedFile?> Function(
+      ProjectPublicResourceFileAccessReadModel access,
+      ProjectPublicResourceReadModel resource,
+    );
+typedef ProjectPublicResourceDownloadedFileAction =
+    Future<bool> Function(ProjectPublicResourceDownloadedFile file);
+
+final class ProjectPublicResourceDownloadedFile {
+  const ProjectPublicResourceDownloadedFile({
+    required this.path,
+    required this.fileName,
+    required this.mimeType,
+    required this.sizeBytes,
+  });
+
+  final String path;
+  final String fileName;
+  final String mimeType;
+  final int sizeBytes;
+}
 
 const String _projectPublicResourceCategoryContractTemplate =
     'contract_template';
@@ -10,16 +30,32 @@ const String _projectPublicResourceCategoryOtherResource = 'other_resource';
 final class ProjectPublicResourceDebugOverrides {
   const ProjectPublicResourceDebugOverrides._();
 
-  static ProjectPublicResourceExternalUrlOpener? _externalUrlOpener;
+  static ProjectPublicResourceLocalDownloader? _localDownloader;
+  static ProjectPublicResourceDownloadedFileAction? _localFileOpener;
+  static ProjectPublicResourceDownloadedFileAction? _localFileSharer;
 
-  static void installExternalUrlOpener(
-    ProjectPublicResourceExternalUrlOpener? opener,
+  static void installLocalDownloader(
+    ProjectPublicResourceLocalDownloader? downloader,
   ) {
-    _externalUrlOpener = opener;
+    _localDownloader = downloader;
+  }
+
+  static void installLocalFileOpener(
+    ProjectPublicResourceDownloadedFileAction? opener,
+  ) {
+    _localFileOpener = opener;
+  }
+
+  static void installLocalFileSharer(
+    ProjectPublicResourceDownloadedFileAction? sharer,
+  ) {
+    _localFileSharer = sharer;
   }
 
   static void reset() {
-    _externalUrlOpener = null;
+    _localDownloader = null;
+    _localFileOpener = null;
+    _localFileSharer = null;
   }
 }
 
@@ -75,6 +111,19 @@ String _projectPublicResourceCategoryLabel(String resourceCategory) {
     _projectPublicResourceCategoryOtherResource => '公共资料',
     _ => resourceCategory,
   };
+}
+
+Map<String, int> _projectPublicResourceCategoryCounts(
+  List<ProjectPublicResourceReadModel> resources,
+) {
+  final counts = <String, int>{
+    for (final option in _projectPublicResourceCategoryOptions) option.value: 0,
+  };
+  for (final resource in resources) {
+    counts[resource.resourceCategory] =
+        (counts[resource.resourceCategory] ?? 0) + 1;
+  }
+  return counts;
 }
 
 String _projectPublicResourceVisibilityLabel(String visibility) {
@@ -140,50 +189,252 @@ String _projectPublicResourceDownloadFailureMessage(
   return switch (result.errorCode) {
     'AUTH_SESSION_INVALID' => '当前登录态不可用，请重新登录或刷新后再试。',
     'FILE_ACCESS_INVALID' => '当前下载资料参数不可用，请稍后再试。',
-    'FILE_ACCESS_NOT_FOUND' => '当前资料不存在或暂不可下载。',
+    'FILE_ACCESS_NOT_FOUND' => '资料文件暂不可下载，请稍后重试。',
     'FILE_ACCESS_PERMISSION_DENIED' => '当前账号暂不可下载这份资料。',
-    'FILE_ACCESS_UNAVAILABLE' => '当前资料暂不可下载，请稍后再试。',
+    'FILE_ACCESS_UNAVAILABLE' => '资料文件暂不可下载，请稍后重试。',
     _ => switch (result.controlledState) {
       AppPageState.unauthorized => '当前登录态不可用，请重新登录或刷新后再试。',
       AppPageState.forbidden => '当前账号暂不可下载这份资料。',
-      AppPageState.notFound => '当前资料不存在或暂不可下载。',
-      _ => '当前资料暂不可下载，请稍后再试。',
+      AppPageState.notFound => '资料文件暂不可下载，请稍后重试。',
+      _ => '资料文件暂不可下载，请稍后重试。',
     },
   };
 }
 
-Future<bool> _openProjectPublicResourceUrl(String accessUrl) async {
-  final uri = Uri.tryParse(accessUrl);
-  if (uri == null || uri.scheme.isEmpty) {
-    return false;
-  }
-
-  final override = ProjectPublicResourceDebugOverrides._externalUrlOpener;
+Future<ProjectPublicResourceDownloadedFile?>
+_downloadProjectPublicResourceFile({
+  required ProjectPublicResourceFileAccessReadModel access,
+  required ProjectPublicResourceReadModel resource,
+}) async {
+  final override = ProjectPublicResourceDebugOverrides._localDownloader;
   if (override != null) {
-    return override(uri);
+    return override(access, resource);
   }
 
+  final uri = Uri.tryParse(access.accessUrl);
+  if (uri == null || uri.scheme.isEmpty) {
+    return null;
+  }
+
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 20);
   try {
-    if (Platform.isMacOS) {
-      final result = await Process.run('open', <String>[uri.toString()]);
-      return result.exitCode == 0;
+    final request = await client.getUrl(uri);
+    final response = await request.close().timeout(const Duration(seconds: 30));
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      return null;
     }
-    if (Platform.isLinux) {
-      final result = await Process.run('xdg-open', <String>[uri.toString()]);
-      return result.exitCode == 0;
+
+    final builder = BytesBuilder(copy: false);
+    await for (final chunk in response) {
+      builder.add(chunk);
     }
-    if (Platform.isWindows) {
-      final result = await Process.run('cmd', <String>[
-        '/c',
-        'start',
-        '',
-        uri.toString(),
-      ]);
-      return result.exitCode == 0;
+    final bytes = builder.takeBytes();
+    if (bytes.isEmpty) {
+      return null;
     }
-  } on ProcessException {
+
+    final directory = Directory(
+      '${(await getApplicationDocumentsDirectory()).path}/public_resources',
+    );
+    await directory.create(recursive: true);
+    final fileName = _projectPublicResourceSafeFileName(
+      access.fileName ?? resource.fileName,
+      fallbackTitle: resource.title,
+      mimeType: access.mimeType ?? resource.mimeType,
+    );
+    final file = File('${directory.path}/$fileName');
+    await file.writeAsBytes(bytes, flush: true);
+    return ProjectPublicResourceDownloadedFile(
+      path: file.path,
+      fileName: fileName,
+      mimeType: access.mimeType ?? resource.mimeType,
+      sizeBytes: bytes.length,
+    );
+  } on TimeoutException {
+    return null;
+  } on IOException {
+    return null;
+  } finally {
+    client.close(force: true);
+  }
+}
+
+String _projectPublicResourceSafeFileName(
+  String? rawFileName, {
+  required String fallbackTitle,
+  required String? mimeType,
+}) {
+  final source = (rawFileName?.trim().isNotEmpty == true
+      ? rawFileName!.trim()
+      : fallbackTitle.trim().isNotEmpty
+      ? fallbackTitle.trim()
+      : 'public-resource');
+  final collapsed = source
+      .replaceAll(RegExp(r'[\\/:*?"<>|\x00-\x1F]'), '_')
+      .replaceAll(RegExp(r'\s+'), ' ')
+      .trim();
+  final limited = collapsed.length > 80
+      ? collapsed.substring(0, 80)
+      : collapsed;
+  final withFallback = limited.isEmpty ? 'public-resource' : limited;
+  if (withFallback.contains('.')) {
+    return withFallback;
+  }
+  return '$withFallback${_projectPublicResourceFileExtension(mimeType)}';
+}
+
+String _projectPublicResourceFileExtension(String? mimeType) {
+  return switch (mimeType) {
+    'application/pdf' => '.pdf',
+    'application/msword' => '.doc',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' =>
+      '.docx',
+    'image/png' => '.png',
+    'image/jpeg' => '.jpg',
+    'image/webp' => '.webp',
+    _ => '.bin',
+  };
+}
+
+String _projectPublicResourceFileSizeLabel(int bytes) {
+  if (bytes < 1024) {
+    return '$bytes B';
+  }
+  final kb = bytes / 1024;
+  if (kb < 1024) {
+    return '${kb.toStringAsFixed(kb >= 100 ? 0 : 1)} KB';
+  }
+  final mb = kb / 1024;
+  return '${mb.toStringAsFixed(mb >= 100 ? 0 : 1)} MB';
+}
+
+Future<bool> _openDownloadedProjectPublicResourceFile(
+  ProjectPublicResourceDownloadedFile file,
+) async {
+  final override = ProjectPublicResourceDebugOverrides._localFileOpener;
+  if (override != null) {
+    return override(file);
+  }
+  try {
+    final result = await OpenFilex.open(file.path, type: file.mimeType);
+    return result.type == ResultType.done;
+  } on PlatformException {
+    return false;
+  } on IOException {
     return false;
   }
+}
 
-  return false;
+Future<bool> _shareDownloadedProjectPublicResourceFile(
+  BuildContext context,
+  ProjectPublicResourceDownloadedFile file,
+) async {
+  final override = ProjectPublicResourceDebugOverrides._localFileSharer;
+  if (override != null) {
+    return override(file);
+  }
+  try {
+    final renderObject = context.findRenderObject();
+    final origin = renderObject is RenderBox
+        ? renderObject.localToGlobal(Offset.zero) & renderObject.size
+        : null;
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        title: file.fileName,
+        files: <XFile>[
+          XFile(file.path, mimeType: file.mimeType, name: file.fileName),
+        ],
+        fileNameOverrides: <String>[file.fileName],
+        sharePositionOrigin: origin,
+      ),
+    );
+    return result.status != ShareResultStatus.unavailable;
+  } on PlatformException {
+    return false;
+  } on ArgumentError {
+    return false;
+  } on IOException {
+    return false;
+  }
+}
+
+Future<void> _showProjectPublicResourceDownloadedSheet({
+  required BuildContext context,
+  required ProjectPublicResourceDownloadedFile file,
+  required ValueChanged<String> onMessage,
+}) async {
+  await showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (BuildContext sheetContext) {
+      return SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Text(
+                '下载完成',
+                style: Theme.of(
+                  sheetContext,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w900),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                file.fileName,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: Theme.of(sheetContext).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '已保存到 App 本地 · ${_projectPublicResourceFileSizeLabel(file.sizeBytes)}',
+                style: Theme.of(sheetContext).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(sheetContext).colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        final opened =
+                            await _openDownloadedProjectPublicResourceFile(
+                              file,
+                            );
+                        onMessage(opened ? '已打开下载资料。' : '当前设备暂不能直接打开该资料。');
+                      },
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('打开'),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        Navigator.of(sheetContext).pop();
+                        final shared =
+                            await _shareDownloadedProjectPublicResourceFile(
+                              context,
+                              file,
+                            );
+                        onMessage(
+                          shared ? '已打开系统分享/保存面板。' : '当前设备暂不能打开保存面板，请稍后重试。',
+                        );
+                      },
+                      icon: const Icon(Icons.ios_share_rounded),
+                      label: const Text('保存 / 分享'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      );
+    },
+  );
 }

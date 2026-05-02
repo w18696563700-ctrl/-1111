@@ -168,6 +168,45 @@ test('file/access forwards bid material scope and project id to Server', async (
   assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
 });
 
+test('file/access forwards public resource scope without owning signing truth', async () => {
+  let captured = null;
+  const { service, calls } = createService({
+    async onGet(path, options) {
+      captured = { path, options };
+      return {
+        fileAssetId: 'file-asset-public-1',
+        mode: 'download',
+        accessUrl: 'https://signed.example.test/resources/template.docx',
+        fileName: '展览定制之家-合同模板.docx',
+        mimeType:
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        expiresAt: '2026-05-02T10:30:00.000Z',
+        contentLengthBytes: 4096,
+        objectKey: 'resources/template.docx',
+      };
+    },
+  });
+
+  const result = await service.getAccess(
+    { authorization: 'Bearer app' },
+    'file-asset-public-1',
+    'download',
+    undefined,
+    'public_resource',
+  );
+
+  assert.equal(calls.commandHeaders, 1);
+  assert.equal(captured.path, '/server/file/access');
+  assert.deepEqual(captured.options.params, {
+    fileAssetId: 'file-asset-public-1',
+    mode: 'download',
+    accessScope: 'public_resource',
+  });
+  assert.equal(result.fileAssetId, 'file-asset-public-1');
+  assert.equal(result.accessUrl, 'https://signed.example.test/resources/template.docx');
+  assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
 test('my project attachment list keeps projectId + attachments[] contract shape', async () => {
   let captured = null;
   const service = new MyProjectAttachmentService(

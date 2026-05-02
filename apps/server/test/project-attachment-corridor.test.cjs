@@ -92,12 +92,31 @@ function createAttachment(overrides = {}) {
   };
 }
 
+function createPublicResource(overrides = {}) {
+  return {
+    resourceId: 'public-resource-1',
+    resourceCategory: 'contract_template',
+    title: '标准合同模板',
+    summary: '用于项目续接的标准合同模板。',
+    fileAssetId: 'asset-public-1',
+    fileName: '标准合同模板.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    visibility: 'app_shared',
+    sortOrder: 10,
+    publishedAt: new Date('2026-04-22T08:00:00.000Z'),
+    publishedBy: 'platform-admin',
+    createdAt: new Date('2026-04-22T08:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 function createAttachmentHarness(overrides = {}) {
   const state = {
     project: createProject(overrides.project),
     projectMissing: overrides.projectMissing ?? false,
     fileAssets: structuredClone(overrides.fileAssets ?? [createFileAsset()]),
     attachments: structuredClone(overrides.attachments ?? []),
+    publicResources: structuredClone(overrides.publicResources ?? []),
     auditLogs: structuredClone(overrides.auditLogs ?? []),
   };
 
@@ -207,6 +226,24 @@ function createAttachmentHarness(overrides = {}) {
       };
     }
 
+    if (entity?.name === 'ProjectPublicResourceEntity') {
+      return {
+        async findOneBy(where) {
+          return (
+            draft.publicResources.find((item) => {
+              if (where?.fileAssetId && item.fileAssetId !== where.fileAssetId) {
+                return false;
+              }
+              if (where?.resourceId && item.resourceId !== where.resourceId) {
+                return false;
+              }
+              return true;
+            }) ?? null
+          );
+        },
+      };
+    }
+
     throw new Error(`unexpected repository ${entity?.name ?? 'unknown'}`);
   }
 
@@ -230,6 +267,7 @@ function createAttachmentHarness(overrides = {}) {
       projectRepository: getRepository({ name: 'ProjectEntity' }, state),
       attachmentRepository: getRepository({ name: 'ProjectAttachmentEntity' }, state),
       fileAssetRepository: getRepository({ name: 'FileAssetEntity' }, state),
+      publicResourceRepository: getRepository({ name: 'ProjectPublicResourceEntity' }, state),
     },
     auditService: {
       async record(input, _context, manager) {
@@ -331,6 +369,7 @@ function createFileAccessService(harness, overrides = {}) {
     harness.repositories.fileAssetRepository,
     harness.repositories.attachmentRepository,
     harness.repositories.projectRepository,
+    harness.repositories.publicResourceRepository,
     {
       async verifyCurrentSessionContext() {
         return {
@@ -893,6 +932,136 @@ test('file/access rejects unbound FileAsset', async () => {
       ),
     (error) => error?.response?.code === 'FILE_ACCESS_NOT_FOUND',
   );
+});
+
+test('file/access returns public-resource signed download when attachment binding is absent', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [],
+    fileAssets: [
+      createFileAsset({
+        id: 'asset-public-1',
+        businessType: 'template_governance',
+        businessId: 'template-1',
+        fileKind: 'public_resource',
+        objectKey: 'resources/contract-template.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        size: 4096,
+        organizationId: 'platform-org',
+      }),
+    ],
+    publicResources: [createPublicResource()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/resources/contract-template.docx';
+      },
+    },
+  });
+
+  const result = await service.getAccess(
+    { fileAssetId: 'asset-public-1', mode: 'download' },
+    createContext('file-access-public-resource-fallback'),
+  );
+
+  assert.equal(result.fileAssetId, 'asset-public-1');
+  assert.equal(result.mode, 'download');
+  assert.equal(result.fileName, '标准合同模板.docx');
+  assert.equal(
+    result.mimeType,
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  );
+  assert.equal(result.accessUrl, 'https://signed.example.test/resources/contract-template.docx');
+  assert.equal(result.contentLengthBytes, 4096);
+  assert.deepEqual(publicUrlCalls, ['resources/contract-template.docx']);
+  assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
+test('file/access public_resource scope only signs published app-shared resources', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [createAttachment()],
+    fileAssets: [
+      createFileAsset({
+        id: 'asset-hidden-resource',
+        businessType: 'template_governance',
+        businessId: 'template-hidden',
+        fileKind: 'public_resource',
+        objectKey: 'resources/hidden.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }),
+    ],
+    publicResources: [
+      createPublicResource({
+        fileAssetId: 'asset-hidden-resource',
+        visibility: 'owner_private',
+      }),
+    ],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return `https://signed.example.test/${objectKey}`;
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        {
+          fileAssetId: 'asset-hidden-resource',
+          mode: 'download',
+          accessScope: 'public_resource',
+        },
+        createContext('file-access-public-resource-hidden'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_NOT_FOUND',
+  );
+  assert.deepEqual(publicUrlCalls, []);
+});
+
+test('file/access public_resource scope rejects preview mode before signing URL', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    attachments: [],
+    fileAssets: [
+      createFileAsset({
+        id: 'asset-public-1',
+        businessType: 'template_governance',
+        businessId: 'template-1',
+        fileKind: 'public_resource',
+        objectKey: 'resources/contract-template.docx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      }),
+    ],
+    publicResources: [createPublicResource()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return `https://signed.example.test/${objectKey}`;
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        {
+          fileAssetId: 'asset-public-1',
+          mode: 'preview',
+          accessScope: 'public_resource',
+        },
+        createContext('file-access-public-resource-preview'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_INVALID',
+  );
+  assert.deepEqual(publicUrlCalls, []);
 });
 
 test('file/access rejects unsupported mode', async () => {

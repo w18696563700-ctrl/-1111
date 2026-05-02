@@ -662,7 +662,7 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
         request,
         nextState: 'archived',
         invalidCode: 'PROJECT_SUBMITTED_DISCARD_INVALID',
-        invalidMessage: '当前项目状态暂不支持作废删除。',
+        invalidMessage: '当前项目状态暂不支持作废归档。',
         allow: (String state) => state == 'submitted',
       );
     },
@@ -1144,7 +1144,7 @@ void main() {
     await _scrollTo(tester, find.text('当前阶段动作'));
     expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '作废删除'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '作废并归档'), findsOneWidget);
     expect(find.text('发布前确认'), findsOneWidget);
     expect(find.textContaining('预发布阶段已开放报价依据资料'), findsOneWidget);
     expect(find.textContaining('补充效果图、尺寸图 / 施工图'), findsWidgets);
@@ -1243,7 +1243,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '删除此项目'), findsOneWidget);
   });
 
-  testWidgets('预发布列表作废删除后详情进入归档只读承接', (WidgetTester tester) async {
+  testWidgets('预发布列表作废并归档后详情进入归档只读承接', (WidgetTester tester) async {
     final projectStates = <String, String>{
       'project-draft-1': 'draft',
       'project-archive-flow': 'submitted',
@@ -1259,15 +1259,15 @@ void main() {
       title: '项目 project-archive-flow',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '作废删除'));
-    await tester.tap(find.widgetWithText(OutlinedButton, '作废删除'));
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '作废并归档'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '作废并归档'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('预发布项目不会被硬删除'), findsOneWidget);
-    await tester.tap(find.widgetWithText(FilledButton, '确认作废'));
+    await tester.tap(find.widgetWithText(FilledButton, '确认作废并归档'));
     await tester.pumpAndSettle();
 
-    expect(find.text('已作废删除'), findsOneWidget);
+    expect(find.text('已作废并归档'), findsOneWidget);
     expect(projectStates['project-archive-flow'], 'archived');
     expect(find.text('删除此项目'), findsNothing);
   });
@@ -1487,11 +1487,13 @@ void main() {
     await tester.tap(find.widgetWithText(OutlinedButton, '撤回到预发布'));
     await tester.pumpAndSettle();
     expect(find.textContaining('项目会下架公域展示并回到预发布列表'), findsOneWidget);
+    expect(find.textContaining('可能产生信用分扣减'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '确认撤回'));
     await tester.pumpAndSettle();
 
     expect(projectStates['project-close-flow'], 'submitted');
     expect(find.text('已撤回到预发布'), findsOneWidget);
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
     expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
   });
 
