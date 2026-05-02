@@ -22,6 +22,22 @@ export function projectCommunicationUnavailable(message = 'Current project commu
   });
 }
 
+export function projectCommunicationWorkbenchInvalid(code: string, message: string) {
+  return new BadRequestException({ code, message });
+}
+
+export function projectCommunicationWorkbenchForbidden(
+  code: string,
+  message: string,
+  details?: Record<string, unknown>
+) {
+  return new ForbiddenException({ code, message, details });
+}
+
+export function projectCommunicationWorkbenchConflict(code: string, message: string) {
+  return new ConflictException({ code, message });
+}
+
 export function projectAlbumInvalid(message: string) {
   return new BadRequestException({
     code: 'PROJECT_ALBUM_INVALID',

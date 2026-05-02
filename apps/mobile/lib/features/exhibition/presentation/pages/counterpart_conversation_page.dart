@@ -5,10 +5,12 @@ class CounterpartConversationPage extends StatefulWidget {
     super.key,
     this.conversationId,
     this.projectId,
+    this.onChatWindowActiveChanged,
   });
 
   final String? conversationId;
   final String? projectId;
+  final ValueChanged<bool>? onChatWindowActiveChanged;
 
   @override
   State<CounterpartConversationPage> createState() =>
@@ -45,12 +47,16 @@ class _CounterpartConversationPageState
   bool _sending = false;
   bool _fallbackPolling = false;
   bool _pausedByLifecycle = false;
+  bool _chatWindowActiveNotified = false;
   String? _lastMarkedReadMessageId;
   final Map<String, ProjectCommunicationFilePreviewAccessView>
   _attachmentPreviewCache =
       <String, ProjectCommunicationFilePreviewAccessView>{};
   final Set<String> _loadingAttachmentPreviewKeys = <String>{};
   final Set<String> _failedAttachmentPreviewKeys = <String>{};
+  CounterpartConversationResult<ProjectCommunicationWorkbenchView>?
+  _workbenchResult;
+  bool _loadingWorkbench = false;
 
   @override
   void initState() {
@@ -61,6 +67,7 @@ class _CounterpartConversationPageState
 
   @override
   void dispose() {
+    _notifyChatWindowActive(false);
     WidgetsBinding.instance.removeObserver(this);
     unawaited(_stopRealtime(waitForClose: false));
     _messageController.dispose();
@@ -106,6 +113,9 @@ class _CounterpartConversationPageState
           (result.data == null ||
               !_hasProjectGroup(result.data!, _selectedProjectId!))) {
         _selectedProjectId = null;
+        _notifyChatWindowActive(false);
+        _workbenchResult = null;
+        _loadingWorkbench = false;
         _drafts.clear();
       }
     });
@@ -114,8 +124,23 @@ class _CounterpartConversationPageState
     if (result.state == AppPageState.content &&
         result.data != null &&
         selectedProjectId != null) {
+      final selectedGroup = _selectedProjectGroup(result.data!);
+      if (selectedGroup != null) {
+        setState(() {
+          _workbenchResult = null;
+          _loadingWorkbench = true;
+        });
+      }
       await _loadThreadAndMessages(result.data!, projectId: selectedProjectId);
     }
+  }
+
+  void _notifyChatWindowActive(bool active) {
+    if (_chatWindowActiveNotified == active) {
+      return;
+    }
+    _chatWindowActiveNotified = active;
+    widget.onChatWindowActiveChanged?.call(active);
   }
 
   Future<void> _loadThreadAndMessages(
@@ -140,11 +165,36 @@ class _CounterpartConversationPageState
     });
     if (threadResult.state == AppPageState.content &&
         threadResult.data != null) {
+      final selectedGroup = _selectedProjectGroup(data);
+      if (selectedGroup != null) {
+        unawaited(_loadProjectWorkbench(selectedGroup, threadResult.data!));
+      }
       await _loadMessages(threadResult.data!);
       await _connectRealtime(threadResult.data!, data.counterpart);
     } else if (mounted) {
       setState(() => _loadingMessages = false);
     }
+  }
+
+  Future<void> _loadProjectWorkbench(
+    CounterpartConversationProjectGroupView group,
+    ProjectCommunicationThreadView thread,
+  ) async {
+    setState(() => _loadingWorkbench = true);
+    final result = await CounterpartConversationConsumerLayer.instance
+        .loadProjectCommunicationWorkbench(
+          projectId: group.projectId,
+          threadId: thread.threadId,
+          counterpartOrganizationId: _result?.data?.counterpart.organizationId,
+          bidId: _firstBidId(group),
+        );
+    if (!mounted || _selectedProjectId != group.projectId) {
+      return;
+    }
+    setState(() {
+      _workbenchResult = result;
+      _loadingWorkbench = false;
+    });
   }
 
   Future<void> _loadMessages(
@@ -384,14 +434,18 @@ class _CounterpartConversationPageState
     if (_lastMarkedReadMessageId == lastReadMessageId) {
       return;
     }
-    await CounterpartConversationConsumerLayer.instance
+    final result = await CounterpartConversationConsumerLayer.instance
         .markProjectCommunicationReadCursor(
           threadId: thread.threadId,
           projectId: thread.projectId,
           lastReadMessageId: lastReadMessageId,
         );
+    if (result.state != AppPageState.content) {
+      return;
+    }
     _lastMarkedReadMessageId = lastReadMessageId;
     _reloadShellContextAfterRead();
+    await _refreshConversationDetailAfterRead();
   }
 
   void _reloadShellContextAfterRead() {
@@ -400,6 +454,30 @@ class _CounterpartConversationPageState
     } catch (_) {
       // Tests may mount this page without the full shell scope.
     }
+  }
+
+  Future<void> _refreshConversationDetailAfterRead() async {
+    final result = await CounterpartConversationConsumerLayer.instance
+        .loadDetail(
+          conversationId: widget.conversationId,
+          projectId: widget.projectId,
+        );
+    if (!mounted || result.state != AppPageState.content) {
+      return;
+    }
+    setState(() {
+      _result = result;
+      final selectedProjectId = _selectedProjectId;
+      if (selectedProjectId != null &&
+          !_hasProjectGroup(result.data!, selectedProjectId)) {
+        _selectedProjectId = null;
+        _workbenchResult = null;
+        _loadingWorkbench = false;
+        _threadResult = null;
+        _messageResult = null;
+        _drafts.clear();
+      }
+    });
   }
 
   Future<void> _sendCurrentMessage() async {
@@ -461,28 +539,6 @@ class _CounterpartConversationPageState
       _messageController.clear();
       _drafts.add(draft);
     });
-    _scheduleScrollToBottom();
-    await _sendDraft(draft);
-  }
-
-  Future<void> _sendConfirmationCard() async {
-    final thread = _threadResult?.data;
-    if (thread == null || _sending) {
-      return;
-    }
-    final confirmation = await _showConfirmationComposer();
-    if (!mounted || confirmation == null) {
-      return;
-    }
-    final draft = _DraftProjectCommunicationMessage(
-      clientMessageId: _newClientMessageId(),
-      body: '',
-      createdAt: DateTime.now(),
-      state: _DraftProjectCommunicationState.sending,
-      messageKind: 'confirmation_card',
-      confirmation: confirmation,
-    );
-    setState(() => _drafts.add(draft));
     _scheduleScrollToBottom();
     await _sendDraft(draft);
   }
@@ -774,14 +830,6 @@ class _CounterpartConversationPageState
     return result ?? false;
   }
 
-  Future<ProjectCommunicationConfirmationView?> _showConfirmationComposer() {
-    return showModalBottomSheet<ProjectCommunicationConfirmationView>(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => const _ProjectConfirmationComposerSheet(),
-    );
-  }
-
   Future<void> _openProjectCommunication(
     CounterpartConversationProjectGroupView group,
   ) async {
@@ -792,6 +840,8 @@ class _CounterpartConversationPageState
     _messageController.clear();
     setState(() {
       _selectedProjectId = group.projectId;
+      _workbenchResult = null;
+      _loadingWorkbench = true;
       _threadResult = null;
       _messageResult = null;
       _lastMarkedReadMessageId = null;
@@ -799,6 +849,7 @@ class _CounterpartConversationPageState
       _loadingThread = true;
       _loadingMessages = true;
     });
+    _notifyChatWindowActive(true);
     _scheduleScrollToTop();
     final data = _result?.data;
     if (data != null) {
@@ -814,6 +865,8 @@ class _CounterpartConversationPageState
     _messageController.clear();
     setState(() {
       _selectedProjectId = null;
+      _workbenchResult = null;
+      _loadingWorkbench = false;
       _threadResult = null;
       _messageResult = null;
       _lastMarkedReadMessageId = null;
@@ -821,6 +874,7 @@ class _CounterpartConversationPageState
       _loadingThread = false;
       _loadingMessages = false;
     });
+    _notifyChatWindowActive(false);
     _scheduleScrollToTop();
   }
 
@@ -869,7 +923,6 @@ class _CounterpartConversationPageState
                   onSend: _sendCurrentMessage,
                   onAttachFile: () => _sendAttachmentMessage(imageOnly: false),
                   onAttachImage: () => _sendAttachmentMessage(imageOnly: true),
-                  onCreateConfirmation: _sendConfirmationCard,
                 ),
           ],
         ),
@@ -893,6 +946,7 @@ class _CounterpartConversationPageState
         ),
         const SizedBox(height: 16),
         _CounterpartProjectEntryList(
+          data: data,
           groups: groups,
           onOpenProjectCommunication: _openProjectCommunication,
         ),
@@ -922,10 +976,13 @@ class _CounterpartConversationPageState
           'bid_participation_request',
         ),
         orderId: selectedOrderId,
+        loadingWorkbench: _loadingWorkbench,
+        workbenchResult: _workbenchResult,
         onBackToProjectList: _backToProjectList,
         onOpenNameAccess: _openBusinessCard,
         onOpenOrder: () => _openOrderDetail(selectedGroup),
         onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
+        onOpenWorkbenchEntry: _openWorkbenchEntry,
       ),
       const SizedBox(height: 12),
       const _ConversationGuidanceBanner(),
@@ -1203,6 +1260,95 @@ class _CounterpartConversationPageState
     Navigator.of(context).pushNamed(routeLocation);
   }
 
+  void _openWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
+    if (entry.group == 'deal_confirmation') {
+      _showSnack('合同确认和最终成交金额确认暂不触发扣费，待后续门禁开启。');
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _ProjectCommunicationMaterialReviewDetailPage(
+          entry: entry,
+          onConfirm: _submitWorkbenchConfirm,
+          onFeedback: _submitWorkbenchFeedback,
+        ),
+      ),
+    );
+  }
+
+  Future<bool> _submitWorkbenchConfirm(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) async {
+    return _submitWorkbenchReview(entry, reviewAction: 'confirm');
+  }
+
+  Future<bool> _submitWorkbenchFeedback(
+    ProjectCommunicationWorkbenchEntryView entry,
+    String feedbackText,
+  ) async {
+    return _submitWorkbenchReview(
+      entry,
+      reviewAction: 'request_supplement',
+      feedbackText: feedbackText,
+    );
+  }
+
+  Future<bool> _submitWorkbenchReview(
+    ProjectCommunicationWorkbenchEntryView entry, {
+    required String reviewAction,
+    String? feedbackText,
+  }) async {
+    final result = await CounterpartConversationConsumerLayer.instance
+        .submitProjectCommunicationMaterialReview(
+          projectId: entry.projectId,
+          threadId: entry.threadId,
+          bidId: entry.bidId,
+          entryKey: entry.entryKey,
+          reviewAction: reviewAction,
+          feedbackText: feedbackText,
+          sourceVersionToken: entry.truthAnchor.sourceVersionToken,
+          idempotencyKey:
+              '${entry.entryKey}-$reviewAction-${DateTime.now().microsecondsSinceEpoch}',
+        );
+    if (result.state != AppPageState.content || result.data == null) {
+      _showSnack(result.message ?? '资料确认提交失败。');
+      return false;
+    }
+    final response = result.data!;
+    setState(() {
+      _workbenchResult = CounterpartConversationResult<
+        ProjectCommunicationWorkbenchView
+      >(
+        state: AppPageState.content,
+        method: result.method,
+        path: result.path,
+        data: ProjectCommunicationWorkbenchView(
+          projectId: response.projectId,
+          threadId: response.threadId,
+          viewerRole: response.viewerRole,
+          entries:
+              response.entries ??
+              _replaceWorkbenchEntry(response.entry),
+          generatedAt: response.updatedAt,
+        ),
+      );
+    });
+    _showSnack(reviewAction == 'confirm' ? '已确认。' : '反馈已提交。');
+    return true;
+  }
+
+  List<ProjectCommunicationWorkbenchEntryView> _replaceWorkbenchEntry(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final current = _workbenchResult?.data?.entries;
+    if (current == null) {
+      return <ProjectCommunicationWorkbenchEntryView>[entry];
+    }
+    return current
+        .map((item) => item.entryKey == entry.entryKey ? entry : item)
+        .toList(growable: false);
+  }
+
   void _openSubjectCard(CounterpartConversationDetailView data) {
     final group = _subjectProjectGroup(data);
     if (group == null || data.counterpart.organizationId.trim().isEmpty) {
@@ -1251,6 +1397,7 @@ class _CounterpartConversationPageState
             projectPublishedAt: group.projectPublishedAt,
             projectUpdatedAt: group.projectUpdatedAt,
             latestActivityAt: group.latestActivityAt,
+            latestUnreadMessageAt: group.latestUnreadMessageAt,
             projectUnreadCount: group.projectUnreadCount,
             hasProjectUnread: group.hasProjectUnread,
             orderSummary: group.orderSummary,

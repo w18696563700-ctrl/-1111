@@ -181,10 +181,22 @@ export interface ProjectLifecycleAcceptedResponse {
   state: ProjectState;
 }
 
+export type ProjectNameAccessStatus = 'visible' | 'requestable' | 'pending' | 'rejected';
+
+export interface ProjectListNameAccessReadModel {
+  status: ProjectNameAccessStatus;
+  canRequest: boolean;
+}
+
+export interface ProjectDetailNameAccessReadModel extends ProjectListNameAccessReadModel {
+  requestId: string | null;
+}
+
 export interface ProjectShowcaseListItemReadModel {
   projectId: string;
   projectNo: string;
   title: string;
+  displayTitle: string;
   exhibitionName: string | null;
   brandName: string | null;
   buildingType: string;
@@ -196,7 +208,9 @@ export interface ProjectShowcaseListItemReadModel {
   cityName: string | null;
   plannedStartAt: string | null;
   plannedEndAt: string | null;
+  publishedAt: string;
   state: ProjectState;
+  nameAccess: ProjectListNameAccessReadModel;
   summary: ProjectSummary;
 }
 
@@ -208,6 +222,7 @@ export interface ProjectReadModel extends ProjectShowcaseListItemReadModel {
   scopeSummary: string | null;
   scheduleDetail: string | null;
   viewerProjectRelation: ProjectViewerRelation;
+  nameAccess: ProjectDetailNameAccessReadModel;
   currentViewerBid?: ProjectCurrentViewerBid | null;
   description: string | null;
 }

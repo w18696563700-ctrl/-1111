@@ -8,12 +8,14 @@ import { BidEntity } from '../bid/entities/bid.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { NotificationModule } from '../notifications/notification.module';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectAttachmentEntity } from '../project/entities/project-attachment.entity';
 import { ProjectNameAccessRequestEntity } from '../project_name_access/entities/project-name-access-request.entity';
 import { ProjectClarificationEntity } from '../trading_im/entities/project-clarification.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { UploadModule } from '../upload/upload.module';
 import { ProjectAlbumController } from './project-album.controller';
 import { ProjectAlbumPhotoEntity } from './entities/project-album-photo.entity';
+import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
 import { ProjectCommunicationReadCursorEntity } from './entities/project-communication-read-cursor.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
@@ -27,12 +29,16 @@ import { ProjectCommunicationPresenter } from './project-communication.presenter
 import { ProjectCommunicationRealtimeEventService } from './project-communication-realtime-event.service';
 import { ProjectCommunicationSoftLinkService } from './project-communication-softlink.service';
 import { ProjectCommunicationUnreadQueryService } from './project-communication-unread.query.service';
+import { ProjectCommunicationWorkbenchController } from './project-communication-workbench.controller';
+import { ProjectCommunicationWorkbenchPresenter } from './project-communication-workbench.presenter';
+import { ProjectCommunicationWorkbenchService } from './project-communication-workbench.service';
 
 @Module({
   imports: [
     CoreModule,
     TypeOrmModule.forFeature([
       ProjectEntity,
+      ProjectAttachmentEntity,
       BidEntity,
       BidParticipationRequestEntity,
       ProjectNameAccessRequestEntity,
@@ -40,6 +46,7 @@ import { ProjectCommunicationUnreadQueryService } from './project-communication-
       ProjectCommunicationThreadEntity,
       ProjectCommunicationMessageEntity,
       ProjectCommunicationReadCursorEntity,
+      ProjectCommunicationMaterialReviewEntity,
       ProjectAlbumPhotoEntity,
       FileAssetEntity
     ]),
@@ -49,11 +56,18 @@ import { ProjectCommunicationUnreadQueryService } from './project-communication-
     NotificationModule,
     UploadModule
   ],
-  controllers: [ProjectCommunicationController, ProjectCommunicationPreviewController, ProjectAlbumController],
+  controllers: [
+    ProjectCommunicationController,
+    ProjectCommunicationWorkbenchController,
+    ProjectCommunicationPreviewController,
+    ProjectAlbumController
+  ],
   providers: [
     ProjectCommunicationAccessService,
     ProjectCommunicationFilePreviewService,
     ProjectCommunicationPresenter,
+    ProjectCommunicationWorkbenchPresenter,
+    ProjectCommunicationWorkbenchService,
     ProjectCommunicationRealtimeEventService,
     ProjectCommunicationMessageService,
     ProjectCommunicationSoftLinkService,

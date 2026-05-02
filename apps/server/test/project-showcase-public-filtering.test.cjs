@@ -185,6 +185,34 @@ test('project showcase list applies real city and bucket filters and trims expir
   });
 });
 
+test('project showcase list excludes non-published states even when publishedAt remains', async () => {
+  const service = createService([
+    createProject('visible-published', {
+      publishedAt: new Date('2026-04-10T08:00:00.000Z'),
+    }),
+    createProject('converted-hidden', {
+      state: 'converted_to_order',
+      publishedAt: new Date('2026-04-10T11:00:00.000Z'),
+    }),
+    createProject('awarded-hidden', {
+      state: 'awarded',
+      publishedAt: new Date('2026-04-10T10:00:00.000Z'),
+    }),
+    createProject('submitted-hidden', {
+      state: 'submitted',
+      publishedAt: new Date('2026-04-10T09:00:00.000Z'),
+    }),
+  ]);
+
+  const result = await service.listProjects(createContext('project-list-state-trim'));
+
+  assert.deepEqual(
+    result.items.map((item) => item.projectId),
+    ['visible-published'],
+  );
+  assert.equal(result.pagination.total, 1);
+});
+
 test('project showcase list supports custom_sqm and 20w_plus boundary buckets', async () => {
   const service = createService([
     createProject('custom-area-match', {

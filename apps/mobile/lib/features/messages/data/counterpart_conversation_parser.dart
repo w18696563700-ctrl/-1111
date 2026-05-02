@@ -7,12 +7,29 @@ CounterpartConversationDetailView parseCounterpartConversationDetail(
 ) {
   final map = _requiredMap(payload, 'counterpart conversation detail');
   final rawGroups = _requiredList(map, 'projectGroups');
+  final conversationUnreadCount = _optionalNonNegativeInt(
+    map['conversationUnreadCount'],
+    'conversationUnreadCount',
+  );
   return CounterpartConversationDetailView(
     conversationId: _requiredString(map, 'conversationId'),
     counterpart: _parseCounterpart(map['counterpart']),
     summary: _parseSummary(map['summary']),
     focusProjectId: _requiredString(map, 'focusProjectId'),
     latestActivityAt: _requiredString(map, 'latestActivityAt'),
+    conversationUnreadCount: conversationUnreadCount,
+    hasUnread:
+        _optionalBool(map['hasUnread'], 'hasUnread') ??
+        conversationUnreadCount > 0,
+    latestUnreadMessageAt: _nullableString(map['latestUnreadMessageAt']),
+    myPublishedUnreadCount: _optionalNonNegativeInt(
+      map['myPublishedUnreadCount'],
+      'myPublishedUnreadCount',
+    ),
+    myBidUnreadCount: _optionalNonNegativeInt(
+      map['myBidUnreadCount'],
+      'myBidUnreadCount',
+    ),
     projectGroups: rawGroups
         .map<CounterpartConversationProjectGroupView>(_parseProjectGroup)
         .toList(growable: false),
@@ -69,6 +86,21 @@ ProjectCommunicationMessageView parseProjectCommunicationMessage(
     confirmation: _parseProjectCommunicationConfirmation(map['payload']),
     clientMessageId: _nullableString(map['clientMessageId']),
     messageState: _requiredString(map, 'messageState'),
+    deliveryState: _enumValue(
+      _nullableString(map['deliveryState']) ?? 'persisted',
+      const <String>{'persisted'},
+      'deliveryState',
+    ),
+    readState: _enumValue(
+      _nullableString(map['readState']) ?? 'not_applicable',
+      const <String>{
+        'unread_by_counterpart',
+        'read_by_counterpart',
+        'not_applicable',
+      },
+      'readState',
+    ),
+    readByCounterpartAt: _nullableString(map['readByCounterpartAt']),
     createdAt: _requiredString(map, 'createdAt'),
   );
 }
@@ -142,6 +174,175 @@ ProjectCommunicationReadCursorView parseProjectCommunicationReadCursor(
     lastReadMessageId: _nullableString(map['lastReadMessageId']),
     lastReadAt: _requiredString(map, 'lastReadAt'),
     updatedAt: _requiredString(map, 'updatedAt'),
+  );
+}
+
+ProjectCommunicationWorkbenchView parseProjectCommunicationWorkbench(
+  Object? payload,
+) {
+  final map = _requiredMap(payload, 'project communication workbench');
+  return ProjectCommunicationWorkbenchView(
+    projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
+    viewerRole: _enumValue(_requiredString(map, 'viewerRole'), const {
+      'publisher',
+      'bidder',
+      'unknown',
+    }, 'viewerRole'),
+    entries: _requiredList(map, 'entries')
+        .map<ProjectCommunicationWorkbenchEntryView>(
+          parseProjectCommunicationWorkbenchEntry,
+        )
+        .toList(growable: false),
+    generatedAt: _requiredString(map, 'generatedAt'),
+  );
+}
+
+ProjectCommunicationMaterialReviewResponseView
+parseProjectCommunicationMaterialReviewResponse(Object? payload) {
+  final map = _requiredMap(payload, 'project communication material review');
+  final rawEntries = map['entries'];
+  return ProjectCommunicationMaterialReviewResponseView(
+    entry: parseProjectCommunicationWorkbenchEntry(map['entry']),
+    entries: rawEntries is List
+        ? rawEntries
+              .cast<Object?>()
+              .map<ProjectCommunicationWorkbenchEntryView>(
+                parseProjectCommunicationWorkbenchEntry,
+              )
+              .toList(growable: false)
+        : null,
+    projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
+    viewerRole: _enumValue(_requiredString(map, 'viewerRole'), const {
+      'publisher',
+      'bidder',
+      'unknown',
+    }, 'viewerRole'),
+    updatedAt: _requiredString(map, 'updatedAt'),
+  );
+}
+
+ProjectCommunicationWorkbenchEntryView
+parseProjectCommunicationWorkbenchEntry(Object? payload) {
+  final map = _requiredMap(payload, 'project communication workbench entry');
+  final group = _enumValue(_requiredString(map, 'group'), const {
+    'publisher_materials',
+    'bid_materials',
+    'deal_confirmation',
+  }, 'group');
+  final reviewState = _nullableString(map['reviewState']);
+  if (group == 'deal_confirmation' && reviewState != null) {
+    throw const FormatException('deal entries must not carry reviewState');
+  }
+  return ProjectCommunicationWorkbenchEntryView(
+    entryKey: _enumValue(_requiredString(map, 'entryKey'), const {
+      'publisher_effect_image_review',
+      'publisher_construction_doc_review',
+      'publisher_material_sample_review',
+      'publisher_equipment_material_list_review',
+      'publisher_service_list_review',
+      'bid_project_understanding_review',
+      'bid_quote_sheet_review',
+      'bid_schedule_plan_review',
+      'contract_confirmation',
+      'final_confirmed_amount_confirmation',
+    }, 'entryKey'),
+    group: group,
+    label: _requiredString(map, 'label'),
+    summary: _nullableString(map['summary']),
+    projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
+    bidId: _nullableString(map['bidId']),
+    viewerRole: _enumValue(_requiredString(map, 'viewerRole'), const {
+      'publisher',
+      'bidder',
+      'unknown',
+    }, 'entry.viewerRole'),
+    subjectOwnerRole: _enumValue(
+      _requiredString(map, 'subjectOwnerRole'),
+      const {'publisher', 'bidder', 'platform'},
+      'subjectOwnerRole',
+    ),
+    availabilityState: _enumValue(
+      _requiredString(map, 'availabilityState'),
+      const {'unsubmitted', 'readable', 'unavailable'},
+      'availabilityState',
+    ),
+    reviewState: reviewState == null
+        ? null
+        : _enumValue(reviewState, const {
+            'unsubmitted',
+            'pending_review',
+            'confirmed',
+            'needs_supplement',
+          }, 'reviewState'),
+    actionState: _enumValue(_requiredString(map, 'actionState'), const {
+      'enabled',
+      'readonly',
+      'blocked',
+    }, 'actionState'),
+    attachmentCount: _requiredInt(map, 'attachmentCount'),
+    sourceFiles: _parseWorkbenchSourceFiles(map['sourceFiles']),
+    latestFeedbackText: _nullableString(map['latestFeedbackText']),
+    latestFeedbackAt: _nullableString(map['latestFeedbackAt']),
+    reviewedAt: _nullableString(map['reviewedAt']),
+    routeTarget: _parseWorkbenchRouteTarget(map['routeTarget']),
+    truthAnchor: _parseWorkbenchTruthAnchor(map['truthAnchor']),
+  );
+}
+
+List<ProjectCommunicationWorkbenchSourceFileView> _parseWorkbenchSourceFiles(
+  Object? payload,
+) {
+  if (payload == null) {
+    return const <ProjectCommunicationWorkbenchSourceFileView>[];
+  }
+  return _requiredList(<String, Object?>{'sourceFiles': payload}, 'sourceFiles')
+      .map<ProjectCommunicationWorkbenchSourceFileView>((item) {
+        final map = _requiredMap(item, 'project communication workbench source file');
+        return ProjectCommunicationWorkbenchSourceFileView(
+          fileAssetId: _requiredString(map, 'fileAssetId'),
+          fileName: _requiredString(map, 'fileName'),
+          mimeType: _requiredString(map, 'mimeType'),
+          sortOrder: _requiredInt(map, 'sortOrder'),
+        );
+      })
+      .toList(growable: false);
+}
+
+ProjectCommunicationWorkbenchRouteTargetView? _parseWorkbenchRouteTarget(
+  Object? payload,
+) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload, 'project communication workbench route');
+  return ProjectCommunicationWorkbenchRouteTargetView(
+    actionKey: _requiredString(map, 'actionKey'),
+    canonicalPath: _requiredString(map, 'canonicalPath'),
+    params: _stringMap(map['params']),
+  );
+}
+
+ProjectCommunicationWorkbenchTruthAnchorView _parseWorkbenchTruthAnchor(
+  Object? payload,
+) {
+  final map = _requiredMap(payload, 'project communication workbench truth');
+  return ProjectCommunicationWorkbenchTruthAnchorView(
+    truthOwner: _requiredString(map, 'truthOwner'),
+    subjectType: _requiredString(map, 'subjectType'),
+    projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
+    bidId: _nullableString(map['bidId']),
+    subjectOwnerOrganizationId: _nullableString(
+      map['subjectOwnerOrganizationId'],
+    ),
+    reviewerOrganizationId: _nullableString(map['reviewerOrganizationId']),
+    materialKind: _nullableString(map['materialKind']),
+    bidMaterialSlot: _nullableString(map['bidMaterialSlot']),
+    dealConfirmationId: _nullableString(map['dealConfirmationId']),
+    sourceVersionToken: _nullableString(map['sourceVersionToken']),
   );
 }
 
@@ -271,6 +472,7 @@ CounterpartConversationProjectGroupView _parseProjectGroup(Object? payload) {
     projectPublishedAt: _nullableString(map['projectPublishedAt']),
     projectUpdatedAt: _nullableString(map['projectUpdatedAt']),
     latestActivityAt: _requiredString(map, 'latestActivityAt'),
+    latestUnreadMessageAt: _nullableString(map['latestUnreadMessageAt']),
     projectUnreadCount: _optionalNonNegativeInt(
       map['projectUnreadCount'],
       'projectUnreadCount',

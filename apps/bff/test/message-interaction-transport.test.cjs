@@ -332,6 +332,9 @@ test("message interactions service forwards frozen server path and hides raw rou
                 latestCardType: "project_order",
               },
               updatedAt: "2026-04-29T10:00:00.000Z",
+              conversationUnreadCount: 4,
+              hasUnread: true,
+              latestUnreadMessageAt: "2026-04-29T10:05:00.000Z",
               pricingSummary: {
                 projectId: "project-1",
                 bidServiceFeeAuthorization: {
@@ -412,6 +415,9 @@ test("message interactions service forwards frozen server path and hides raw rou
           },
         },
         updatedAt: "2026-04-29T10:00:00.000Z",
+        conversationUnreadCount: 4,
+        hasUnread: true,
+        latestUnreadMessageAt: "2026-04-29T10:05:00.000Z",
         routeTarget: {
           objectType: "counterpart_conversation",
           actionKey: "counterpart_conversation.open",
@@ -536,6 +542,9 @@ test("message interactions service preserves server-owned counterpart identity w
     "organizationId",
     "role",
   ]);
+  assert.equal(result.items[0].conversationUnreadCount, 0);
+  assert.equal(result.items[0].hasUnread, false);
+  assert.equal(result.items[0].latestUnreadMessageAt, null);
   assert.deepEqual(result.items[0].counterpart, {
     organizationId: "org-certified",
     displayName: "重庆海川展览展示有限公司",
@@ -584,6 +593,11 @@ test("counterpart conversation detail service forwards frozen server path and hi
           },
           focusProjectId: "project-1",
           latestActivityAt: "2026-04-29T10:00:00.000Z",
+          conversationUnreadCount: 2,
+          hasUnread: true,
+          latestUnreadMessageAt: "2026-04-29T10:04:00.000Z",
+          myPublishedUnreadCount: 2,
+          myBidUnreadCount: 0,
           projectGroups: [
             {
               projectId: "project-1",
@@ -596,6 +610,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
               latestActivityAt: "2026-04-29T10:00:00.000Z",
               projectUnreadCount: 2,
               hasProjectUnread: true,
+              latestUnreadMessageAt: "2026-04-29T10:04:00.000Z",
               orderSummary: {
                 orderId: "order-1",
                 projectId: "project-1",
@@ -723,8 +738,14 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.equal(result.projectGroups[0].projectRelation, "my_published");
   assert.equal(result.projectGroups[0].projectPublishedAt, "2026-04-28T09:00:00.000Z");
   assert.equal(result.projectGroups[0].projectUpdatedAt, "2026-04-29T08:30:00.000Z");
+  assert.equal(result.conversationUnreadCount, 2);
+  assert.equal(result.hasUnread, true);
+  assert.equal(result.latestUnreadMessageAt, "2026-04-29T10:04:00.000Z");
+  assert.equal(result.myPublishedUnreadCount, 2);
+  assert.equal(result.myBidUnreadCount, 0);
   assert.equal(result.projectGroups[0].projectUnreadCount, 2);
   assert.equal(result.projectGroups[0].hasProjectUnread, true);
+  assert.equal(result.projectGroups[0].latestUnreadMessageAt, "2026-04-29T10:04:00.000Z");
   assert.deepEqual(result.projectGroups[0].orderSummary, {
     orderId: "order-1",
     projectId: "project-1",
@@ -892,6 +913,9 @@ test("project communication routes forward thread, message list, send, and read 
     {},
   );
   assert.equal(messages.items[0].messageId, "message-1");
+  assert.equal(messages.items[0].deliveryState, "persisted");
+  assert.equal(messages.items[0].readState, "not_applicable");
+  assert.equal(messages.items[0].readByCounterpartAt, null);
 
   const message = await service.sendProjectCommunicationMessage(
     {

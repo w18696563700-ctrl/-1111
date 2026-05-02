@@ -1825,6 +1825,61 @@ export const projectConversationWorkbenchV1Migrations = [
   }
 ];
 
+export const projectCommunicationMaterialReviewMigrations = [
+  {
+    key: '20260502_project_communication_material_review_truth',
+    statements: [
+      `CREATE TABLE IF NOT EXISTS project_communication_material_reviews (
+        id varchar(64) PRIMARY KEY,
+        project_id varchar(64) NOT NULL,
+        thread_id varchar(64) NOT NULL,
+        bid_id varchar(64) NOT NULL,
+        entry_key varchar(96) NOT NULL,
+        subject_type varchar(64) NOT NULL,
+        material_kind varchar(64),
+        bid_material_slot varchar(64),
+        subject_owner_organization_id varchar(64) NOT NULL,
+        reviewer_organization_id varchar(64) NOT NULL,
+        review_state varchar(32) NOT NULL,
+        feedback_reason_codes jsonb NOT NULL DEFAULT '[]'::jsonb,
+        feedback_text text,
+        source_version_token varchar(128) NOT NULL,
+        confirmed_by_user_id varchar(64),
+        confirmed_at timestamptz,
+        feedback_by_user_id varchar(64),
+        feedback_at timestamptz,
+        request_id varchar(64) NOT NULL DEFAULT '',
+        trace_id varchar(64) NOT NULL DEFAULT '',
+        created_at timestamptz NOT NULL DEFAULT now(),
+        updated_at timestamptz NOT NULL DEFAULT now(),
+        CONSTRAINT chk_project_communication_material_reviews_state
+          CHECK (review_state IN ('pending_review', 'confirmed', 'needs_supplement')),
+        CONSTRAINT chk_project_communication_material_reviews_subject
+          CHECK (subject_type IN ('publisher_quote_basis_material', 'bid_submission_material')),
+        CONSTRAINT chk_project_communication_material_reviews_entry
+          CHECK (entry_key IN (
+            'publisher_effect_image_review',
+            'publisher_construction_doc_review',
+            'publisher_material_sample_review',
+            'publisher_equipment_material_list_review',
+            'publisher_service_list_review',
+            'bid_project_understanding_review',
+            'bid_quote_sheet_review',
+            'bid_schedule_plan_review'
+          ))
+      )`,
+      `CREATE UNIQUE INDEX IF NOT EXISTS idx_project_communication_material_reviews_active_unique
+       ON project_communication_material_reviews (project_id, bid_id, reviewer_organization_id, entry_key)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_communication_material_reviews_project_bid
+       ON project_communication_material_reviews (project_id, bid_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_communication_material_reviews_reviewer
+       ON project_communication_material_reviews (reviewer_organization_id)`,
+      `CREATE INDEX IF NOT EXISTS idx_project_communication_material_reviews_state
+       ON project_communication_material_reviews (review_state)`
+    ]
+  }
+];
+
 export const projectCommunicationNotificationPreviewV1Migrations = [
   {
     key: '20260501_project_communication_notification_preview_v1_truth',
@@ -2654,6 +2709,7 @@ export const serverMigrations = [
   ...bidParticipationRequestMigrations,
   ...projectCommunicationAlbumMigrations,
   ...projectConversationWorkbenchV1Migrations,
+  ...projectCommunicationMaterialReviewMigrations,
   ...projectCommunicationNotificationPreviewV1Migrations,
   ...projectCounterpartyRatingMigrations,
   ...projectExitGovernancePhase1Migrations,

@@ -11704,9 +11704,12 @@ components:
         - projectId
         - projectNo
         - title
+        - displayTitle
         - buildingType
         - budgetAmount
+        - publishedAt
         - state
+        - nameAccess
         - summary
       description: >
         Frozen showcase list-card read model for the current Flutter App
@@ -11724,6 +11727,12 @@ components:
           type: string
         title:
           type: string
+        displayTitle:
+          type: string
+          description: >
+            App-facing project title display value. It may carry either the real
+            title or the controlled project-name-access placeholder and must be
+            consumed together with `nameAccess`.
         exhibitionName:
           type:
             - string
@@ -11793,10 +11802,56 @@ components:
           description: >
             Optional planned end date shown on showcase cards when present and
             also used by public read trimming.
+        publishedAt:
+          type: string
+          format: date-time
+          description: >
+            Canonical app-facing publish time for rows that have entered the
+            public showcase list. The truth source is Server `Project.publishedAt`.
         state:
           $ref: '#/components/schemas/ProjectState'
+        nameAccess:
+          $ref: '#/components/schemas/ProjectListNameAccessReadModel'
         summary:
           $ref: '#/components/schemas/ProjectReadSummary'
+    ProjectNameAccessStatus:
+      type: string
+      enum:
+        - visible
+        - requestable
+        - pending
+        - rejected
+      description: >
+        Controlled project-name-access status used by public project list and
+        detail reads. BFF and Flutter must not invent additional statuses.
+    ProjectListNameAccessReadModel:
+      type: object
+      required:
+        - status
+        - canRequest
+      description: >
+        Minimum project-name-access projection for public project list items.
+        This carrier only controls title visibility and request entry display;
+        it is not an action matrix or permission truth.
+      properties:
+        status:
+          $ref: '#/components/schemas/ProjectNameAccessStatus'
+        canRequest:
+          type: boolean
+    ProjectDetailNameAccessReadModel:
+      allOf:
+        - $ref: '#/components/schemas/ProjectListNameAccessReadModel'
+        - type: object
+          required:
+            - requestId
+          properties:
+            requestId:
+              type:
+                - string
+                - 'null'
+              description: >
+                Current organization's existing name-access request id when
+                available; otherwise `null`.
     ProjectViewerRelation:
       type: string
       enum:
@@ -11831,10 +11886,12 @@ components:
         - projectId
         - projectNo
         - title
+        - displayTitle
         - buildingType
         - budgetAmount
         - viewerProjectRelation
         - state
+        - nameAccess
         - summary
       description: >
         Shared showcase detail read model for the current Flutter App
@@ -11856,6 +11913,12 @@ components:
           type: string
         title:
           type: string
+        displayTitle:
+          type: string
+          description: >
+            App-facing detail title display value. It may carry either the real
+            title or the controlled project-name-access placeholder and must be
+            consumed together with `nameAccess`.
         exhibitionName:
           type:
             - string
@@ -11971,6 +12034,8 @@ components:
             schedule object or time-slot array.
         viewerProjectRelation:
           $ref: '#/components/schemas/ProjectViewerRelation'
+        nameAccess:
+          $ref: '#/components/schemas/ProjectDetailNameAccessReadModel'
         currentViewerBid:
           oneOf:
             - $ref: '#/components/schemas/ProjectCurrentViewerBid'

@@ -887,6 +887,24 @@ void main() {
     await tester.pumpAndSettle();
   }
 
+  int selectedBottomDestinationIndex(WidgetTester tester) {
+    return tester
+        .widget<NavigationBar>(find.byType(NavigationBar).last)
+        .selectedIndex;
+  }
+
+  Future<void> dragFrom(
+    WidgetTester tester, {
+    required Offset start,
+    required Offset offset,
+  }) async {
+    final gesture = await tester.startGesture(start);
+    await gesture.moveBy(offset);
+    await gesture.up();
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 120));
+  }
+
   NavigatorState rootNavigator(WidgetTester tester) {
     return tester.state<NavigatorState>(find.byType(Navigator).first);
   }
@@ -1555,6 +1573,84 @@ void main() {
     );
   });
 
+  testWidgets(
+    'root shell horizontal swipes switch bottom buildings without cycling',
+    (WidgetTester tester) async {
+      final profileTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/profile/index': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'organization': <String, Object?>{
+                      'organizationId': 'org-1',
+                      'roleKeys': <Object?>[],
+                      'visibleBuildings': <Object?>[
+                        'exhibition',
+                        'messages',
+                        'profile',
+                      ],
+                    },
+                    'certification': <String, Object?>{'status': 'verified'},
+                    'membership': <String, Object?>{'status': 'active'},
+                    'settingsEntry': <String, Object?>{'state': 'visible'},
+                  },
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(buildApp(profileTransport: profileTransport));
+      await tester.pumpAndSettle();
+
+      expect(selectedBottomDestinationIndex(tester), 0);
+
+      await dragFrom(
+        tester,
+        start: const Offset(420, 300),
+        offset: const Offset(-260, 0),
+      );
+      expect(selectedBottomDestinationIndex(tester), 1);
+
+      await dragFrom(
+        tester,
+        start: const Offset(420, 300),
+        offset: const Offset(-260, 0),
+      );
+      expect(selectedBottomDestinationIndex(tester), 2);
+
+      await dragFrom(
+        tester,
+        start: const Offset(420, 300),
+        offset: const Offset(-260, 0),
+      );
+      expect(selectedBottomDestinationIndex(tester), 2);
+
+      await dragFrom(
+        tester,
+        start: const Offset(420, 300),
+        offset: const Offset(260, 0),
+      );
+      expect(selectedBottomDestinationIndex(tester), 1);
+
+      await dragFrom(
+        tester,
+        start: const Offset(420, 300),
+        offset: const Offset(260, 0),
+      );
+      expect(selectedBottomDestinationIndex(tester), 0);
+
+      await dragFrom(
+        tester,
+        start: const Offset(420, 300),
+        offset: const Offset(260, 0),
+      );
+      expect(selectedBottomDestinationIndex(tester), 0);
+    },
+  );
+
   testWidgets('shell back button keeps hover tooltip hidden', (
     WidgetTester tester,
   ) async {
@@ -1593,6 +1689,48 @@ void main() {
       find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded).first,
     );
     await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(find.text('合同详情'), findsNothing);
+    expect(find.text('发现优质项目，把握商机'), findsOneWidget);
+  });
+
+  testWidgets('left edge drag pops stacked shell routes', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            ...defaultHandlers(),
+            'GET /api/app/contract/detail': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'contractId': 'contract-1',
+                  'orderId': 'order-1',
+                  'state': 'pending_confirm',
+                  'summary': _summary('contract'),
+                },
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(buildApp(transport: transport));
+    await tester.pumpAndSettle();
+    await pushNamedRoute(
+      tester,
+      ExhibitionRoutes.contractDetailWithOrderId('order-1'),
+    );
+
+    expect(find.text('合同详情'), findsOneWidget);
+
+    await dragFrom(
+      tester,
+      start: const Offset(4, 260),
+      offset: const Offset(96, 0),
+    );
     await tester.pumpAndSettle();
 
     expect(find.text('合同详情'), findsNothing);
@@ -1984,20 +2122,15 @@ void main() {
         find.widgetWithText(FilledButton, '进入项目沟通').first,
       );
       expect(find.text('展览项目 1'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
+      expect(selectedBottomDestinationIndex(tester), 1);
 
       await _scrollAndTap(
         tester,
-        find.widgetWithText(FilledButton, '进入此项目竞标沟通').first,
+        find.widgetWithText(FilledButton, '进入沟通').first,
       );
-      expect(find.text('竞标沟通'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('聊天'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('聊天'), findsOneWidget);
-      expect(find.text('想跟TA说点什么...'), findsOneWidget);
+      expect(find.text('返回项目列表'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsNothing);
 
       await tester.tap(
         find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded).first,
@@ -2005,9 +2138,9 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(find.text('竞标沟通'), findsNothing);
-      expect(find.text('互动中心'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '进入项目沟通'), findsOneWidget);
+      expect(find.text('返回项目列表'), findsNothing);
+      expect(find.text('展览项目 1'), findsOneWidget);
+      expect(find.byType(NavigationBar), findsOneWidget);
     },
   );
 
@@ -2105,6 +2238,113 @@ void main() {
         find.descendant(of: navigationBar, matching: find.text('消息')),
         findsOneWidget,
       );
+    },
+  );
+
+  testWidgets(
+    'messages page reloads shell unread badge after project communication refresh',
+    (WidgetTester tester) async {
+      var shellContextLoads = 0;
+      final shellContextConsumer = AppShellContextConsumer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/shell/context': (AppApiRequest request) async {
+                    shellContextLoads += 1;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _shellContextPayload(
+                        unreadSummary: <String, Object?>{
+                          'messages': shellContextLoads <= 1 ? 0 : 2,
+                        },
+                      ),
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+      final definition =
+          messagesRegisteredEntryByActionKey['counterpart_conversation.open']!;
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'interactionId': 'interaction-1',
+                            'interactionType': 'counterpart_conversation',
+                            'conversationId': 'conversation-1',
+                            'projectId': 'project-1',
+                            'counterpart': const <String, Object?>{
+                              'organizationId': 'org-counterpart',
+                              'displayName': '重庆海川展览工厂',
+                              'companyName': '重庆坤特展览展示有限公司',
+                              'role': 'counterpart',
+                            },
+                            'summary': const <String, Object?>{
+                              'focusProjectId': 'project-1',
+                              'title': '项目沟通',
+                              'text': '有 2 条项目沟通未读消息。',
+                              'projectCount': 1,
+                              'latestCardType': 'system_notice',
+                            },
+                            'conversationUnreadCount': 2,
+                            'hasUnread': true,
+                            'latestUnreadMessageAt': '2026-05-02T10:18:00Z',
+                            'updatedAt': '2026-05-02T10:18:00Z',
+                            'routeTarget': <String, Object?>{
+                              'objectType': definition.objectType,
+                              'actionKey': definition.actionKey,
+                              'canonicalPath': definition.canonicalPath,
+                              'params': const <String, Object?>{
+                                'conversationId': 'conversation-1',
+                                'projectId': 'project-1',
+                              },
+                            },
+                          },
+                        ],
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          shellContextConsumer: shellContextConsumer,
+          messagesTransport: messagesTransport,
+          sessionStore: buildAuthenticatedSessionStore(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navigationBar = find.byType(NavigationBar);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsNothing,
+      );
+
+      await tapBottomDestination(tester, '消息');
+
+      expect(shellContextLoads, greaterThanOrEqualTo(2));
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
     },
   );
 

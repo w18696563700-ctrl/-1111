@@ -136,6 +136,10 @@ Object _parseInteractionItem(Map<String, Object?> raw) {
     return routeTarget;
   }
 
+  final conversationUnreadCount = _optionalNonNegativeInt(
+    raw['conversationUnreadCount'],
+    'conversationUnreadCount',
+  );
   return MessageInteractionItemView(
     interactionId: interactionId,
     interactionType: interactionType,
@@ -146,6 +150,10 @@ Object _parseInteractionItem(Map<String, Object?> raw) {
     p0PaySummary: parseP0PayReadOnlySummary(
       raw['p0PaySummary'] ?? raw['paymentStatusSummary'],
     ),
+    conversationUnreadCount: conversationUnreadCount,
+    hasUnread:
+        _readOptionalBool(raw['hasUnread']) ?? conversationUnreadCount > 0,
+    latestUnreadMessageAt: _readNullableString(raw['latestUnreadMessageAt']),
     updatedAt: updatedAt,
     routeTarget: routeTarget as MessageInteractionRouteTarget,
   );
@@ -323,6 +331,26 @@ String? _readRequiredString(Map raw, String fieldName) {
 int? _readRequiredInt(Map raw, String fieldName) {
   final value = raw[fieldName];
   if (value is int) {
+    return value;
+  }
+  return null;
+}
+
+int _optionalNonNegativeInt(Object? value, String fieldName) {
+  if (value == null) {
+    return 0;
+  }
+  if (value is int && value >= 0) {
+    return value;
+  }
+  throw FormatException('field "$fieldName" must be a non-negative int');
+}
+
+bool? _readOptionalBool(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  if (value is bool) {
     return value;
   }
   return null;

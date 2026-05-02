@@ -418,6 +418,9 @@ export class ProjectQueryService {
     if (this.isArchivedProject(project)) {
       return false;
     }
+    if (project.state?.trim() !== 'published') {
+      return false;
+    }
     const plannedEndAt = this.toDateOnlyString(project.plannedEndAt);
     if (!plannedEndAt) {
       return true;

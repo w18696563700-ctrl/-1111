@@ -94,7 +94,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
         messageResult?.data?.items ?? const <ProjectCommunicationMessageView>[];
     return _ActionCard(
       title: '项目沟通记录',
-      summary: '消息、附件与确认卡都继续锚定当前项目，便于后续协同与核验。',
+      summary: '消息与附件继续锚定当前项目，关键资料确认请在项目工作入口处理。',
       children: <Widget>[
         if (loadingThread || loadingMessages)
           const _StateMessage(title: '正在同步沟通记录', body: '正在读取项目沟通消息。')
@@ -111,7 +111,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
             body: messageResult!.message ?? messageResult!.state.contractName,
           )
         else if (messages.isEmpty && drafts.isEmpty)
-          const _StateMessage(title: '还没有项目沟通记录', body: '可以从底部输入框发送第一条消息或确认卡。')
+          const _StateMessage(title: '还没有项目沟通记录', body: '可以从底部输入框发送第一条项目沟通消息。')
         else ...<Widget>[
           for (final message in messages)
             _ProjectCommunicationMessageBubble(
@@ -232,11 +232,13 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final statusLabel = _messageStatusLabel(message, isMine);
+    final sentAtLabel = _formatChatTime(message.createdAt);
     return _ChatBubble(
       body: message.body,
       attachment: message.attachment,
       confirmation: message.confirmation,
-      meta: _formatChatTime(message.createdAt),
+      meta: statusLabel == null ? sentAtLabel : '$sentAtLabel · $statusLabel',
       isMine: isMine,
       senderName: senderName,
       roleLabel: roleLabel,
@@ -250,6 +252,22 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
           ? null
           : onOpenConfirmationSoftLink,
     );
+  }
+
+  String? _messageStatusLabel(
+    ProjectCommunicationMessageView message,
+    bool isMine,
+  ) {
+    if (!isMine) {
+      return null;
+    }
+    if (message.readState == 'read_by_counterpart') {
+      return '已读';
+    }
+    if (message.deliveryState == 'persisted') {
+      return '已发送';
+    }
+    return null;
   }
 }
 
@@ -271,9 +289,10 @@ class _DraftProjectCommunicationMessageBubble extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final failed = draft.state == _DraftProjectCommunicationState.failed;
+    final sentAtLabel = _formatDraftChatTime(draft.createdAt);
     final meta = failed
-        ? '发送失败${draft.errorMessage == null ? '' : ' · ${draft.errorMessage}'}'
-        : '发送中...';
+        ? '$sentAtLabel · 发送失败${draft.errorMessage == null ? '' : ' · ${draft.errorMessage}'}'
+        : '$sentAtLabel · 发送中';
     return _ChatBubble(
       body: draft.body,
       attachment: draft.attachment,
@@ -808,7 +827,6 @@ class _ProjectCommunicationComposer extends StatelessWidget {
     required this.onSend,
     required this.onAttachFile,
     required this.onAttachImage,
-    required this.onCreateConfirmation,
   });
 
   final TextEditingController controller;
@@ -817,7 +835,6 @@ class _ProjectCommunicationComposer extends StatelessWidget {
   final VoidCallback onSend;
   final VoidCallback onAttachFile;
   final VoidCallback onAttachImage;
-  final VoidCallback onCreateConfirmation;
 
   @override
   Widget build(BuildContext context) {
@@ -854,12 +871,6 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                       label: '图片',
                       enabled: enabled && !sending,
                       onPressed: onAttachImage,
-                    ),
-                    _ComposerActionButton(
-                      icon: Icons.verified_outlined,
-                      label: '确认',
-                      enabled: enabled && !sending,
-                      onPressed: onCreateConfirmation,
                     ),
                   ],
                 ),
@@ -936,107 +947,6 @@ class _ComposerActionButton extends StatelessWidget {
   }
 }
 
-class _ProjectConfirmationComposerSheet extends StatefulWidget {
-  const _ProjectConfirmationComposerSheet();
-
-  @override
-  State<_ProjectConfirmationComposerSheet> createState() =>
-      _ProjectConfirmationComposerSheetState();
-}
-
-class _ProjectConfirmationComposerSheetState
-    extends State<_ProjectConfirmationComposerSheet> {
-  final TextEditingController _titleController = TextEditingController();
-  final TextEditingController _summaryController = TextEditingController();
-  String _type = 'quote';
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _summaryController.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.viewInsetsOf(context).bottom;
-    return Padding(
-      padding: EdgeInsets.fromLTRB(20, 18, 20, 20 + bottomInset),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Text(
-            '新增关键确认',
-            style: Theme.of(
-              context,
-            ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w900),
-          ),
-          const SizedBox(height: 12),
-          DropdownButtonFormField<String>(
-            initialValue: _type,
-            items: const <DropdownMenuItem<String>>[
-              DropdownMenuItem(value: 'quote', child: Text('报价确认')),
-              DropdownMenuItem(
-                value: 'material_process',
-                child: Text('工艺/材质确认'),
-              ),
-              DropdownMenuItem(value: 'schedule', child: Text('排期确认')),
-            ],
-            onChanged: (value) => setState(() => _type = value ?? 'quote'),
-            decoration: const InputDecoration(labelText: '确认类型'),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _titleController,
-            maxLength: 80,
-            decoration: const InputDecoration(
-              labelText: '标题',
-              hintText: '例如：报价确认',
-            ),
-          ),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _summaryController,
-            minLines: 3,
-            maxLines: 5,
-            maxLength: 500,
-            decoration: const InputDecoration(
-              labelText: '确认摘要',
-              hintText: '写清楚报价、材质或排期的关键结论。',
-            ),
-          ),
-          const SizedBox(height: 12),
-          FilledButton.icon(
-            onPressed: _submit,
-            icon: const Icon(Icons.verified_outlined),
-            label: const Text('发送确认卡'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _submit() {
-    final title = _titleController.text.trim();
-    final summary = _summaryController.text.trim();
-    if (title.isEmpty || summary.isEmpty) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(const SnackBar(content: Text('请填写确认标题和摘要。')));
-      return;
-    }
-    Navigator.of(context).pop(
-      ProjectCommunicationConfirmationView(
-        confirmationType: _type,
-        title: title,
-        summary: summary,
-        status: 'proposed',
-      ),
-    );
-  }
-}
-
 String _formatChatTime(String value) {
   final parsed = DateTime.tryParse(value);
   if (parsed == null) {
@@ -1045,6 +955,12 @@ String _formatChatTime(String value) {
   final local = parsed.toLocal();
   final hour = local.hour.toString().padLeft(2, '0');
   final minute = local.minute.toString().padLeft(2, '0');
+  return '$hour:$minute';
+}
+
+String _formatDraftChatTime(DateTime value) {
+  final hour = value.hour.toString().padLeft(2, '0');
+  final minute = value.minute.toString().padLeft(2, '0');
   return '$hour:$minute';
 }
 

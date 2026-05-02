@@ -617,11 +617,19 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
         ? '$companyName · 项目 ${item.summary.projectCount} 个'
         : '项目 ${item.summary.projectCount} 个';
     final avatarUrl = identity.avatarUrl?.trim();
+    final unreadCount = item.conversationUnreadCount;
+    final hasUnread = item.hasUnread && unreadCount > 0;
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
+        color: hasUnread
+            ? theme.colorScheme.errorContainer.withValues(alpha: 0.10)
+            : theme.colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+        border: Border.all(
+          color: hasUnread
+              ? theme.colorScheme.error.withValues(alpha: 0.38)
+              : theme.colorScheme.outlineVariant,
+        ),
       ),
       child: Padding(
         padding: const EdgeInsets.all(12),
@@ -672,6 +680,10 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (hasUnread) ...<Widget>[
+                  const SizedBox(width: 8),
+                  _MessagesUnreadBadge(label: _unreadCountLabel(unreadCount)),
+                ],
               ],
             ),
             const SizedBox(height: 10),
@@ -689,6 +701,33 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _MessagesUnreadBadge extends StatelessWidget {
+  const _MessagesUnreadBadge({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        child: Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onError,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );
@@ -856,7 +895,17 @@ String _notFoundHint(_MessagesInteractionTab tab) {
 
 String _projectCommunicationOpenLabel(MessageInteractionItemView item) {
   return switch (item.interactionType) {
-    'counterpart_conversation' => '进入项目沟通',
+    'counterpart_conversation' =>
+      item.hasUnread && item.conversationUnreadCount > 0
+          ? '进入项目沟通 · 未读 ${item.conversationUnreadCount}'
+          : '进入项目沟通',
     _ => '进入沟通',
   };
+}
+
+String _unreadCountLabel(int count) {
+  if (count > 99) {
+    return '99+';
+  }
+  return '$count';
 }

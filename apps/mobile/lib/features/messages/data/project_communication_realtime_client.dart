@@ -71,6 +71,9 @@ final class ProjectCommunicationMessageCreatedEvent {
       confirmation: confirmation,
       clientMessageId: clientMessageId,
       messageState: 'active',
+      deliveryState: 'persisted',
+      readState: 'not_applicable',
+      readByCounterpartAt: null,
       createdAt: createdAt,
     );
   }

@@ -2,7 +2,10 @@ import { Injectable, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ProjectEntity } from '../project/entities/project.entity';
-import { ProjectCommunicationUnreadQueryService } from '../project_communication/project-communication-unread.query.service';
+import {
+  ProjectCommunicationUnreadQueryService,
+  ProjectCommunicationUnreadStats,
+} from '../project_communication/project-communication-unread.query.service';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
@@ -29,6 +32,11 @@ type ConversationAggregate = {
   focusProjectId: string;
   pricingSummary?: Record<string, unknown>;
   latestActivityAt: string;
+  conversationUnreadCount: number;
+  hasUnread: boolean;
+  latestUnreadMessageAt: string | null;
+  myPublishedUnreadCount: number;
+  myBidUnreadCount: number;
   projectGroups: CounterpartConversationProjectGroupProjection[];
 };
 
@@ -91,6 +99,9 @@ export class CounterpartConversationProjectionService {
         conversationId: conversation.conversationId,
         projectId: conversation.focusProjectId,
       }),
+      conversationUnreadCount: conversation.conversationUnreadCount,
+      hasUnread: conversation.hasUnread,
+      latestUnreadMessageAt: conversation.latestUnreadMessageAt,
     }));
   }
 
@@ -127,6 +138,11 @@ export class CounterpartConversationProjectionService {
       summary: conversation.summary,
       focusProjectId,
       latestActivityAt: conversation.latestActivityAt,
+      conversationUnreadCount: conversation.conversationUnreadCount,
+      hasUnread: conversation.hasUnread,
+      latestUnreadMessageAt: conversation.latestUnreadMessageAt,
+      myPublishedUnreadCount: conversation.myPublishedUnreadCount,
+      myBidUnreadCount: conversation.myBidUnreadCount,
       projectGroups: this.sortProjectGroups(conversation.projectGroups, focusProjectId),
     };
   }
@@ -138,10 +154,10 @@ export class CounterpartConversationProjectionService {
     }
 
     const projectIds = [...new Set(seeds.map((item) => item.projectId))];
-    const [projects, ratingEntryMap, unreadByProjectId] = await Promise.all([
+    const [projects, ratingEntryMap, unreadStatsByProjectId] = await Promise.all([
       this.projectRepository.findBy({ id: In(projectIds) }),
       this.buildRatingEntryMap(projectIds, viewerOrganizationId),
-      this.buildProjectUnreadMap(projectIds, viewerOrganizationId),
+      this.buildProjectUnreadStatsMap(projectIds, viewerOrganizationId),
     ]);
     const projectMap = new Map(projects.map((item) => [item.id, item]));
     const nameAccessProjectionMap = await this.buildNameAccessProjectionMap({
@@ -158,10 +174,11 @@ export class CounterpartConversationProjectionService {
           nameAccessProjectionMap,
           viewerOrganizationId,
           ratingEntryMap,
-          unreadByProjectId,
+          unreadStatsByProjectId,
         });
         const focusProject = projectGroups[0];
         const latestCard = focusProject.cards[0];
+        const unreadSummary = this.summarizeProjectGroupUnread(projectGroups);
         return {
           conversationId,
           counterpart: aggregate.counterpart,
@@ -175,6 +192,11 @@ export class CounterpartConversationProjectionService {
           focusProjectId: focusProject.projectId,
           ...(focusProject.pricingSummary ? { pricingSummary: focusProject.pricingSummary } : {}),
           latestActivityAt: aggregate.latestActivityAt,
+          conversationUnreadCount: unreadSummary.conversationUnreadCount,
+          hasUnread: unreadSummary.conversationUnreadCount > 0,
+          latestUnreadMessageAt: unreadSummary.latestUnreadMessageAt,
+          myPublishedUnreadCount: unreadSummary.myPublishedUnreadCount,
+          myBidUnreadCount: unreadSummary.myBidUnreadCount,
           projectGroups,
         };
       })
@@ -291,7 +313,7 @@ export class CounterpartConversationProjectionService {
     projectMap: Map<string, ProjectEntity>;
     viewerOrganizationId: string;
     ratingEntryMap: Map<string, CounterpartConversationRatingEntryProjection>;
-    unreadByProjectId: Map<string, number>;
+    unreadStatsByProjectId: Map<string, ProjectCommunicationUnreadStats>;
     nameAccessProjectionMap: Awaited<
       ReturnType<ProjectNameAccessProjectionService['buildPublicProjectionMap']>
     >;
@@ -302,7 +324,8 @@ export class CounterpartConversationProjectionService {
         const projection = input.nameAccessProjectionMap.get(projectId);
         const titleVisibility =
           projection?.nameAccess.status === 'visible' ? 'visible' : 'masked';
-        const projectUnreadCount = input.unreadByProjectId.get(projectId) ?? 0;
+        const unreadStats =
+          input.unreadStatsByProjectId.get(projectId) ?? this.emptyUnreadStats();
         return {
           projectId,
           projectDisplayTitle: this.buildCounterpartProjectDisplayTitle({
@@ -319,8 +342,9 @@ export class CounterpartConversationProjectionService {
           projectPublishedAt: project?.publishedAt?.toISOString() ?? null,
           projectUpdatedAt: project?.updatedAt?.toISOString() ?? null,
           latestActivityAt: group.latestActivityAt,
-          projectUnreadCount,
-          hasProjectUnread: projectUnreadCount > 0,
+          projectUnreadCount: unreadStats.unreadCount,
+          hasProjectUnread: unreadStats.hasUnread,
+          latestUnreadMessageAt: unreadStats.latestUnreadMessageAt,
           ...(group.pricingSummary ? { pricingSummary: group.pricingSummary } : {}),
           ratingEntry:
             input.ratingEntryMap.get(
@@ -336,17 +360,62 @@ export class CounterpartConversationProjectionService {
       );
   }
 
-  private async buildProjectUnreadMap(
+  private async buildProjectUnreadStatsMap(
     projectIds: string[],
     viewerOrganizationId: string,
   ) {
     if (!this.unreadQueryService) {
-      return new Map(projectIds.map((projectId) => [projectId, 0]));
+      return new Map(projectIds.map((projectId) => [projectId, this.emptyUnreadStats()]));
     }
-    return this.unreadQueryService.buildUnreadMapForCounterpartProjects(
+    return this.unreadQueryService.buildUnreadStatsForCounterpartProjects(
       projectIds,
       viewerOrganizationId,
     );
+  }
+
+  private summarizeProjectGroupUnread(
+    projectGroups: CounterpartConversationProjectGroupProjection[],
+  ) {
+    return projectGroups.reduce(
+      (summary, group) => {
+        summary.conversationUnreadCount += group.projectUnreadCount;
+        summary.latestUnreadMessageAt = this.maxIso(
+          summary.latestUnreadMessageAt,
+          group.latestUnreadMessageAt,
+        );
+        if (group.projectRelation === 'my_published') {
+          summary.myPublishedUnreadCount += group.projectUnreadCount;
+        }
+        if (group.projectRelation === 'my_bid') {
+          summary.myBidUnreadCount += group.projectUnreadCount;
+        }
+        return summary;
+      },
+      {
+        conversationUnreadCount: 0,
+        latestUnreadMessageAt: null as string | null,
+        myPublishedUnreadCount: 0,
+        myBidUnreadCount: 0,
+      },
+    );
+  }
+
+  private maxIso(left: string | null, right: string | null) {
+    if (!right) {
+      return left;
+    }
+    if (!left) {
+      return right;
+    }
+    return left >= right ? left : right;
+  }
+
+  private emptyUnreadStats(): ProjectCommunicationUnreadStats {
+    return {
+      unreadCount: 0,
+      hasUnread: false,
+      latestUnreadMessageAt: null,
+    };
   }
 
   private buildCounterpartProjectDisplayTitle(input: {

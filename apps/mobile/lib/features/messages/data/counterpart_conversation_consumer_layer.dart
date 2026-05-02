@@ -203,6 +203,90 @@ class CounterpartConversationConsumerLayer {
     );
   }
 
+  Future<CounterpartConversationResult<ProjectCommunicationWorkbenchView>>
+  loadProjectCommunicationWorkbench({
+    required String? projectId,
+    required String? threadId,
+    String? counterpartOrganizationId,
+    String? bidId,
+  }) {
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedThreadId = _normalize(threadId);
+    if (normalizedProjectId == null || normalizedThreadId == null) {
+      return Future.value(
+        _invalid(
+          MessagesCanonicalPaths.projectCommunicationWorkbench,
+          'projectId and threadId are required before loading project workbench',
+        ),
+      );
+    }
+    final queryParameters = <String, String>{
+      'projectId': normalizedProjectId,
+      'threadId': normalizedThreadId,
+    };
+    final normalizedCounterpartId = _normalize(counterpartOrganizationId);
+    if (normalizedCounterpartId != null) {
+      queryParameters['counterpartOrganizationId'] = normalizedCounterpartId;
+    }
+    final normalizedBidId = _normalize(bidId);
+    if (normalizedBidId != null) {
+      queryParameters['bidId'] = normalizedBidId;
+    }
+    return _get(
+      MessagesCanonicalPaths.projectCommunicationWorkbench,
+      queryParameters: queryParameters,
+      parser: parseProjectCommunicationWorkbench,
+    );
+  }
+
+  Future<
+    CounterpartConversationResult<ProjectCommunicationMaterialReviewResponseView>
+  >
+  submitProjectCommunicationMaterialReview({
+    required String? projectId,
+    required String? threadId,
+    required String? bidId,
+    required String entryKey,
+    required String reviewAction,
+    List<String> feedbackReasonCodes = const <String>[],
+    String? feedbackText,
+    String? sourceVersionToken,
+    required String idempotencyKey,
+  }) {
+    final normalizedProjectId = _normalize(projectId);
+    final normalizedThreadId = _normalize(threadId);
+    final normalizedEntryKey = _normalize(entryKey);
+    final normalizedReviewAction = _normalize(reviewAction);
+    final normalizedIdempotencyKey = _normalize(idempotencyKey);
+    if (normalizedProjectId == null ||
+        normalizedThreadId == null ||
+        normalizedEntryKey == null ||
+        normalizedReviewAction == null ||
+        normalizedIdempotencyKey == null) {
+      return Future.value(
+        _invalid(
+          MessagesCanonicalPaths.projectCommunicationWorkbenchMaterialReview,
+          'projectId, threadId, entryKey, reviewAction and idempotencyKey are required before material review',
+        ),
+      );
+    }
+    return _post(
+      MessagesCanonicalPaths.projectCommunicationWorkbenchMaterialReview,
+      body: <String, Object?>{
+        'projectId': normalizedProjectId,
+        'threadId': normalizedThreadId,
+        'bidId': _normalize(bidId),
+        'entryKey': normalizedEntryKey,
+        'reviewAction': normalizedReviewAction,
+        'feedbackReasonCodes': feedbackReasonCodes,
+        'feedbackText': _normalize(feedbackText),
+        'sourceVersionToken': _normalize(sourceVersionToken),
+        'idempotencyKey': normalizedIdempotencyKey,
+      },
+      parser: parseProjectCommunicationMaterialReviewResponse,
+    );
+  }
+
   Future<
     CounterpartConversationResult<ProjectCommunicationFilePreviewAccessView>
   >

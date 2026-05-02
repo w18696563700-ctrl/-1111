@@ -15840,9 +15840,12 @@
           "projectId",
           "projectNo",
           "title",
+          "displayTitle",
           "buildingType",
           "budgetAmount",
+          "publishedAt",
           "state",
+          "nameAccess",
           "summary"
         ],
         "description": "Frozen showcase list-card read model for the current Flutter App `project/list` surface only. This model admits the current card fields plus optional `areaSqm` and standardized province/city `code + name`. Lightweight region/type/state or raw-area labels remain derivable from these returned fields and do not become an explicit shared `tags` array. District detail, free-text address, scope, schedule, `buildingTypeRemark`, `description`, and formal attachment lists remain outside the list-card contract.\n",
@@ -15855,6 +15858,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "displayTitle": {
+            "type": "string",
+            "description": "App-facing project title display value. It may carry either the real title or the controlled project-name-access placeholder and must be consumed together with `nameAccess`.\n"
           },
           "exhibitionName": {
             "type": [
@@ -15929,13 +15936,69 @@
             "format": "date",
             "description": "Optional planned end date shown on showcase cards when present and also used by public read trimming.\n"
           },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Canonical app-facing publish time for rows that have entered the public showcase list. The truth source is Server `Project.publishedAt`.\n"
+          },
           "state": {
             "$ref": "#/components/schemas/ProjectState"
+          },
+          "nameAccess": {
+            "$ref": "#/components/schemas/ProjectListNameAccessReadModel"
           },
           "summary": {
             "$ref": "#/components/schemas/ProjectReadSummary"
           }
         }
+      },
+      "ProjectNameAccessStatus": {
+        "type": "string",
+        "enum": [
+          "visible",
+          "requestable",
+          "pending",
+          "rejected"
+        ],
+        "description": "Controlled project-name-access status used by public project list and detail reads. BFF and Flutter must not invent additional statuses.\n"
+      },
+      "ProjectListNameAccessReadModel": {
+        "type": "object",
+        "required": [
+          "status",
+          "canRequest"
+        ],
+        "description": "Minimum project-name-access projection for public project list items. This carrier only controls title visibility and request entry display; it is not an action matrix or permission truth.\n",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/ProjectNameAccessStatus"
+          },
+          "canRequest": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ProjectDetailNameAccessReadModel": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/ProjectListNameAccessReadModel"
+          },
+          {
+            "type": "object",
+            "required": [
+              "requestId"
+            ],
+            "properties": {
+              "requestId": {
+                "type": [
+                  "string",
+                  "null"
+                ],
+                "description": "Current organization's existing name-access request id when available; otherwise `null`.\n"
+              }
+            }
+          }
+        ]
       },
       "ProjectViewerRelation": {
         "type": "string",
@@ -15967,10 +16030,12 @@
           "projectId",
           "projectNo",
           "title",
+          "displayTitle",
           "buildingType",
           "budgetAmount",
           "viewerProjectRelation",
           "state",
+          "nameAccess",
           "summary"
         ],
         "description": "Shared showcase detail read model for the current Flutter App `project/detail` surface and the internal `GET /server/projects/{projectId}` pair only. This model carries the richer detail truth admitted by project publish and showcase alignment, including Round B fields, standardized district detail, free-text `detailAddress`, and detail `description`. For optional-auth owner-aware continuation, this model also carries the minimum `viewerProjectRelation` carrier only; it must not expose raw `creator_user_id`, raw `organization_id`, or any action matrix. `buildingTypeRemark` remains explanatory only and does not become classification truth. Formal attachment lists remain outside this shared detail contract and must enter a separate attachment-read contract freeze.\n",
@@ -15983,6 +16048,10 @@
           },
           "title": {
             "type": "string"
+          },
+          "displayTitle": {
+            "type": "string",
+            "description": "App-facing detail title display value. It may carry either the real title or the controlled project-name-access placeholder and must be consumed together with `nameAccess`.\n"
           },
           "exhibitionName": {
             "type": [
@@ -16100,6 +16169,9 @@
           },
           "viewerProjectRelation": {
             "$ref": "#/components/schemas/ProjectViewerRelation"
+          },
+          "nameAccess": {
+            "$ref": "#/components/schemas/ProjectDetailNameAccessReadModel"
           },
           "currentViewerBid": {
             "oneOf": [

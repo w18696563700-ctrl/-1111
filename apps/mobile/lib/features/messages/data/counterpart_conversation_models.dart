@@ -89,6 +89,7 @@ final class CounterpartConversationProjectGroupView {
     required this.projectPublishedAt,
     required this.projectUpdatedAt,
     required this.latestActivityAt,
+    required this.latestUnreadMessageAt,
     required this.projectUnreadCount,
     required this.hasProjectUnread,
     required this.orderSummary,
@@ -104,6 +105,7 @@ final class CounterpartConversationProjectGroupView {
   final String? projectPublishedAt;
   final String? projectUpdatedAt;
   final String latestActivityAt;
+  final String? latestUnreadMessageAt;
   final int projectUnreadCount;
   final bool hasProjectUnread;
   final CounterpartConversationOrderSummaryView? orderSummary;
@@ -174,6 +176,11 @@ final class CounterpartConversationDetailView {
     required this.summary,
     required this.focusProjectId,
     required this.latestActivityAt,
+    required this.conversationUnreadCount,
+    required this.hasUnread,
+    required this.latestUnreadMessageAt,
+    required this.myPublishedUnreadCount,
+    required this.myBidUnreadCount,
     required this.projectGroups,
   });
 
@@ -182,6 +189,11 @@ final class CounterpartConversationDetailView {
   final MessageInteractionSummaryView summary;
   final String focusProjectId;
   final String latestActivityAt;
+  final int conversationUnreadCount;
+  final bool hasUnread;
+  final String? latestUnreadMessageAt;
+  final int myPublishedUnreadCount;
+  final int myBidUnreadCount;
   final List<CounterpartConversationProjectGroupView> projectGroups;
 }
 
@@ -223,6 +235,9 @@ final class ProjectCommunicationMessageView {
     required this.confirmation,
     required this.clientMessageId,
     required this.messageState,
+    required this.deliveryState,
+    required this.readState,
+    required this.readByCounterpartAt,
     required this.createdAt,
   });
 
@@ -238,6 +253,9 @@ final class ProjectCommunicationMessageView {
   final ProjectCommunicationConfirmationView? confirmation;
   final String? clientMessageId;
   final String messageState;
+  final String deliveryState;
+  final String readState;
+  final String? readByCounterpartAt;
   final String createdAt;
 }
 
@@ -348,6 +366,145 @@ final class ProjectCommunicationReadCursorView {
   final String organizationId;
   final String? lastReadMessageId;
   final String lastReadAt;
+  final String updatedAt;
+}
+
+final class ProjectCommunicationWorkbenchView {
+  const ProjectCommunicationWorkbenchView({
+    required this.projectId,
+    required this.threadId,
+    required this.viewerRole,
+    required this.entries,
+    required this.generatedAt,
+  });
+
+  final String projectId;
+  final String threadId;
+  final String viewerRole;
+  final List<ProjectCommunicationWorkbenchEntryView> entries;
+  final String generatedAt;
+}
+
+final class ProjectCommunicationWorkbenchEntryView {
+  const ProjectCommunicationWorkbenchEntryView({
+    required this.entryKey,
+    required this.group,
+    required this.label,
+    required this.summary,
+    required this.projectId,
+    required this.threadId,
+    required this.bidId,
+    required this.viewerRole,
+    required this.subjectOwnerRole,
+    required this.availabilityState,
+    required this.reviewState,
+    required this.actionState,
+    required this.attachmentCount,
+    required this.sourceFiles,
+    required this.latestFeedbackText,
+    required this.latestFeedbackAt,
+    required this.reviewedAt,
+    required this.routeTarget,
+    required this.truthAnchor,
+  });
+
+  final String entryKey;
+  final String group;
+  final String label;
+  final String? summary;
+  final String projectId;
+  final String threadId;
+  final String? bidId;
+  final String viewerRole;
+  final String subjectOwnerRole;
+  final String availabilityState;
+  final String? reviewState;
+  final String actionState;
+  final int attachmentCount;
+  final List<ProjectCommunicationWorkbenchSourceFileView> sourceFiles;
+  final String? latestFeedbackText;
+  final String? latestFeedbackAt;
+  final String? reviewedAt;
+  final ProjectCommunicationWorkbenchRouteTargetView? routeTarget;
+  final ProjectCommunicationWorkbenchTruthAnchorView truthAnchor;
+
+  bool get isMaterialEntry => group != 'deal_confirmation';
+
+  bool get canSubmitReview =>
+      isMaterialEntry &&
+      actionState == 'enabled' &&
+      availabilityState == 'readable';
+}
+
+final class ProjectCommunicationWorkbenchSourceFileView {
+  const ProjectCommunicationWorkbenchSourceFileView({
+    required this.fileAssetId,
+    required this.fileName,
+    required this.mimeType,
+    required this.sortOrder,
+  });
+
+  final String fileAssetId;
+  final String fileName;
+  final String mimeType;
+  final int sortOrder;
+}
+
+final class ProjectCommunicationWorkbenchRouteTargetView {
+  const ProjectCommunicationWorkbenchRouteTargetView({
+    required this.actionKey,
+    required this.canonicalPath,
+    required this.params,
+  });
+
+  final String actionKey;
+  final String canonicalPath;
+  final Map<String, String> params;
+}
+
+final class ProjectCommunicationWorkbenchTruthAnchorView {
+  const ProjectCommunicationWorkbenchTruthAnchorView({
+    required this.truthOwner,
+    required this.subjectType,
+    required this.projectId,
+    required this.threadId,
+    required this.bidId,
+    required this.subjectOwnerOrganizationId,
+    required this.reviewerOrganizationId,
+    required this.materialKind,
+    required this.bidMaterialSlot,
+    required this.dealConfirmationId,
+    required this.sourceVersionToken,
+  });
+
+  final String truthOwner;
+  final String subjectType;
+  final String projectId;
+  final String threadId;
+  final String? bidId;
+  final String? subjectOwnerOrganizationId;
+  final String? reviewerOrganizationId;
+  final String? materialKind;
+  final String? bidMaterialSlot;
+  final String? dealConfirmationId;
+  final String? sourceVersionToken;
+}
+
+final class ProjectCommunicationMaterialReviewResponseView {
+  const ProjectCommunicationMaterialReviewResponseView({
+    required this.entry,
+    required this.entries,
+    required this.projectId,
+    required this.threadId,
+    required this.viewerRole,
+    required this.updatedAt,
+  });
+
+  final ProjectCommunicationWorkbenchEntryView entry;
+  final List<ProjectCommunicationWorkbenchEntryView>? entries;
+  final String projectId;
+  final String threadId;
+  final String viewerRole;
   final String updatedAt;
 }
 

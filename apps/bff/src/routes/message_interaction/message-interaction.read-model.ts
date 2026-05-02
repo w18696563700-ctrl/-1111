@@ -28,6 +28,9 @@ export type MessageInteractionReadModel = {
   };
   pricingSummary?: Record<string, unknown>;
   updatedAt: string;
+  conversationUnreadCount: number;
+  hasUnread: boolean;
+  latestUnreadMessageAt: string | null;
   routeTarget: MessageInteractionRouteTarget;
 };
 
@@ -111,6 +114,13 @@ function readMessageInteractionItem(
     summary,
     ...(pricingSummary ? { pricingSummary } : {}),
     updatedAt: readRequiredString(record.updatedAt, "updatedAt"),
+    conversationUnreadCount: readOptionalNonNegativeNumber(
+      record.conversationUnreadCount,
+      "conversationUnreadCount",
+      0,
+    ),
+    hasUnread: readOptionalBoolean(record.hasUnread, false),
+    latestUnreadMessageAt: readNullableString(record.latestUnreadMessageAt),
     routeTarget,
   };
 }
@@ -297,6 +307,35 @@ function readRequiredNumber(value: unknown, fieldName: string) {
   if (typeof value !== "number" || Number.isNaN(value)) {
     throw new Error(
       `Message interactions response is missing \`${fieldName}\`.`,
+    );
+  }
+  return value;
+}
+
+function readOptionalNonNegativeNumber(
+  value: unknown,
+  fieldName: string,
+  fallback: number,
+) {
+  if (value == null) {
+    return fallback;
+  }
+  const parsed = readRequiredNumber(value, fieldName);
+  if (parsed < 0) {
+    throw new Error(
+      `Message interactions response returned a negative \`${fieldName}\`.`,
+    );
+  }
+  return parsed;
+}
+
+function readOptionalBoolean(value: unknown, fallback: boolean) {
+  if (value == null) {
+    return fallback;
+  }
+  if (typeof value !== "boolean") {
+    throw new Error(
+      "Message interactions response returned a non-boolean optional field.",
     );
   }
   return value;

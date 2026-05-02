@@ -825,10 +825,19 @@ test('counterpart conversation project title uses concrete project title when vi
     emptySource,
     emptySource,
     {
-      async buildUnreadMapForCounterpartProjects(projectIds, viewerOrganizationId) {
+      async buildUnreadStatsForCounterpartProjects(projectIds, viewerOrganizationId) {
         assert.deepEqual(projectIds, ['project-luzhou']);
         assert.equal(viewerOrganizationId, 'org-owner');
-        return new Map([['project-luzhou', 2]]);
+        return new Map([
+          [
+            'project-luzhou',
+            {
+              unreadCount: 2,
+              hasUnread: true,
+              latestUnreadMessageAt: '2026-04-24T09:30:00.000Z',
+            },
+          ],
+        ]);
       },
     },
   );
@@ -847,9 +856,15 @@ test('counterpart conversation project title uses concrete project title when vi
   assert.equal(result.projectGroups[0].latestActivityAt, now);
   assert.equal(result.projectGroups[0].projectUnreadCount, 2);
   assert.equal(result.projectGroups[0].hasProjectUnread, true);
+  assert.equal(result.projectGroups[0].latestUnreadMessageAt, '2026-04-24T09:30:00.000Z');
+  assert.equal(result.conversationUnreadCount, 2);
+  assert.equal(result.hasUnread, true);
+  assert.equal(result.latestUnreadMessageAt, '2026-04-24T09:30:00.000Z');
+  assert.equal(result.myPublishedUnreadCount, 2);
+  assert.equal(result.myBidUnreadCount, 0);
 });
 
-test('project communication unread query counts only counterpart unread threads', async () => {
+test('project communication unread query counts counterpart unread messages', async () => {
   const {
     ProjectCommunicationUnreadQueryService,
   } = require('../dist/modules/project_communication/project-communication-unread.query.service.js');
@@ -859,8 +874,8 @@ test('project communication unread query counts only counterpart unread threads'
       projectId: 'project-1',
       ownerOrganizationId: 'org-viewer',
       counterpartOrganizationId: 'org-other',
-      lastMessageId: 'message-other-new',
-      lastMessageAt: new Date('2026-04-24T09:00:00.000Z'),
+      lastMessageId: 'message-other-new-3',
+      lastMessageAt: new Date('2026-04-24T09:40:00.000Z'),
     },
     {
       id: 'thread-read',
@@ -892,44 +907,200 @@ test('project communication unread query counts only counterpart unread threads'
             threadId: 'thread-unread',
             organizationId: 'org-viewer',
             projectId: 'project-1',
+            lastReadMessageId: 'message-viewer-read-boundary',
             lastReadAt: new Date('2026-04-24T08:30:00.000Z'),
           },
           {
             threadId: 'thread-read',
             organizationId: 'org-viewer',
             projectId: 'project-1',
+            lastReadMessageId: 'message-other-read',
             lastReadAt: new Date('2026-04-24T08:30:00.000Z'),
           },
         ];
       },
     },
     {
-      async findBy() {
+      async find({ where }) {
+        assert.ok(where.threadId);
         return [
           {
-            id: 'message-other-new',
+            id: 'message-viewer-read-boundary',
+            threadId: 'thread-unread',
+            projectId: 'project-1',
+            senderOrganizationId: 'org-viewer',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T08:30:00.000Z'),
+          },
+          {
+            id: 'message-other-new-1',
+            threadId: 'thread-unread',
+            projectId: 'project-1',
             senderOrganizationId: 'org-other',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T09:00:00.000Z'),
+          },
+          {
+            id: 'message-other-new-2',
+            threadId: 'thread-unread',
+            projectId: 'project-1',
+            senderOrganizationId: 'org-other',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T09:10:00.000Z'),
+          },
+          {
+            id: 'message-viewer-own-after',
+            threadId: 'thread-unread',
+            projectId: 'project-1',
+            senderOrganizationId: 'org-viewer',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T09:20:00.000Z'),
+          },
+          {
+            id: 'message-other-new-3',
+            threadId: 'thread-unread',
+            projectId: 'project-1',
+            senderOrganizationId: 'org-other',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T09:40:00.000Z'),
           },
           {
             id: 'message-other-read',
+            threadId: 'thread-read',
+            projectId: 'project-1',
             senderOrganizationId: 'org-third',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T08:00:00.000Z'),
           },
           {
             id: 'message-own',
+            threadId: 'thread-own-last',
+            projectId: 'project-2',
             senderOrganizationId: 'org-viewer',
+            messageState: 'active',
+            createdAt: new Date('2026-04-24T07:00:00.000Z'),
+          },
+        ];
+      },
+      async findBy() {
+        return [
+          {
+            id: 'message-viewer-read-boundary',
+            threadId: 'thread-unread',
+            projectId: 'project-1',
+            createdAt: new Date('2026-04-24T08:30:00.000Z'),
+          },
+          {
+            id: 'message-other-read',
+            threadId: 'thread-read',
+            projectId: 'project-1',
+            createdAt: new Date('2026-04-24T08:00:00.000Z'),
           },
         ];
       },
     },
   );
 
+  const unreadStatsByProject = await service.buildUnreadStatsForCounterpartProjects(
+    ['project-1', 'project-2'],
+    'org-viewer',
+  );
   const unreadByProject = await service.buildUnreadMapForCounterpartProjects(
     ['project-1', 'project-2'],
     'org-viewer',
   );
-  assert.equal(unreadByProject.get('project-1'), 1);
+  assert.equal(unreadStatsByProject.get('project-1').unreadCount, 3);
+  assert.equal(unreadStatsByProject.get('project-1').hasUnread, true);
+  assert.equal(
+    unreadStatsByProject.get('project-1').latestUnreadMessageAt,
+    '2026-04-24T09:40:00.000Z',
+  );
+  assert.equal(unreadByProject.get('project-1'), 3);
   assert.equal(unreadByProject.get('project-2'), 0);
-  assert.equal(await service.countUnreadForShell('org-viewer'), 1);
+  assert.equal(await service.countUnreadForShell('org-viewer'), 3);
+});
+
+test('project communication mark read rejects message outside project thread', async () => {
+  const {
+    ProjectCommunicationMessageService,
+  } = require('../dist/modules/project_communication/project-communication-message.service.js');
+  const {
+    ProjectCommunicationPresenter,
+  } = require('../dist/modules/project_communication/project-communication.presenter.js');
+  const thread = {
+    id: 'thread-1',
+    projectId: 'project-1',
+    ownerOrganizationId: 'org-viewer',
+    counterpartOrganizationId: 'org-other',
+  };
+  const manager = {
+    getRepository(entity) {
+      if (entity?.name === 'ProjectCommunicationThreadEntity') {
+        return {
+          async findOneBy(where) {
+            assert.deepEqual(where, {
+              id: 'thread-1',
+              projectId: 'project-1',
+            });
+            return thread;
+          },
+        };
+      }
+      if (entity?.name === 'ProjectCommunicationMessageEntity') {
+        return {
+          async findOneBy(where) {
+            assert.deepEqual(where, {
+              id: 'message-other-thread',
+              threadId: 'thread-1',
+              projectId: 'project-1',
+            });
+            return null;
+          },
+        };
+      }
+      if (entity?.name === 'ProjectCommunicationReadCursorEntity') {
+        throw new Error('read cursor repository should not be reached');
+      }
+      throw new Error(`Unexpected repository ${entity?.name}`);
+    },
+  };
+  const service = new ProjectCommunicationMessageService(
+    {},
+    {
+      manager,
+      async transaction(callback) {
+        return callback(manager);
+      },
+    },
+    {
+      async requireExistingThreadParticipant(candidateThread) {
+        assert.equal(candidateThread.id, 'thread-1');
+        return {
+          organizationId: 'org-viewer',
+          currentSession: {
+            userId: 'user-1',
+            actorId: 'actor-1',
+          },
+        };
+      },
+    },
+    {},
+    new ProjectCommunicationPresenter(),
+    {},
+  );
+
+  await assert.rejects(
+    () =>
+      service.markRead(
+        {
+          projectId: 'project-1',
+          threadId: 'thread-1',
+          lastReadMessageId: 'message-other-thread',
+        },
+        createContext('project-communication-mark-read-cross-thread'),
+      ),
+    /lastReadMessageId/,
+  );
 });
 
 test('bid submission snapshot returns canonical attachment list instead of hardcoded zero', async () => {

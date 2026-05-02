@@ -29,6 +29,9 @@ export function readProjectCommunicationMessageReadModel(value: unknown) {
     payload: readNullableRecord(source.payload),
     clientMessageId: readNullableString(source.clientMessageId),
     messageState: readString(source.messageState, 'messageState'),
+    deliveryState: readDeliveryState(source.deliveryState),
+    readState: readReadState(source.readState),
+    readByCounterpartAt: readNullableString(source.readByCounterpartAt),
     createdAt: readString(source.createdAt, 'createdAt')
   };
 }
@@ -81,6 +84,32 @@ function readBodyString(value: unknown, field: string) {
     throw new Error(`Field \`${field}\` is required in project communication response.`);
   }
   return value;
+}
+
+function readDeliveryState(value: unknown) {
+  if (value == null) {
+    return 'persisted';
+  }
+  const normalized = readString(value, 'deliveryState');
+  if (normalized !== 'persisted') {
+    throw new Error('Field `deliveryState` is unsupported in project communication response.');
+  }
+  return normalized;
+}
+
+function readReadState(value: unknown) {
+  if (value == null) {
+    return 'not_applicable';
+  }
+  const normalized = readString(value, 'readState');
+  if (
+    normalized !== 'unread_by_counterpart' &&
+    normalized !== 'read_by_counterpart' &&
+    normalized !== 'not_applicable'
+  ) {
+    throw new Error('Field `readState` is unsupported in project communication response.');
+  }
+  return normalized;
 }
 
 function readNullableString(value: unknown) {

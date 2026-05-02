@@ -423,10 +423,7 @@ class AppRouter {
         requestId: routeUri.queryParameters['requestId'],
         bidParticipation: true,
       ),
-      ExhibitionRoutes.counterpartConversation => CounterpartConversationPage(
-        conversationId: routeUri.queryParameters['conversationId'],
-        projectId: routeUri.queryParameters['projectId'],
-      ),
+      ExhibitionRoutes.counterpartConversation => const SizedBox.shrink(),
       ExhibitionRoutes.bidThread => BidThreadPage(
         projectId: routeUri.queryParameters['projectId'],
         bidId: routeUri.queryParameters['bidId'],
@@ -530,6 +527,20 @@ class AppRouter {
       ),
       _ => null,
     };
+    final isCounterpartConversationRoute =
+        routePath == ExhibitionRoutes.counterpartConversation;
+    if (isCounterpartConversationRoute) {
+      return MaterialPageRoute<void>(
+        settings: settings,
+        builder: (_) => _CounterpartConversationRouteScaffold(
+          conversationId: routeUri.queryParameters['conversationId'],
+          projectId: routeUri.queryParameters['projectId'],
+          title: title,
+          titleContent: titleContent,
+          appBarActions: appBarActions,
+        ),
+      );
+    }
 
     return MaterialPageRoute<void>(
       settings: settings,
@@ -743,5 +754,53 @@ class AppRouter {
 
     final last = routeSegments.last.trim();
     return last.isEmpty ? null : Uri.decodeComponent(last);
+  }
+}
+
+class _CounterpartConversationRouteScaffold extends StatefulWidget {
+  const _CounterpartConversationRouteScaffold({
+    required this.conversationId,
+    required this.projectId,
+    required this.title,
+    required this.titleContent,
+    required this.appBarActions,
+  });
+
+  final String? conversationId;
+  final String? projectId;
+  final String title;
+  final Widget? titleContent;
+  final List<Widget> appBarActions;
+
+  @override
+  State<_CounterpartConversationRouteScaffold> createState() =>
+      _CounterpartConversationRouteScaffoldState();
+}
+
+class _CounterpartConversationRouteScaffoldState
+    extends State<_CounterpartConversationRouteScaffold> {
+  bool _chatWindowActive = false;
+
+  void _handleChatWindowActiveChanged(bool active) {
+    if (_chatWindowActive == active || !mounted) {
+      return;
+    }
+    setState(() => _chatWindowActive = active);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AppShellScaffold(
+      currentBuilding: AppBuilding.messages,
+      titleOverride: widget.title,
+      titleContent: widget.titleContent,
+      appBarActions: widget.appBarActions,
+      showBottomNavigationBar: !_chatWindowActive,
+      child: CounterpartConversationPage(
+        conversationId: widget.conversationId,
+        projectId: widget.projectId,
+        onChatWindowActiveChanged: _handleChatWindowActiveChanged,
+      ),
+    );
   }
 }

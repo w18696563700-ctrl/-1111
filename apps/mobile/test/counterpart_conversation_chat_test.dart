@@ -1169,6 +1169,13 @@ void main() {
       expect(find.text('项目列表'), findsOneWidget);
       expect(find.text('发布时间：2026-05-01 18:00'), findsOneWidget);
       expect(find.text('未读 1'), findsOneWidget);
+      expect(
+        find.byKey(
+          const ValueKey<String>('counterpart-project-unread-badge-project-1'),
+        ),
+        findsOneWidget,
+      );
+      expect(find.byIcon(Icons.mark_chat_unread_outlined), findsOneWidget);
       expect(find.text('进入沟通'), findsOneWidget);
       expect(find.text('查看申请'), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
@@ -1850,7 +1857,7 @@ void main() {
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -900));
       await tester.pump();
       expect(find.text('在吗'), findsOneWidget);
-      expect(find.text('发送中...'), findsOneWidget);
+      expect(find.textContaining('发送中'), findsOneWidget);
       expect(
         postedBody,
         isA<Map<String, Object?>>()
@@ -2092,11 +2099,9 @@ void main() {
   );
 
   testWidgets(
-    'project communication confirmation action sends confirmation card payload',
+    'project communication keeps historical confirmation cards without composer entry',
     (WidgetTester tester) async {
-      var messageLoadCount = 0;
       var postCount = 0;
-      Object? postedBody;
       final confirmationPayload = const <String, Object?>{
         'confirmation': <String, Object?>{
           'confirmationType': 'quote',
@@ -2126,22 +2131,29 @@ void main() {
                   },
               'GET /api/app/message/project-communication/messages':
                   (AppApiRequest request) async {
-                    messageLoadCount += 1;
-                    final items = messageLoadCount > 1
-                        ? <Object?>[
-                            _messagePayload(
-                              messageId: 'message-confirmation-1',
-                              body: '',
-                              messageKind: 'confirmation_card',
-                              payload: confirmationPayload,
-                            ),
-                          ]
-                        : <Object?>[];
                     return AppApiResponse(
                       statusCode: 200,
                       uri: request.uri,
                       body: <String, Object?>{
-                        'items': items,
+                        'items': <Object?>[
+                          <String, Object?>{
+                            'messageId': 'message-confirmation-1',
+                            'threadId': 'project-thread-1',
+                            'projectId': 'project-1',
+                            'senderUserId': 'user-counterpart',
+                            'senderActorId': null,
+                            'senderOrganizationId': 'org-counterpart',
+                            'messageKind': 'confirmation_card',
+                            'body': '',
+                            'payload': confirmationPayload,
+                            'clientMessageId': null,
+                            'messageState': 'active',
+                            'deliveryState': 'persisted',
+                            'readState': 'read_by_counterpart',
+                            'readByCounterpartAt': null,
+                            'createdAt': '2026-05-04T10:02:00Z',
+                          },
+                        ],
                         'nextCursor': null,
                       },
                     );
@@ -2149,7 +2161,6 @@ void main() {
               'POST /api/app/message/project-communication/messages':
                   (AppApiRequest request) async {
                     postCount += 1;
-                    postedBody = request.body;
                     return AppApiResponse(
                       statusCode: 202,
                       uri: request.uri,
@@ -2186,32 +2197,12 @@ void main() {
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
       await _enterFirstProjectCommunication(tester);
-      await tester.tap(find.widgetWithText(TextButton, '确认'));
-      await tester.pumpAndSettle();
-      await tester.enterText(find.byType(TextField).at(1), '最终报价确认');
-      await tester.enterText(
-        find.byType(TextField).at(2),
-        '总价 10000 元，包含基础搭建。',
-      );
-      await tester.tap(find.text('发送确认卡'));
       await tester.pumpAndSettle();
 
-      expect(postCount, 1);
-      expect(
-        postedBody,
-        isA<Map<String, Object?>>()
-            .having(
-              (Map<String, Object?> body) => body['messageKind'],
-              'messageKind',
-              'confirmation_card',
-            )
-            .having(
-              (Map<String, Object?> body) => body['payload'],
-              'payload',
-              confirmationPayload,
-            )
-            .having((Map<String, Object?> body) => body['body'], 'body', ''),
-      );
+      expect(postCount, 0);
+      expect(find.widgetWithText(TextButton, '确认'), findsNothing);
+      expect(find.text('发送确认卡'), findsNothing);
+      await _ensureVisible(tester, find.text('最终报价确认'));
       expect(find.text('报价确认'), findsOneWidget);
       expect(find.text('待确认'), findsOneWidget);
       expect(find.text('最终报价确认'), findsOneWidget);

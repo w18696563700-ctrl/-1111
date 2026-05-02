@@ -174,6 +174,10 @@ class _MessagesPageState extends State<MessagesPage> {
         _projectCommunicationLoading = false;
       }
     });
+    if (result.state == AppPageState.content ||
+        result.state == AppPageState.empty) {
+      _reloadShellContext();
+    }
   }
 
   Future<void> _loadNotifications({bool showLoading = true}) async {
@@ -283,11 +287,16 @@ class _MessagesPageState extends State<MessagesPage> {
     return itemsByConversationId.values.toList(growable: false);
   }
 
-  void _openProjectCommunication(
+  Future<void> _openProjectCommunication(
     BuildContext context,
     MessageInteractionItemView item,
-  ) {
-    Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
+  ) async {
+    await Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
+    if (!mounted) {
+      return;
+    }
+    await _refreshAll(showLoading: false);
+    _reloadShellContext();
   }
 
   Future<void> _openNotification(AppNotificationItemView item) async {
@@ -296,7 +305,7 @@ class _MessagesPageState extends State<MessagesPage> {
         item.notificationId,
       ]);
       await _loadNotifications(showLoading: false);
-      _reloadShellContextAfterNotificationRead();
+      _reloadShellContext();
     }
     if (!mounted) {
       return;
@@ -311,7 +320,7 @@ class _MessagesPageState extends State<MessagesPage> {
     Navigator.of(context).pushNamed(routeLocation);
   }
 
-  void _reloadShellContextAfterNotificationRead() {
+  void _reloadShellContext() {
     try {
       unawaited(AppShellScope.read(context).reloadShellContext());
     } catch (_) {

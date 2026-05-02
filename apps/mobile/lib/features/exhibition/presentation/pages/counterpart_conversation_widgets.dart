@@ -425,10 +425,12 @@ class _ConversationGuidanceBanner extends StatelessWidget {
 
 class _CounterpartProjectEntryList extends StatefulWidget {
   const _CounterpartProjectEntryList({
+    required this.data,
     required this.groups,
     required this.onOpenProjectCommunication,
   });
 
+  final CounterpartConversationDetailView data;
   final List<CounterpartConversationProjectGroupView> groups;
   final ValueChanged<CounterpartConversationProjectGroupView>
   onOpenProjectCommunication;
@@ -550,7 +552,10 @@ class _CounterpartProjectEntryListState
                       ChoiceChip(
                         avatar: Icon(_projectRelationIcon(relation), size: 18),
                         label: Text(
-                          '${_projectRelationLabel(relation)} · ${relationGroups[relation]!.length}',
+                          _projectRelationChipLabel(
+                            relation,
+                            relationGroups[relation]!.length,
+                          ),
                         ),
                         selected: relation == selectedRelation,
                         onSelected: (_) =>
@@ -602,6 +607,23 @@ class _CounterpartProjectEntryListState
     };
   }
 
+  String _projectRelationChipLabel(String relation, int projectCount) {
+    final unreadCount = _relationUnreadCount(relation);
+    final base = '${_projectRelationLabel(relation)} · $projectCount';
+    if (unreadCount <= 0) {
+      return base;
+    }
+    return '$base · 未读 $unreadCount';
+  }
+
+  int _relationUnreadCount(String relation) {
+    return switch (relation) {
+      'my_published' => widget.data.myPublishedUnreadCount,
+      'my_bid' => widget.data.myBidUnreadCount,
+      _ => 0,
+    };
+  }
+
   IconData _projectRelationIcon(String relation) {
     return switch (relation) {
       'my_published' => Icons.send_outlined,
@@ -625,6 +647,10 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
     final theme = Theme.of(context);
     final maskedTitle = group.titleVisibility == 'masked';
     final publishedAtLabel = _formatProjectTimestamp(group.projectPublishedAt);
+    final latestUnreadLabel = _formatProjectTimestamp(
+      group.latestUnreadMessageAt,
+    );
+    final hasUnread = group.hasProjectUnread && group.projectUnreadCount > 0;
     const maskedTitleColor = Color(0xFF1F7A3A);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -647,10 +673,9 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
                   backgroundColor: const Color(0xFFEAF4FF),
                 ),
                 if (group.hasProjectUnread && group.projectUnreadCount > 0)
-                  _ConversationPill(
-                    label: '未读 ${group.projectUnreadCount}',
-                    foregroundColor: theme.colorScheme.onErrorContainer,
-                    backgroundColor: theme.colorScheme.errorContainer,
+                  _ProjectUnreadPill(
+                    projectId: group.projectId,
+                    count: group.projectUnreadCount,
                   ),
               ],
             ),
@@ -721,6 +746,16 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
                 ],
               ),
             ],
+            if (latestUnreadLabel != null && hasUnread) ...<Widget>[
+              const SizedBox(height: 6),
+              Text(
+                '最新未读：$latestUnreadLabel',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.error,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
           ],
         );
         final actionColumn = SizedBox(
@@ -762,9 +797,16 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
         );
         return DecoratedBox(
           decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
+            color: hasUnread
+                ? theme.colorScheme.errorContainer.withValues(alpha: 0.16)
+                : theme.colorScheme.surfaceContainerLowest,
             borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
+            border: Border.all(
+              color: hasUnread
+                  ? theme.colorScheme.error.withValues(alpha: 0.64)
+                  : theme.colorScheme.outlineVariant,
+              width: hasUnread ? 1.4 : 1,
+            ),
           ),
           child: Padding(
             padding: const EdgeInsets.all(14),
@@ -797,31 +839,33 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
     required this.group,
     required this.participationCard,
     required this.orderId,
+    required this.loadingWorkbench,
+    required this.workbenchResult,
     required this.onBackToProjectList,
     required this.onOpenNameAccess,
     required this.onOpenOrder,
     required this.onOpenProjectAlbum,
+    required this.onOpenWorkbenchEntry,
   });
 
   final CounterpartConversationProjectGroupView group;
   final CounterpartConversationBusinessCardView? participationCard;
   final String? orderId;
+  final bool loadingWorkbench;
+  final CounterpartConversationResult<ProjectCommunicationWorkbenchView>?
+  workbenchResult;
   final VoidCallback onBackToProjectList;
   final ValueChanged<CounterpartConversationBusinessCardView> onOpenNameAccess;
   final VoidCallback onOpenOrder;
   final VoidCallback onOpenProjectAlbum;
+  final ValueChanged<ProjectCommunicationWorkbenchEntryView>
+  onOpenWorkbenchEntry;
 
   @override
   Widget build(BuildContext context) {
-    final requesterCompanyName = participationCard?.requesterCompanyName
-        ?.trim();
-    final participationMessage =
-        '${requesterCompanyName == null || requesterCompanyName.isEmpty ? '对方公司' : requesterCompanyName}申请查看该项目详情并参与竞标';
     return _ActionCard(
       title: '项目工作入口',
-      summary: participationCard == null
-          ? '当前项目暂无参与竞标申请或审核入口。'
-          : participationMessage,
+      summary: '围绕当前项目完成资料审阅、合同与成交金额确认。',
       children: <Widget>[
         Align(
           alignment: Alignment.centerLeft,
@@ -868,6 +912,12 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
             ),
           ],
         ),
+        const SizedBox(height: 14),
+        _ProjectCommunicationWorkbenchSection(
+          loading: loadingWorkbench,
+          result: workbenchResult,
+          onOpenEntry: onOpenWorkbenchEntry,
+        ),
         if (orderId == null) ...<Widget>[
           const SizedBox(height: 8),
           Text(
@@ -878,6 +928,44 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
           ),
         ],
       ],
+    );
+  }
+
+}
+
+class _UnknownProjectWorkbenchSection extends StatelessWidget {
+  const _UnknownProjectWorkbenchSection();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              Icons.info_outline_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '当前项目工作入口暂不可读',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -956,6 +1044,53 @@ class _ConversationPill extends StatelessWidget {
             color: foregroundColor ?? theme.colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w800,
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectUnreadPill extends StatelessWidget {
+  const _ProjectUnreadPill({required this.projectId, required this.count});
+
+  final String projectId;
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: theme.colorScheme.error.withValues(alpha: 0.18),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+        child: Row(
+          key: ValueKey<String>('counterpart-project-unread-badge-$projectId'),
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              Icons.mark_chat_unread_outlined,
+              size: 15,
+              color: theme.colorScheme.onError,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '未读 $count',
+              style: theme.textTheme.labelLarge?.copyWith(
+                color: theme.colorScheme.onError,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+          ],
         ),
       ),
     );

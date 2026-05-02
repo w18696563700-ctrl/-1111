@@ -4,6 +4,12 @@ import { ProjectCommunicationMessageEntity } from './entities/project-communicat
 import { ProjectCommunicationReadCursorEntity } from './entities/project-communication-read-cursor.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 
+type ProjectCommunicationMessageReadProjection = {
+  viewerOrganizationId?: string | null;
+  counterpartReadCursor?: ProjectCommunicationReadCursorEntity | null;
+  counterpartReadBoundaryMessage?: ProjectCommunicationMessageEntity | null;
+};
+
 @Injectable()
 export class ProjectCommunicationPresenter {
   toThread(thread: ProjectCommunicationThreadEntity) {
@@ -20,7 +26,11 @@ export class ProjectCommunicationPresenter {
     };
   }
 
-  toMessage(message: ProjectCommunicationMessageEntity) {
+  toMessage(
+    message: ProjectCommunicationMessageEntity,
+    projection: ProjectCommunicationMessageReadProjection = {}
+  ) {
+    const readState = this.readStateForMessage(message, projection);
     return {
       messageId: message.id,
       threadId: message.threadId,
@@ -33,16 +43,54 @@ export class ProjectCommunicationPresenter {
       payload: this.toMessagePayload(message.payload),
       clientMessageId: message.clientMessageId,
       messageState: message.messageState,
+      deliveryState: 'persisted',
+      readState,
+      readByCounterpartAt:
+        readState === 'read_by_counterpart'
+          ? projection.counterpartReadCursor?.lastReadAt.toISOString() ?? null
+          : null,
       createdAt: message.createdAt.toISOString()
     };
   }
 
-  toMessages(items: ProjectCommunicationMessageEntity[]) {
+  toMessages(
+    items: ProjectCommunicationMessageEntity[],
+    projection: ProjectCommunicationMessageReadProjection = {}
+  ) {
     const last = items.at(-1) ?? null;
     return {
-      items: items.map((item) => this.toMessage(item)),
+      items: items.map((item) => this.toMessage(item, projection)),
       nextCursor: last?.createdAt.toISOString() ?? null
     };
+  }
+
+  private readStateForMessage(
+    message: ProjectCommunicationMessageEntity,
+    projection: ProjectCommunicationMessageReadProjection
+  ) {
+    const viewerOrganizationId = projection.viewerOrganizationId?.trim();
+    if (!viewerOrganizationId || message.senderOrganizationId !== viewerOrganizationId) {
+      return 'not_applicable';
+    }
+    if (this.isReadByCounterpart(message, projection)) {
+      return 'read_by_counterpart';
+    }
+    return 'unread_by_counterpart';
+  }
+
+  private isReadByCounterpart(
+    message: ProjectCommunicationMessageEntity,
+    projection: ProjectCommunicationMessageReadProjection
+  ) {
+    const cursor = projection.counterpartReadCursor;
+    if (!cursor) {
+      return false;
+    }
+    const boundary = projection.counterpartReadBoundaryMessage;
+    if (cursor.lastReadMessageId && boundary?.threadId === message.threadId) {
+      return message.createdAt <= boundary.createdAt;
+    }
+    return message.createdAt <= cursor.lastReadAt;
   }
 
   private toMessagePayload(payload: Record<string, unknown> | null | undefined) {

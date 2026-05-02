@@ -87,6 +87,7 @@ export type CounterpartConversationProjectGroupProjection = {
   latestActivityAt: string;
   projectUnreadCount: number;
   hasProjectUnread: boolean;
+  latestUnreadMessageAt: string | null;
   pricingSummary?: Record<string, unknown>;
   ratingEntry: CounterpartConversationRatingEntryProjection | null;
   cards: CounterpartConversationBusinessCardProjection[];
@@ -110,6 +111,9 @@ export type CounterpartConversationListItemProjection = {
   summary: CounterpartConversationSummaryProjection;
   pricingSummary?: Record<string, unknown>;
   updatedAt: string;
+  conversationUnreadCount: number;
+  hasUnread: boolean;
+  latestUnreadMessageAt: string | null;
   routeTarget: CounterpartConversationRouteTarget;
 };
 
@@ -119,5 +123,10 @@ export type CounterpartConversationDetailProjection = {
   summary: CounterpartConversationSummaryProjection;
   focusProjectId: string;
   latestActivityAt: string;
+  conversationUnreadCount: number;
+  hasUnread: boolean;
+  latestUnreadMessageAt: string | null;
+  myPublishedUnreadCount: number;
+  myBidUnreadCount: number;
   projectGroups: CounterpartConversationProjectGroupProjection[];
 };

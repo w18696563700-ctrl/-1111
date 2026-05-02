@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { RequestContext } from '../../shared/request-context';
+import { BidEntity } from '../bid/entities/bid.entity';
+import { ProjectAttachmentEntity } from '../project/entities/project-attachment.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
@@ -10,6 +12,22 @@ import { ProjectCommunicationThreadEntity } from './entities/project-communicati
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
 
 const PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND = 'project_communication_attachment';
+const WORKBENCH_PUBLISHER_MATERIAL_KINDS = new Set([
+  'effect_image',
+  'construction_doc',
+  'material_sample',
+  'equipment_material_list',
+  'service_list'
+]);
+const WORKBENCH_BID_MATERIAL_SLOTS = [
+  { field: 'projectUnderstandingFileAssetId', label: '项目理解' },
+  { field: 'quoteSheetFileAssetId', label: '报价表' },
+  { field: 'schedulePlanFileAssetId', label: '进度安排' }
+] as const;
+
+type WorkbenchSourceFile = {
+  fileName: string | null;
+};
 
 @Injectable()
 export class ProjectCommunicationFilePreviewService {
@@ -20,6 +38,10 @@ export class ProjectCommunicationFilePreviewService {
     private readonly messageRepository: Repository<ProjectCommunicationMessageEntity>,
     @InjectRepository(FileAssetEntity)
     private readonly fileAssetRepository: Repository<FileAssetEntity>,
+    @InjectRepository(ProjectAttachmentEntity)
+    private readonly projectAttachmentRepository: Repository<ProjectAttachmentEntity>,
+    @InjectRepository(BidEntity)
+    private readonly bidRepository: Repository<BidEntity>,
     private readonly accessService: ProjectCommunicationAccessService,
     private readonly publicUrlService: UploadPublicUrlService,
     private readonly config: RuntimeConfigService
@@ -35,11 +57,15 @@ export class ProjectCommunicationFilePreviewService {
     }
     await this.accessService.requireExistingThreadParticipant(thread, context);
     const message = await this.findAttachmentMessage(projectId, threadId, fileAssetId);
-    if (!message) {
+    const workbenchSource = message ? null : await this.findWorkbenchSourceFile(projectId, thread, fileAssetId);
+    if (!message && !workbenchSource) {
       throw this.forbidden('Current FileAsset is not attached to this project communication thread.');
     }
     const fileAsset = await this.fileAssetRepository.findOneBy({ id: fileAssetId });
-    if (!fileAsset || !this.isProjectCommunicationFileAsset(fileAsset, projectId)) {
+    if (!fileAsset) {
+      throw this.forbidden('Current FileAsset truth is not aligned with project communication preview.');
+    }
+    if (message && !this.isProjectCommunicationFileAsset(fileAsset, projectId)) {
       throw this.forbidden('Current FileAsset truth is not aligned with project communication preview.');
     }
     const previewType = this.previewType(fileAsset.mimeType);
@@ -54,7 +80,7 @@ export class ProjectCommunicationFilePreviewService {
       threadId,
       previewType,
       canPreview,
-      fileName: this.readPayloadFileName(message.payload) ?? fileAsset.id,
+      fileName: this.readPayloadFileName(message?.payload) ?? workbenchSource?.fileName ?? fileAsset.id,
       mimeType: fileAsset.mimeType,
       accessUrl,
       expiresAt: accessUrl ? this.buildExpiresAt() : null,
@@ -67,6 +93,36 @@ export class ProjectCommunicationFilePreviewService {
   private async findAttachmentMessage(projectId: string, threadId: string, fileAssetId: string) {
     const items = await this.messageRepository.find({ where: { projectId, threadId } });
     return items.find((item) => this.readPayloadFileAssetId(item.payload) === fileAssetId) ?? null;
+  }
+
+  private async findWorkbenchSourceFile(
+    projectId: string,
+    thread: ProjectCommunicationThreadEntity,
+    fileAssetId: string
+  ): Promise<WorkbenchSourceFile | null> {
+    const projectAttachment = await this.projectAttachmentRepository.findOneBy({
+      projectId,
+      fileAssetId,
+      visibility: 'owner_private'
+    });
+    if (
+      projectAttachment &&
+      WORKBENCH_PUBLISHER_MATERIAL_KINDS.has(projectAttachment.attachmentKind)
+    ) {
+      return { fileName: projectAttachment.fileName };
+    }
+
+    const bid = await this.bidRepository.findOneBy({
+      projectId,
+      bidderOrganizationId: thread.counterpartOrganizationId
+    });
+    if (!bid) {
+      return null;
+    }
+    const slot = WORKBENCH_BID_MATERIAL_SLOTS.find(
+      (item) => bid[item.field] === fileAssetId
+    );
+    return slot ? { fileName: slot.label } : null;
   }
 
   private isProjectCommunicationFileAsset(fileAsset: FileAssetEntity, projectId: string) {

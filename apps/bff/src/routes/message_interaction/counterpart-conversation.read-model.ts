@@ -20,6 +20,11 @@ export type CounterpartConversationDetailReadModel = {
   };
   focusProjectId: string;
   latestActivityAt: string;
+  conversationUnreadCount: number;
+  hasUnread: boolean;
+  latestUnreadMessageAt: string | null;
+  myPublishedUnreadCount: number;
+  myBidUnreadCount: number;
   projectGroups: Array<{
     projectId: string;
     projectDisplayTitle: string;
@@ -31,6 +36,7 @@ export type CounterpartConversationDetailReadModel = {
     latestActivityAt: string;
     projectUnreadCount: number;
     hasProjectUnread: boolean;
+    latestUnreadMessageAt: string | null;
     pricingSummary?: Record<string, unknown>;
     orderSummary: {
       orderId: string;
@@ -130,6 +136,23 @@ export function readCounterpartConversationDetailReadModel(
       record.latestActivityAt,
       "latestActivityAt",
     ),
+    conversationUnreadCount: readOptionalNonNegativeNumber(
+      record.conversationUnreadCount,
+      "conversationUnreadCount",
+      0,
+    ),
+    hasUnread: readOptionalBoolean(record.hasUnread, false),
+    latestUnreadMessageAt: readNullableString(record.latestUnreadMessageAt),
+    myPublishedUnreadCount: readOptionalNonNegativeNumber(
+      record.myPublishedUnreadCount,
+      "myPublishedUnreadCount",
+      0,
+    ),
+    myBidUnreadCount: readOptionalNonNegativeNumber(
+      record.myBidUnreadCount,
+      "myBidUnreadCount",
+      0,
+    ),
     projectGroups: readRequiredArray(record.projectGroups, "projectGroups").map(
       readProjectGroup,
     ),
@@ -188,6 +211,7 @@ function readProjectGroup(value: unknown) {
       record.hasProjectUnread,
       "projectGroup.hasProjectUnread",
     ),
+    latestUnreadMessageAt: readNullableString(record.latestUnreadMessageAt),
     ...(pricingSummary ? { pricingSummary } : {}),
     orderSummary,
     ratingEntry: readRatingEntry(record.ratingEntry),
@@ -661,10 +685,39 @@ function readRequiredNumber(value: unknown, fieldName: string) {
   return value;
 }
 
+function readOptionalNonNegativeNumber(
+  value: unknown,
+  fieldName: string,
+  fallback: number,
+) {
+  if (value == null) {
+    return fallback;
+  }
+  const parsed = readRequiredNumber(value, fieldName);
+  if (parsed < 0) {
+    throw new Error(
+      `Counterpart conversation response returned a negative \`${fieldName}\`.`,
+    );
+  }
+  return parsed;
+}
+
 function readRequiredBoolean(value: unknown, fieldName: string) {
   if (typeof value !== "boolean") {
     throw new Error(
       `Counterpart conversation response is missing \`${fieldName}\`.`,
+    );
+  }
+  return value;
+}
+
+function readOptionalBoolean(value: unknown, fallback: boolean) {
+  if (value == null) {
+    return fallback;
+  }
+  if (typeof value !== "boolean") {
+    throw new Error(
+      "Counterpart conversation response returned a non-boolean optional field.",
     );
   }
   return value;

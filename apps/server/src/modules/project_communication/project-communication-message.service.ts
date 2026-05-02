@@ -123,7 +123,7 @@ export class ProjectCommunicationMessageService {
     const projectId = this.readRequiredString(query.projectId, 'projectId');
     const cursor = this.readOptionalCursor(query.cursor);
     const limit = this.readLimit(query.limit);
-    const { thread } = await this.requireThreadParticipant(threadId, projectId, context);
+    const { actor, thread } = await this.requireThreadParticipant(threadId, projectId, context);
     const where = cursor
       ? { threadId: thread.id, projectId: thread.projectId, createdAt: MoreThan(cursor) }
       : { threadId: thread.id, projectId: thread.projectId };
@@ -132,7 +132,11 @@ export class ProjectCommunicationMessageService {
       order: { createdAt: 'ASC', id: 'ASC' },
       take: limit
     });
-    return this.presenter.toMessages(items);
+    const readProjection = await this.loadCounterpartReadProjection(
+      thread,
+      actor.organizationId
+    );
+    return this.presenter.toMessages(items, readProjection);
   }
 
   async sendMessage(payload: Record<string, unknown>, context: RequestContext) {
@@ -276,6 +280,43 @@ export class ProjectCommunicationMessageService {
     }
     const actor = await this.accessService.requireExistingThreadParticipant(thread, context, manager);
     return { actor, thread };
+  }
+
+  private async loadCounterpartReadProjection(
+    thread: ProjectCommunicationThreadEntity,
+    viewerOrganizationId: string
+  ) {
+    const counterpartOrganizationId = this.counterpartOrganizationIdForViewer(
+      thread,
+      viewerOrganizationId
+    );
+    const cursor = await this.dataSource
+      .getRepository(ProjectCommunicationReadCursorEntity)
+      .findOneBy({
+        threadId: thread.id,
+        organizationId: counterpartOrganizationId
+      });
+    const boundary = cursor?.lastReadMessageId
+      ? await this.messageRepository.findOneBy({
+          id: cursor.lastReadMessageId,
+          threadId: thread.id,
+          projectId: thread.projectId
+        })
+      : null;
+    return {
+      viewerOrganizationId,
+      counterpartReadCursor: cursor ?? null,
+      counterpartReadBoundaryMessage: boundary ?? null
+    };
+  }
+
+  private counterpartOrganizationIdForViewer(
+    thread: ProjectCommunicationThreadEntity,
+    viewerOrganizationId: string
+  ) {
+    return thread.ownerOrganizationId === viewerOrganizationId
+      ? thread.counterpartOrganizationId
+      : thread.ownerOrganizationId;
   }
 
   private async ensureReadMessageBelongsToThread(

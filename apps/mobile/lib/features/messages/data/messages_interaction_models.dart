@@ -13,6 +13,10 @@ final class MessagesCanonicalPaths {
       '/api/app/message/project-communication/messages';
   static const String projectCommunicationReadCursor =
       '/api/app/message/project-communication/read-cursor';
+  static const String projectCommunicationWorkbench =
+      '/api/app/message/project-communication/workbench';
+  static const String projectCommunicationWorkbenchMaterialReview =
+      '/api/app/message/project-communication/workbench/material-review';
   static const String projectCommunicationFilePreviewAccess =
       '/api/app/file/preview/access';
   static const String confirmationSoftLinkDetail =
@@ -111,6 +115,9 @@ final class MessageInteractionItemView {
     required this.counterpart,
     required this.summary,
     required this.p0PaySummary,
+    required this.conversationUnreadCount,
+    required this.hasUnread,
+    required this.latestUnreadMessageAt,
     required this.updatedAt,
     required this.routeTarget,
   });
@@ -122,6 +129,9 @@ final class MessageInteractionItemView {
   final MessageInteractionCounterpartView counterpart;
   final MessageInteractionSummaryView summary;
   final P0PayReadOnlySummaryView? p0PaySummary;
+  final int conversationUnreadCount;
+  final bool hasUnread;
+  final String? latestUnreadMessageAt;
   final String updatedAt;
   final MessageInteractionRouteTarget routeTarget;
 }
