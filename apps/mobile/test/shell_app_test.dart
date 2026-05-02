@@ -5348,8 +5348,8 @@ void main() {
       expect(find.widgetWithText(OutlinedButton, '收起项目信息'), findsOneWidget);
       await _expectVisibleText(tester, '查看报价依据资料');
       await _expectVisibleText(tester, '填写报价与预授权确认');
-      await _expectVisibleText(tester, '平台成交服务费确认');
-      await _expectVisibleTextContaining(tester, '本页不本地计算正式金额');
+      await _expectVisibleText(tester, '竞标服务费预授权额度确认');
+      await _expectVisibleTextContaining(tester, '成交后按平台规则扣取服务费');
       await _expectVisibleText(tester, '你需要做什么');
       await _expectVisibleText(tester, '48小时');
       await _expectVisibleText(tester, '上传方案');

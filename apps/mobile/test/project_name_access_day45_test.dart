@@ -590,12 +590,11 @@ void main() {
     expect(find.text('项目列表'), findsOneWidget);
     expect(find.text('参与竞标申请'), findsNothing);
 
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '进入此项目竞标沟通'));
+    await _tapVisible(tester, find.widgetWithText(FilledButton, '进入沟通'));
 
-    expect(find.text('竞标沟通'), findsOneWidget);
-    expect(find.text('参与竞标申请 / 审核'), findsOneWidget);
+    expect(find.text('项目工作入口'), findsOneWidget);
 
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '参与竞标申请 / 审核'));
+    await _tapVisible(tester, find.widgetWithText(FilledButton, '进入审核'));
 
     expect(find.text('参与竞标申请'), findsWidgets);
     expect(

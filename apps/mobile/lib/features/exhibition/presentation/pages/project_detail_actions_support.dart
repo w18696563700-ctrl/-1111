@@ -269,7 +269,12 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
           )
         else if (canContinueBid && participationApproved)
           FilledButton(
-            onPressed: () => _continueBidWithGuard(projectId),
+            onPressed: () => _continueBidWithGuard(
+              projectId,
+              bidParticipationRequestId: _projectNameAccessRequestId(
+                projectMap,
+              ),
+            ),
             child: const Text('立即参与竞标'),
           )
         else if (canContinueBid && canRequestParticipation)
@@ -374,16 +379,22 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
         scheduleDetail == null;
   }
 
-  void _continueBidWithGuard(String projectId) {
+  void _continueBidWithGuard(
+    String projectId, {
+    String? bidParticipationRequestId,
+  }) {
     final accessGuard = _deriveBidAccessGuard(
       snapshot: AppShellScope.read(context).snapshot,
       hasSession: AppSessionStore.instance.hasAnySession,
     );
 
     if (accessGuard == null) {
-      Navigator.of(
-        context,
-      ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(projectId));
+      Navigator.of(context).pushNamed(
+        ExhibitionRoutes.bidSubmitWithProjectId(
+          projectId,
+          bidParticipationRequestId: bidParticipationRequestId,
+        ),
+      );
       return;
     }
 

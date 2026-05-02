@@ -897,10 +897,18 @@ void main() {
       expect(find.widgetWithText(FilledButton, '打开发布项目工作台'), findsNothing);
       expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
       expect(
-        transport.requests
-            .map((AppApiRequest request) => request.canonicalPath)
-            .toList(),
-        <String>[ExhibitionCanonicalPaths.projectDetail],
+        transport.requests.map(
+          (AppApiRequest request) => request.canonicalPath,
+        ),
+        contains(ExhibitionCanonicalPaths.projectDetail),
+      );
+      expect(
+        transport.requests.map(
+          (AppApiRequest request) => request.canonicalPath,
+        ),
+        contains(
+          ExhibitionCanonicalPaths.projectPricingSummary('project-owner-1'),
+        ),
       );
     },
   );
@@ -909,6 +917,7 @@ void main() {
     'shell mainline continues from project list to minimum bid submit result',
     (WidgetTester tester) async {
       final uploadedKinds = <String>[];
+      Map<String, Object?>? bidSubmitBody;
       BidSubmitAttachmentDebugOverrides.installPicker(() async {
         final nextFile = switch (uploadedKinds.length) {
           0 => 'project-understanding.png',
@@ -954,9 +963,28 @@ void main() {
                     projectNo: 'PROJ-1',
                     title: '首发项目',
                     budgetAmount: 1200,
-                  ),
+                  )..['nameAccess'] = const <String, Object?>{
+                    'status': 'visible',
+                    'requestId': 'request-1',
+                  },
                 );
               },
+              'GET /api/app/project/project-1/pricing-summary':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'projectId': 'project-1',
+                        'bidderPricing': <String, Object?>{
+                          'bidServiceFeeAuthorizationStatus': 'frozen',
+                        },
+                        'bidServiceFeeAuthorization': <String, Object?>{
+                          'authorizationStatus': 'frozen',
+                        },
+                      },
+                    );
+                  },
               'GET /api/app/project/bid-materials':
                   (AppApiRequest request) async {
                     expect(
@@ -980,6 +1008,20 @@ void main() {
                       body: const <String, Object?>{'resources': <Object?>[]},
                     );
                   },
+              'GET /api/app/my/projects': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{'items': <Object?>[]},
+                );
+              },
+              'GET /api/app/my/bids': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{'items': <Object?>[]},
+                );
+              },
               'POST /api/app/file/upload/init': (AppApiRequest request) async {
                 final body = request.body as Map<String, Object?>;
                 final fileKind = '${body['fileKind']}';
@@ -1014,15 +1056,7 @@ void main() {
                     );
                   },
               'POST /api/app/bid/submit': (AppApiRequest request) async {
-                expect(request.body, <String, Object?>{
-                  'projectId': 'project-1',
-                  'quoteAmount': 1200.0,
-                  'proposalSummary': '首发主链投标',
-                  'projectUnderstandingFileAssetId':
-                      'fa-session-bid_project_understanding',
-                  'quoteSheetFileAssetId': 'fa-session-bid_quote_sheet',
-                  'schedulePlanFileAssetId': 'fa-session-bid_schedule_plan',
-                });
+                bidSubmitBody = request.body as Map<String, Object?>;
                 return AppApiResponse(
                   statusCode: 202,
                   uri: request.uri,
@@ -1052,12 +1086,32 @@ void main() {
 
       expect(find.text('竞标提交'), findsWidgets);
       await _enterVisibleBidTextField(tester, label: '竞标报价', value: '1200');
+      await _tapVisible(
+        tester,
+        find.widgetWithText(CheckboxListTile, '我已阅读并同意平台成交服务费规则'),
+      );
+      await _tapVisible(
+        tester,
+        find.widgetWithText(CheckboxListTile, '我知晓未中标自动释放，中标并合同确认后正式扣款'),
+      );
+      await _tapVisible(
+        tester,
+        find.widgetWithText(CheckboxListTile, '我知晓发布方毁约或项目条件重大变化时，预授权应按规则释放'),
+      );
       await _enterVisibleBidTextField(tester, label: '方案说明', value: '首发主链投标');
       await _uploadBidAttachment(tester, '项目理解');
       await _uploadBidAttachment(tester, '报价表');
       await _uploadBidAttachment(tester, '进度安排');
       await _tapVisible(tester, find.widgetWithText(FilledButton, '提交竞标'));
 
+      expect(bidSubmitBody, <String, Object?>{
+        'projectId': 'project-1',
+        'quoteAmount': 1200.0,
+        'proposalSummary': '首发主链投标',
+        'projectUnderstandingFileAssetId': 'fa-session-bid_project_understanding',
+        'quoteSheetFileAssetId': 'fa-session-bid_quote_sheet',
+        'schedulePlanFileAssetId': 'fa-session-bid_schedule_plan',
+      });
       expect(find.text('竞标已提交'), findsOneWidget);
       expect(find.text('竞标 ID：bid-1'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '继续创建订单'), findsNothing);

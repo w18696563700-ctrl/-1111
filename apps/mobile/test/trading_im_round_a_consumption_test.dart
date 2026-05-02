@@ -433,8 +433,8 @@ void main() {
     expect(find.textContaining('竞标服务费预授权：已冻结'), findsOneWidget);
     expect(find.textContaining('预授权额度：4000.00'), findsOneWidget);
     expect(find.textContaining('合同确认：待处理'), findsOneWidget);
-    expect(find.textContaining('不执行支付'), findsOneWidget);
-    expect(find.textContaining('只读 routeTarget'), findsOneWidget);
+    expect(find.textContaining('不在这里裁定扣费'), findsOneWidget);
+    expect(find.textContaining('后续入口'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '支付'), findsNothing);
   });
 
@@ -601,12 +601,12 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('点击查看'),
+        find.text('查看竞标摘要'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
 
-      final viewSnapshotFinder = find.widgetWithText(FilledButton, '点击查看');
+      final viewSnapshotFinder = find.widgetWithText(FilledButton, '查看竞标摘要');
       expect(viewSnapshotFinder, findsOneWidget);
 
       await tester.ensureVisible(viewSnapshotFinder);
