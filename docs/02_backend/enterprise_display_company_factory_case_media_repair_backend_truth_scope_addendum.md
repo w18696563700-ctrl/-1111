@@ -92,4 +92,3 @@ inputs_canonical:
   - truth repair only
   - no new capability
   - no new state machine
-

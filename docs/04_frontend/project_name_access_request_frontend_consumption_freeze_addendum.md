@@ -121,4 +121,3 @@ inputs_canonical:
   - `Go for gate judgment and implementation sequencing`
 - 当前仍：
   - `No-Go for implementation`
-

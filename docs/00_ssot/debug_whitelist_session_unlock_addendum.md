@@ -160,4 +160,3 @@ inputs_canonical:
 
 - 在受控环境下，通过 `env flag + whitelist` 双重限制，跳过 OTP 步骤，
   但仍由 `Server` 建立并验证真实 session 的临时联调能力
-

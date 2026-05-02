@@ -117,4 +117,3 @@ based_on:
 
 - 下一轮唯一动作是：
   - 对当前 verified object 进入 maintenance-only follow-up judgment
-

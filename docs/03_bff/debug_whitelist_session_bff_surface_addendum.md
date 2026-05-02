@@ -106,4 +106,3 @@ inputs_canonical:
 - 可以暴露受控 app-facing path
 - 但 `BFF` 只做 forwarding + shaping
 - 不得成为第二套 session truth root
-

@@ -204,4 +204,3 @@ inputs_canonical:
 - 本任务单冻结后，唯一允许的下一步是：
   - 按 `Package A-F` 顺序进入 bounded implementation
   - 并在 code 完成后单独发起数据修复与 smoke judgment
-

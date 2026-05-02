@@ -80,4 +80,3 @@ inputs_canonical:
   - `project.state` 当前是 `varchar(32)` carrier
   - 本轮复用已存在的 terminal state `archived`
   - 本轮不新增字段、不改约束、不改索引
-

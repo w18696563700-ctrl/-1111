@@ -86,4 +86,3 @@ inputs_canonical:
   - verification verdict 只能写 `PASS / PASS WITH RISK / FAIL`
   - gate decision 只能写 `Go for BFF package B / No-Go`
   - 即使 `PASS`，也不自动打开 `Flutter package C / release-prep / launch`
-

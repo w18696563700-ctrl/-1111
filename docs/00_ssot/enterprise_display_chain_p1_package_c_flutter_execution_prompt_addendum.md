@@ -114,4 +114,3 @@ inputs_canonical:
 - 不要顺手扩字段
 - 不要把本轮改动扩到 submit / list / detail / recommendation
 - 只给真实发包、真实测试、真实剩余风险
-

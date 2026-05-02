@@ -64,4 +64,3 @@ inputs_canonical:
 - 不得直接运行时读取 `apps/mobile/assets/location/china_province_city.json` 作为 server truth。
 - 不得只修 blank，不修 stale。
 - 不得让 organization certification summary 或注册城市语义反向污染 enterprise display 当前城市展示名。
-

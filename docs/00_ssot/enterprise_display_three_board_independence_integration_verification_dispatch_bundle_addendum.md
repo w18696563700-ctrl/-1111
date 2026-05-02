@@ -141,4 +141,3 @@ inputs_canonical:
 - 已有实时证据说明云上 canonical board-scoped family 当前仍未 route-visible，或相反已 route-visible；不能停留在猜测。
 - 已对 authenticated positive-session 是否存在给出明确结论。
 - 已形成 standalone legacy compatibility removal plan。
-

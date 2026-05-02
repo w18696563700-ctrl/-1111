@@ -28,4 +28,3 @@ owner: Codex Control
 - Online presence.
 - Read cursor fan-out.
 - Push notification delivery.
-

@@ -100,4 +100,3 @@ based_on:
   - migration before freeze
   - any fake `awarded / converted_to_order` close implementation
   - mobile / Admin / integration / release-prep / production release
-

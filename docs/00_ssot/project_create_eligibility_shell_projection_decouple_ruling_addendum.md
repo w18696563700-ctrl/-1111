@@ -46,4 +46,3 @@ based_on:
   - shell context 新增 create-eligibility projection
 - 当前唯一最高优先级文书固定为：
   - `docs/00_ssot/project_create_eligibility_shell_projection_decouple_ruling_addendum.md`
-

@@ -104,4 +104,3 @@ BFF may map these errors to App-facing copy, but BFF must not reinterpret the me
 - Leave current organization is not implemented by reusing member disable.
 - Leave current organization does not delete organization, certification, projects, messages, files, orders, or audit history.
 - All generated contracts are refreshed from `docs/01_contracts/openapi.yaml` and `docs/01_contracts/error_codes.yaml`.
-

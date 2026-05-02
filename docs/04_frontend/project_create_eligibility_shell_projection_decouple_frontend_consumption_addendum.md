@@ -29,4 +29,3 @@ inputs_canonical:
   - `roleKeys`
   - `certificationStatus`
   自己生成最终 create eligibility 真值。
-

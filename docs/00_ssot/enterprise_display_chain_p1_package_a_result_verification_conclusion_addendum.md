@@ -84,4 +84,3 @@ inputs_canonical:
   - verdict = `PASS WITH RISK`
   - gate decision = `No-Go`
   - 下一步唯一动作 = `contact write contract patch`
-

@@ -73,4 +73,3 @@ to the original business truth and `projectId`.
 - Veto if Flutter calls Server directly.
 - Veto if WebSocket becomes a generic DM entry.
 - Veto if HTTP history fallback is removed.
-

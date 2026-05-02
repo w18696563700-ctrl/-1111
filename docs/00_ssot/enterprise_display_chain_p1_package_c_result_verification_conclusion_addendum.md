@@ -72,4 +72,3 @@ inputs_canonical:
   - package verdict = `PASS`
   - chain gate decision = `No-Go`
   - 下一步唯一动作 = `Server package D / contact persistence patch`
-

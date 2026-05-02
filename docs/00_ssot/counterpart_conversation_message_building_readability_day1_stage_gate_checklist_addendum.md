@@ -43,4 +43,3 @@ Day 1 冻结通过，允许进入第 2 天 Server 只读投影补齐。
 - Server 可以在 `apps/server/src/modules/message_interaction/**`、`apps/server/src/modules/project_communication/**`、`apps/server/src/modules/shell/**` 内做只读 projection 补齐。
 - Server 可以补 targeted tests。
 - 不允许新增表、迁移、写命令或状态机。
-

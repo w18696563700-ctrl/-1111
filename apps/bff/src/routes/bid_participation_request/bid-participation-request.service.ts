@@ -324,4 +324,3 @@ export class BidParticipationRequestService {
     return normalized.length > 0 ? normalized : '';
   }
 }
-

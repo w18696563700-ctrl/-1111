@@ -60,4 +60,3 @@ inputs_canonical:
 
 - 不得把 mobile `china_province_city.json` 直接抬成 server runtime contract truth。
 - 不得把 BFF 或 Flutter 的 name derivation 误写成正式 contract 行为。
-

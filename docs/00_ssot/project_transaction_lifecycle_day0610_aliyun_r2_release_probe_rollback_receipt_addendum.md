@@ -1,7 +1,7 @@
 # Project Transaction Lifecycle Day0610 Aliyun R2 Release Probe / Migration Dry-Run / Rollback Receipt
 
-计划日期：2026-06-10  
-执行记录日期：2026-04-26  
+计划日期：2026-06-10
+执行记录日期：2026-04-26
 状态：R2 gray runtime gate Conditional Pass；Production acceptance No-Go
 
 ## 1. 结论

@@ -112,4 +112,3 @@ freeze_date_local: 2026-04-10
 - 当前可移交含义：
   - mobile 侧已给出 bounded closure 证据
   - 但仍需独立 runtime 复核，不能直接写成 release-ready 或 total closure
-

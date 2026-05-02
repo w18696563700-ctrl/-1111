@@ -42,4 +42,3 @@ inputs_canonical:
 - 当前明确不新造：
   - generic `/api/app/messages/*` thread write family
   - direct-to-Server mobile path
-

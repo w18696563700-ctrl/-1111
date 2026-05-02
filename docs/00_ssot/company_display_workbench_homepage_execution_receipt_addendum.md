@@ -99,4 +99,3 @@ Not allowed by this receipt:
 - OpenAPI / contracts changes
 - production release
 - cloud deployment
-

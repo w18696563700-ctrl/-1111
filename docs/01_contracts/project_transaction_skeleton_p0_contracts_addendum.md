@@ -184,4 +184,3 @@ inputs_canonical:
   - `order/detail -> contract/detail -> milestone/list -> inspection/detail`
 - `contract/amend`、`inspection/recheck`、`rating/*`、`dispute/*` 当前都不批准为 P0 对象
 - `payment / billing / deposit / guarantee / credit / membership` 当前都不属于 P0
-

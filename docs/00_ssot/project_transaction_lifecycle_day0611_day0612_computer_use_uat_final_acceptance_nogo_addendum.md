@@ -1,7 +1,7 @@
 # Project Transaction Lifecycle Day0611-Day0612 Computer Use UAT / Final Acceptance Pack No-Go Addendum
 
-计划日期：2026-06-11 至 2026-06-12  
-执行记录日期：2026-04-26  
+计划日期：2026-06-11 至 2026-06-12
+执行记录日期：2026-04-26
 状态：Final acceptance No-Go
 
 ## 1. 结论

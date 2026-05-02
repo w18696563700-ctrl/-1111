@@ -115,4 +115,3 @@ based_on:
   或数据库约束调整时，才允许 migration
 - 当前 round 因只复用已存在的 `state varchar(32)` carrier 与
   `archived` state value，不先引入 migration
-

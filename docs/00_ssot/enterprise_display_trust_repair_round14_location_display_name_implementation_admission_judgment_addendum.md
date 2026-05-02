@@ -61,4 +61,3 @@ inputs_canonical:
 
 - `Go for bounded cloud implementation`
 - `No-Go for release and closure`
-

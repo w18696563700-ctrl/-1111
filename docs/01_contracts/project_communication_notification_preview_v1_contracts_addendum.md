@@ -205,4 +205,3 @@ The expected generated output scope is the existing first-batch scope:
 
 After this L2 freeze, `pnpm contracts:generate` and `pnpm contracts:check`
 must pass before Stage 3 can be `Go for implementation prerequisite check`.
-

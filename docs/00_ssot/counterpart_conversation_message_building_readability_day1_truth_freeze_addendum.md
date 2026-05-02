@@ -158,4 +158,3 @@ layer: L0 SSOT
 - 更省成本：只改 Flutter 样式，但不能真实解决发布时间、申请公司、未读提示。
 - 更适合当前阶段：`projectPublishedAt + requesterCompanyName + unreadSummary.messages` 最小闭环。
 - 风险更大：从 summary 截公司名、用 `latestActivityAt` 冒充发布时间、把 App 内未读扩大成系统通知。
-

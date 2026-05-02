@@ -37,4 +37,3 @@ If WebSocket connection, subscription, or event parsing fails, Flutter must use:
 
 The fallback must be quiet by default and must not flash the page into loading
 state.
-

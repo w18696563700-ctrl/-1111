@@ -291,4 +291,3 @@ Current prior evidence:
 - `docs/01_contracts/forum_interaction_inbox_materialization_contract_addendum.md`
   freezes only the forum-derived interaction inbox and must not be treated as
   the notification owner for this package.
-

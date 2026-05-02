@@ -36,4 +36,3 @@ export class BidParticipationRequestEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }
-

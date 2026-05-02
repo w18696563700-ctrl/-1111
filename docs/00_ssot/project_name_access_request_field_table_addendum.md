@@ -80,4 +80,3 @@ inputs_canonical:
   - `onlineState`
   - generic `messageText`
   - local-only `maskedByClient`
-

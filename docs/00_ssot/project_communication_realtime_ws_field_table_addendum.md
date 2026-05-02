@@ -37,4 +37,3 @@ owner: Codex Control
 Flutter consumes the Server event envelope without inventing new state names.
 Unknown `eventType` values must be ignored only after logging/controlled
 handling; unknown critical fields must be treated as contract drift.
-

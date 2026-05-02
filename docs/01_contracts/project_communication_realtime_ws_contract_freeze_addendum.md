@@ -46,4 +46,3 @@ owner: Codex Control
 - Unauthorized thread: reject subscription.
 - Unknown event type: client ignores with controlled handling.
 - WebSocket unavailable: client falls back to HTTP message list.
-

@@ -22,4 +22,3 @@ inputs_canonical:
 - BFF 当前正式不得：
   - 改写该资格真值
   - 用 shell context 生成第二资格状态机
-

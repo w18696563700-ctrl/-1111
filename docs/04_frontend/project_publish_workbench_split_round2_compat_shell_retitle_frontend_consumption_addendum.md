@@ -58,4 +58,3 @@ inputs_canonical:
   - 一级入口
   - owner CTA
   - homepage 回流按钮
-

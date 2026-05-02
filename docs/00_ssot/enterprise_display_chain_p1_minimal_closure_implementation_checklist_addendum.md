@@ -210,4 +210,3 @@ inputs_canonical:
   - 严格限定在本单范围内
   - 不引入新的 truth 扩张
   - 遇到 contract 新增时先停回 contract 层
-

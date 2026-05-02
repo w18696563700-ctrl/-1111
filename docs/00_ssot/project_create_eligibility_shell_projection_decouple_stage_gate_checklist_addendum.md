@@ -54,4 +54,3 @@ based_on:
 - 当前 veto gates 均未阻断。
 - 当前轮结论固定为：
   - `Go for docs + contracts + backend + bff + frontend bounded implementation`
-

@@ -111,4 +111,3 @@ inputs_canonical:
   - mandatory case-media projection carrier presence
   - board-scoped case visibility semantics
   - unified factory naming semantics
-

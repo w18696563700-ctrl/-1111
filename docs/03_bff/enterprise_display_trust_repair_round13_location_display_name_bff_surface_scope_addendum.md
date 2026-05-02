@@ -49,4 +49,3 @@ inputs_canonical:
 
 - 不得把当前对象退回为“前端自己映射一下就行”。
 - 不得在 BFF 中复制一份地区 lookup，制造 server/BFF 双真源。
-

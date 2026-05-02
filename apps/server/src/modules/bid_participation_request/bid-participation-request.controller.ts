@@ -56,4 +56,3 @@ export class BidParticipationRequestController {
     return this.writeService.rejectRequest(projectId, requestId, resolveRequestContext(headers));
   }
 }
-

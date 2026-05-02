@@ -78,4 +78,3 @@ layer: L2 Contracts
 - 不新增 push-token route。
 - 不新增系统通知权限 contract。
 - 不改变 `POST /api/app/message/project-communication/read-cursor`。
-

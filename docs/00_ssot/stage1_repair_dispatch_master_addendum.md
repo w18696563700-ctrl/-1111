@@ -88,40 +88,40 @@ inputs_canonical:
 
 ## 3. repair execution order
 
-1. `S1-R01`  
-进入条件：当前主线仍停留在 `stage-1 dispatch authoring`。  
+1. `S1-R01`
+进入条件：当前主线仍停留在 `stage-1 dispatch authoring`。
 进入下一项条件：后端执行回执形成，且 `结果校验 Agent` 确认公开 OTP send 不再依赖开发态/白名单语义。
 
-2. `S1-R02`  
-进入条件：`S1-R01` 通过。  
+2. `S1-R02`
+进入条件：`S1-R01` 通过。
 进入下一项条件：`shell/context + organization create/join-by-code/switch + organization/mine` 在真实公众 actor 前提下稳定承接。
 
-3. `S1-R03`  
-进入条件：`S1-R02` 通过。  
+3. `S1-R03`
+进入条件：`S1-R02` 通过。
 进入下一项条件：移动端认证主路径已不再把手填 `licenseFileId` 当主路径，上传三段式与 submit/resubmit 串通。
 
-4. `S1-R04`  
-进入条件：`S1-R03` 通过。  
+4. `S1-R04`
+进入条件：`S1-R03` 通过。
 进入下一项条件：最小认证审核闭环可把状态稳定推进为 `approved / rejected`，并且可被 profile/shell 回读。
 
-5. `S1-R05`  
-进入条件：`S1-R04` 通过。  
+5. `S1-R05`
+进入条件：`S1-R04` 通过。
 进入下一项条件：`/api/app/profile/governance/appeals*` 已不再漂移到不存在的 server profile 路由。
 
-6. `S1-R06`  
-进入条件：`S1-R05` 通过。  
+6. `S1-R06`
+进入条件：`S1-R05` 通过。
 进入下一项条件：`messages` building active object 已被总控裁死，文书冻结已同步。
 
-7. `S1-C01`  
-进入条件：`S1-R06` 通过。  
+7. `S1-C01`
+进入条件：`S1-R06` 通过。
 进入下一项条件：`message/index` 的阶段1最小 closure 已完成，客户端不再把不存在的 transport 当作已运行内核。
 
-8. `S1-C03`  
-进入条件：`S1-C01` 通过。  
+8. `S1-C03`
+进入条件：`S1-C01` 通过。
 进入下一项条件：Admin `review-tasks` 已不再是 orphan API gap。
 
-9. `S1-C02`  
-进入条件：`S1-C03` 通过。  
+9. `S1-C02`
+进入条件：`S1-C03` 通过。
 进入 closure 评估条件：交易主链最小 route / contract / inventory closure 已形成，且 ghost route 不再冒充可运行 transport。
 
 ## 4. role assignment

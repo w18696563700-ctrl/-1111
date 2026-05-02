@@ -55,4 +55,3 @@ inputs_canonical:
   - verdict = `PASS`
   - gate decision = `Go for Flutter package C`
   - 下一步唯一动作 = `Flutter package C / contact write request closure`
-

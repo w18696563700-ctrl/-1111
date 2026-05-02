@@ -20,4 +20,3 @@ import { OrganizationCreditShadowRecomputeTriggerEntity } from './entities/organ
   exports: [CreditScoringShadowAggregationService]
 })
 export class CreditScoringShadowModule {}
-

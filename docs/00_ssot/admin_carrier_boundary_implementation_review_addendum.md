@@ -278,4 +278,3 @@ const authorization =
 | 是否需要本轮改代码 | 否 |
 | 是否需要后续改代码 | 是，最小改 Admin runtime + tests |
 | 是否需要改 contracts/generated | 否 |
-

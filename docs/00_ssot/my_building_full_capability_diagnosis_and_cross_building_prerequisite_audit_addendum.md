@@ -163,55 +163,55 @@ inputs_canonical:
 
 ## 9. P0 prerequisite list
 
-1. `P0-1` 公开登录开通  
+1. `P0-1` 公开登录开通
 当前 root blocker。必须先把 whitelist/dev OTP 与公众可用 OTP send 语义切开，形成真实受控公开登录。
 
-2. `P0-2` organization scope 最小闭环  
+2. `P0-2` organization scope 最小闭环
 必须固定 `shell/context`、`organization/mine`、`create / join / switch` 与登录后的 first-time handoff。
 
-3. `P0-3` 企业认证上传 / 提交 / 重提闭环  
+3. `P0-3` 企业认证上传 / 提交 / 重提闭环
 必须补齐营业执照文件上传三段式，消灭 hand-entered `licenseFileId`。
 
-4. `P0-4` 企业认证审核最小运营闭环  
+4. `P0-4` 企业认证审核最小运营闭环
 必须让认证进入最小可运营 review 闭环，不能只停在 server-side write truth。
 
-5. `P0-5` 消息楼单一对象真源裁决  
+5. `P0-5` 消息楼单一对象真源裁决
 必须先裁掉 `forum interaction inbox` 与 `message/index` 双主线。
 
 ## 10. P1 prerequisite list
 
-1. forum app-facing route family closure  
+1. forum app-facing route family closure
 让 mobile forum consumer 期望面与 BFF 实际暴露面重新对齐。
 
-2. exhibition 私域继续面 transport inventory closure  
+2. exhibition 私域继续面 transport inventory closure
 对齐 `bid / order / contract / milestone / inspection / rating / dispute` 的 mobile path、BFF controller、Server truth。
 
-3. 我的楼功能本体 Round 1 consistency closure  
+3. 我的楼功能本体 Round 1 consistency closure
 只在 P0 prerequisites 处理后再进入，目标是收口 `entry owner / route owner / page owner / truth owner` 的漂移，而不是抢在前置没闭环时先做表层增量。
 
 ## 11. P2 deferred list
 
-1. `payment / billing / V2.3` 相关扩写  
-2. 通用 IM / conversation center  
-3. `我的项目` 深层附件与更大 CTA 矩阵  
-4. person-first 第二套 identity / certification truth  
+1. `payment / billing / V2.3` 相关扩写
+2. 通用 IM / conversation center
+3. `我的项目` 深层附件与更大 CTA 矩阵
+4. person-first 第二套 identity / certification truth
 5. 任何 release-prep / launch 相关动作
 
 ## 12. Structural Risks
 
-1. **truth owner 漂移风险**  
+1. **truth owner 漂移风险**
 `profile` 已经同时承接 identity / organization / certification / governance / project entry / forum entry；如果不持续写死“entry owner 不等于 truth owner”，很容易把 `profile` 误做成第二工作台或第二后台。
 
-2. **form/page 伪完成冒充内核完成**  
+2. **form/page 伪完成冒充内核完成**
 登录页、认证页、消息页、展览继续页很多都存在，但存在并不等于 runtime 闭环成立。
 
-3. **messages 对象分裂风险**  
+3. **messages 对象分裂风险**
 当前 `messages` building 的页面 owner 与 object truth owner 没锁死，是最明显的结构风险之一。
 
-4. **public-vs-controlled login 语义混写风险**  
+4. **public-vs-controlled login 语义混写风险**
 当前代码里既有公众样式登录入口，也有 whitelist/dev OTP 语义；如果不单独修复，产品层会反复把“受控登录”误写成“公众开放登录”。
 
-5. **guard 先于真闭环风险**  
+5. **guard 先于真闭环风险**
 `bid submit`、`enterprise apply` 等 guard 已经写出正确依赖，但如果前置真闭环不补，guard 只会稳定把用户挡住，无法转化成真正可推进能力。
 
 ## 13. 阶段门禁核查表

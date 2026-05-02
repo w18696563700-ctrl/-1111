@@ -86,4 +86,3 @@ inputs_canonical:
 - 本 patch 未完成前：
   - `BFF package B = No-Go`
   - `Flutter package C = No-Go`
-

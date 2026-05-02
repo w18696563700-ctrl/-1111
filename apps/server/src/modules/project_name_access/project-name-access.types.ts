@@ -13,4 +13,3 @@ export type ProjectNameAccessProjection = {
   brandName: string | null;
   nameAccess: ProjectNameAccessReadModel;
 };
-

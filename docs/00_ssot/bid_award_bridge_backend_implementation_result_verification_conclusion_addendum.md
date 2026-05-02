@@ -176,4 +176,3 @@ inputs_canonical:
   - 消除 `server/*` 与 `/api/app/*` 的 authoritative drift
 - 在这个动作完成前：
   - `No-Go for BFF bounded implementation`
-

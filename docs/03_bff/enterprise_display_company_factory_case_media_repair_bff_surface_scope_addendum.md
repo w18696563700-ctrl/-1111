@@ -77,4 +77,3 @@ inputs_canonical:
   - route alignment
   - shaping alignment
   - smoke-test closure only
-

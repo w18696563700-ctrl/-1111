@@ -243,4 +243,3 @@ test('profile organization self leave blocks the last active admin', async () =>
   assert.equal(state.sessions[0].organizationId, 'org-current');
   assert.equal(state.audits.length, 0);
 });
-

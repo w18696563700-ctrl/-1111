@@ -37,4 +37,3 @@ import { BidParticipationRequestEntity } from './entities/bid-participation-requ
   exports: [BidParticipationRequestAccessService, TypeOrmModule],
 })
 export class BidParticipationRequestModule {}
-

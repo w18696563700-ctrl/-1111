@@ -25,4 +25,3 @@ owner: Codex Control
   explicitly calls or subscribes to a Server internal event channel.
 - Server does not create IM delivery/read-receipt state.
 - Server does not send offline push.
-

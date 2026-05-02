@@ -411,4 +411,3 @@ export interface RatingSubmitAcceptedResponse {
 
 export const WORKBENCH_RATING_ENTRY_STATES = ["controlled_unavailable","extension_only","eligible","submitted"] as const;
 export type WorkbenchRatingEntryState = (typeof WORKBENCH_RATING_ENTRY_STATES)[number];
-

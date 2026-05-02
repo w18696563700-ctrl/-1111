@@ -92,4 +92,3 @@ freeze_date_local: 2026-04-10
 
 - 下一轮唯一动作：
   - 围绕 `enterprise_hub V1` 输出一份 bounded re-entry dispatch bundle
-

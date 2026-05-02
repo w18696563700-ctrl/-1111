@@ -292,4 +292,3 @@ function countRecentConsecutiveNegative(ratings: ShadowRatingValue[]) {
 function thisDateValue(value: Date | null) {
   return value?.getTime() ?? 0;
 }
-

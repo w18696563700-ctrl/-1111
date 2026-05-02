@@ -104,4 +104,3 @@ This hotfix must not:
 - The second progress step shows `进入预发布列表 / 补齐五类资料`.
 - Existing entries to `我的项目`, `我的竞标`, prepublish, bidding, and active
   project stages remain valid.
-

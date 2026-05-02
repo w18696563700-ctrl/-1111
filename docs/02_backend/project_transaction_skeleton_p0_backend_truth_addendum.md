@@ -193,4 +193,3 @@ inputs_canonical:
   - `audit_logs`
 - `order/detail / contract/detail / milestone/list / inspection/detail` 只读，不得被当成写命令真源
 - `payment / billing / deposit / guarantee / credit / membership` 全部不属于当前包
-

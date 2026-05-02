@@ -78,4 +78,3 @@
 | Android native SDK bridge | Go |
 | iOS SDK bridge | Conditional Go, retained for next native package |
 | Production real-money open | No-Go until Alipay app online, merchant binding, secrets, callback domain, and whitelist UAT pass |
-

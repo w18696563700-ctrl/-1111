@@ -164,4 +164,3 @@ Decision:
 - Go for focused product/UAT validation on the deployed cloud build.
 - Go for reopening release-prep discussion if the next stage is desired.
 - No-Go for claiming real payment runtime readiness; this stage only proves route parity, gates, and cloud behavior under current feature boundary.
-

@@ -130,4 +130,3 @@ inputs_canonical:
 - 不允许 session-truth bypass
 - 必须受 `env flag + whitelist` 双重限制
 - 必须可审计、可撤销、可失效
-

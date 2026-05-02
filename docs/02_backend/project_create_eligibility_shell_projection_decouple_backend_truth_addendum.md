@@ -28,4 +28,3 @@ inputs_canonical:
 
 - workbench summary 仍可继续输出 `project_chain.canCreateProject`
 - 但它当前只作为 fallback compatibility projection
-

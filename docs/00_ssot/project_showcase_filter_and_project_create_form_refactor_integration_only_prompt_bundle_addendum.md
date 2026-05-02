@@ -125,4 +125,3 @@ E. 当前是否允许把这一对象标记为 `development-stage integration ver
 - 不要写“理论上”
 - 只给执行证据和阶段结论
 ```
-

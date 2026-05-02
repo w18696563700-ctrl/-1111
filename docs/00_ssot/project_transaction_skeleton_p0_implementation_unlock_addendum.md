@@ -98,4 +98,3 @@ inputs_canonical:
 且当前唯一允许的实现主题只有：
 
 - `bid/submit -> order/create -> contract/confirm -> milestone/submit -> inspection/submit`
-

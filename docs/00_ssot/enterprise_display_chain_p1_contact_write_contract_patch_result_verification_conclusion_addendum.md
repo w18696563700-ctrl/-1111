@@ -58,4 +58,3 @@ inputs_canonical:
   - verdict = `PASS`
   - gate decision = `Go for BFF package B`
   - 下一步唯一动作 = `BFF package B / contact write path closure`
-

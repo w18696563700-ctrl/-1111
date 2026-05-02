@@ -30,4 +30,3 @@ inputs_canonical:
 
 - `GET /api/app/exhibition/workbench.project_chain.canCreateProject` 当前继续保留：
   - compatibility fallback only
-

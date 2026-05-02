@@ -53,4 +53,3 @@ export class AppBidParticipationRequestController {
     return this.service.rejectRequest(projectId, requestId, payload, headers);
   }
 }
-

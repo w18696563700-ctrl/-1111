@@ -180,4 +180,3 @@ Recommended release-prep prerequisites:
 - Confirm rollback notes for BFF/Server release `20260430012927-platform-pricing-cloud-parity`.
 - Confirm support/operator handling for `PROJECT_AUTHENTICITY_SINCERITY_REQUIRED` and `BID_SERVICE_FEE_AUTHORIZATION_REQUIRED`.
 - Confirm whether to schedule a later de-legacy cleanup for old naming residue.
-

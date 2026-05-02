@@ -112,4 +112,3 @@ inputs_canonical:
 - 不要顺手扩字段
 - 不要给 contact truth 新开第二 owner
 - 只给真实持久化、真实测试、真实剩余风险
-

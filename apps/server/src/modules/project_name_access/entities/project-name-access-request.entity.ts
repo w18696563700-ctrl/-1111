@@ -36,4 +36,3 @@ export class ProjectNameAccessRequestEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }
-

@@ -17,4 +17,3 @@ export class OrganizationCreditShadowReasonCodeEntity {
   @UpdateDateColumn({ name: 'updated_at', type: 'timestamptz' })
   updatedAt!: Date;
 }
-

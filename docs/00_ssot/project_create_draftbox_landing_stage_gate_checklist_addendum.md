@@ -61,4 +61,3 @@ Not allowed:
 - contracts;
 - cloud runtime;
 - database data repair.
-

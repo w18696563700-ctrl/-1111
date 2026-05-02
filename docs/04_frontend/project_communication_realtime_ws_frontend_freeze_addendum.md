@@ -25,4 +25,3 @@ owner: Codex Control
 - No generic private message UI.
 - No offline push.
 - No delivery guarantee state machine.
-

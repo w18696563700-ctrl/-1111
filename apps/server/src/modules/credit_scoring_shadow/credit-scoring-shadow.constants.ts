@@ -102,4 +102,3 @@ export const CREDIT_SHADOW_TEXT_SCORE_COLUMNS = [
   'satisfactionLevel',
   'ratingGrade'
 ] as const;
-

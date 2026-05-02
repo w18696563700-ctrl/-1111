@@ -47,4 +47,3 @@ based_on:
 
 - 下一轮唯一动作固定为：
   - 锁定新的唯一 bounded object candidate，再决定是否提交新的《阶段门禁核查表》
-

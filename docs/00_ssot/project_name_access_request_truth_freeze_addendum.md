@@ -148,4 +148,3 @@ inputs_canonical:
   - `Go for L2/L3/L4/L5 freeze authoring`
 - 当前仍：
   - `No-Go for implementation`
-
