@@ -9,9 +9,9 @@ Future<void> main() async {
   final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
   unawaited(() async {
     await for (final request in server) {
-      print('method=${request.method} path=${request.uri.path}');
+      stdout.writeln('method=${request.method} path=${request.uri.path}');
       final raw = await utf8.decoder.bind(request).join();
-      print('body=$raw');
+      stdout.writeln('body=$raw');
       request.response
         ..statusCode = 200
         ..headers.contentType = ContentType.json
@@ -21,11 +21,18 @@ Future<void> main() async {
   }());
   final consumer = ProfileIdentityConsumerLayer(
     client: AppApiClient(
-      config: AppApiConfig(baseUrl: 'http://${server.address.host}:${server.port}/api/app'),
+      config: AppApiConfig(
+        baseUrl: 'http://${server.address.host}:${server.port}/api/app',
+      ),
     ),
   );
-  final result = await consumer.patchOrganizationMemberRole(memberId: 'member-2', roleKey: 'supplier_admin');
-  print('state=${result.state} message=${result.message} path=${result.path}');
-  print('data=${result.data?.traceId}');
+  final result = await consumer.patchOrganizationMemberRole(
+    memberId: 'member-2',
+    roleKey: 'supplier_admin',
+  );
+  stdout.writeln(
+    'state=${result.state} message=${result.message} path=${result.path}',
+  );
+  stdout.writeln('data=${result.data?.traceId}');
   await server.close(force: true);
 }

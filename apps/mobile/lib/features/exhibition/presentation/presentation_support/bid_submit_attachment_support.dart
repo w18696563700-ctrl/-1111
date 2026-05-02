@@ -39,20 +39,6 @@ final class BidSubmitAttachmentDebugOverrides {
   }
 }
 
-enum _BidSubmitAttachmentUploadUiStatus {
-  idle,
-  selecting,
-  selectedReady,
-  initStarting,
-  initFailed,
-  directUploading,
-  directUploadFailed,
-  confirming,
-  confirmFailed,
-  uploadBound,
-  unsupportedType,
-}
-
 class _ResolvedBidSubmitAttachmentDraft {
   const _ResolvedBidSubmitAttachmentDraft({
     required this.fileName,
@@ -300,19 +286,6 @@ String _bidSubmitAttachmentUnsupportedTypeMessage(String attachmentLabel) {
     '报价表' => '报价表只支持 XLS、XLSX、PDF、DOC、DOCX 文件。',
     '进度安排' => '进度安排只支持 PDF、DOC、DOCX、XLS、XLSX 文件。',
     _ => '当前文件类型暂不支持。',
-  };
-}
-
-String _bidSubmitAttachmentUploadFailureMessage(
-  _BidSubmitAttachmentUploadUiStatus status,
-) {
-  return switch (status) {
-    _BidSubmitAttachmentUploadUiStatus.initFailed => '当前附件上传初始化未完成，请稍后重试。',
-    _BidSubmitAttachmentUploadUiStatus.directUploadFailed =>
-      '当前附件直传未完成，请重新上传当前附件。',
-    _BidSubmitAttachmentUploadUiStatus.confirmFailed =>
-      '当前附件确认结果未完成，请再次确认或重新上传。',
-    _ => '',
   };
 }
 

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_api_entry_mode.dart';
@@ -8,18 +9,21 @@ Future<void> main() async {
     config: AppApiConfig(baseUrl: AppApiEntryTarget.sshTunnelBaseUrl),
   );
 
-  Future<void> probe(String label, Future<AppApiResponse> Function() run) async {
+  Future<void> probe(
+    String label,
+    Future<AppApiResponse> Function() run,
+  ) async {
     try {
       final res = await run();
       // Keep output short and deterministic for agent receipts.
-      print('[$label] status=${res.statusCode} path=${res.uri.path}');
+      stdout.writeln('[$label] status=${res.statusCode} path=${res.uri.path}');
       if (res.body != null) {
-        print('[$label] body=${res.body}');
+        stdout.writeln('[$label] body=${res.body}');
       }
     } on TimeoutException catch (e) {
-      print('[$label] timeout $e');
+      stdout.writeln('[$label] timeout $e');
     } catch (e) {
-      print('[$label] exception $e');
+      stdout.writeln('[$label] exception $e');
       rethrow;
     }
   }

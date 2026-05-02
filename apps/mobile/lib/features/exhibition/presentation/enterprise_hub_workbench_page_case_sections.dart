@@ -70,16 +70,14 @@ extension _EnterpriseWorkbenchPageCaseSections
               width: double.infinity,
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: Theme.of(
-                  context,
-                ).colorScheme.surfaceContainerHighest,
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
                 _caseComposerLockReason!,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  fontWeight: FontWeight.w600,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
           ],
@@ -157,85 +155,11 @@ extension _EnterpriseWorkbenchPageCaseSections
             contentPadding: EdgeInsets.zero,
             title: const Text('标记为重点案例'),
             onChanged: editable
-                ? (value) =>
-                    _updateWorkbenchState(() => _caseFeatured = value)
+                ? (value) => _updateWorkbenchState(() => _caseFeatured = value)
                 : null,
           ),
         ],
       ),
     );
   }
-
-  Widget _buildFactoryEquipmentField() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '设备清单',
-          style: Theme.of(
-            context,
-          ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w700),
-        ),
-        const SizedBox(height: 4),
-        Text('前面填写设备名称，后面填写数量。', style: Theme.of(context).textTheme.bodySmall),
-        const SizedBox(height: 10),
-        ...List<Widget>.generate(_factoryEquipmentEntries.length, (index) {
-          final entry = _factoryEquipmentEntries[index];
-          return Padding(
-            padding: EdgeInsets.only(
-              bottom: index == _factoryEquipmentEntries.length - 1 ? 0 : 12,
-            ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Expanded(
-                  child: TextField(
-                    controller: entry.nameController,
-                    onChanged: (_) => _markProfileDraftDirty(),
-                    decoration: const InputDecoration(
-                      labelText: '设备名称',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                SizedBox(
-                  width: 120,
-                  child: TextField(
-                    controller: entry.quantityController,
-                    onChanged: (_) => _markProfileDraftDirty(),
-                    keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(
-                      labelText: '数量',
-                      border: OutlineInputBorder(),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                IconButton(
-                  onPressed: _factoryEquipmentEntries.length == 1
-                      ? _addFactoryEquipmentEntry
-                      : () => _removeFactoryEquipmentEntry(index),
-                  icon: Icon(
-                    _factoryEquipmentEntries.length == 1
-                        ? Icons.add_circle_outline_rounded
-                        : Icons.remove_circle_outline_rounded,
-                  ),
-                ),
-              ],
-            ),
-          );
-        }),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: TextButton.icon(
-            onPressed: _addFactoryEquipmentEntry,
-            icon: const Icon(Icons.add_rounded),
-            label: const Text('添加设备'),
-          ),
-        ),
-      ],
-    );
-  }
-
 }

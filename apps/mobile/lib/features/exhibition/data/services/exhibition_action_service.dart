@@ -331,13 +331,15 @@ class _ExhibitionActionService {
     required String requestMethod,
   }) {
     final payload = response.body;
-    final payloadPreview = switch (payload) {
-      null => 'null',
-      final Object value => jsonEncode(value),
-    };
-    print(
-      '[exhibition-action] $requestMethod $canonicalPath status=${response.statusCode} payload=${payloadPreview.length > 600 ? '${payloadPreview.substring(0, 600)}...(truncated)' : payloadPreview}',
-    );
+    if (kDebugMode) {
+      final payloadPreview = switch (payload) {
+        null => 'null',
+        final Object value => jsonEncode(value),
+      };
+      debugPrint(
+        '[exhibition-action] $requestMethod $canonicalPath status=${response.statusCode} payload=${payloadPreview.length > 600 ? '${payloadPreview.substring(0, 600)}...(truncated)' : payloadPreview}',
+      );
+    }
 
     if (response.statusCode >= 200 && response.statusCode < 300) {
       final validation = _sanitizeAndValidateSuccessPayload(
@@ -346,9 +348,11 @@ class _ExhibitionActionService {
         payload,
       );
       if (!validation.isValid) {
-        print(
-          '[exhibition-action] validation failed path=$canonicalPath message="${validation.message}" payload=${validation.payload}',
-        );
+        if (kDebugMode) {
+          debugPrint(
+            '[exhibition-action] validation failed path=$canonicalPath message="${validation.message}" payload=${validation.payload}',
+          );
+        }
         return ExhibitionActionResult(
           method: requestMethod,
           path: canonicalPath,
@@ -369,9 +373,11 @@ class _ExhibitionActionService {
     }
 
     final failurePayload = _sanitizeFailurePayload(payload);
-    print(
-      '[exhibition-action] request failed path=$canonicalPath state=${_mapHttpFailureState(response.statusCode)} errorCode=${_extractErrorCode(failurePayload)}',
-    );
+    if (kDebugMode) {
+      debugPrint(
+        '[exhibition-action] request failed path=$canonicalPath state=${_mapHttpFailureState(response.statusCode)} errorCode=${_extractErrorCode(failurePayload)}',
+      );
+    }
 
     return ExhibitionActionResult(
       method: requestMethod,

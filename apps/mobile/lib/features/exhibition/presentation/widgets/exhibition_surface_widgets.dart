@@ -98,7 +98,12 @@ class _ActionCard extends StatelessWidget {
     this.tone = _ActionCardTone.standard,
     this.eyebrow,
     this.titleColor,
+    // Strategic reserve for dense workbench headers. Do not remove only
+    // because current call sites do not pass it.
+    // ignore: unused_element_parameter
     this.titleTrailing,
+    // Strategic reserve for bounded warning/help copy variants.
+    // ignore: unused_element_parameter
     this.summaryStyle,
   });
 

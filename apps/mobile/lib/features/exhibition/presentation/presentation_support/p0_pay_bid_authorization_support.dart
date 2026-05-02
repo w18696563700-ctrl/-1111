@@ -22,8 +22,7 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
       _DetailLine(label: '预计服务费', value: _p0PayEstimatedFeeText()),
       const _StateMessage(
         title: '你需要做什么',
-        body:
-            '选择报价有效期，核对 4000 元竞标服务费预授权额度，并勾选规则确认。Flutter 不计算服务费，提交前只确认 Server/BFF 返回的冻结状态。',
+        body: '选择报价有效期，核对 4000 元竞标服务费预授权额度，并勾选规则确认。提交前会以平台记录确认预授权状态。',
       ),
       const SizedBox(height: 12),
       _buildP0PayQuoteValiditySelector(),
@@ -186,7 +185,9 @@ String _p0PayAuthorizationStatusText(ExhibitionLoadResult? result) {
     payload?['membershipDiscountRate'],
   );
   final capAmount = _normalizeDynamicText(payload?['capAmount']);
-  final estimatedFeeAmount = _normalizeDynamicText(payload?['estimatedFeeAmount']);
+  final estimatedFeeAmount = _normalizeDynamicText(
+    payload?['estimatedFeeAmount'],
+  );
   final membershipTier = _p0PayMembershipTierDisplay(
     _normalizeDynamicText(payload?['membershipTierSnapshot']) ??
         _normalizeDynamicText(payload?['membershipTierAtAuthorization']),
@@ -224,36 +225,6 @@ double? _p0PayRequirementNumber(Map<String, Object?> requirement, String key) {
     return value.toDouble();
   }
   return double.tryParse(_normalizeDynamicText(value) ?? '');
-}
-
-String _p0PayFeeRateDisplay({String? label, String? rate}) {
-  final formattedRate = _p0PayFeeRatePercent(rate);
-  if (label != null &&
-      formattedRate != null &&
-      !label.contains(formattedRate)) {
-    return '$label（$formattedRate）';
-  }
-  return label ?? formattedRate ?? '待平台返回';
-}
-
-String? _p0PayFeeRatePercent(String? value) {
-  final text = value?.trim();
-  if (text == null || text.isEmpty) {
-    return null;
-  }
-  if (text.endsWith('%')) {
-    return text;
-  }
-  final parsed = double.tryParse(text);
-  if (parsed == null) {
-    return text;
-  }
-  final percent = parsed * 100;
-  final fixed = percent.toStringAsFixed(2);
-  final trimmed = fixed
-      .replaceFirst(RegExp(r'\.00$'), '')
-      .replaceFirst(RegExp(r'0$'), '');
-  return '$trimmed%';
 }
 
 String? _p0PayMembershipTierDisplay(String? value) {

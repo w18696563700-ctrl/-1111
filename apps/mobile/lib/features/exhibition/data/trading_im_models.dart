@@ -377,14 +377,6 @@ bool _requiredBool(Map<String, Object?> body, String field) {
   return value;
 }
 
-num _requiredNumber(Map<String, Object?> body, String field) {
-  final value = body[field];
-  if (value is! num) {
-    throw FormatException('field "$field" must be numeric');
-  }
-  return value;
-}
-
 bool? _optionalBool(Object? value) => value is bool ? value : null;
 
 BidThreadSystemSeedActionView? _parseSystemSeedAction(Object? payload) {

@@ -1,5 +1,9 @@
 part of '../exhibition_trade_pages.dart';
 
+// Strategic reserve: current submit page retired seat/completeness from the
+// main surface, but the frozen Package A truth remains available for a bounded
+// future reactivation after SSOT approval.
+// ignore: unused_element
 List<Widget> _buildBidSeatAndCompletenessSections({
   required BuildContext context,
   required String? projectId,

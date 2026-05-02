@@ -1,7 +1,6 @@
 import 'dart:io';
 
 import 'package:mobile/core/api/app_api_client.dart';
-import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';

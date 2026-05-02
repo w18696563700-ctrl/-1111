@@ -12,10 +12,6 @@ extension _HomeProjectFilterPresentation on _HomeProjectFilter {
 
 enum _HomeForumFilter { comprehensive }
 
-extension _HomeForumFilterPresentation on _HomeForumFilter {
-  String get label => '综合';
-}
-
 enum _HomeEnterpriseFilter { comprehensive, province, featured }
 
 extension _HomeEnterpriseFilterPresentation on _HomeEnterpriseFilter {
