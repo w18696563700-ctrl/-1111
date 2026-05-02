@@ -41,3 +41,5 @@ apps/mobile/assets/images/exhibition/default_project_cover.jpg
 # Local-only runtime and assistant state
 .codex/
 runtime/
+!apps/bff/src/core/runtime/
+!apps/bff/src/core/runtime/*.ts

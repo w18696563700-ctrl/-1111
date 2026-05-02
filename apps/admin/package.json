@@ -6,7 +6,7 @@
     "dev": "node ./scripts/with-formal-cloud-env.cjs next dev --port 3100",
     "dev:tunnel": "SERVER_ADMIN_API_ENTRY_MODE=ssh_tunnel node ./scripts/with-formal-cloud-env.cjs next dev --port 3100",
     "dev:local": "SERVER_ADMIN_API_ENTRY_MODE=local_dev node ./scripts/with-formal-cloud-env.cjs next dev --port 3100",
-    "build": "node ./scripts/with-formal-cloud-env.cjs next build",
+    "build": "node ./scripts/with-formal-cloud-env.cjs next build --webpack",
     "start": "node ./scripts/with-formal-cloud-env.cjs next start --port 3100",
     "lint": "eslint .",
     "test:admin-side:prepare": "rm -rf test-dist && tsc -p tsconfig.admin-tests.json",
