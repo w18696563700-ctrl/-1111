@@ -447,6 +447,7 @@ module ContractsGeneration
       }
 
       export interface MyProjectListItemReadModel {
+        projectCreatedAt: string | null;
         publicProject: ProjectShowcaseListItemReadModel;
         privateSummary: MyProjectPrivateProgressSummaryReadModel;
       }

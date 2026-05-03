@@ -12178,6 +12178,7 @@ components:
     MyProjectListItemReadModel:
       type: object
       required:
+        - projectCreatedAt
         - publicProject
         - privateSummary
       description: >
@@ -12186,6 +12187,16 @@ components:
         separated and must not collapse into public showcase list, recent
         project workbench summary, or full single-project detail truth.
       properties:
+        projectCreatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+          description: >
+            App-facing project creation time for private my-project list
+            display only. Truth source is Server `Project.createdAt`; this
+            field is not save time, update time, draft saved time, or recent
+            operation time. BFF must not synthesize it from current time.
         publicProject:
           $ref: '#/components/schemas/ProjectShowcaseListItemReadModel'
         privateSummary:

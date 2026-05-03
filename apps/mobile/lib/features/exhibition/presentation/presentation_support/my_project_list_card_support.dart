@@ -16,6 +16,7 @@ class _MyProjectCompactCard extends StatelessWidget {
     this.secondaryActionLabel,
     this.onSecondaryPressed,
     this.highlighted = false,
+    this.highlightLabel,
   });
 
   final String title;
@@ -32,6 +33,7 @@ class _MyProjectCompactCard extends StatelessWidget {
   final String? secondaryActionLabel;
   final VoidCallback? onSecondaryPressed;
   final bool highlighted;
+  final String? highlightLabel;
 
   @override
   Widget build(BuildContext context) {
@@ -81,7 +83,10 @@ class _MyProjectCompactCard extends StatelessWidget {
             ),
             if (highlighted) ...<Widget>[
               const SizedBox(height: 8),
-              _StatusPill(label: '刚刚保存到草稿箱', tone: _ActionCardTone.emphasis),
+              _StatusPill(
+                label: highlightLabel ?? '创建时间暂未返回',
+                tone: _ActionCardTone.emphasis,
+              ),
             ],
             if (description.trim().isNotEmpty) ...<Widget>[
               const SizedBox(height: 8),
@@ -170,6 +175,28 @@ class _MyProjectCompactCard extends StatelessWidget {
       ),
     );
   }
+}
+
+String _myProjectDraftHighlightLabel(Map<String, Object?> item) {
+  final rawCreatedAt = item['projectCreatedAt'];
+  final createdAt = _formatMyProjectCreatedAt(
+    rawCreatedAt is String ? rawCreatedAt : null,
+  );
+  return createdAt == null ? '创建时间暂未返回' : '创建时间：$createdAt';
+}
+
+String? _formatMyProjectCreatedAt(String? raw) {
+  if (raw == null || raw.trim().isEmpty) {
+    return null;
+  }
+  final parsed = DateTime.tryParse(raw.trim());
+  if (parsed == null) {
+    return null;
+  }
+  final local = parsed.toLocal();
+  String twoDigits(int value) => value.toString().padLeft(2, '0');
+  return '${local.year}-${twoDigits(local.month)}-${twoDigits(local.day)} '
+      '${twoDigits(local.hour)}:${twoDigits(local.minute)}';
 }
 
 class _MyProjectCompactLine extends StatelessWidget {

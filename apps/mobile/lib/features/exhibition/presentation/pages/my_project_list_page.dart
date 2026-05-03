@@ -346,6 +346,9 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
                   ? () => _openRoute(detailRouteName)
                   : null,
               highlighted: highlighted,
+              highlightLabel: highlighted
+                  ? _myProjectDraftHighlightLabel(item)
+                  : null,
             );
             if (highlighted) {
               card = KeyedSubtree(key: _highlightedProjectKey, child: card);

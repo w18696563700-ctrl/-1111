@@ -52,6 +52,7 @@ export class MyProjectPresenter {
 
   private toListItem(project: ProjectEntity, privateSummary: MyProjectPrivateProgressReadModel) {
     return {
+      projectCreatedAt: project.createdAt.toISOString(),
       publicProject: this.projectPresenter.toShowcaseListItem(project),
       privateSummary
     };

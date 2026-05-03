@@ -174,10 +174,12 @@ Future<void> _selectProjectType(
 Map<String, Object?> _draftMyProjectListBody({
   required String projectId,
   required String title,
+  String projectCreatedAt = '2026-05-03T10:20:00',
 }) {
   return <String, Object?>{
     'ongoingProjects': <Object?>[
       <String, Object?>{
+        'projectCreatedAt': projectCreatedAt,
         'publicProject': <String, Object?>{
           'projectId': projectId,
           'projectNo': 'EXH-2026-DRAFT',
@@ -618,7 +620,7 @@ void main() {
         contains('stage=draft'),
       );
       expect(find.text('草稿项目'), findsOneWidget);
-      expect(find.text('刚刚保存到草稿箱'), findsOneWidget);
+      expect(find.text('创建时间：2026-05-03 10:20'), findsOneWidget);
       expect(find.text('预发布项目'), findsNothing);
     },
   );

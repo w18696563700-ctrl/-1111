@@ -3,7 +3,7 @@
   "formalInputs": [
     {
       "path": "docs/01_contracts/openapi.yaml",
-      "sha256": "b4fe841485ff8313dee217e9b5bb92d848f8e33c99a3f5adbf62afe64e20afa3"
+      "sha256": "75fb4fc7c8f2e0c3676daa7c6bacaa5a04807d479df020ca75a348e6294b207d"
     },
     {
       "path": "docs/01_contracts/error_codes.yaml",
@@ -21,12 +21,12 @@
     {
       "path": "packages/contracts/openapi/openapi.bundle.json",
       "kind": "bundle",
-      "sha256": "bd77723ff11350aa4a17332d25b601f8d0e92a2e253ba5658f669b314ecb4c85"
+      "sha256": "7cc822f42e80dc6fdd32334c345d1654cbdea47698e967ac11e91a1e3dcc252f"
     },
     {
       "path": "packages/contracts/src/generated/app-api.types.ts",
       "kind": "types",
-      "sha256": "3e02596514d5e202a4aa42e694cf76888864c100a3cbf57600e9ba09c3333c1d"
+      "sha256": "64fe50e18543f0666d3b2290f567802fedb997e73392fc39f752f3fe2249667e"
     },
     {
       "path": "packages/contracts/src/generated/error-codes.ts",
@@ -60,5 +60,5 @@
       "random_value"
     ]
   },
-  "manifestHash": "1e11f526fa1c235314a218946119b60c6b9e17391ccb84b63e703ff049a0b848"
+  "manifestHash": "6f4f25e74d17f0123fd98290570777214e5f18f64de4414522b2fced505c92c5"
 }
