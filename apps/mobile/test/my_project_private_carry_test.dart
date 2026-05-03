@@ -121,8 +121,12 @@ Map<String, Object?> _privateProgress({
 Map<String, Object?> _myProjectItem({
   required Map<String, Object?> publicProject,
   required Map<String, Object?> privateSummary,
+  String? projectCreatedAt,
 }) {
   return <String, Object?>{
+    ...(projectCreatedAt == null
+        ? const <String, Object?>{}
+        : <String, Object?>{'projectCreatedAt': projectCreatedAt}),
     'publicProject': publicProject,
     'privateSummary': privateSummary,
   };
@@ -244,7 +248,12 @@ ExhibitionMobileApp _buildApp({
 }
 
 Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
-  final scrollable = find.byType(Scrollable).first;
+  final scrollable = find
+      .byWidgetPredicate(
+        (Widget widget) =>
+            widget is Scrollable && widget.axisDirection == AxisDirection.down,
+      )
+      .first;
   for (
     var attempt = 0;
     attempt < 8 && finder.evaluate().isEmpty;
@@ -269,11 +278,7 @@ Future<void> _scrollTo(WidgetTester tester, Finder finder) async {
     await tester.drag(scrollable, const Offset(0, -260));
     await tester.pumpAndSettle();
   }
-  await tester.scrollUntilVisible(
-    finder,
-    200,
-    scrollable: find.byType(Scrollable).first,
-  );
+  await tester.scrollUntilVisible(finder, 200, scrollable: scrollable);
   await tester.pumpAndSettle();
 }
 
@@ -476,7 +481,10 @@ Map<String, Object?> _publicProjectDetailForState({
   );
 }
 
-Map<String, Object?> _myProjectListBodyFromStates(Map<String, String> states) {
+Map<String, Object?> _myProjectListBodyFromStates(
+  Map<String, String> states, {
+  bool includeProjectCreatedAt = true,
+}) {
   final ongoingProjects = <Object?>[];
   final historicalProjects = <Object?>[];
   final entries = states.entries.toList()
@@ -490,6 +498,9 @@ Map<String, Object?> _myProjectListBodyFromStates(Map<String, String> states) {
         state: entry.value,
       ),
       privateSummary: _privateProgressForState(entry.value),
+      projectCreatedAt: includeProjectCreatedAt
+          ? _projectCreatedAtForTest(entry.key)
+          : null,
     );
     if (entry.value == 'archived' ||
         entry.value == 'awarded' ||
@@ -503,6 +514,12 @@ Map<String, Object?> _myProjectListBodyFromStates(Map<String, String> states) {
     'ongoingProjects': ongoingProjects,
     'historicalProjects': historicalProjects,
   };
+}
+
+String _projectCreatedAtForTest(String projectId) {
+  if (projectId.contains('draft')) return '2026-05-03T09:30:00';
+  if (projectId.contains('submitted')) return '2026-05-02T10:20:00';
+  return '2026-05-01T08:00:00';
 }
 
 Finder _entityCardByTitle(String title) {
@@ -549,8 +566,12 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
   String? failingLifecycleMessage,
   List<String>? pricingCalls,
   Set<String> projectsWithExistingSincerityOrder = const <String>{},
+  Map<String, String>? sincerityFeedbackChoices,
   void Function(String projectId)? onDelete,
+  bool includeProjectCreatedAt = true,
 }) {
+  final feedbackChoices = sincerityFeedbackChoices ?? <String, String>{};
+
   Future<AppApiResponse> lifecycleSuccess(
     AppApiRequest request, {
     required String nextState,
@@ -604,7 +625,10 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
     'GET /api/app/my/projects': (AppApiRequest request) async => AppApiResponse(
       statusCode: 200,
       uri: request.uri,
-      body: _myProjectListBodyFromStates(projectStates),
+      body: _myProjectListBodyFromStates(
+        projectStates,
+        includeProjectCreatedAt: includeProjectCreatedAt,
+      ),
     ),
     'GET /api/app/my/bids': (AppApiRequest request) async => AppApiResponse(
       statusCode: 200,
@@ -833,6 +857,29 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
                     'sortOrder': 0,
                     'createdAt': '2026-04-13T16:19:00Z',
                   },
+                  <String, Object?>{
+                    'attachmentId': 'attachment-construction-1',
+                    'projectId': projectId,
+                    'fileAssetId': 'file-construction-1',
+                    'fileName': '尺寸图.pdf',
+                    'attachmentKind': 'construction_doc',
+                    'mimeType': 'application/pdf',
+                    'visibility': 'owner_private',
+                    'sortOrder': 1,
+                    'createdAt': '2026-04-13T16:20:00Z',
+                  },
+                  <String, Object?>{
+                    'attachmentId': 'attachment-material-1',
+                    'projectId': projectId,
+                    'fileAssetId': 'file-material-1',
+                    'fileName': '材质样板.xlsx',
+                    'attachmentKind': 'material_sample',
+                    'mimeType':
+                        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+                    'visibility': 'owner_private',
+                    'sortOrder': 2,
+                    'createdAt': '2026-04-13T16:21:00Z',
+                  },
                 ]
               : const <Map<String, Object?>>[];
           return AppApiResponse(
@@ -865,9 +912,45 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
                     'alipay_candidate',
                   ],
                 'publishGateStatus': 'required',
+                'freezeFeedbackSummary': <String, Object?>{
+                  'supportFreezeCount': 1,
+                  'opposeFreezeCount': 0,
+                  if (feedbackChoices[projectId] != null)
+                    'myChoice': feedbackChoices[projectId],
+                },
               },
               'readOnly': true,
               'updatedAt': '2026-04-26T09:00:00Z',
+            },
+          );
+        };
+    handlers['POST ${ExhibitionCanonicalPaths.projectAuthenticitySincerityFreezeFeedback(projectId)}'] =
+        (AppApiRequest request) async {
+          pricingCalls?.add(request.canonicalPath);
+          final body = request.body as Map<String, Object?>?;
+          final choice = body?['choice'];
+          if (choice is! String ||
+              (choice != 'support_freeze' && choice != 'oppose_freeze')) {
+            return AppApiResponse(
+              statusCode: 400,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'errorCode':
+                    'PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED',
+                'message': '反馈选择无效。',
+              },
+            );
+          }
+          feedbackChoices[projectId] = choice;
+          return AppApiResponse(
+            statusCode: 202,
+            uri: request.uri,
+            body: <String, Object?>{
+              'projectId': projectId,
+              'myChoice': choice,
+              'supportFreezeCount': choice == 'support_freeze' ? 2 : 1,
+              'opposeFreezeCount': choice == 'oppose_freeze' ? 1 : 0,
+              'updatedAt': '2026-04-26T09:01:30Z',
             },
           );
         };
@@ -931,6 +1014,27 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
         };
   }
 
+  handlers['GET /api/app/project/edit/detail'] = (AppApiRequest request) async {
+    final projectId = request.uri.queryParameters['projectId'];
+    final state = projectId == null ? null : projectStates[projectId];
+    if (projectId == null || state == null) {
+      return AppApiResponse(
+        statusCode: 404,
+        uri: request.uri,
+        body: const <String, Object?>{
+          'errorCode': 'AUTH_RESOURCE_UNAVAILABLE',
+          'message': '当前项目不可用。',
+        },
+      );
+    }
+
+    return AppApiResponse(
+      statusCode: 200,
+      uri: request.uri,
+      body: _publicProjectDetailForState(projectId: projectId, state: state),
+    );
+  };
+
   return handlers;
 }
 
@@ -945,8 +1049,9 @@ void main() {
       surfaceSize: const Size(393, 1000),
     );
 
+    await _scrollTo(tester, find.text('发布前待办'));
     expect(find.text('发布前待办'), findsOneWidget);
-    expect(find.text('项目真实性诚意金'), findsOneWidget);
+    expect(find.text('项目真实性诚意金绿色通道'), findsOneWidget);
     expect(find.text('报价依据资料'), findsWidgets);
     await _capturePrepublishWorkbench(
       boundaryKey,
@@ -964,8 +1069,9 @@ void main() {
       surfaceSize: const Size(320, 780),
     );
 
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
-    expect(find.widgetWithText(FilledButton, '继续处理诚意金'), findsOneWidget);
+    await _scrollTo(tester, find.text('发布前待办'));
+    expect(find.widgetWithText(FilledButton, '完成诚意金绿色通道表态'), findsNothing);
+    expect(find.text('正在补齐报价依据资料'), findsNothing);
     await _capturePrepublishWorkbench(
       boundaryKey,
       'prepublish_workbench_narrow_bottom.png',
@@ -1117,8 +1223,30 @@ void main() {
 
     await _scrollTo(tester, find.text('草稿项目'));
     expect(find.text('草稿项目'), findsWidgets);
-    expect(find.text('刚刚保存到草稿箱'), findsOneWidget);
+    expect(find.text('创建时间：2026-05-03 09:30'), findsOneWidget);
     expect(find.text('预发布项目'), findsNothing);
+  });
+
+  testWidgets('我的项目草稿高亮缺少 projectCreatedAt 时展示降级文案', (
+    WidgetTester tester,
+  ) async {
+    final handlers = _mutableMyProjectHandlers(
+      projectStates: <String, String>{'project-draft-1': 'draft'},
+      includeProjectCreatedAt: false,
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        exhibitionHandlers: handlers,
+        initialRoute: ExhibitionRoutes.myProjectDraftboxWithProjectId(
+          'project-draft-1',
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _scrollTo(tester, find.text('草稿项目'));
+    expect(find.text('创建时间暂未返回'), findsOneWidget);
   });
 
   testWidgets('我的项目列表卡片显示阶段、下一步和归档只读说明', (WidgetTester tester) async {
@@ -1223,7 +1351,8 @@ void main() {
     );
     await _scrollTo(tester, find.text('发布前待办'));
     expect(find.text('发布前待办'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '提交发布'), findsOneWidget);
+    expect(find.text('0/3 必传已补齐'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '确认并发布'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '作废并归档'), findsOneWidget);
     expect(find.text('发布确认'), findsOneWidget);
@@ -1321,9 +1450,18 @@ void main() {
 
     expect(find.text('已撤回到草稿'), findsOneWidget);
     expect(projectStates['project-withdraw-flow'], 'draft');
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续编辑'));
-    expect(find.widgetWithText(FilledButton, '继续编辑'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '删除此项目'), findsOneWidget);
+    expect(
+      find.descendant(
+        of: find.byType(AppBar),
+        matching: find.text('草稿 -> 预发布信息补充页'),
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.widgetWithText(FilledButton, '确认保存并进入预发布信息补充页'),
+      findsOneWidget,
+    );
+    expect(find.text('预发布补资料并发布页'), findsNothing);
   });
 
   testWidgets('预发布列表作废并归档后详情进入归档只读承接', (WidgetTester tester) async {
@@ -1375,11 +1513,16 @@ void main() {
       title: '项目 project-publish-flow',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
-    await tester.tap(find.widgetWithText(FilledButton, '继续处理诚意金').last);
+    await _scrollTo(
+      tester,
+      find.widgetWithText(OutlinedButton, '支持项目真实性诚意金机制 1'),
+    );
+    await tester.tap(
+      find.widgetWithText(OutlinedButton, '支持项目真实性诚意金机制 1').first,
+    );
     await tester.pumpAndSettle();
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，提交发布'));
-    await tester.tap(find.widgetWithText(FilledButton, '检查无误，提交发布'));
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '确认并发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '确认并发布'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('项目将从预发布列表进入公域项目详情'), findsOneWidget);
@@ -1391,23 +1534,15 @@ void main() {
       pricingCalls,
       containsAllInOrder(<String>[
         ExhibitionCanonicalPaths.projectPricingSummary('project-publish-flow'),
-        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
+        ExhibitionCanonicalPaths.projectAuthenticitySincerityFreezeFeedback(
           'project-publish-flow',
-        ),
-        ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
-          'project-publish-flow',
-          'sincerity-project-publish-flow',
-        ),
-        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
-          'project-publish-flow',
-          'sincerity-project-publish-flow',
         ),
       ]),
     );
     expect(find.textContaining('竞标中', skipOffstage: false), findsWidgets);
   });
 
-  testWidgets('预发布详情未完成 200 诚意金时不执行正式发布', (WidgetTester tester) async {
+  testWidgets('预发布详情未完成诚意金绿色通道表态时不执行正式发布', (WidgetTester tester) async {
     final projectStates = <String, String>{
       'project-draft-1': 'draft',
       'project-sincerity-pending': 'submitted',
@@ -1427,30 +1562,21 @@ void main() {
       title: '项目 project-sincerity-pending',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
-    await tester.tap(find.widgetWithText(FilledButton, '继续处理诚意金'));
-    await tester.pumpAndSettle();
+    await _scrollTo(tester, find.text('发布前待办'));
+    final publishButton = tester.widget<FilledButton>(
+      find.widgetWithText(FilledButton, '确认并发布').first,
+    );
+    expect(publishButton.onPressed, isNull);
 
-    expect(find.textContaining('暂未取得可打开的支付链接'), findsOneWidget);
+    expect(find.textContaining('确认后，项目将从预发布列表进入公域项目详情'), findsNothing);
     expect(projectStates['project-sincerity-pending'], 'submitted');
     expect(
       pricingCalls,
-      containsAllInOrder(<String>[
+      contains(
         ExhibitionCanonicalPaths.projectPricingSummary(
           'project-sincerity-pending',
         ),
-        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrders(
-          'project-sincerity-pending',
-        ),
-        ExhibitionCanonicalPaths.projectAuthenticitySincerityPayInit(
-          'project-sincerity-pending',
-          'sincerity-project-sincerity-pending',
-        ),
-        ExhibitionCanonicalPaths.projectAuthenticitySincerityOrderStatus(
-          'project-sincerity-pending',
-          'sincerity-project-sincerity-pending',
-        ),
-      ]),
+      ),
     );
   });
 
@@ -1478,12 +1604,16 @@ void main() {
       actionLabel: '补资料后确认发布',
     );
     expect(find.text('发布进度'), findsOneWidget);
-    expect(find.text('项目真实性诚意金', skipOffstage: false), findsWidgets);
+    await _scrollTo(tester, find.text('发布前待办'));
+    expect(find.text('项目真实性诚意金绿色通道'), findsOneWidget);
     expect(find.text('查看诚意金规则说明', skipOffstage: false), findsOneWidget);
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
-    expect(find.widgetWithText(FilledButton, '继续处理诚意金'), findsWidgets);
+    await _tapVisible(tester, find.text('查看诚意金规则说明'));
+    expect(find.text('支持项目真实性诚意金机制 1'), findsOneWidget);
+    expect(find.text('暂不支持项目真实性诚意金机制 0'), findsOneWidget);
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '继续处理'));
+    expect(find.widgetWithText(OutlinedButton, '继续处理'), findsWidgets);
 
-    await tester.tap(find.widgetWithText(FilledButton, '继续处理诚意金').last);
+    await tester.tap(find.widgetWithText(OutlinedButton, '继续处理').last);
     await tester.pumpAndSettle();
 
     expect(projectStates['project-existing-sincerity-order'], 'submitted');
@@ -1515,7 +1645,7 @@ void main() {
     );
   });
 
-  testWidgets('预发布详情缺少必传效果图时拦截正式发布', (WidgetTester tester) async {
+  testWidgets('预发布详情缺少必传报价依据资料时拦截正式发布', (WidgetTester tester) async {
     final projectStates = <String, String>{
       'project-draft-1': 'draft',
       'project-missing-effect': 'submitted',

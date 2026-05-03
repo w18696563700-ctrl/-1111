@@ -234,6 +234,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   ExhibitionLoadResult? _p0PayDepositStatusResult;
   P0PayPaymentPollResult? _p0PayDepositPollResult;
   bool? _editReviewExpandedOverride;
+  bool _redirectingSubmittedEditToDetail = false;
   Map<_ProjectCreateFieldId, String> _fieldErrors =
       <_ProjectCreateFieldId, String>{};
   String? _formErrorMessage;
@@ -287,7 +288,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
 
   @override
   void dispose() {
-    _publishProjectEditHeaderStatus(_editingProjectId, null);
+    _clearProjectEditHeaderStatusAfterFrame(_editingProjectId);
     _titleController.dispose();
     _brandNameController.dispose();
     _buildingTypeController.dispose();
@@ -508,6 +509,11 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       return;
     }
 
+    final confirmed = await _confirmCreateProjectBaseInfoSave();
+    if (!confirmed || !mounted) {
+      return;
+    }
+
     final plannedStartAt = _normalizeDateInput(plannedStartAtInput) ?? '';
     final plannedEndAt = _normalizeDateInput(plannedEndAtInput) ?? '';
     final exhibitionName = _titleController.text.trim();
@@ -698,15 +704,59 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         _payloadMap(result.payload) ?? const <String, Object?>{},
       );
     }
+    final currentState = _stateFromPayload(result.payload);
     _publishProjectEditHeaderStatus(
       projectId,
-      _stateFromPayload(result.payload),
+      currentState == 'submitted' ? null : currentState,
     );
 
     setState(() {
       _editDetailResult = result;
       _editDetailLoading = false;
     });
+    if (currentState == 'submitted') {
+      _redirectSubmittedEditToMyProjectDetail(projectId);
+    }
+  }
+
+  void _redirectSubmittedEditToMyProjectDetail(String projectId) {
+    if (_redirectingSubmittedEditToDetail) {
+      return;
+    }
+    _redirectingSubmittedEditToDetail = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushReplacementNamed(
+        ExhibitionRoutes.myProjectDetailWithProjectId(projectId),
+      );
+    });
+  }
+
+  Future<bool> _confirmCreateProjectBaseInfoSave() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('确认保存基础信息'),
+          content: const Text(
+            '本次只保存项目基础信息，不会正式发布。保存后将在我的项目草稿箱继续补资料、核对信息并完成发布流程。',
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(dialogContext).pop(false),
+              child: const Text('返回修改'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('确认保存'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
   }
 
   void _hydrateProjectForm(Map<String, Object?> payload) {
@@ -774,11 +824,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       action: () => ExhibitionConsumerLayer.instance.submitProject(
         ProjectLifecycleActionCommand(projectId: projectId),
       ),
+      openSubmittedDetailOnSuccess: true,
     );
   }
 
   Future<void> _runLifecycleMutation({
     required Future<ExhibitionActionResult> Function() action,
+    bool openSubmittedDetailOnSuccess = false,
   }) async {
     FocusScope.of(context).unfocus();
     final projectId = _editingProjectId;
@@ -815,6 +867,19 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     }
 
     if (!mounted) {
+      return;
+    }
+
+    if (openSubmittedDetailOnSuccess &&
+        result.isSuccess &&
+        _stateFromPayload(result.payload) == 'submitted') {
+      setState(() {
+        _submitting = false;
+        _lastResult = null;
+      });
+      Navigator.of(context).pushReplacementNamed(
+        ExhibitionRoutes.myProjectDetailWithProjectId(projectId),
+      );
       return;
     }
 
@@ -907,11 +972,13 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     final editState = _stateFromPayload(editResult?.payload);
     final editContentReady =
         editResult?.state == AppPageState.content && _editingProjectId != null;
+    final showEditDraftBottomActions =
+        isEditMode && editContentReady && editState == 'draft';
 
-    return _SubmissionPageFrame(
+    final page = _SubmissionPageFrame(
       title: isEditMode ? '编辑项目' : '创建项目',
       summary: isEditMode
-          ? '继续查看当前项目编辑回显，并按当前生命周期选择下一步。'
+          ? '继续查看当前项目编辑回显，并按当前任务选择下一步。'
           : '先保存项目基本信息，成功后直接跳转到我的项目草稿箱继续处理。',
       canonicalPath: isEditMode
           ? ExhibitionCanonicalPaths.projectSave
@@ -921,7 +988,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       onSubmitPressed: _submitCreate,
       submitButtonLabel: '保存并查看我的项目',
       submitHintText: isEditMode ? null : '保存后可在“我的项目”继续编辑和进入预发布核对。',
-      bottomPadding: isEditMode ? 28 : 96,
+      bottomPadding: showEditDraftBottomActions ? 156 : (isEditMode ? 28 : 96),
       showSubmitButton: !isEditMode && !_guardLoading && !_accessGuard.blocked,
       showConnectionInfo: false,
       showTechnicalDisclosure: false,
@@ -1000,6 +1067,28 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
                 ),
               ),
             ],
+    );
+
+    if (!showEditDraftBottomActions) {
+      return page;
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        page,
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: _ProjectEditDraftBottomActionBar(
+            submitting: _submitting,
+            onSubmitToPrepublish: _submitProject,
+            onSaveDraft: _saveProject,
+            onOpenDetail: () => _openMyProjectDetail(_editingProjectId!),
+          ),
+        ),
+      ],
     );
   }
 
@@ -1506,6 +1595,33 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     }
 
     final projectId = _editingProjectId!;
+    if (currentState == 'submitted') {
+      return <Widget>[
+        _ActionCard(
+          title: '正在进入预发布补资料并发布页',
+          summary: '项目已进入预发布阶段，报价依据资料、诚意金绿色通道和确认发布统一在我的项目详情中处理。',
+          tone: _ActionCardTone.emphasis,
+          children: <Widget>[
+            const _DetailLine(label: '当前阶段', value: '预发布列表', highlight: true),
+            const _DetailLine(
+              label: '下一步',
+              value: '进入预发布补资料并发布页继续处理。',
+              highlight: true,
+            ),
+            const SizedBox(height: 12),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: FilledButton(
+                onPressed: _submitting
+                    ? null
+                    : () => _openMyProjectDetail(projectId),
+                child: const Text('进入预发布补资料并发布页'),
+              ),
+            ),
+          ],
+        ),
+      ];
+    }
     final canManageAttachments = _canEnterProjectAttachmentCorridor(
       currentState,
     );
@@ -1516,27 +1632,19 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         currentStep: _projectPublishProgressStepForState(state: currentState),
         basicInfoOnlyNote: currentState == 'draft',
         useDraftLandingCopy: currentState == 'draft',
+        compact: true,
+        showStepNotice: false,
       ),
-      const SizedBox(height: 16),
-      _ActionCard(
-        title: '当前生命周期',
-        summary: _projectLifecycleSummary(currentState),
-        tone: _ActionCardTone.emphasis,
-        children: <Widget>[
-          _StateMessage(
-            title: '当前任务',
-            body: _projectLifecycleBody(currentState),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 12,
-            runSpacing: 12,
-            children: _buildLifecycleActionButtons(
-              projectId: projectId,
-              currentState: currentState,
-            ),
-          ),
-        ],
+      const SizedBox(height: 12),
+      _ProjectEditCurrentStepNotice(
+        title: _projectEditCurrentStepTitle(currentState),
+        message: _projectEditCurrentStepMessage(currentState),
+        actions: currentState == 'draft'
+            ? const <Widget>[]
+            : _buildLifecycleActionButtons(
+                projectId: projectId,
+                currentState: currentState,
+              ),
       ),
       const SizedBox(height: 16),
       KeyedSubtree(
@@ -1554,61 +1662,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         const SizedBox(height: 16),
         KeyedSubtree(
           key: _editReviewContentKey,
-          child: Column(
-            children: _buildProjectCreateRoundABody(
-              context: context,
-              guardLoading: false,
-              accessGuard: const _ProjectCreateAccessGuard.allowed(),
-              formErrorMessage: _formErrorMessage,
-              selectedProjectTypeLabel: _selectedProjectTypeLabel,
-              selectedStandardizedLocationLabel:
-                  _selectedStandardizedLocationLabel,
-              selectedP0PayTaskType: _p0PayTaskType,
-              showSupplementalSection: true,
-              hasStandardizedLocationSelection:
-                  _selectedStandardizedLocation != null,
-              districtSelectionEnabled:
-                  _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
-              exhibitionNameController: _titleController,
-              brandNameController: _brandNameController,
-              buildingTypeController: _buildingTypeController,
-              buildingTypeRemarkController: _buildingTypeRemarkController,
-              budgetAmountController: _budgetAmountController,
-              areaSqmController: _areaSqmController,
-              provinceNameController: _provinceNameController,
-              cityNameController: _cityNameController,
-              districtNameController: _districtNameController,
-              detailAddressController: _detailAddressController,
-              scopeSummaryController: _scopeSummaryController,
-              plannedStartAtController: _plannedStartAtController,
-              plannedEndAtController: _plannedEndAtController,
-              scheduleDetailController: _scheduleDetailController,
-              descriptionController: _descriptionController,
-              fieldKeys: _fieldKeys,
-              fieldErrors: _fieldErrors,
-              onFieldInteracted: _handleFieldInteracted,
-              onProjectTypePressed: _pickProjectType,
-              onStandardizedLocationPressed: _pickStandardizedLocation,
-              onDistrictPressed: _pickDistrict,
-              onScopeSummaryPressed: _editScopeSummary,
-              onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
-              onPlannedStartDatePressed: () => _pickDate(
-                controller: _plannedStartAtController,
-                fieldId: _ProjectCreateFieldId.plannedStartAt,
-              ),
-              onPlannedEndDatePressed: () => _pickDate(
-                controller: _plannedEndAtController,
-                fieldId: _ProjectCreateFieldId.plannedEndAt,
-              ),
-              onPlannedStartDateCleared: () => _clearDate(
-                controller: _plannedStartAtController,
-                fieldId: _ProjectCreateFieldId.plannedStartAt,
-              ),
-              onPlannedEndDateCleared: () => _clearDate(
-                controller: _plannedEndAtController,
-                fieldId: _ProjectCreateFieldId.plannedEndAt,
-              ),
-            ),
+          child: _buildProjectEditReviewContent(
+            projectId: projectId,
+            currentState: currentState,
           ),
         ),
       ],
@@ -1624,24 +1680,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
           compactKindHints: true,
         )
       else if (currentState == 'draft')
-        _ActionCard(
-          title: '报价依据资料',
-          children: <Widget>[
-            const _DetailLine(label: '当前状态', value: '当前项目尚未进入预发布附件补充阶段。'),
-            const _DetailLine(label: '当前提示', value: '请仔细核对上面信息，确认进入预发布列表。'),
-            const SizedBox(height: 12),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                key: const ValueKey<String>(
-                  'project-edit-draft-submit-to-prepublish-bottom',
-                ),
-                onPressed: _submitting ? null : _submitProject,
-                child: const Text('确认保存到预发布列表'),
-              ),
-            ),
-          ],
-        )
+        const _ProjectEditDraftAttachmentStatusCard()
       else
         const _ActionCard(
           title: '报价依据资料',
@@ -1711,7 +1750,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     return <Widget>[
       const SizedBox(height: 16),
       _ActionCard(
-        title: '当前生命周期结果',
+        title: '当前任务结果',
         summary: '当前动作已受理，页面已按真实项目状态刷新。',
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
@@ -2224,7 +2263,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       'draft' => <Widget>[
         FilledButton(
           onPressed: _submitting ? null : _submitProject,
-          child: const Text('保存到预发布列表'),
+          child: const Text('确认保存并进入预发布信息补充页'),
         ),
         OutlinedButton(
           onPressed: _submitting ? null : _saveProject,
@@ -2270,32 +2309,57 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     };
   }
 
+  // Retained for future non-draft edit guidance variants; the current draft
+  // publish wizard uses the lighter current-step notice below.
+  // ignore: unused_element
   String _projectLifecycleSummary(String? state) {
     return switch (state) {
-      'draft' => '继续完善当前内容，准备进入预发布列表。',
+      'draft' => '继续完善当前内容，保存后进入预发布信息补充页。',
       'submitted' => '先核对已保存内容，再补充报价依据资料。',
       'published' => '当前已进入竞标中，页面只保留回看和补资料入口。',
       final String value => '当前项目处于 ${_frontStageStateLabel(value)}。',
-      _ => '当前项目生命周期正在读取。',
+      _ => '当前项目发布流程正在读取。',
     };
   }
 
+  // ignore: unused_element
   String _projectLifecycleBody(String? state) {
     return switch (state) {
-      'draft' => '先核对下方内容；准备好后保存到预发布列表。如只想暂存，继续使用“仅保存草稿”。',
+      'draft' => '先核对下方内容；确认后进入预发布信息补充页。如只想暂存，继续使用“仅保存草稿”。',
       'submitted' =>
         '当前页只负责回看已保存内容和补充报价依据资料；最终发布确认回到“我的项目 -> 预发布列表 -> 单项目详情”完成。',
       'published' => '当前可继续回看编辑回显或补充报价依据资料；公域详情和我的项目详情会按真实状态同步回显。',
       final String value =>
         '当前项目处于 ${_frontStageStateLabel(value)}；页面只按真实状态承接下一步。',
-      _ => '当前页只消费真实生命周期状态，不在本地伪造第二状态机。',
+      _ => '当前页只消费真实发布流程状态，不在本地伪造第二状态机。',
+    };
+  }
+
+  String _projectEditCurrentStepTitle(String? state) {
+    return switch (state) {
+      'draft' => '正在填写项目基础信息',
+      'submitted' => '正在核对预发布信息',
+      'published' => '项目已进入发布后回看',
+      final String value => '当前处于 ${_frontStageStateLabel(value)}',
+      _ => '正在读取项目发布流程',
+    };
+  }
+
+  String _projectEditCurrentStepMessage(String? state) {
+    return switch (state) {
+      'draft' => '保存后进入预发布信息补充页，后续可继续补充报价依据资料。',
+      'submitted' => '可继续核对已保存内容，并回到我的项目详情补充报价依据资料。',
+      'published' => '当前页面保留回看和必要补充入口，正式状态以后端回读为准。',
+      final String value =>
+        '当前项目处于 ${_frontStageStateLabel(value)}，页面只按真实状态展示下一步。',
+      _ => '当前页只消费真实发布流程状态，不在本地伪造第二状态机。',
     };
   }
 
   String _projectEditReviewSummary(String? state) {
     return switch (state) {
       'draft' => '基础信息当前保持展开，可直接继续修改。',
-      'submitted' => '已保存内容已收起，按需展开继续核对或修改。',
+      'submitted' => '已保存内容已收起，按需展开只读核对；如需修改请返回草稿编辑。',
       'published' => '已保存内容已收起，按需展开回看当前编辑回显。',
       final String value => '当前内容已按 ${_frontStageStateLabel(value)} 阶段收敛。',
       _ => '已保存内容会按当前阶段决定默认展开方式。',
@@ -2345,6 +2409,144 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       if (area != null) '$area㎡',
     ];
     return parts.isEmpty ? '待补充' : parts.join(' / ');
+  }
+
+  Widget _buildProjectEditReviewContent({
+    required String projectId,
+    required String? currentState,
+  }) {
+    if (currentState == 'draft') {
+      return Column(
+        children: _buildProjectCreateRoundABody(
+          context: context,
+          guardLoading: false,
+          accessGuard: const _ProjectCreateAccessGuard.allowed(),
+          formErrorMessage: _formErrorMessage,
+          selectedProjectTypeLabel: _selectedProjectTypeLabel,
+          selectedStandardizedLocationLabel: _selectedStandardizedLocationLabel,
+          selectedP0PayTaskType: _p0PayTaskType,
+          showSupplementalSection: true,
+          hasStandardizedLocationSelection:
+              _selectedStandardizedLocation != null,
+          districtSelectionEnabled:
+              _selectedStandardizedLocation?.districts.isNotEmpty ?? false,
+          exhibitionNameController: _titleController,
+          brandNameController: _brandNameController,
+          buildingTypeController: _buildingTypeController,
+          buildingTypeRemarkController: _buildingTypeRemarkController,
+          budgetAmountController: _budgetAmountController,
+          areaSqmController: _areaSqmController,
+          provinceNameController: _provinceNameController,
+          cityNameController: _cityNameController,
+          districtNameController: _districtNameController,
+          detailAddressController: _detailAddressController,
+          scopeSummaryController: _scopeSummaryController,
+          plannedStartAtController: _plannedStartAtController,
+          plannedEndAtController: _plannedEndAtController,
+          scheduleDetailController: _scheduleDetailController,
+          descriptionController: _descriptionController,
+          fieldKeys: _fieldKeys,
+          fieldErrors: _fieldErrors,
+          onFieldInteracted: _handleFieldInteracted,
+          onProjectTypePressed: _pickProjectType,
+          onStandardizedLocationPressed: _pickStandardizedLocation,
+          onDistrictPressed: _pickDistrict,
+          onScopeSummaryPressed: _editScopeSummary,
+          onP0PayTaskTypeChanged: _setP0PayTaskTypeFromCreateChoice,
+          onPlannedStartDatePressed: () => _pickDate(
+            controller: _plannedStartAtController,
+            fieldId: _ProjectCreateFieldId.plannedStartAt,
+          ),
+          onPlannedEndDatePressed: () => _pickDate(
+            controller: _plannedEndAtController,
+            fieldId: _ProjectCreateFieldId.plannedEndAt,
+          ),
+          onPlannedStartDateCleared: () => _clearDate(
+            controller: _plannedStartAtController,
+            fieldId: _ProjectCreateFieldId.plannedStartAt,
+          ),
+          onPlannedEndDateCleared: () => _clearDate(
+            controller: _plannedEndAtController,
+            fieldId: _ProjectCreateFieldId.plannedEndAt,
+          ),
+        ),
+      );
+    }
+
+    return _buildProjectEditReadOnlyDetailsCard(
+      projectId: projectId,
+      currentState: currentState,
+    );
+  }
+
+  Widget _buildProjectEditReadOnlyDetailsCard({
+    required String projectId,
+    required String? currentState,
+  }) {
+    final exhibitionName =
+        _normalizeOptionalText(_titleController.text) ?? '待补充';
+    final brandName =
+        _normalizeOptionalText(_brandNameController.text) ?? '待补充';
+    final projectTypeLabel = _selectedProjectTypeLabel;
+    final budget = _normalizeOptionalText(_budgetAmountController.text);
+    final area = _normalizeOptionalText(_areaSqmController.text);
+    final detailAddress =
+        _normalizeOptionalText(_detailAddressController.text) ?? '待补充';
+    final scopeSummary =
+        _normalizeOptionalText(_scopeSummaryController.text) ?? '待补充';
+    final scheduleDetail =
+        _normalizeOptionalText(_scheduleDetailController.text) ?? '待补充';
+    final description =
+        _normalizeOptionalText(_descriptionController.text) ?? '待补充';
+    final region = _publishedProjectRegionLabel() ?? '待补充';
+    final scheduleRange = _projectEditScheduleRangeLabel();
+    final returnRoute = ExhibitionRoutes.projectEditWithProjectId(projectId);
+
+    return _ActionCard(
+      title: '当前内容只读核对',
+      summary: '以下为当前已保存或已回填的信息，展开仅用于核对，不在预发布信息补充页第三次铺开完整编辑表单。',
+      children: <Widget>[
+        _DetailLine(label: '展会', value: exhibitionName),
+        _DetailLine(label: '品牌', value: brandName),
+        _DetailLine(
+          label: '项目类型',
+          value: projectTypeLabel == null
+              ? '待补充'
+              : _buildingTypeLabel(
+                  _normalizeBuildingTypeSelection(projectTypeLabel),
+                ),
+        ),
+        _DetailLine(label: '预算金额', value: budget == null ? '待补充' : '¥$budget'),
+        _DetailLine(label: '项目面积', value: area == null ? '待补充' : '$area ㎡'),
+        _DetailLine(label: '项目地点', value: region),
+        _DetailLine(label: '详细地址', value: detailAddress),
+        _DetailLine(label: '范围说明', value: scopeSummary),
+        _DetailLine(label: '计划时间', value: scheduleRange),
+        _DetailLine(label: '详细时间', value: scheduleDetail),
+        _DetailLine(label: '补充说明', value: description),
+        const SizedBox(height: 12),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: OutlinedButton.icon(
+            onPressed: () => Navigator.of(context).pushNamed(returnRoute),
+            icon: const Icon(Icons.edit_note_rounded),
+            label: const Text('返回草稿编辑'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _projectEditScheduleRangeLabel() {
+    final start = _normalizeOptionalText(_plannedStartAtController.text);
+    final end = _normalizeOptionalText(_plannedEndAtController.text);
+    return switch ((start, end)) {
+      (final String startValue?, final String endValue?) =>
+        '$startValue 至 $endValue',
+      (final String startValue?, null) => startValue,
+      (null, final String endValue?) => endValue,
+      _ => '待补充',
+    };
   }
 
   void _applyValidationFeedback(_ProjectCreateValidationResult validation) {
@@ -2795,6 +2997,243 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     }
     final parsed = DateTime.tryParse(normalized);
     return parsed == null ? normalized : _displayDate(parsed);
+  }
+}
+
+class _ProjectEditCurrentStepNotice extends StatelessWidget {
+  const _ProjectEditCurrentStepNotice({
+    required this.title,
+    required this.message,
+    required this.actions,
+  });
+
+  final String title;
+  final String message;
+  final List<Widget> actions;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppVisualTokens.brandGold.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: AppVisualTokens.brandGold.withValues(alpha: 0.20),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Icon(
+              Icons.assignment_outlined,
+              color: AppVisualTokens.brandGold,
+              size: 24,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    title,
+                    style: theme.textTheme.titleSmall?.copyWith(
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    message,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                  if (actions.isNotEmpty) ...<Widget>[
+                    const SizedBox(height: 10),
+                    Wrap(spacing: 10, runSpacing: 10, children: actions),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Icon(
+              Icons.chevron_right_rounded,
+              color: colorScheme.onSurfaceVariant,
+              size: 22,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectEditDraftAttachmentStatusCard extends StatelessWidget {
+  const _ProjectEditDraftAttachmentStatusCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppVisualTokens.brandGold.withValues(alpha: 0.18),
+        ),
+        boxShadow: <BoxShadow>[
+          BoxShadow(
+            color: colorScheme.shadow.withValues(alpha: 0.025),
+            blurRadius: 12,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppVisualTokens.brandGold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(10),
+                child: Icon(
+                  Icons.inventory_2_outlined,
+                  color: AppVisualTokens.brandGold,
+                  size: 22,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Text(
+                    '报价依据资料',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '当前处于草稿阶段，需先确认保存到预发布信息补充页；进入后可继续补充报价依据资料。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectEditDraftBottomActionBar extends StatelessWidget {
+  const _ProjectEditDraftBottomActionBar({
+    required this.submitting,
+    required this.onSubmitToPrepublish,
+    required this.onSaveDraft,
+    required this.onOpenDetail,
+  });
+
+  final bool submitting;
+  final VoidCallback onSubmitToPrepublish;
+  final VoidCallback onSaveDraft;
+  final VoidCallback onOpenDetail;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Material(
+      color: colorScheme.surface.withValues(alpha: 0.96),
+      elevation: 14,
+      shadowColor: colorScheme.shadow.withValues(alpha: 0.18),
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 12),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              TextButton.icon(
+                onPressed: submitting ? null : onOpenDetail,
+                icon: const Icon(Icons.chevron_right_rounded, size: 18),
+                label: const Text('查看我的项目详情'),
+                style: TextButton.styleFrom(
+                  foregroundColor: colorScheme.onSurfaceVariant,
+                  textStyle: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: submitting ? null : onSaveDraft,
+                      style: OutlinedButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        side: BorderSide(
+                          color: AppVisualTokens.brandGold.withValues(
+                            alpha: 0.46,
+                          ),
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('仅保存草稿'),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: submitting ? null : onSubmitToPrepublish,
+                      style: FilledButton.styleFrom(
+                        minimumSize: const Size.fromHeight(48),
+                        backgroundColor: AppVisualTokens.brandGold,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      child: const FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text('确认保存并进入预发布信息补充页'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

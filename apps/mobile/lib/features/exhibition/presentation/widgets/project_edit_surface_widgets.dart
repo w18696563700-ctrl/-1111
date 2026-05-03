@@ -20,6 +20,26 @@ void _publishProjectEditHeaderStatus(String? projectId, String? state) {
   );
 }
 
+void _clearProjectEditHeaderStatusAfterFrame(String? projectId) {
+  final normalizedProjectId = _normalizeId(projectId);
+  if (normalizedProjectId == null) {
+    return;
+  }
+  final notifier = _projectEditHeaderStatusNotifierFor(normalizedProjectId);
+  final valueToClear = notifier.value;
+  if (valueToClear == null) {
+    return;
+  }
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (_projectEditHeaderStatusNotifiers[normalizedProjectId] != notifier) {
+      return;
+    }
+    if (notifier.value == valueToClear) {
+      notifier.value = null;
+    }
+  });
+}
+
 class ProjectEditStatusAppBarAction extends StatelessWidget {
   const ProjectEditStatusAppBarAction({super.key, required this.projectId});
 
@@ -122,7 +142,7 @@ class ProjectEditHeaderTitle extends StatelessWidget {
 
 String _projectEditHeaderStatusLabel(String state) {
   return switch (state) {
-    'draft' => '草稿 -> 预发布列表',
+    'draft' => '草稿 -> 预发布信息补充页',
     _ => _frontStageStateLabel(state),
   };
 }
