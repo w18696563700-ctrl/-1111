@@ -134,7 +134,7 @@ class _ExhibitionLoadService {
       ExhibitionCanonicalPaths.orderDetail,
       queryParameters: <String, String>{
         'orderId': normalized,
-        if (normalizedProjectId != null) 'projectId': normalizedProjectId,
+        'projectId': ?normalizedProjectId,
       },
       forceRefresh: forceRefresh,
     );
