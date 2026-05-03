@@ -3,6 +3,7 @@ import { requireVerifiedCurrentSessionContext } from '../../shared/current-sessi
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { MembershipQueryService } from '../membership/membership.query.service';
+import { CounterpartConversationProjectionService } from '../message_interaction/counterpart-conversation.projection.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { PrivateOperatingSystemReorganizationService } from '../private_operating_system_reorganization/private-operating-system-reorganization.service';
 import { ProjectCommunicationUnreadQueryService } from '../project_communication/project-communication-unread.query.service';
@@ -19,7 +20,9 @@ export class ShellQueryService {
     private readonly avatarUrlService: UploadPublicUrlService,
     private readonly presenter: ShellPresenter,
     @Optional()
-    private readonly projectCommunicationUnreadQueryService?: ProjectCommunicationUnreadQueryService
+    private readonly projectCommunicationUnreadQueryService?: ProjectCommunicationUnreadQueryService,
+    @Optional()
+    private readonly counterpartConversationProjectionService?: CounterpartConversationProjectionService
   ) {}
 
   async getContext(context: RequestContext) {
@@ -65,6 +68,16 @@ export class ShellQueryService {
   }
 
   private async countMessagesUnread(organizationId: string | null) {
+    if (this.counterpartConversationProjectionService && organizationId) {
+      const conversations =
+        await this.counterpartConversationProjectionService.listConversations(
+          organizationId
+        );
+      return conversations.reduce(
+        (total, conversation) => total + conversation.conversationUnreadCount,
+        0
+      );
+    }
     if (!this.projectCommunicationUnreadQueryService) {
       return 0;
     }

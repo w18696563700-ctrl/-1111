@@ -62,5 +62,6 @@ import { MessageInteractionQueryService } from './message-interaction.query.serv
     MessageInteractionPresenter,
     MessageInteractionQueryService,
   ],
+  exports: [CounterpartConversationProjectionService],
 })
 export class MessageInteractionModule {}
