@@ -521,6 +521,7 @@ class AppRouter {
     final titleContent = switch (routePath) {
       ExhibitionRoutes.myProjectDetail => MyProjectDetailHeaderTitle(
         projectId: routeUri.queryParameters['projectId'],
+        stageHint: routeUri.queryParameters['stage'],
       ),
       ExhibitionRoutes.projectEdit => ProjectEditHeaderTitle(
         projectId: routeUri.queryParameters['projectId'],

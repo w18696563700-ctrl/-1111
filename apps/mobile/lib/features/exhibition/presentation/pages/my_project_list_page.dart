@@ -312,9 +312,15 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
             };
             final routeName = stage.value == _MyProjectStageBucket.draft
                 ? ExhibitionRoutes.projectEditWithProjectId(projectId)
-                : ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
+                : ExhibitionRoutes.myProjectDetailWithProjectId(
+                    projectId,
+                    stage: _myProjectDetailRouteStageHint(stage.value),
+                  );
             final detailRouteName =
-                ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
+                ExhibitionRoutes.myProjectDetailWithProjectId(
+                  projectId,
+                  stage: _myProjectDetailRouteStageHint(stage.value),
+                );
             final highlighted = projectId == _highlightProjectId;
 
             Widget card = _MyProjectCompactCard(
@@ -359,4 +365,12 @@ _MyProjectWorkspaceBucket _myProjectWorkspaceFromRoute(String? workspace) {
   return workspace?.trim() == 'bids'
       ? _MyProjectWorkspaceBucket.bids
       : _MyProjectWorkspaceBucket.published;
+}
+
+String? _myProjectDetailRouteStageHint(_MyProjectStageBucket stage) {
+  return switch (stage) {
+    _MyProjectStageBucket.submitted => 'submitted',
+    _MyProjectStageBucket.published => 'published',
+    _ => null,
+  };
 }

@@ -630,7 +630,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     Navigator.of(context).pushNamed(ExhibitionRoutes.myProjectList);
   }
 
-  Future<void> _openMyProjectDetail(String projectId) async {
+  Future<void> _openMyProjectDetail(String projectId, {String? stage}) async {
     await ExhibitionConsumerLayer.instance.loadMyProjectDetail(
       projectId: projectId,
       forceRefresh: true,
@@ -638,9 +638,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     if (!mounted) {
       return;
     }
-    Navigator.of(
-      context,
-    ).pushNamed(ExhibitionRoutes.myProjectDetailWithProjectId(projectId));
+    Navigator.of(context).pushNamed(
+      ExhibitionRoutes.myProjectDetailWithProjectId(projectId, stage: stage),
+    );
   }
 
   Future<void> _openProjectEdit(String projectId) async {
@@ -729,7 +729,10 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         return;
       }
       Navigator.of(context).pushReplacementNamed(
-        ExhibitionRoutes.myProjectDetailWithProjectId(projectId),
+        ExhibitionRoutes.myProjectDetailWithProjectId(
+          projectId,
+          stage: 'submitted',
+        ),
       );
     });
   }
@@ -878,7 +881,10 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
         _lastResult = null;
       });
       Navigator.of(context).pushReplacementNamed(
-        ExhibitionRoutes.myProjectDetailWithProjectId(projectId),
+        ExhibitionRoutes.myProjectDetailWithProjectId(
+          projectId,
+          stage: 'submitted',
+        ),
       );
       return;
     }
@@ -1614,7 +1620,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
               child: FilledButton(
                 onPressed: _submitting
                     ? null
-                    : () => _openMyProjectDetail(projectId),
+                    : () => _openMyProjectDetail(projectId, stage: 'submitted'),
                 child: const Text('进入预发布补资料并发布页'),
               ),
             ),
@@ -1698,7 +1704,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
             ),
             onPressed: _submitting
                 ? null
-                : () => _openMyProjectDetail(projectId),
+                : () => _openMyProjectDetail(projectId, stage: 'submitted'),
             child: const Text('信息核对无误，返回预发布列表详情'),
           ),
         ),
@@ -1725,7 +1731,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     final actionButtons = switch (state) {
       'submitted' => <Widget>[
         OutlinedButton(
-          onPressed: () => _openMyProjectDetail(projectId),
+          onPressed: () => _openMyProjectDetail(projectId, stage: 'submitted'),
           child: const Text('查看预发布列表详情'),
         ),
       ],
@@ -2276,7 +2282,9 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
       ],
       'submitted' => <Widget>[
         FilledButton(
-          onPressed: _submitting ? null : () => _openMyProjectDetail(projectId),
+          onPressed: _submitting
+              ? null
+              : () => _openMyProjectDetail(projectId, stage: 'submitted'),
           child: const Text('返回预发布列表详情'),
         ),
         OutlinedButton(

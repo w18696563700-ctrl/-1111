@@ -976,7 +976,11 @@ void main() {
       expect(find.text('项目地点与范围'), findsNothing);
       expect(find.text('计划时间'), findsNothing);
       expect(find.text('补充说明'), findsNothing);
-      expect(find.text('我的项目详情'), findsWidgets);
+      expect(find.textContaining('我的项目详情', findRichText: true), findsWidgets);
+      expect(
+        find.textContaining('预发布补资料并发布页', findRichText: true),
+        findsWidgets,
+      );
       expect(find.text('当前阶段：预发布列表'), findsOneWidget);
       expect(find.text('报价依据资料'), findsWidgets);
       expect(find.text('编辑项目'), findsNothing);
