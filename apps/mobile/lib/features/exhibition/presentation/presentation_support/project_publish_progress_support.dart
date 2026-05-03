@@ -463,6 +463,9 @@ String _projectPublishProgressTitle(_ProjectPublishProgressStep step) {
   };
 }
 
+// Retained for non-workbench sincerity surfaces; the current prepublish
+// workbench uses a denser folded rule panel.
+// ignore: unused_element
 class _ProjectSincerityStatusCard extends StatelessWidget {
   const _ProjectSincerityStatusCard({
     required this.snapshot,
@@ -508,7 +511,8 @@ class _ProjectSincerityStatusCard extends StatelessWidget {
         const SizedBox(height: 10),
         _StateMessage(
           title: '内测说明',
-          body: current?.policyNotice ??
+          body:
+              current?.policyNotice ??
               '内测期间暂不需要真实支付；页面仍按平台返回状态走完整流程，不在本地改写支付结果。',
         ),
         if (current?.freezeFeedback != null) ...<Widget>[
@@ -773,9 +777,10 @@ _projectAuthenticitySinceritySnapshotFromPayload(Object? payload) {
         sincerity?['channelCandidates'] ??
         source['channelCandidates'],
   );
-  final feedbackSummary = _projectAuthenticitySincerityFreezeFeedbackFromPayload(
-    publisherPricing?['freezeFeedbackSummary'],
-  );
+  final feedbackSummary =
+      _projectAuthenticitySincerityFreezeFeedbackFromPayload(
+        publisherPricing?['freezeFeedbackSummary'],
+      );
   if (!required && status == null && orderId == null && amount == null) {
     return null;
   }

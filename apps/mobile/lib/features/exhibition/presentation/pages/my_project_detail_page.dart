@@ -33,6 +33,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   String? _submittingSincerityFeedbackChoice;
   _MyProjectLifecycleActionKind? _submittingLifecycleAction;
   ExhibitionLoadResult? _pricingSummaryResult;
+  ExhibitionLoadResult? _quoteBasisAttachmentResult;
+  bool _quoteBasisAttachmentsLoading = false;
 
   @override
   void initState() {
@@ -61,12 +63,25 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final projectId =
         _normalizeId(publicProject?['projectId'] as String?) ??
         _normalizeId(widget.projectId);
-    if (_shouldReadProjectPricingSummary(state) && projectId != null) {
+    final shouldReadPricing =
+        _shouldReadProjectPricingSummary(state) && projectId != null;
+    if (shouldReadPricing) {
       await _loadProjectPricingSummary(projectId, forceRefresh: forceRefresh);
     } else if (mounted) {
       setState(() {
         _pricingSummaryResult = null;
         _pricingSummaryLoading = false;
+      });
+    }
+    if (!mounted) {
+      return;
+    }
+    if (projectId != null && _myProjectCanOpenAttachmentStage(state)) {
+      await _loadQuoteBasisAttachments(projectId, forceRefresh: forceRefresh);
+    } else if (mounted) {
+      setState(() {
+        _quoteBasisAttachmentResult = null;
+        _quoteBasisAttachmentsLoading = false;
       });
     }
   }
@@ -151,14 +166,29 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             _projectAuthenticitySinceritySnapshotFromPayload(
               _pricingSummaryResult?.payload,
             );
+        final quoteBasisProgress = _quoteBasisProgress();
         final publishProgressStep = _projectPublishProgressStepForState(
           state: state,
           sincerity: sinceritySnapshot,
         );
-        final showSincerityCard =
+        final showPrepublishTodo =
             isOwnerSurface &&
             projectId != null &&
             stage.value == _MyProjectStageBucket.submitted;
+        final pendingSummary = _myProjectPrepublishPendingSummary(
+          stage: stage,
+          sincerity: sinceritySnapshot,
+          pricingLoading: _pricingSummaryLoading,
+          quoteBasis: quoteBasisProgress,
+        );
+        final bottomPlan = _myProjectBottomPublishCtaPlan(
+          projectId: projectId,
+          state: state,
+          sincerity: sinceritySnapshot,
+          pricingLoading: _pricingSummaryLoading,
+          quoteBasis: quoteBasisProgress,
+          canRunLifecycleActions: canRunLifecycleActions,
+        );
 
         return <Widget>[
           const SizedBox(height: 16),
@@ -171,6 +201,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             summaryHeading: summaryHeading,
             stage: stage,
             privateMap: privateMap,
+            pendingSummary: pendingSummary,
             showContinueAttachmentAction: showContinueAttachmentAction,
             onContinueAttachmentAction: showContinueAttachmentAction
                 ? _scrollToAttachments
@@ -181,20 +212,38 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             currentStep: publishProgressStep,
             sincerity: sinceritySnapshot,
           ),
-          if (showSincerityCard) ...<Widget>[
+          if (showPrepublishTodo) ...<Widget>[
             const SizedBox(height: 16),
-            _ProjectSincerityStatusCard(
-              snapshot: sinceritySnapshot,
-              loading: _pricingSummaryLoading,
-              continuing: _continuingSincerityPayment,
-              onRefresh: () =>
+            _MyProjectPrepublishTodoCard(
+              sincerity: sinceritySnapshot,
+              pricingLoading: _pricingSummaryLoading,
+              quoteBasis: quoteBasisProgress,
+              bottomPlan: bottomPlan,
+              continuingSincerity: _continuingSincerityPayment,
+              onContinueSincerity: () => _continueSincerityFromTodo(projectId),
+              onRefreshSincerity: () =>
                   _loadProjectPricingSummary(projectId, forceRefresh: true),
-              onContinuePayment: sinceritySnapshot?.canContinuePayment == true
-                  ? () => _continueProjectAuthenticitySincerityPayment(
-                      projectId,
-                      _pricingSummaryResult?.payload,
+              onAddAttachments: _scrollToAttachments,
+              onPublish:
+                  bottomPlan.kind == _MyProjectBottomPublishCtaKind.publish
+                  ? () => _runLifecycleAction(
+                      _MyProjectLifecycleActionKind.publish,
+                      projectId: projectId,
                     )
                   : null,
+              onWithdraw: _myProjectCanWithdraw(state)
+                  ? () => _runLifecycleAction(
+                      _MyProjectLifecycleActionKind.withdraw,
+                      projectId: projectId,
+                    )
+                  : null,
+              onDiscard: _myProjectCanDiscardSubmitted(state)
+                  ? () => _runLifecycleAction(
+                      _MyProjectLifecycleActionKind.discardSubmitted,
+                      projectId: projectId,
+                    )
+                  : null,
+              submittingLifecycleAction: _submittingLifecycleAction,
               submittingFeedbackChoice: _submittingSincerityFeedbackChoice,
               onFeedbackChoice: (String choice) =>
                   _submitProjectAuthenticitySincerityFreezeFeedback(
@@ -202,17 +251,18 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                     choice,
                   ),
             ),
+          ] else ...<Widget>[
+            const SizedBox(height: 16),
+            _buildStageActionCard(
+              context,
+              projectId: projectId,
+              stage: stage,
+              state: state,
+              isOwnerSurface: isOwnerSurface,
+              canRunLifecycleActions: canRunLifecycleActions,
+              canManageAttachments: canManageAttachments,
+            ),
           ],
-          const SizedBox(height: 16),
-          _buildStageActionCard(
-            context,
-            projectId: projectId,
-            stage: stage,
-            state: state,
-            isOwnerSurface: isOwnerSurface,
-            canRunLifecycleActions: canRunLifecycleActions,
-            canManageAttachments: canManageAttachments,
-          ),
           if (canManageAttachments && projectId != null) ...<Widget>[
             const SizedBox(height: 16),
             KeyedSubtree(
@@ -221,12 +271,15 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 key: ValueKey<String>('my-project-attachment-$projectId'),
                 projectId: projectId,
                 title: '报价依据资料',
-                summary: '请补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单、服务清单，作为接单方报价依据。',
+                summary: '五类资料按真实附件列表回读；效果图是当前发布确认前置项。',
                 // Keep the detail surface compact: no duplicated technical
                 // upload-chain explanation above the attachment controls.
                 showIntroCopy: false,
                 compactKindHints: true,
-                emptyMessage: '当前还没有补充报价依据资料。',
+                showKindHint: false,
+                showIdleUploadState: false,
+                emptyMessage: '请至少补充一类资料，方便接单方准确报价。',
+                onListResultChanged: _handleQuoteBasisAttachmentResult,
               ),
             ),
             const SizedBox(height: 16),
@@ -258,19 +311,44 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final viewerProjectRelation = _normalizeId(
       publicProject['viewerProjectRelation'] as String?,
     );
-    final canSubmit =
+    final canRunLifecycleActions =
         projectId != null &&
         viewerProjectRelation == 'owner' &&
         _snapshot?.isDemo != true &&
         _myProjectStageBucketFromState(state) ==
-            _MyProjectStageBucket.submitted &&
-        _myProjectCanPublish(state);
-    if (!canSubmit) {
+            _MyProjectStageBucket.submitted;
+    if (!canRunLifecycleActions) {
       return null;
     }
 
+    final sinceritySnapshot = _projectAuthenticitySinceritySnapshotFromPayload(
+      _pricingSummaryResult?.payload,
+    );
+    final quoteBasisProgress = _quoteBasisProgress();
+    final plan = _myProjectBottomPublishCtaPlan(
+      projectId: projectId,
+      state: state,
+      sincerity: sinceritySnapshot,
+      pricingLoading: _pricingSummaryLoading,
+      quoteBasis: quoteBasisProgress,
+      canRunLifecycleActions: canRunLifecycleActions,
+    );
     final submitting =
         _submittingLifecycleAction == _MyProjectLifecycleActionKind.publish;
+    final onPressed = switch (plan.kind) {
+      _MyProjectBottomPublishCtaKind.sincerity =>
+        plan.enabled ? () => _continueSincerityFromTodo(projectId) : null,
+      _MyProjectBottomPublishCtaKind.attachment =>
+        plan.enabled ? _scrollToAttachments : null,
+      _MyProjectBottomPublishCtaKind.publish =>
+        plan.enabled && _submittingLifecycleAction == null
+            ? () => _runLifecycleAction(
+                _MyProjectLifecycleActionKind.publish,
+                projectId: projectId,
+              )
+            : null,
+      _MyProjectBottomPublishCtaKind.disabled => null,
+    };
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     return DecoratedBox(
@@ -294,24 +372,19 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             SizedBox(
               width: double.infinity,
               child: FilledButton(
-                onPressed: _submittingLifecycleAction == null
-                    ? () => _runLifecycleAction(
-                        _MyProjectLifecycleActionKind.publish,
-                        projectId: projectId,
-                      )
-                    : null,
+                onPressed: onPressed,
                 style: FilledButton.styleFrom(
                   minimumSize: const Size.fromHeight(48),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
-                child: Text(submitting ? '发布中...' : '资料已补齐，提交发布'),
+                child: Text(submitting ? '提交中...' : plan.label),
               ),
             ),
             const SizedBox(height: 8),
             Text(
-              '提交后按平台发布规则处理，结果以云端项目状态为准。',
+              plan.helper,
               textAlign: TextAlign.center,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
@@ -333,6 +406,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     required String? summaryHeading,
     required _MyProjectStageOption stage,
     required Map<String, Object?> privateMap,
+    required String pendingSummary,
     required bool showContinueAttachmentAction,
     required VoidCallback? onContinueAttachmentAction,
   }) {
@@ -340,6 +414,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       _DetailLine(label: '项目名称', value: title ?? '未提供'),
       _DetailLine(label: '项目编号', value: projectNo ?? '未提供'),
       _DetailLine(label: '当前阶段', value: stage.label, highlight: true),
+      _DetailLine(label: '待处理事项', value: pendingSummary, highlight: true),
       if (_summaryExpanded) ...<Widget>[
         _DetailLine(label: '项目类型', value: _buildingTypeLabel(buildingType)),
         _DetailLine(
@@ -825,8 +900,11 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     if (!mounted) {
       return false;
     }
-    if (pollResult.isSuccess ||
-        _projectAuthenticitySinceritySatisfied(pollResult.result.payload)) {
+    final pollSatisfied =
+        pollResult.isSuccess ||
+        _projectAuthenticitySinceritySatisfied(pollResult.result.payload);
+    if (pollSatisfied) {
+      setState(() => _pricingSummaryResult = pollResult.result);
       return true;
     }
 
@@ -838,6 +916,23 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
           : '暂未取得可打开的支付链接；当前诚意金仍未完成，请刷新状态或稍后再试。',
     );
     return false;
+  }
+
+  Future<void> _continueSincerityFromTodo(String projectId) async {
+    final satisfied = await _ensureProjectAuthenticitySincerityBeforePublish(
+      projectId,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (satisfied) {
+      _showPageMessage('项目真实性诚意金已满足，可以继续发布确认。');
+      return;
+    }
+    await _loadProjectPricingSummary(projectId, forceRefresh: true);
+    if (!mounted) {
+      return;
+    }
   }
 
   Future<void> _submitProjectAuthenticitySincerityFreezeFeedback(
@@ -996,6 +1091,51 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       _pricingSummaryResult = result;
       _pricingSummaryLoading = false;
     });
+  }
+
+  Future<void> _loadQuoteBasisAttachments(
+    String projectId, {
+    bool forceRefresh = false,
+  }) async {
+    setState(() => _quoteBasisAttachmentsLoading = true);
+    final result = await ExhibitionConsumerLayer.instance
+        .loadProjectAttachments(
+          projectId: projectId,
+          forceRefresh: forceRefresh,
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _quoteBasisAttachmentResult = result;
+      _quoteBasisAttachmentsLoading = false;
+    });
+  }
+
+  void _handleQuoteBasisAttachmentResult(ExhibitionLoadResult? result) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _quoteBasisAttachmentResult = result;
+      _quoteBasisAttachmentsLoading = false;
+    });
+  }
+
+  _QuoteBasisChecklistProgress _quoteBasisProgress() {
+    final result = _quoteBasisAttachmentResult;
+    final attachments = _projectAttachmentListFromPayload(
+      result?.payload,
+    )?.attachments;
+    final unavailable =
+        result != null &&
+        result.state != AppPageState.content &&
+        result.state != AppPageState.empty;
+    return _quoteBasisChecklistProgressFromAttachments(
+      attachments: attachments,
+      loading: _quoteBasisAttachmentsLoading,
+      unavailable: unavailable,
+    );
   }
 
   String _projectAuthenticitySincerityPendingMessage(

@@ -10,6 +10,9 @@ import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
 
+const String _prepublishWorkbenchCaptureOutputDir =
+    '/Users/wangweiwei/Desktop/展览装修之家总控/.tmp/agent_reports/my_project_detail_prepublish_todo_workbench/20260503';
+
 Map<String, Object?> _publicProjectListItem({
   required String projectId,
   required String projectNo,
@@ -278,6 +281,46 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await _scrollTo(tester, finder);
   await tester.tap(finder.first);
   await tester.pumpAndSettle();
+}
+
+Future<void> _pumpPrepublishWorkbenchCapture(
+  WidgetTester tester,
+  GlobalKey boundaryKey, {
+  required Size surfaceSize,
+}) async {
+  addTearDown(() => tester.binding.setSurfaceSize(null));
+  await tester.binding.setSurfaceSize(surfaceSize);
+  final handlers = _mutableMyProjectHandlers(
+    projectStates: <String, String>{'project-sincerity-pending': 'submitted'},
+    projectsWithExistingSincerityOrder: const <String>{
+      'project-sincerity-pending',
+    },
+  );
+  await tester.pumpWidget(
+    RepaintBoundary(
+      key: boundaryKey,
+      child: KeyedSubtree(
+        key: UniqueKey(),
+        child: _buildApp(
+          exhibitionHandlers: handlers,
+          initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+            'project-sincerity-pending',
+          ),
+        ),
+      ),
+    ),
+  );
+  await tester.pumpAndSettle();
+}
+
+Future<void> _capturePrepublishWorkbench(
+  GlobalKey boundaryKey,
+  String filename,
+) async {
+  await expectLater(
+    find.byKey(boundaryKey),
+    matchesGoldenFile('$_prepublishWorkbenchCaptureOutputDir/$filename'),
+  );
 }
 
 Future<void> _tapChoiceChipLabel(WidgetTester tester, String label) async {
@@ -892,6 +935,43 @@ Map<String, _AppHandler> _mutableMyProjectHandlers({
 }
 
 void main() {
+  testWidgets('capture prepublish todo workbench standard viewport', (
+    WidgetTester tester,
+  ) async {
+    final boundaryKey = GlobalKey();
+    await _pumpPrepublishWorkbenchCapture(
+      tester,
+      boundaryKey,
+      surfaceSize: const Size(393, 1000),
+    );
+
+    expect(find.text('发布前待办'), findsOneWidget);
+    expect(find.text('项目真实性诚意金'), findsOneWidget);
+    expect(find.text('报价依据资料'), findsWidgets);
+    await _capturePrepublishWorkbench(
+      boundaryKey,
+      'prepublish_workbench_standard.png',
+    );
+  });
+
+  testWidgets('capture prepublish todo workbench narrow bottom cta', (
+    WidgetTester tester,
+  ) async {
+    final boundaryKey = GlobalKey();
+    await _pumpPrepublishWorkbenchCapture(
+      tester,
+      boundaryKey,
+      surfaceSize: const Size(320, 780),
+    );
+
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
+    expect(find.widgetWithText(FilledButton, '继续处理诚意金'), findsOneWidget);
+    await _capturePrepublishWorkbench(
+      boundaryKey,
+      'prepublish_workbench_narrow_bottom.png',
+    );
+  });
+
   testWidgets('我的项目列表按四阶段切换并把已归档项目放到只读区', (WidgetTester tester) async {
     final handlers = _mutableMyProjectHandlers(
       projectStates: <String, String>{
@@ -1141,13 +1221,14 @@ void main() {
       find.textContaining('预发布补资料并发布页', findRichText: true),
       findsOneWidget,
     );
-    await _scrollTo(tester, find.text('当前阶段动作'));
-    expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
+    await _scrollTo(tester, find.text('发布前待办'));
+    expect(find.text('发布前待办'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '提交发布'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '返回草稿继续编辑'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '作废并归档'), findsOneWidget);
-    expect(find.text('发布前确认'), findsOneWidget);
-    expect(find.textContaining('预发布阶段已开放报价依据资料'), findsOneWidget);
-    expect(find.textContaining('补充效果图、尺寸图 / 施工图'), findsWidgets);
+    expect(find.text('发布确认'), findsOneWidget);
+    expect(find.textContaining('报价依据资料'), findsWidgets);
+    expect(find.textContaining('效果图'), findsWidgets);
     expect(find.text('删除此项目'), findsNothing);
   });
 
@@ -1184,7 +1265,7 @@ void main() {
     expect(find.text('下架关闭'), findsNothing);
     await _scrollTo(tester, find.text('报价依据资料'));
     expect(find.text('报价依据资料'), findsOneWidget);
-    expect(find.textContaining('效果图、尺寸图 / 施工图、材质图 / 材料样板'), findsWidgets);
+    expect(find.text('报价依据资料 checklist'), findsOneWidget);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
     await _scrollTo(tester, find.text('公共资源下载区'));
@@ -1294,15 +1375,17 @@ void main() {
       title: '项目 project-publish-flow',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
+    await tester.tap(find.widgetWithText(FilledButton, '继续处理诚意金').last);
+    await tester.pumpAndSettle();
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，提交发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '检查无误，提交发布'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('项目将从预发布列表进入公域项目详情'), findsOneWidget);
     await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
     await tester.pumpAndSettle();
 
-    expect(find.text('已正式发布'), findsOneWidget);
     expect(projectStates['project-publish-flow'], 'published');
     expect(
       pricingCalls,
@@ -1344,10 +1427,8 @@ void main() {
       title: '项目 project-sincerity-pending',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
+    await tester.tap(find.widgetWithText(FilledButton, '继续处理诚意金'));
     await tester.pumpAndSettle();
 
     expect(find.textContaining('暂未取得可打开的支付链接'), findsOneWidget);
@@ -1399,16 +1480,13 @@ void main() {
     expect(find.text('发布进度'), findsOneWidget);
     expect(find.text('项目真实性诚意金', skipOffstage: false), findsWidgets);
     expect(find.text('查看诚意金规则说明', skipOffstage: false), findsOneWidget);
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续支付诚意金'));
-    expect(find.widgetWithText(FilledButton, '继续支付诚意金'), findsOneWidget);
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '继续处理诚意金'));
+    expect(find.widgetWithText(FilledButton, '继续处理诚意金'), findsWidgets);
 
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(FilledButton, '确认发布'));
+    await tester.tap(find.widgetWithText(FilledButton, '继续处理诚意金').last);
     await tester.pumpAndSettle();
 
-    expect(projectStates['project-existing-sincerity-order'], 'published');
+    expect(projectStates['project-existing-sincerity-order'], 'submitted');
     expect(
       pricingCalls,
       isNot(
@@ -1453,11 +1531,11 @@ void main() {
       title: '项目 project-missing-effect',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    await tester.tap(find.widgetWithText(FilledButton, '检查无误，确定发布'));
+    await _scrollTo(tester, find.widgetWithText(FilledButton, '补充报价依据资料'));
+    await tester.tap(find.widgetWithText(FilledButton, '补充报价依据资料'));
     await tester.pumpAndSettle();
 
-    expect(find.text('请先上传必传效果图，再进行正式发布确认。'), findsOneWidget);
+    expect(find.text('报价依据资料'), findsWidgets);
     expect(find.textContaining('项目将从预发布列表进入公域项目详情'), findsNothing);
     expect(projectStates['project-missing-effect'], 'submitted');
   });
@@ -1492,8 +1570,8 @@ void main() {
 
     expect(projectStates['project-close-flow'], 'submitted');
     expect(find.text('已撤回到预发布'), findsOneWidget);
-    await _scrollTo(tester, find.widgetWithText(FilledButton, '检查无误，确定发布'));
-    expect(find.widgetWithText(FilledButton, '检查无误，确定发布'), findsOneWidget);
+    await _scrollTo(tester, find.text('发布前待办'));
+    expect(find.text('发布前待办'), findsOneWidget);
   });
 
   testWidgets('进行中详情只展示取消申请和违约留痕入口', (WidgetTester tester) async {

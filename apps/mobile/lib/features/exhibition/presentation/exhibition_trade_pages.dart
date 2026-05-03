@@ -96,6 +96,8 @@ part 'presentation_support/my_project_list_surface_support.dart';
 part 'presentation_support/my_bid_workspace_support.dart';
 part 'presentation_support/my_project_private_progress_support.dart';
 part 'presentation_support/project_publish_progress_support.dart';
+part 'presentation_support/my_project_detail_prepublish_workbench_resolvers.dart';
+part 'presentation_support/my_project_detail_prepublish_workbench_support.dart';
 part 'presentation_support/project_standardized_location_options.dart';
 part 'presentation_support/project_attachment_support.dart';
 part 'presentation_support/trading_im_attachment_support.dart';
