@@ -48,7 +48,7 @@ module ContractsGeneration
     validate_truth_metadata!(openapi, error_codes)
 
     bundle_content = JSON.pretty_generate(openapi) + "\n"
-    app_api_types_content = build_app_api_types(openapi)
+    app_api_types_content = build_app_api_types(openapi).rstrip + "\n"
     error_codes_content = build_error_codes_ts(error_codes)
     index_content = build_index_ts
 
@@ -215,6 +215,7 @@ module ContractsGeneration
 
     registry_literal = JSON.pretty_generate(registry_entries)
     project_type_block = build_project_contract_types(schemas)
+    message_type_block = build_message_contract_types(schemas)
     trading_type_block = build_trading_contract_types(schemas)
 
     <<~TS
@@ -296,7 +297,202 @@ module ContractsGeneration
 
       #{project_type_block}
 
+      #{message_type_block}
+
       #{trading_type_block}
+    TS
+  end
+
+  def build_message_contract_types(schemas)
+    workbench_entry_keys = schemas.fetch('ProjectCommunicationWorkbenchEntryKey').fetch('enum')
+    material_review_entry_keys = schemas.fetch('ProjectCommunicationMaterialReviewEntryKey').fetch('enum')
+    workbench_groups = schemas.fetch('ProjectCommunicationWorkbenchEntryGroup').fetch('enum')
+    viewer_roles = schemas.fetch('ProjectCommunicationWorkbenchViewerRole').fetch('enum')
+    subject_owner_roles = schemas.fetch('ProjectCommunicationWorkbenchSubjectOwnerRole').fetch('enum')
+    availability_states = schemas.fetch('ProjectCommunicationWorkbenchAvailabilityState').fetch('enum')
+    review_states = schemas.fetch('ProjectCommunicationWorkbenchReviewState').fetch('enum')
+    action_states = schemas.fetch('ProjectCommunicationWorkbenchActionState').fetch('enum')
+    material_review_actions = schemas.fetch('ProjectCommunicationMaterialReviewAction').fetch('enum')
+    message_kinds = schemas.fetch('ProjectCommunicationMessageKind').fetch('enum')
+    delivery_states = schemas.fetch('ProjectCommunicationMessageDeliveryState').fetch('enum')
+    read_states = schemas.fetch('ProjectCommunicationMessageReadState').fetch('enum')
+
+    <<~TS
+      export const PROJECT_COMMUNICATION_MESSAGE_KINDS = #{json_array(message_kinds)} as const;
+      export type ProjectCommunicationMessageKind =
+        (typeof PROJECT_COMMUNICATION_MESSAGE_KINDS)[number];
+
+      export const PROJECT_COMMUNICATION_MESSAGE_DELIVERY_STATES = #{json_array(delivery_states)} as const;
+      export type ProjectCommunicationMessageDeliveryState =
+        (typeof PROJECT_COMMUNICATION_MESSAGE_DELIVERY_STATES)[number];
+
+      export const PROJECT_COMMUNICATION_MESSAGE_READ_STATES = #{json_array(read_states)} as const;
+      export type ProjectCommunicationMessageReadState =
+        (typeof PROJECT_COMMUNICATION_MESSAGE_READ_STATES)[number];
+
+      export interface ProjectCommunicationThreadResponse {
+        threadId: string;
+        projectId: string;
+        ownerOrganizationId: string;
+        counterpartOrganizationId: string;
+        threadState: string;
+        lastMessageId: string | null;
+        lastMessageAt: string | null;
+        createdAt: string;
+        updatedAt: string;
+      }
+
+      export interface ProjectCommunicationMessage {
+        messageId: string;
+        threadId: string;
+        projectId: string;
+        senderUserId: string;
+        senderActorId?: string | null;
+        senderOrganizationId: string;
+        messageKind: ProjectCommunicationMessageKind;
+        body: string;
+        payload: Record<string, unknown> | null;
+        clientMessageId: string | null;
+        messageState: string;
+        deliveryState: ProjectCommunicationMessageDeliveryState;
+        readState: ProjectCommunicationMessageReadState;
+        readByCounterpartAt: string | null;
+        createdAt: string;
+      }
+
+      export interface ProjectCommunicationMessageListResponse {
+        items: ProjectCommunicationMessage[];
+        nextCursor: string | null;
+      }
+
+      export interface ProjectCommunicationReadCursorRequest {
+        projectId: string;
+        threadId: string;
+        lastReadMessageId: string;
+      }
+
+      export interface ProjectCommunicationReadCursorResponse {
+        threadId: string;
+        projectId: string;
+        organizationId: string;
+        lastReadMessageId: string | null;
+        lastReadAt: string;
+        updatedAt: string;
+      }
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_ENTRY_KEYS = #{json_array(workbench_entry_keys)} as const;
+      export type ProjectCommunicationWorkbenchEntryKey =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_ENTRY_KEYS)[number];
+
+      export const PROJECT_COMMUNICATION_MATERIAL_REVIEW_ENTRY_KEYS = #{json_array(material_review_entry_keys)} as const;
+      export type ProjectCommunicationMaterialReviewEntryKey =
+        (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_ENTRY_KEYS)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_ENTRY_GROUPS = #{json_array(workbench_groups)} as const;
+      export type ProjectCommunicationWorkbenchEntryGroup =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_ENTRY_GROUPS)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_VIEWER_ROLES = #{json_array(viewer_roles)} as const;
+      export type ProjectCommunicationWorkbenchViewerRole =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_VIEWER_ROLES)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_SUBJECT_OWNER_ROLES = #{json_array(subject_owner_roles)} as const;
+      export type ProjectCommunicationWorkbenchSubjectOwnerRole =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_SUBJECT_OWNER_ROLES)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_AVAILABILITY_STATES = #{json_array(availability_states)} as const;
+      export type ProjectCommunicationWorkbenchAvailabilityState =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_AVAILABILITY_STATES)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_REVIEW_STATES = #{json_array(review_states)} as const;
+      export type ProjectCommunicationWorkbenchReviewState =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_REVIEW_STATES)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_ACTION_STATES = #{json_array(action_states)} as const;
+      export type ProjectCommunicationWorkbenchActionState =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_ACTION_STATES)[number];
+
+      export const PROJECT_COMMUNICATION_MATERIAL_REVIEW_ACTIONS = #{json_array(material_review_actions)} as const;
+      export type ProjectCommunicationMaterialReviewAction =
+        (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_ACTIONS)[number];
+
+      export interface ProjectCommunicationWorkbenchSourceFile {
+        fileAssetId: string;
+        fileName: string;
+        mimeType: string;
+        sortOrder: number;
+      }
+
+      export interface ProjectCommunicationWorkbenchRouteTarget {
+        actionKey: string;
+        canonicalPath: string;
+        params: Record<string, string>;
+      }
+
+      export interface ProjectCommunicationWorkbenchTruthAnchor {
+        truthOwner: 'server';
+        subjectType: 'publisher_quote_basis_material' | 'bid_submission_material' | 'deal_confirmation';
+        projectId: string;
+        threadId: string;
+        bidId: string | null;
+        subjectOwnerOrganizationId: string | null;
+        reviewerOrganizationId: string | null;
+        materialKind: string | null;
+        bidMaterialSlot: string | null;
+        dealConfirmationId: string | null;
+        sourceVersionToken: string | null;
+      }
+
+      export interface ProjectCommunicationWorkbenchEntry {
+        entryKey: ProjectCommunicationWorkbenchEntryKey;
+        group: ProjectCommunicationWorkbenchEntryGroup;
+        label: string;
+        summary: string | null;
+        projectId: string;
+        threadId: string;
+        bidId: string | null;
+        viewerRole: ProjectCommunicationWorkbenchViewerRole;
+        subjectOwnerRole: ProjectCommunicationWorkbenchSubjectOwnerRole;
+        availabilityState: ProjectCommunicationWorkbenchAvailabilityState;
+        reviewState: ProjectCommunicationWorkbenchReviewState | null;
+        actionState: ProjectCommunicationWorkbenchActionState;
+        attachmentCount: number;
+        sourceFiles: ProjectCommunicationWorkbenchSourceFile[];
+        latestFeedbackText: string | null;
+        latestFeedbackAt: string | null;
+        reviewedAt: string | null;
+        routeTarget: ProjectCommunicationWorkbenchRouteTarget | null;
+        truthAnchor: ProjectCommunicationWorkbenchTruthAnchor;
+      }
+
+      export interface ProjectCommunicationWorkbenchResponse {
+        projectId: string;
+        threadId: string;
+        viewerRole: ProjectCommunicationWorkbenchViewerRole;
+        entries: ProjectCommunicationWorkbenchEntry[];
+        generatedAt: string;
+      }
+
+      export interface ProjectCommunicationMaterialReviewRequest {
+        projectId: string;
+        threadId: string;
+        bidId?: string | null;
+        entryKey: ProjectCommunicationMaterialReviewEntryKey;
+        reviewAction: ProjectCommunicationMaterialReviewAction;
+        feedbackReasonCodes?: string[];
+        feedbackText?: string | null;
+        sourceVersionToken?: string | null;
+        idempotencyKey: string;
+      }
+
+      export interface ProjectCommunicationMaterialReviewResponse {
+        entry: ProjectCommunicationWorkbenchEntry;
+        entries?: ProjectCommunicationWorkbenchEntry[];
+        projectId: string;
+        threadId: string;
+        viewerRole: ProjectCommunicationWorkbenchViewerRole;
+        updatedAt: string;
+      }
     TS
   end
 

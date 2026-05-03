@@ -783,6 +783,231 @@ paths:
           description: Controlled forbidden message interaction response.
         "404":
           description: Controlled unavailable response for hidden or unavailable interaction surface.
+  /api/app/message/counterpart-conversation/detail:
+    get:
+      tags: [Message]
+      summary: Counterpart conversation detail canonical path for Flutter App
+      operationId: getAppCounterpartConversationDetail
+      parameters:
+        - in: query
+          name: conversationId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Runtime-verified project communication counterpart conversation
+            detail. This path only exposes project groups, unread projections,
+            and bounded continuation cards; it must not become a generic chat,
+            order, payment, settlement, or admin-governance surface.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterpartConversationDetailResponse'
+        "400":
+          description: Controlled invalid counterpart conversation query response.
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden counterpart conversation response.
+        "404":
+          description: Controlled unavailable counterpart conversation response.
+  /api/app/message/project-communication/thread:
+    get:
+      tags: [Message]
+      summary: Project communication thread canonical read path for Flutter App
+      operationId: getAppProjectCommunicationThread
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: counterpartOrganizationId
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Runtime-verified read-only thread anchor for project communication.
+            This path only resolves the current project communication thread
+            boundary and must not create a new message state machine.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCommunicationThreadResponse'
+        "400":
+          description: Controlled invalid project communication thread query response.
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden project communication thread response.
+        "404":
+          description: Controlled unavailable project communication thread response.
+  /api/app/message/project-communication/messages:
+    get:
+      tags: [Message]
+      summary: Project communication messages canonical read path for Flutter App
+      operationId: getAppProjectCommunicationMessages
+      parameters:
+        - in: query
+          name: threadId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+      responses:
+        "200":
+          description: >
+            Runtime-verified project communication message timeline read path.
+            This path exposes persisted project communication messages and
+            read-state projections only; it must not reopen generic DM or group
+            chat semantics.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCommunicationMessageListResponse'
+        "400":
+          description: Controlled invalid project communication message query response.
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden project communication message response.
+        "404":
+          description: Controlled unavailable project communication message response.
+  /api/app/message/project-communication/read-cursor:
+    post:
+      tags: [Message]
+      summary: Mark current project communication thread read cursor
+      operationId: markAppProjectCommunicationReadCursor
+      requestBody:
+        required: true
+        description: >
+          Runtime-verified read cursor write for the current authenticated
+          organization. The organization is derived from session context and
+          must not be client-supplied.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCommunicationReadCursorRequest'
+      responses:
+        "202":
+          description: Project communication read cursor accepted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCommunicationReadCursorResponse'
+        "400":
+          description: Controlled invalid read cursor payload response.
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden read cursor response.
+        "404":
+          description: Controlled unavailable read cursor response.
+  /api/app/message/project-communication/workbench:
+    get:
+      tags: [Message]
+      summary: Project communication workbench 10-entry read path
+      operationId: getAppProjectCommunicationWorkbench
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: threadId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: counterpartOrganizationId
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: bidId
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Runtime-verified project communication workbench read model. It
+            exposes the 10 fixed entries for material review and reserved deal
+            confirmation entry points. It must not claim contract confirmation,
+            final amount confirmation, payment, charge, callback, or upload
+            completion as current runtime truth.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCommunicationWorkbenchResponse'
+        "400":
+          description: Controlled invalid workbench query response.
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden workbench response.
+        "404":
+          description: Controlled unavailable workbench response.
+  /api/app/message/project-communication/workbench/material-review:
+    post:
+      tags: [Message]
+      summary: Submit project communication workbench material review action
+      operationId: submitAppProjectCommunicationWorkbenchMaterialReview
+      requestBody:
+        required: true
+        description: >
+          Runtime-verified material-review command for the first eight
+          workbench material entries only. Deal confirmation, final confirmed
+          amount, payment, charge, callback, and file-upload completion are
+          explicitly outside this request.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProjectCommunicationMaterialReviewRequest'
+      responses:
+        "202":
+          description: Material review action accepted and refreshed workbench projection returned.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCommunicationMaterialReviewResponse'
+        "400":
+          description: Controlled invalid material review payload response.
+        "401":
+          description: Controlled invalid or expired app session response.
+        "403":
+          description: Controlled forbidden material review response.
+        "404":
+          description: Controlled unavailable material review response.
+        "409":
+          description: Controlled material source version conflict response.
   /api/app/exhibition/home:
     get:
       tags: [Exhibition]
@@ -12618,6 +12843,9 @@ components:
         - counterpart
         - summary
         - updatedAt
+        - conversationUnreadCount
+        - hasUnread
+        - latestUnreadMessageAt
         - routeTarget
       properties:
         interactionId:
@@ -12645,6 +12873,19 @@ components:
             truth.
         updatedAt:
           type: string
+          format: date-time
+        conversationUnreadCount:
+          type: integer
+          minimum: 0
+          description: >
+            Server-owned unread message count for this counterpart conversation.
+            BFF must not derive this from local cache.
+        hasUnread:
+          type: boolean
+        latestUnreadMessageAt:
+          type:
+            - string
+            - 'null'
           format: date-time
         routeTarget:
           $ref: '#/components/schemas/MessageInteractionRouteTarget'
@@ -12754,6 +12995,772 @@ components:
           type: object
           additionalProperties:
             type: string
+    CounterpartConversationDetailResponse:
+      type: object
+      required:
+        - conversationId
+        - counterpart
+        - summary
+        - focusProjectId
+        - latestActivityAt
+        - conversationUnreadCount
+        - hasUnread
+        - latestUnreadMessageAt
+        - myPublishedUnreadCount
+        - myBidUnreadCount
+        - projectGroups
+      description: >
+        Runtime-verified counterpart conversation detail projection for project
+        communication only. This response is read-only aggregation and must
+        not become business truth for contracts, payment, settlement, or admin
+        governance.
+      properties:
+        conversationId:
+          type: string
+        counterpart:
+          $ref: '#/components/schemas/MessageInteractionCounterpart'
+        summary:
+          $ref: '#/components/schemas/MessageInteractionSummary'
+        focusProjectId:
+          type: string
+        latestActivityAt:
+          type: string
+          format: date-time
+        conversationUnreadCount:
+          type: integer
+          minimum: 0
+        hasUnread:
+          type: boolean
+        latestUnreadMessageAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        myPublishedUnreadCount:
+          type: integer
+          minimum: 0
+        myBidUnreadCount:
+          type: integer
+          minimum: 0
+        projectGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/CounterpartConversationProjectGroup'
+    CounterpartConversationProjectGroup:
+      type: object
+      required:
+        - projectId
+        - projectDisplayTitle
+        - titleVisibility
+        - projectRelation
+        - projectState
+        - projectPublishedAt
+        - projectUpdatedAt
+        - latestActivityAt
+        - projectUnreadCount
+        - hasProjectUnread
+        - latestUnreadMessageAt
+        - orderSummary
+        - ratingEntry
+        - cards
+      properties:
+        projectId:
+          type: string
+        projectDisplayTitle:
+          type: string
+        titleVisibility:
+          type: string
+          enum:
+            - masked
+            - visible
+        projectRelation:
+          type: string
+          enum:
+            - my_published
+            - my_bid
+            - unknown
+        projectState:
+          type:
+            - string
+            - 'null'
+        projectPublishedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        projectUpdatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        latestActivityAt:
+          type: string
+          format: date-time
+        projectUnreadCount:
+          type: integer
+          minimum: 0
+        hasProjectUnread:
+          type: boolean
+        latestUnreadMessageAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        pricingSummary:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+          description: Read-only display projection only; not payment truth.
+        orderSummary:
+          oneOf:
+            - $ref: '#/components/schemas/CounterpartConversationOrderSummary'
+            - type: 'null'
+        ratingEntry:
+          oneOf:
+            - $ref: '#/components/schemas/CounterpartConversationRatingEntry'
+            - type: 'null'
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CounterpartConversationCard'
+    CounterpartConversationOrderSummary:
+      type: object
+      required:
+        - orderId
+        - projectId
+        - buyerOrganizationId
+        - sellerOrganizationId
+        - state
+        - completionRequestState
+      properties:
+        orderId:
+          type: string
+        projectId:
+          type:
+            - string
+            - 'null'
+        buyerOrganizationId:
+          type:
+            - string
+            - 'null'
+        sellerOrganizationId:
+          type:
+            - string
+            - 'null'
+        state:
+          type:
+            - string
+            - 'null'
+        completionRequestState:
+          type:
+            - string
+            - 'null'
+    CounterpartConversationRatingEntry:
+      type: object
+      required:
+        - orderId
+        - projectId
+        - rateeOrganizationId
+        - canRate
+        - reason
+        - ratingState
+      properties:
+        orderId:
+          type: string
+        projectId:
+          type: string
+        rateeOrganizationId:
+          type: string
+        canRate:
+          type: boolean
+        reason:
+          type:
+            - string
+            - 'null'
+        ratingState:
+          type:
+            - string
+            - 'null'
+    CounterpartConversationCard:
+      type: object
+      required:
+        - cardId
+        - cardType
+        - title
+        - summary
+        - status
+        - updatedAt
+        - requesterCompanyName
+        - requesterOrganizationId
+        - truthAnchor
+        - detailRouteTarget
+        - decisionAvailability
+      properties:
+        cardId:
+          type: string
+        cardType:
+          type: string
+          enum:
+            - project_name_access_request
+            - bid_participation_request
+            - bid_thread
+            - project_clarification
+            - project_order
+            - system_notice
+        title:
+          type: string
+        summary:
+          type: string
+        status:
+          type:
+            - string
+            - 'null'
+        updatedAt:
+          type: string
+          format: date-time
+        requesterCompanyName:
+          type:
+            - string
+            - 'null'
+        requesterOrganizationId:
+          type:
+            - string
+            - 'null'
+        truthAnchor:
+          type: object
+          additionalProperties:
+            type: string
+        detailRouteTarget:
+          oneOf:
+            - $ref: '#/components/schemas/MessageInteractionRouteTarget'
+            - type: 'null'
+        decisionAvailability:
+          oneOf:
+            - $ref: '#/components/schemas/CounterpartConversationDecisionAvailability'
+            - type: 'null'
+    CounterpartConversationDecisionAvailability:
+      type: object
+      required:
+        - canApprove
+        - canReject
+      properties:
+        canApprove:
+          type: boolean
+        canReject:
+          type: boolean
+    ProjectCommunicationThreadResponse:
+      type: object
+      required:
+        - threadId
+        - projectId
+        - ownerOrganizationId
+        - counterpartOrganizationId
+        - threadState
+        - lastMessageId
+        - lastMessageAt
+        - createdAt
+        - updatedAt
+      description: >
+        Runtime-verified project communication thread anchor. It is a boundary
+        carrier for project communication and not a generic chat room truth.
+      properties:
+        threadId:
+          type: string
+        projectId:
+          type: string
+        ownerOrganizationId:
+          type: string
+        counterpartOrganizationId:
+          type: string
+        threadState:
+          type: string
+        lastMessageId:
+          type:
+            - string
+            - 'null'
+        lastMessageAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProjectCommunicationMessageKind:
+      type: string
+      enum:
+        - text
+        - image
+        - file
+        - confirmation_card
+    ProjectCommunicationMessageDeliveryState:
+      type: string
+      enum:
+        - persisted
+    ProjectCommunicationMessageReadState:
+      type: string
+      enum:
+        - unread_by_counterpart
+        - read_by_counterpart
+        - not_applicable
+    ProjectCommunicationMessage:
+      type: object
+      required:
+        - messageId
+        - threadId
+        - projectId
+        - senderUserId
+        - senderOrganizationId
+        - messageKind
+        - body
+        - payload
+        - clientMessageId
+        - messageState
+        - deliveryState
+        - readState
+        - readByCounterpartAt
+        - createdAt
+      properties:
+        messageId:
+          type: string
+        threadId:
+          type: string
+        projectId:
+          type: string
+        senderUserId:
+          type: string
+        senderActorId:
+          type:
+            - string
+            - 'null'
+        senderOrganizationId:
+          type: string
+        messageKind:
+          $ref: '#/components/schemas/ProjectCommunicationMessageKind'
+        body:
+          type: string
+        payload:
+          type:
+            - object
+            - 'null'
+          additionalProperties: true
+        clientMessageId:
+          type:
+            - string
+            - 'null'
+        messageState:
+          type: string
+        deliveryState:
+          $ref: '#/components/schemas/ProjectCommunicationMessageDeliveryState'
+        readState:
+          $ref: '#/components/schemas/ProjectCommunicationMessageReadState'
+        readByCounterpartAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+    ProjectCommunicationMessageListResponse:
+      type: object
+      required:
+        - items
+        - nextCursor
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectCommunicationMessage'
+        nextCursor:
+          type:
+            - string
+            - 'null'
+    ProjectCommunicationReadCursorRequest:
+      type: object
+      required:
+        - projectId
+        - threadId
+        - lastReadMessageId
+      description: >
+        Read cursor payload for the current authenticated organization. The
+        organizationId is always derived by Server and must not be accepted
+        from Flutter.
+      properties:
+        projectId:
+          type: string
+        threadId:
+          type: string
+        lastReadMessageId:
+          type: string
+    ProjectCommunicationReadCursorResponse:
+      type: object
+      required:
+        - threadId
+        - projectId
+        - organizationId
+        - lastReadMessageId
+        - lastReadAt
+        - updatedAt
+      properties:
+        threadId:
+          type: string
+        projectId:
+          type: string
+        organizationId:
+          type: string
+        lastReadMessageId:
+          type:
+            - string
+            - 'null'
+        lastReadAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProjectCommunicationWorkbenchEntryKey:
+      type: string
+      enum:
+        - publisher_effect_image_review
+        - publisher_construction_doc_review
+        - publisher_material_sample_review
+        - publisher_equipment_material_list_review
+        - publisher_service_list_review
+        - bid_project_understanding_review
+        - bid_quote_sheet_review
+        - bid_schedule_plan_review
+        - contract_confirmation
+        - final_confirmed_amount_confirmation
+    ProjectCommunicationMaterialReviewEntryKey:
+      type: string
+      enum:
+        - publisher_effect_image_review
+        - publisher_construction_doc_review
+        - publisher_material_sample_review
+        - publisher_equipment_material_list_review
+        - publisher_service_list_review
+        - bid_project_understanding_review
+        - bid_quote_sheet_review
+        - bid_schedule_plan_review
+    ProjectCommunicationWorkbenchEntryGroup:
+      type: string
+      enum:
+        - publisher_materials
+        - bid_materials
+        - deal_confirmation
+    ProjectCommunicationWorkbenchViewerRole:
+      type: string
+      enum:
+        - publisher
+        - bidder
+        - unknown
+    ProjectCommunicationWorkbenchSubjectOwnerRole:
+      type: string
+      enum:
+        - publisher
+        - bidder
+        - platform
+    ProjectCommunicationWorkbenchAvailabilityState:
+      type: string
+      enum:
+        - unsubmitted
+        - readable
+        - unavailable
+    ProjectCommunicationWorkbenchReviewState:
+      type: string
+      enum:
+        - unsubmitted
+        - pending_review
+        - confirmed
+        - needs_supplement
+    ProjectCommunicationWorkbenchActionState:
+      type: string
+      enum:
+        - enabled
+        - readonly
+        - blocked
+    ProjectCommunicationWorkbenchSourceFile:
+      type: object
+      required:
+        - fileAssetId
+        - fileName
+        - mimeType
+        - sortOrder
+      properties:
+        fileAssetId:
+          type: string
+        fileName:
+          type: string
+        mimeType:
+          type: string
+        sortOrder:
+          type: integer
+          minimum: 0
+    ProjectCommunicationWorkbenchRouteTarget:
+      type: object
+      required:
+        - actionKey
+        - canonicalPath
+        - params
+      properties:
+        actionKey:
+          type: string
+          enum:
+            - project_communication_material_review.open
+            - project_deal_confirmation.open
+            - project_deal_confirmation.final_amount.open
+        canonicalPath:
+          type: string
+          enum:
+            - /api/app/message/project-communication/workbench/material-review-detail
+            - /api/app/project/{projectId}/deal-confirmations
+        params:
+          type: object
+          additionalProperties:
+            type: string
+    ProjectCommunicationWorkbenchTruthAnchor:
+      type: object
+      required:
+        - truthOwner
+        - subjectType
+        - projectId
+        - threadId
+        - bidId
+        - subjectOwnerOrganizationId
+        - reviewerOrganizationId
+        - materialKind
+        - bidMaterialSlot
+        - dealConfirmationId
+        - sourceVersionToken
+      properties:
+        truthOwner:
+          type: string
+          enum:
+            - server
+        subjectType:
+          type: string
+          enum:
+            - publisher_quote_basis_material
+            - bid_submission_material
+            - deal_confirmation
+        projectId:
+          type: string
+        threadId:
+          type: string
+        bidId:
+          type:
+            - string
+            - 'null'
+        subjectOwnerOrganizationId:
+          type:
+            - string
+            - 'null'
+        reviewerOrganizationId:
+          type:
+            - string
+            - 'null'
+        materialKind:
+          type:
+            - string
+            - 'null'
+          enum:
+            - effect_image
+            - construction_doc
+            - material_sample
+            - equipment_material_list
+            - service_list
+            - null
+        bidMaterialSlot:
+          type:
+            - string
+            - 'null'
+          enum:
+            - project_understanding
+            - quote_sheet
+            - schedule_plan
+            - null
+        dealConfirmationId:
+          type:
+            - string
+            - 'null'
+        sourceVersionToken:
+          type:
+            - string
+            - 'null'
+    ProjectCommunicationWorkbenchEntry:
+      type: object
+      required:
+        - entryKey
+        - group
+        - label
+        - summary
+        - projectId
+        - threadId
+        - bidId
+        - viewerRole
+        - subjectOwnerRole
+        - availabilityState
+        - reviewState
+        - actionState
+        - attachmentCount
+        - sourceFiles
+        - latestFeedbackText
+        - latestFeedbackAt
+        - reviewedAt
+        - routeTarget
+        - truthAnchor
+      properties:
+        entryKey:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchEntryKey'
+        group:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchEntryGroup'
+        label:
+          type: string
+        summary:
+          type:
+            - string
+            - 'null'
+        projectId:
+          type: string
+        threadId:
+          type: string
+        bidId:
+          type:
+            - string
+            - 'null'
+        viewerRole:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchViewerRole'
+        subjectOwnerRole:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchSubjectOwnerRole'
+        availabilityState:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchAvailabilityState'
+        reviewState:
+          oneOf:
+            - $ref: '#/components/schemas/ProjectCommunicationWorkbenchReviewState'
+            - type: 'null'
+          description: Null only for deal confirmation entries.
+        actionState:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchActionState'
+        attachmentCount:
+          type: integer
+          minimum: 0
+        sourceFiles:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectCommunicationWorkbenchSourceFile'
+        latestFeedbackText:
+          type:
+            - string
+            - 'null'
+        latestFeedbackAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        reviewedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+        routeTarget:
+          oneOf:
+            - $ref: '#/components/schemas/ProjectCommunicationWorkbenchRouteTarget'
+            - type: 'null'
+        truthAnchor:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchTruthAnchor'
+    ProjectCommunicationWorkbenchResponse:
+      type: object
+      required:
+        - projectId
+        - threadId
+        - viewerRole
+        - entries
+        - generatedAt
+      properties:
+        projectId:
+          type: string
+        threadId:
+          type: string
+        viewerRole:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchViewerRole'
+        entries:
+          type: array
+          minItems: 10
+          maxItems: 10
+          items:
+            $ref: '#/components/schemas/ProjectCommunicationWorkbenchEntry'
+        generatedAt:
+          type: string
+          format: date-time
+    ProjectCommunicationMaterialReviewAction:
+      type: string
+      enum:
+        - confirm
+        - request_supplement
+    ProjectCommunicationMaterialReviewRequest:
+      type: object
+      required:
+        - projectId
+        - threadId
+        - entryKey
+        - reviewAction
+        - idempotencyKey
+      properties:
+        projectId:
+          type: string
+        threadId:
+          type: string
+        bidId:
+          type:
+            - string
+            - 'null'
+        entryKey:
+          $ref: '#/components/schemas/ProjectCommunicationMaterialReviewEntryKey'
+        reviewAction:
+          $ref: '#/components/schemas/ProjectCommunicationMaterialReviewAction'
+        feedbackReasonCodes:
+          type: array
+          items:
+            type: string
+        feedbackText:
+          type:
+            - string
+            - 'null'
+        sourceVersionToken:
+          type:
+            - string
+            - 'null'
+        idempotencyKey:
+          type: string
+    ProjectCommunicationMaterialReviewResponse:
+      type: object
+      required:
+        - entry
+        - projectId
+        - threadId
+        - viewerRole
+        - updatedAt
+      properties:
+        entry:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchEntry'
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProjectCommunicationWorkbenchEntry'
+        projectId:
+          type: string
+        threadId:
+          type: string
+        viewerRole:
+          $ref: '#/components/schemas/ProjectCommunicationWorkbenchViewerRole'
+        updatedAt:
+          type: string
+          format: date-time
     RatingEntryReadModel:
       type: object
       required:
