@@ -171,6 +171,19 @@ class AppBootstrapController extends ChangeNotifier {
     notifyListeners();
   }
 
+  void applyMessagesUnreadProjection(int unreadCount) {
+    final normalized = unreadCount < 0 ? 0 : unreadCount;
+    final nextSummary = Map<String, Object?>.of(
+      _shellContext.unreadSummary ?? const <String, Object?>{},
+    );
+    if (nextSummary['messages'] == normalized) {
+      return;
+    }
+    nextSummary['messages'] = normalized;
+    _shellContext = _shellContext.copyWith(unreadSummary: nextSummary);
+    notifyListeners();
+  }
+
   Future<void> _bootstrapShell() async {
     final consumer = _shellContextConsumer;
     if (consumer == null) {
