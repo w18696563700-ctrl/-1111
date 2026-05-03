@@ -2349,6 +2349,74 @@ void main() {
   );
 
   testWidgets(
+    'messages page clears stale shell unread badge after project communication refresh',
+    (WidgetTester tester) async {
+      var shellContextLoads = 0;
+      final shellContextConsumer = AppShellContextConsumer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/shell/context': (AppApiRequest request) async {
+                    shellContextLoads += 1;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _shellContextPayload(
+                        unreadSummary: const <String, Object?>{'messages': 2},
+                      ),
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'lane': 'project_communication',
+                      'items': <Object?>[],
+                    },
+                  ),
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          shellContextConsumer: shellContextConsumer,
+          messagesTransport: messagesTransport,
+          sessionStore: buildAuthenticatedSessionStore(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navigationBar = find.byType(NavigationBar);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsOneWidget,
+      );
+
+      await tapBottomDestination(tester, '消息');
+
+      expect(shellContextLoads, greaterThanOrEqualTo(2));
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsNothing,
+      );
+      expect(find.text('当前没有新的项目沟通'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
     'messages tab keeps forum inbox opt-in on first entry and refreshes the selected inbox after returning',
     (WidgetTester tester) async {
       final forumTransport = FakeAppApiTransport(

@@ -174,9 +174,14 @@ class _MessagesPageState extends State<MessagesPage> {
         _projectCommunicationLoading = false;
       }
     });
-    if (result.state == AppPageState.content ||
-        result.state == AppPageState.empty) {
-      _reloadShellContext();
+    if (loadToken == _latestReminderLoadToken &&
+        (result.state == AppPageState.content ||
+            result.state == AppPageState.empty)) {
+      _applyMessagesUnreadProjection(result);
+      await _reloadShellContext();
+      if (mounted && loadToken == _latestReminderLoadToken) {
+        _applyMessagesUnreadProjection(result);
+      }
     }
   }
 
@@ -296,7 +301,7 @@ class _MessagesPageState extends State<MessagesPage> {
       return;
     }
     await _refreshAll(showLoading: false);
-    _reloadShellContext();
+    await _reloadShellContext();
   }
 
   Future<void> _openNotification(AppNotificationItemView item) async {
@@ -305,7 +310,7 @@ class _MessagesPageState extends State<MessagesPage> {
         item.notificationId,
       ]);
       await _loadNotifications(showLoading: false);
-      _reloadShellContext();
+      await _reloadShellContext();
     }
     if (!mounted) {
       return;
@@ -320,12 +325,43 @@ class _MessagesPageState extends State<MessagesPage> {
     Navigator.of(context).pushNamed(routeLocation);
   }
 
-  void _reloadShellContext() {
+  Future<void> _reloadShellContext() async {
     try {
-      unawaited(AppShellScope.read(context).reloadShellContext());
+      await AppShellScope.read(context).reloadShellContext();
     } catch (_) {
       // Tests may mount this page without the full shell scope.
     }
+  }
+
+  void _applyMessagesUnreadProjection(MessageInteractionListResult result) {
+    try {
+      AppShellScope.read(context).applyMessagesUnreadProjection(
+        _projectCommunicationUnreadProjection(result),
+      );
+    } catch (_) {
+      // Tests may mount this page without the full shell scope.
+    }
+  }
+
+  int _projectCommunicationUnreadProjection(
+    MessageInteractionListResult result,
+  ) {
+    if (result.state == AppPageState.empty) {
+      return 0;
+    }
+    if (result.state != AppPageState.content) {
+      return 0;
+    }
+    return result.items
+        .where(
+          (MessageInteractionItemView item) =>
+              item.interactionType == 'counterpart_conversation',
+        )
+        .fold<int>(
+          0,
+          (int total, MessageInteractionItemView item) =>
+              total + item.conversationUnreadCount,
+        );
   }
 
   void _openSource(BuildContext context, ForumInteractionInboxItemView item) {
