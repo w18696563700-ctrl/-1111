@@ -10,6 +10,9 @@ class _ProjectAttachmentSection extends StatefulWidget {
     this.autoloadFormalList = true,
     this.showIntroCopy = true,
     this.compactKindHints = false,
+    this.showKindHint = true,
+    this.showIdleUploadState = true,
+    this.onListResultChanged,
   });
 
   final String? projectId;
@@ -19,6 +22,9 @@ class _ProjectAttachmentSection extends StatefulWidget {
   final bool autoloadFormalList;
   final bool showIntroCopy;
   final bool compactKindHints;
+  final bool showKindHint;
+  final bool showIdleUploadState;
+  final ValueChanged<ExhibitionLoadResult?>? onListResultChanged;
 
   @override
   State<_ProjectAttachmentSection> createState() =>
@@ -132,6 +138,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _listResult = result;
       _loadingList = false;
     });
+    widget.onListResultChanged?.call(result);
   }
 
   Future<void> _selectAttachment({bool append = false}) async {
@@ -747,10 +754,28 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               : null,
         ),
         const SizedBox(height: 12),
-        _ProjectAttachmentKindHint(
-          option: kindOption,
-          compactCopy: widget.compactKindHints,
+        _ProjectAttachmentRequirementPanel(
+          attachments: _attachments,
+          selectedKind: _selectedAttachmentKind,
+          onSelectKind: _canChooseAttachment
+              ? (String value) {
+                  setState(() => _selectedAttachmentKind = value);
+                }
+              : null,
+          onAddKind: _canChooseAttachment
+              ? (String value) {
+                  setState(() => _selectedAttachmentKind = value);
+                  _selectAttachment();
+                }
+              : null,
         ),
+        if (widget.showKindHint) ...<Widget>[
+          const SizedBox(height: 12),
+          _ProjectAttachmentKindHint(
+            option: kindOption,
+            compactCopy: widget.compactKindHints,
+          ),
+        ],
         if (_selectedDrafts.isNotEmpty) ...<Widget>[
           const SizedBox(height: 12),
           Text(
@@ -875,12 +900,16 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               ),
           ],
         ),
-        const SizedBox(height: 12),
-        _ProjectAttachmentStatePanel(
-          status: _uploadStatus,
-          message: _uploadMessage,
-          selectedDraft: _firstSelectedDraft,
-        ),
+        if (widget.showIdleUploadState ||
+            _uploadStatus != _ProjectAttachmentUploadUiStatus.idle ||
+            _selectedDrafts.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 12),
+          _ProjectAttachmentStatePanel(
+            status: _uploadStatus,
+            message: _uploadMessage,
+            selectedDraft: _firstSelectedDraft,
+          ),
+        ],
         const SizedBox(height: 16),
         _ProjectAttachmentFormalListPanel(
           loading: _loadingList,
@@ -897,6 +926,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           onPreview: _previewAttachment,
           onDelete: _deleteAttachment,
           autoloaded: widget.autoloadFormalList || _listResult != null,
+          showChecklist: false,
         ),
       ],
     );

@@ -509,7 +509,7 @@ void main() {
     expect(find.widgetWithText(ChoiceChip, '材质图 / 材料样板'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '设备物料清单'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '服务清单'), findsOneWidget);
-    expect(find.textContaining('全格式文件'), findsOneWidget);
+    expect(find.textContaining('全格式文件'), findsNothing);
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
     expect(find.textContaining('展馆和展位图'), findsNothing);
     expect(find.textContaining('展商手册'), findsNothing);
@@ -551,6 +551,8 @@ void main() {
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
     expect(find.text('可下载平台共享模板与公共资料。'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, '展开下载资料'));
+    await tester.pumpAndSettle();
     expect(find.widgetWithText(ChoiceChip, '合同模板 · 1'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '流程图与说明 · 1'), findsOneWidget);
     expect(find.widgetWithText(ChoiceChip, '公共资料 · 1'), findsOneWidget);
@@ -673,7 +675,7 @@ void main() {
 
     await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.widgetWithText(ChoiceChip, '服务清单'));
-    expect(find.textContaining('全格式文件'), findsOneWidget);
+    expect(find.textContaining('全格式文件'), findsNothing);
 
     await _tapVisible(tester, find.text('选择服务清单', skipOffstage: false));
     expect(find.text('服务清单资料.zip'), findsOneWidget);
@@ -1556,7 +1558,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.widgetWithText(OutlinedButton, '预览图片'), findsNothing);
-    expect(find.text('当前还没有报价依据资料'), findsOneWidget);
+    expect(find.text('暂无报价依据资料'), findsOneWidget);
   });
 
   testWidgets(
@@ -1677,6 +1679,8 @@ void main() {
     expect(find.text('报价依据资料'), findsWidgets);
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
+    await tester.tap(find.widgetWithText(OutlinedButton, '展开下载资料'));
+    await tester.pumpAndSettle();
     expect(find.text('当前暂无可下载的公共资源'), findsOneWidget);
     expect(find.text('暂无可下载公共资源。'), findsOneWidget);
   });
@@ -1735,6 +1739,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('公共资源下载区'));
+      await tester.tap(find.widgetWithText(OutlinedButton, '展开下载资料'));
+      await tester.pumpAndSettle();
       expect(find.text('当前公共资源下载区暂不可用'), findsOneWidget);
       expect(find.text('当前账号暂不可访问公共资源目录。'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '重新读取'), findsOneWidget);
@@ -1790,6 +1796,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('公共资源下载区'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '展开下载资料'));
+    await tester.pumpAndSettle();
     expect(find.text('当前公共资源目录读取超时'), findsOneWidget);
     expect(find.textContaining('这次公共资源目录读取超时了'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '重新读取'), findsOneWidget);

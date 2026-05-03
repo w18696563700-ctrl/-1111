@@ -129,9 +129,17 @@ class _ProjectAttachmentKindPicker extends StatelessWidget {
 }
 
 class _ProjectAttachmentRequirementPanel extends StatelessWidget {
-  const _ProjectAttachmentRequirementPanel({required this.attachments});
+  const _ProjectAttachmentRequirementPanel({
+    required this.attachments,
+    this.selectedKind,
+    this.onSelectKind,
+    this.onAddKind,
+  });
 
   final List<ProjectAttachmentReadModel> attachments;
+  final String? selectedKind;
+  final ValueChanged<String>? onSelectKind;
+  final ValueChanged<String>? onAddKind;
 
   @override
   Widget build(BuildContext context) {
@@ -183,10 +191,23 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                     ),
                     const SizedBox(width: 8),
                     Expanded(
-                      child: Text(
-                        option.label,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
+                      child: InkWell(
+                        onTap: onSelectKind == null
+                            ? null
+                            : () => onSelectKind!(option.value),
+                        borderRadius: BorderRadius.circular(10),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Text(
+                            option.label,
+                            style: Theme.of(context).textTheme.bodyMedium
+                                ?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                  color: selectedKind == option.value
+                                      ? Theme.of(context).colorScheme.primary
+                                      : null,
+                                ),
+                          ),
                         ),
                       ),
                     ),
@@ -199,6 +220,13 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                         fontWeight: FontWeight.w700,
                       ),
                     ),
+                    if (onAddKind != null) ...<Widget>[
+                      const SizedBox(width: 8),
+                      TextButton(
+                        onPressed: () => onAddKind!(option.value),
+                        child: Text(satisfied ? '继续补' : '添加'),
+                      ),
+                    ],
                   ],
                 ),
               );
@@ -377,6 +405,7 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
     required this.onPreview,
     required this.onDelete,
     required this.autoloaded,
+    this.showChecklist = true,
   });
 
   final bool loading;
@@ -391,6 +420,7 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
   final ValueChanged<ProjectAttachmentReadModel> onPreview;
   final ValueChanged<ProjectAttachmentReadModel> onDelete;
   final bool autoloaded;
+  final bool showChecklist;
 
   @override
   Widget build(BuildContext context) {
@@ -435,12 +465,11 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          _ProjectAttachmentRequirementPanel(attachments: attachments),
-          const SizedBox(height: 12),
-          _EmptyNotice(
-            title: '当前还没有报价依据资料',
-            message: '$emptyMessage 只有 bind 成功后，报价依据资料才会出现在这里。',
-          ),
+          if (showChecklist) ...<Widget>[
+            _ProjectAttachmentRequirementPanel(attachments: attachments),
+            const SizedBox(height: 12),
+          ],
+          _EmptyNotice(title: '暂无报价依据资料', message: emptyMessage),
         ],
       );
     }
@@ -448,8 +477,10 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        _ProjectAttachmentRequirementPanel(attachments: attachments),
-        const SizedBox(height: 12),
+        if (showChecklist) ...<Widget>[
+          _ProjectAttachmentRequirementPanel(attachments: attachments),
+          const SizedBox(height: 12),
+        ],
         Text(
           '报价依据资料列表',
           style: Theme.of(
