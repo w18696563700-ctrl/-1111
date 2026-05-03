@@ -48,6 +48,8 @@ void main() {
       foldedKey,
       '20260503-project-communication-workbench-expanded.png',
     );
+    await tester.tapAt(const Offset(20, 20));
+    await tester.pumpAndSettle();
 
     await tester.binding.setSurfaceSize(const Size(390, 844));
     final narrowKey = GlobalKey();

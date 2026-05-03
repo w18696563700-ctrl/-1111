@@ -19,8 +19,6 @@ class _ProjectCommunicationWorkbenchSection extends StatefulWidget {
 
 class _ProjectCommunicationWorkbenchSectionState
     extends State<_ProjectCommunicationWorkbenchSection> {
-  final Set<String> _expandedGroupKeys = <String>{};
-
   @override
   Widget build(BuildContext context) {
     final view = widget.result?.data;
@@ -49,35 +47,65 @@ class _ProjectCommunicationWorkbenchSectionState
       ),
       _WorkbenchGroupData(
         key: 'deal_confirmation',
-        title: '成交确认',
+        title: '中间方成交确认',
         summary: '合同确认、最终成交金额',
         entries: view.entries
             .where((entry) => entry.group == 'deal_confirmation')
             .toList(growable: false),
       ),
     ];
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: <Widget>[
-        for (var index = 0; index < groups.length; index += 1) ...<Widget>[
-          if (index > 0) const SizedBox(height: 8),
-          _WorkbenchGroup(
-            data: groups[index],
-            expanded: _expandedGroupKeys.contains(groups[index].key),
-            onToggle: () => _toggleGroup(groups[index].key),
-            onOpenEntry: widget.onOpenEntry,
-          ),
-        ],
-      ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final twoColumns = constraints.maxWidth >= 360;
+        final buttonWidth = twoColumns
+            ? (constraints.maxWidth - 8) / 2
+            : constraints.maxWidth;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Text(
+              '资料入口',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: <Widget>[
+                for (final group in groups)
+                  SizedBox(
+                    width: group.key == 'deal_confirmation' && twoColumns
+                        ? constraints.maxWidth
+                        : buttonWidth,
+                    child: _WorkbenchGroupButton(
+                      data: group,
+                      onPressed: () => _openGroupSheet(context, group),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        );
+      },
     );
   }
 
-  void _toggleGroup(String key) {
-    setState(() {
-      if (!_expandedGroupKeys.add(key)) {
-        _expandedGroupKeys.remove(key);
-      }
-    });
+  void _openGroupSheet(BuildContext context, _WorkbenchGroupData data) {
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (sheetContext) => _WorkbenchGroupSheet(
+        data: data,
+        onOpenEntry: (entry) {
+          Navigator.of(sheetContext).pop();
+          widget.onOpenEntry(entry);
+        },
+      ),
+    );
   }
 }
 
@@ -133,18 +161,11 @@ class _WorkbenchUnavailableBox extends StatelessWidget {
   }
 }
 
-class _WorkbenchGroup extends StatelessWidget {
-  const _WorkbenchGroup({
-    required this.data,
-    required this.expanded,
-    required this.onToggle,
-    required this.onOpenEntry,
-  });
+class _WorkbenchGroupButton extends StatelessWidget {
+  const _WorkbenchGroupButton({required this.data, required this.onPressed});
 
   final _WorkbenchGroupData data;
-  final bool expanded;
-  final VoidCallback onToggle;
-  final ValueChanged<ProjectCommunicationWorkbenchEntryView> onOpenEntry;
+  final VoidCallback onPressed;
 
   @override
   Widget build(BuildContext context) {
@@ -163,11 +184,11 @@ class _WorkbenchGroup extends StatelessWidget {
             color: Colors.transparent,
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: onToggle,
+              onTap: onPressed,
               child: Padding(
                 padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 11,
+                  horizontal: 10,
+                  vertical: 10,
                 ),
                 child: Row(
                   children: <Widget>[
@@ -212,18 +233,16 @@ class _WorkbenchGroup extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 6),
                     Text(
-                      expanded ? '收起' : '展开',
+                      '查看',
                       style: theme.textTheme.labelSmall?.copyWith(
                         color: theme.colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                     Icon(
-                      expanded
-                          ? Icons.keyboard_arrow_up_rounded
-                          : Icons.keyboard_arrow_down_rounded,
+                      Icons.chevron_right_rounded,
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
                   ],
@@ -231,16 +250,6 @@ class _WorkbenchGroup extends StatelessWidget {
               ),
             ),
           ),
-          if (expanded) ...<Widget>[
-            Divider(height: 1, color: theme.colorScheme.outlineVariant),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: _WorkbenchGroupTiles(
-                entries: data.entries,
-                onOpenEntry: onOpenEntry,
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -253,6 +262,124 @@ class _WorkbenchGroup extends StatelessWidget {
       'deal_confirmation' => Icons.workspace_premium_outlined,
       _ => Icons.assignment_turned_in_outlined,
     };
+  }
+}
+
+class _WorkbenchGroupSheet extends StatelessWidget {
+  const _WorkbenchGroupSheet({required this.data, required this.onOpenEntry});
+
+  final _WorkbenchGroupData data;
+  final ValueChanged<ProjectCommunicationWorkbenchEntryView> onOpenEntry;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final status = _groupStatus(data.entries);
+    final style = _workbenchStatusStyle(theme, status);
+    final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(16, 0, 16, 16 + bottomInset),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.sizeOf(context).height * 0.78,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                Icon(_groupIcon(data.key), color: theme.colorScheme.primary),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        data.title,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        data.summary,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                _MaterialConfirmationStatusPill(
+                  label: _groupStatusLabel(data.entries, status),
+                  foreground: style.pillForeground,
+                  background: style.pillBackground,
+                ),
+              ],
+            ),
+            const SizedBox(height: 14),
+            Flexible(
+              child: data.entries.isEmpty
+                  ? const _WorkbenchSheetEmptyState()
+                  : SingleChildScrollView(
+                      child: _WorkbenchGroupTiles(
+                        entries: data.entries,
+                        onOpenEntry: onOpenEntry,
+                      ),
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  IconData _groupIcon(String key) {
+    return switch (key) {
+      'publisher_materials' => Icons.article_outlined,
+      'bid_materials' => Icons.assignment_outlined,
+      'deal_confirmation' => Icons.workspace_premium_outlined,
+      _ => Icons.assignment_turned_in_outlined,
+    };
+  }
+}
+
+class _WorkbenchSheetEmptyState extends StatelessWidget {
+  const _WorkbenchSheetEmptyState();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Row(
+          children: <Widget>[
+            Icon(
+              Icons.info_outline_rounded,
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '当前分组暂无可展示资料',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
 
@@ -269,7 +396,7 @@ class _WorkbenchGroupTiles extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final twoColumns = constraints.maxWidth >= 340;
+        final twoColumns = constraints.maxWidth >= 520;
         final tileWidth = twoColumns
             ? (constraints.maxWidth - 8) / 2
             : constraints.maxWidth;

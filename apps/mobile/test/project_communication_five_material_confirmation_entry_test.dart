@@ -63,6 +63,11 @@ Future<void> _expandWorkbenchGroup(WidgetTester tester, String label) async {
   await tester.pumpAndSettle();
 }
 
+Future<void> _closeWorkbenchGroupSheet(WidgetTester tester) async {
+  await tester.tapAt(const Offset(20, 20));
+  await tester.pumpAndSettle();
+}
+
 final class _NoopProjectCommunicationRealtimeClient
     implements ProjectCommunicationRealtimeClient {
   const _NoopProjectCommunicationRealtimeClient();
@@ -426,7 +431,7 @@ void main() {
     await _ensureVisible(tester, find.text('发布方资料'));
     expect(find.text('发布方资料'), findsOneWidget);
     expect(find.text('竞标资料'), findsOneWidget);
-    expect(find.text('成交确认'), findsOneWidget);
+    expect(find.text('中间方成交确认'), findsOneWidget);
     expect(find.text('需补充'), findsOneWidget);
     expect(find.text('有待确认资料'), findsOneWidget);
     expect(find.text('2 项暂不可读'), findsOneWidget);
@@ -441,13 +446,15 @@ void main() {
     expect(find.text('设备物料清单确认'), findsOneWidget);
     expect(find.text('服务清单确认'), findsOneWidget);
     expect(find.text('未提交'), findsOneWidget);
+    await _closeWorkbenchGroupSheet(tester);
 
     await _expandWorkbenchGroup(tester, '竞标资料');
     expect(find.text('项目理解确认'), findsOneWidget);
     expect(find.text('报价表确认'), findsOneWidget);
     expect(find.text('进度安排确认'), findsOneWidget);
+    await _closeWorkbenchGroupSheet(tester);
 
-    await _expandWorkbenchGroup(tester, '成交确认');
+    await _expandWorkbenchGroup(tester, '中间方成交确认');
     expect(find.text('合同确认'), findsOneWidget);
     expect(find.text('最终成交金额确认'), findsOneWidget);
     expect(find.text('报价确认'), findsNothing);
@@ -497,6 +504,9 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('已确认。'), findsOneWidget);
+      await tester.pumpAndSettle();
+      await _ensureVisible(tester, find.text('发布方资料'));
+      await _expandWorkbenchGroup(tester, '发布方资料');
       expect(find.text('已确认'), findsOneWidget);
       expect(
         transport.requests.where(
@@ -558,7 +568,7 @@ void main() {
     await tester.pumpWidget(_buildPage(transport));
     await tester.pumpAndSettle();
     await _enterProjectCommunication(tester);
-    await _expandWorkbenchGroup(tester, '成交确认');
+    await _expandWorkbenchGroup(tester, '中间方成交确认');
     await _ensureVisible(tester, find.text('最终成交金额确认'));
     await tester.tap(find.text('最终成交金额确认'));
     await tester.pumpAndSettle();
