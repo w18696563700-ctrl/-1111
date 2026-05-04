@@ -219,6 +219,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   bool _editDetailLoading = false;
   ExhibitionLoadResult? _editDetailResult;
   int _guardRetryCount = 0;
+  final SubmitGuard _submitGuard = SubmitGuard();
   bool _submitting = false;
   bool _p0PaySubmitting = false;
   String _p0PayTaskType = _projectQuoteIntentionFixedPrice;
@@ -307,6 +308,7 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
     _p0PayMaterialFileAssetIdsController.dispose();
     _p0PayQuoteDeadlineAtController.dispose();
     _p0PayContactIdController.dispose();
+    _submitGuard.dispose();
     super.dispose();
   }
 
@@ -445,6 +447,10 @@ class _ProjectCreatePageState extends State<ProjectCreatePage> {
   }
 
   Future<void> _submitCreate() async {
+    await _submitGuard.run<void>(_submitCreateGuarded);
+  }
+
+  Future<void> _submitCreateGuarded() async {
     FocusScope.of(context).unfocus();
 
     if (_guardLoading) {

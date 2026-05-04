@@ -15,6 +15,7 @@ import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
+import 'package:mobile/shared/widgets/app_page_state_view.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 
 part 'exhibition_home_page_sections.dart';

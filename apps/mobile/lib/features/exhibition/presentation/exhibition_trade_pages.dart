@@ -29,10 +29,11 @@ import 'package:mobile/features/messages/data/messages_registered_entry_registry
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
-import 'package:mobile/shared/ui/app_visual_components.dart';
-import 'package:mobile/shared/ui/app_visual_tokens.dart';
 import 'package:mobile/shared/file/attachment_tile.dart';
 import 'package:mobile/shared/file/file_open_coordinator.dart';
+import 'package:mobile/shared/state/submit_guard.dart';
+import 'package:mobile/shared/ui/app_visual_components.dart';
+import 'package:mobile/shared/ui/app_visual_tokens.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher_string.dart';

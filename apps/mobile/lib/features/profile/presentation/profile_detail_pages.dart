@@ -29,6 +29,7 @@ import 'package:mobile/features/profile/presentation/profile_personal_edit_suppo
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
 import 'package:mobile/shared/format/money_formatter.dart';
 import 'package:mobile/shared/ui/app_visual_tokens.dart';
+import 'package:mobile/shared/widgets/app_page_state_view.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
 import 'package:mobile/shell/presentation/app_shell_scaffold.dart';

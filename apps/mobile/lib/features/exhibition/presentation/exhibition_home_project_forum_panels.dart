@@ -297,41 +297,44 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
           ? '${widget.provinceName ?? '本省'}当前还没有公开项目'
           : '当前还没有公开项目';
       return <Widget>[
-        _HomeStateNotice(
+        AppPageStateView(
+          state: AppPageState.empty,
           title: title,
           message: '可以先进入项目列表继续查看，或直接发布项目。',
-          actions: <Widget>[
-            OutlinedButton(
-              onPressed: widget.onOpenProjectList,
-              child: const Text('进入项目列表'),
-            ),
-            FilledButton(
-              onPressed: widget.onOpenProjectCreate,
-              child: const Text('去发布项目'),
-            ),
-          ],
+          retryLabel: '进入项目列表',
+          onRetry: widget.onOpenProjectList,
+          content: const SizedBox.shrink(),
+          scope: AppPageStateViewScope.card,
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: widget.onOpenProjectCreate,
+          child: const Text('去发布项目'),
         ),
       ];
     }
 
+    final message = _selectedFilter == _HomeProjectFilter.province
+        ? '当前不会把综合项目伪装成本省结果。你可以先刷新，或进入项目列表查看。'
+        : '当前不会用本地演示项目替代云端推荐。你可以先刷新，或进入项目列表查看。';
     return <Widget>[
-      _HomeStateNotice(
+      AppPageStateView(
+        state: activeState == AppPageState.content
+            ? AppPageState.errorRetryable
+            : activeState ?? AppPageState.errorRetryable,
         title: _selectedFilter == _HomeProjectFilter.province
             ? '${widget.provinceName ?? '本省'}项目推荐暂时没有刷新成功'
             : '当前项目推荐暂时没有刷新成功',
-        message: _selectedFilter == _HomeProjectFilter.province
-            ? '当前不会把综合项目伪装成本省结果。你可以先刷新，或进入项目列表查看。'
-            : '当前不会用本地演示项目替代云端推荐。你可以先刷新，或进入项目列表查看。',
-        actions: <Widget>[
-          OutlinedButton(
-            onPressed: _refreshActiveFilter,
-            child: const Text('刷新当前频道'),
-          ),
-          OutlinedButton(
-            onPressed: widget.onOpenProjectList,
-            child: const Text('进入项目列表'),
-          ),
-        ],
+        message: message,
+        retryLabel: '刷新当前频道',
+        onRetry: _refreshActiveFilter,
+        content: const SizedBox.shrink(),
+        scope: AppPageStateViewScope.card,
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton(
+        onPressed: widget.onOpenProjectList,
+        child: const Text('进入项目列表'),
       ),
     ];
   }
