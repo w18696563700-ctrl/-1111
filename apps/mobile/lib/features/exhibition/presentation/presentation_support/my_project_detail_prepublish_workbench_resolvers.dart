@@ -2,6 +2,12 @@ part of '../exhibition_trade_pages.dart';
 
 enum _MyProjectBottomPublishCtaKind { sincerity, attachment, publish, disabled }
 
+const List<String> _projectRequiredQuoteBasisAttachmentKinds = <String>[
+  _projectAttachmentKindEffectImage,
+  _projectAttachmentKindConstructionDoc,
+  _projectAttachmentKindMaterialSample,
+];
+
 final class _QuoteBasisChecklistProgress {
   const _QuoteBasisChecklistProgress({
     required this.countsByKind,
@@ -27,6 +33,23 @@ final class _QuoteBasisChecklistProgress {
     return (countsByKind[_projectAttachmentKindEffectImage] ?? 0) > 0;
   }
 
+  int get requiredTotal => _projectRequiredQuoteBasisAttachmentKinds.length;
+
+  int get requiredCompleted {
+    return _projectRequiredQuoteBasisAttachmentKinds.where((String kind) {
+      return (countsByKind[kind] ?? 0) > 0;
+    }).length;
+  }
+
+  bool get allRequiredKindsPresent => requiredCompleted >= requiredTotal;
+
+  List<String> get missingRequiredLabels {
+    return _projectRequiredQuoteBasisAttachmentKinds
+        .where((String kind) => (countsByKind[kind] ?? 0) <= 0)
+        .map(_projectAttachmentKindLabel)
+        .toList(growable: false);
+  }
+
   bool get allKindsPresent => completed >= total;
 
   String get summaryLabel {
@@ -37,6 +60,16 @@ final class _QuoteBasisChecklistProgress {
       return '暂不可用';
     }
     return '$completed/$total 已补充';
+  }
+
+  String get requiredSummaryLabel {
+    if (loading) {
+      return '正在读取';
+    }
+    if (unavailable) {
+      return '暂不可用';
+    }
+    return '$requiredCompleted/$requiredTotal 必传已补齐';
   }
 }
 
@@ -76,6 +109,13 @@ _QuoteBasisChecklistProgress _quoteBasisChecklistProgressFromAttachments({
   );
 }
 
+bool _sincerityGreenChannelChoiceCompleted(
+  _ProjectAuthenticitySinceritySnapshot? sincerity,
+) {
+  final choice = sincerity?.freezeFeedback?.myChoice;
+  return choice == 'support_freeze' || choice == 'oppose_freeze';
+}
+
 String _myProjectPrepublishPendingSummary({
   required _MyProjectStageOption stage,
   required _ProjectAuthenticitySinceritySnapshot? sincerity,
@@ -85,25 +125,22 @@ String _myProjectPrepublishPendingSummary({
   if (stage.value != _MyProjectStageBucket.submitted) {
     return stage.detailNextStep;
   }
-  if (pricingLoading) {
-    return '正在核对诚意金状态';
-  }
-  if (sincerity?.satisfied != true) {
-    return '诚意金待处理';
-  }
   if (quoteBasis.loading) {
     return '正在核对报价依据资料';
   }
   if (quoteBasis.unavailable) {
     return '报价依据资料暂不可用';
   }
-  if (!quoteBasis.hasRequiredEffectImage) {
-    return '效果图待补充';
+  if (!quoteBasis.allRequiredKindsPresent) {
+    return '必传资料待补充：${quoteBasis.missingRequiredLabels.join('、')}';
   }
-  if (!quoteBasis.allKindsPresent) {
-    return '报价依据资料 ${quoteBasis.summaryLabel}，建议继续补齐';
+  if (pricingLoading) {
+    return '正在核对诚意金绿色通道';
   }
-  return '发布前待办已清晰，可检查无误后提交发布';
+  if (!_sincerityGreenChannelChoiceCompleted(sincerity)) {
+    return '诚意金绿色通道待表态';
+  }
+  return '发布前待办已清晰，可确认发布';
 }
 
 _MyProjectBottomPublishCtaPlan _myProjectBottomPublishCtaPlan({
@@ -120,24 +157,6 @@ _MyProjectBottomPublishCtaPlan _myProjectBottomPublishCtaPlan({
       label: '暂不可提交',
       helper: '当前项目或账号关系暂不满足发布操作条件。',
       enabled: false,
-    );
-  }
-
-  if (pricingLoading) {
-    return const _MyProjectBottomPublishCtaPlan(
-      kind: _MyProjectBottomPublishCtaKind.disabled,
-      label: '正在读取诚意金状态',
-      helper: '请等待云端状态回读完成。',
-      enabled: false,
-    );
-  }
-
-  if (sincerity?.satisfied != true) {
-    return const _MyProjectBottomPublishCtaPlan(
-      kind: _MyProjectBottomPublishCtaKind.sincerity,
-      label: '继续处理诚意金',
-      helper: '完成当前项目真实性诚意金后，再继续发布确认。',
-      enabled: true,
     );
   }
 
@@ -159,11 +178,29 @@ _MyProjectBottomPublishCtaPlan _myProjectBottomPublishCtaPlan({
     );
   }
 
-  if (!quoteBasis.hasRequiredEffectImage) {
-    return const _MyProjectBottomPublishCtaPlan(
+  if (!quoteBasis.allRequiredKindsPresent) {
+    return _MyProjectBottomPublishCtaPlan(
       kind: _MyProjectBottomPublishCtaKind.attachment,
       label: '补充报价依据资料',
-      helper: '请先补充效果图，再进行正式发布确认。',
+      helper: '请先补齐必传资料：${quoteBasis.missingRequiredLabels.join('、')}。',
+      enabled: true,
+    );
+  }
+
+  if (pricingLoading) {
+    return const _MyProjectBottomPublishCtaPlan(
+      kind: _MyProjectBottomPublishCtaKind.disabled,
+      label: '正在读取诚意金绿色通道',
+      helper: '请等待云端诚意金状态和表态记录回读完成。',
+      enabled: false,
+    );
+  }
+
+  if (!_sincerityGreenChannelChoiceCompleted(sincerity)) {
+    return const _MyProjectBottomPublishCtaPlan(
+      kind: _MyProjectBottomPublishCtaKind.sincerity,
+      label: '完成诚意金绿色通道表态',
+      helper: '请选择支持或暂不支持项目真实性诚意金机制，任一选择均可继续发布。',
       enabled: true,
     );
   }
@@ -179,10 +216,10 @@ _MyProjectBottomPublishCtaPlan _myProjectBottomPublishCtaPlan({
 
   return _MyProjectBottomPublishCtaPlan(
     kind: _MyProjectBottomPublishCtaKind.publish,
-    label: '检查无误，提交发布',
+    label: '确认并发布',
     helper: quoteBasis.allKindsPresent
         ? '提交后按平台发布规则处理，结果以云端项目状态为准。'
-        : '五类资料尚未全部补齐；当前发布门禁仍按真实效果图与诚意金状态校验。',
+        : '设备物料清单、服务清单仍建议补充；当前已满足三类必传资料和绿色通道表态。',
     enabled: true,
   );
 }

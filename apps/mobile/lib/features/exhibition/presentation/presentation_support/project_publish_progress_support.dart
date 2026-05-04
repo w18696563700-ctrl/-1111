@@ -185,12 +185,16 @@ class _ProjectPublishProgressCard extends StatelessWidget {
     this.sincerity,
     this.basicInfoOnlyNote = false,
     this.useDraftLandingCopy = false,
+    this.compact = false,
+    this.showStepNotice = true,
   });
 
   final _ProjectPublishProgressStep currentStep;
   final _ProjectAuthenticitySinceritySnapshot? sincerity;
   final bool basicInfoOnlyNote;
   final bool useDraftLandingCopy;
+  final bool compact;
+  final bool showStepNotice;
 
   @override
   Widget build(BuildContext context) {
@@ -205,18 +209,18 @@ class _ProjectPublishProgressCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(compact ? 20 : 24),
         border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
         boxShadow: <BoxShadow>[
           BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.04),
-            blurRadius: 18,
-            offset: const Offset(0, 8),
+            color: colorScheme.shadow.withValues(alpha: compact ? 0.03 : 0.04),
+            blurRadius: compact ? 12 : 18,
+            offset: Offset(0, compact ? 5 : 8),
           ),
         ],
       ),
       child: Padding(
-        padding: const EdgeInsets.all(18),
+        padding: EdgeInsets.all(compact ? 14 : 18),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -235,19 +239,22 @@ class _ProjectPublishProgressCard extends StatelessWidget {
                   _StatusPill(label: '基础信息', tone: _ActionCardTone.emphasis),
               ],
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: compact ? 10 : 16),
             _ProjectPublishStepper(
               nodes: nodes,
               currentIndex: math.max(currentIndex, 0),
+              compact: compact,
             ),
-            const SizedBox(height: 16),
-            _ProjectPublishStepNotice(
-              title: _projectPublishProgressTitle(currentStep),
-              message: _projectPublishProgressSummary(
-                currentStep,
-                useDraftLandingCopy: useDraftLandingCopy,
+            if (showStepNotice) ...<Widget>[
+              SizedBox(height: compact ? 10 : 16),
+              _ProjectPublishStepNotice(
+                title: _projectPublishProgressTitle(currentStep),
+                message: _projectPublishProgressSummary(
+                  currentStep,
+                  useDraftLandingCopy: useDraftLandingCopy,
+                ),
               ),
-            ),
+            ],
             if (sincerity != null) ...<Widget>[
               const SizedBox(height: 12),
               _DetailLine(
@@ -267,17 +274,19 @@ class _ProjectPublishStepper extends StatelessWidget {
   const _ProjectPublishStepper({
     required this.nodes,
     required this.currentIndex,
+    this.compact = false,
   });
 
   final List<_ProjectPublishProgressNode> nodes;
   final int currentIndex;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        const nodeWidth = 50.0;
+        final nodeWidth = compact ? 44.0 : 50.0;
         final totalNodeWidth = nodeWidth * nodes.length;
         final lineWidth = nodes.length <= 1
             ? 0.0
@@ -301,11 +310,12 @@ class _ProjectPublishStepper extends StatelessWidget {
                       index: index,
                       active: index == currentIndex,
                       completed: index < currentIndex,
+                      compact: compact,
                     ),
                   ),
                   if (index < nodes.length - 1)
                     Padding(
-                      padding: const EdgeInsets.only(top: 14),
+                      padding: EdgeInsets.only(top: compact ? 12 : 14),
                       child: SizedBox(
                         width: lineWidth,
                         child: Divider(
@@ -333,12 +343,14 @@ class _ProjectPublishStepperNode extends StatelessWidget {
     required this.index,
     required this.active,
     required this.completed,
+    this.compact = false,
   });
 
   final _ProjectPublishProgressNode node;
   final int index;
   final bool active;
   final bool completed;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
@@ -359,8 +371,8 @@ class _ProjectPublishStepperNode extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Container(
-          width: 28,
-          height: 28,
+          width: compact ? 24 : 28,
+          height: compact ? 24 : 28,
           alignment: Alignment.center,
           decoration: BoxDecoration(
             color: background,
@@ -372,7 +384,11 @@ class _ProjectPublishStepperNode extends StatelessWidget {
             ),
           ),
           child: completed
-              ? Icon(Icons.check_rounded, size: 16, color: foreground)
+              ? Icon(
+                  Icons.check_rounded,
+                  size: compact ? 14 : 16,
+                  color: foreground,
+                )
               : Text(
                   '${index + 1}',
                   style: theme.textTheme.labelMedium?.copyWith(
@@ -381,7 +397,7 @@ class _ProjectPublishStepperNode extends StatelessWidget {
                   ),
                 ),
         ),
-        const SizedBox(height: 8),
+        SizedBox(height: compact ? 6 : 8),
         Text(
           node.label,
           maxLines: 1,
@@ -599,14 +615,14 @@ class _SincerityFreezeFeedbackStrip extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '用户征集',
+              '绿色通道表态',
               style: theme.textTheme.labelLarge?.copyWith(
                 fontWeight: FontWeight.w900,
               ),
             ),
             const SizedBox(height: 4),
             Text(
-              '你更支持正式期恢复冻结，还是继续降低发布门槛？当前反馈只做统计，不影响本次发布。',
+              '上线初期暂不强制真实支付或冻结；请选择是否支持项目真实性诚意金机制。当前反馈只做统计，选择暂不支持仍可继续发布。',
               style: theme.textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.42,
@@ -618,14 +634,14 @@ class _SincerityFreezeFeedbackStrip extends StatelessWidget {
               runSpacing: 10,
               children: <Widget>[
                 _SincerityFreezeFeedbackButton(
-                  label: '支持冻结 ${summary.supportFreezeCount}',
+                  label: '支持项目真实性诚意金机制 ${summary.supportFreezeCount}',
                   choice: 'support_freeze',
                   selected: summary.myChoice == 'support_freeze',
                   submittingChoice: submittingChoice,
                   onChoice: onChoice,
                 ),
                 _SincerityFreezeFeedbackButton(
-                  label: '反对冻结 ${summary.opposeFreezeCount}',
+                  label: '暂不支持项目真实性诚意金机制 ${summary.opposeFreezeCount}',
                   choice: 'oppose_freeze',
                   selected: summary.myChoice == 'oppose_freeze',
                   submittingChoice: submittingChoice,
@@ -722,7 +738,7 @@ String _projectPublishProgressSummary(
   return switch (step) {
     _ProjectPublishProgressStep.basic => '当前正在整理项目基础信息，保存后进入预发布核对。',
     _ProjectPublishProgressStep.quoteBasis => '当前应补齐报价依据资料，再处理项目真实性诚意金。',
-    _ProjectPublishProgressStep.sincerity => '当前需要完成当前项目的 200 元真实性诚意金。',
+    _ProjectPublishProgressStep.sincerity => '当前需要完成项目真实性诚意金绿色通道表态。',
     _ProjectPublishProgressStep.confirmation => '当前可检查无误后正式发布。',
     _ProjectPublishProgressStep.published => '当前项目已经进入公域竞标展示。',
   };

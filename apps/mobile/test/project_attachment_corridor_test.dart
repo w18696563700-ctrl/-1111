@@ -751,7 +751,7 @@ void main() {
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
     expect(find.text('效果图样张.png'), findsOneWidget);
 
-    await _tapVisible(tester, find.text('预览当前图片'));
+    await _tapVisible(tester, find.text('预览').first);
     expect(find.text('图片预览'), findsOneWidget);
   });
 
@@ -1082,11 +1082,14 @@ void main() {
 
     await _scrollTo(tester, find.text('报价依据资料').last);
     await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
-    expect(find.text('待上传附件（1）'), findsOneWidget);
+    expect(find.text('待上传附件（1）'), findsNothing);
+    expect(find.text('待上传 1'), findsOneWidget);
+    expect(find.text('已选择'), findsOneWidget);
     expect(find.text('效果图_A.png'), findsOneWidget);
 
-    await _tapVisible(tester, find.text('继续添加'));
-    expect(find.text('待上传附件（2）'), findsOneWidget);
+    await _tapVisible(tester, find.text('继续添加附件'));
+    expect(find.text('待上传附件（2）'), findsNothing);
+    expect(find.text('待上传 2'), findsOneWidget);
     expect(find.text('效果图_B.webp'), findsOneWidget);
 
     await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
@@ -1095,6 +1098,155 @@ void main() {
     expect(find.text('已上传 2'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '预览图片'), findsWidgets);
   });
+
+  testWidgets(
+    'pending attachments keep original kind when switching checklist type',
+    (WidgetTester tester) async {
+      final drafts = <ProjectAttachmentDraft>[
+        const ProjectAttachmentDraft(
+          fileName: '效果图待上传.docx',
+          bytes: <int>[21, 22, 23, 24],
+        ),
+        const ProjectAttachmentDraft(
+          fileName: '施工图待上传.docx',
+          bytes: <int>[25, 26, 27, 28],
+        ),
+      ];
+      var pickIndex = 0;
+      ProjectAttachmentDebugOverrides.installPicker(() async {
+        if (pickIndex >= drafts.length) {
+          return null;
+        }
+        final draft = drafts[pickIndex];
+        pickIndex += 1;
+        return draft;
+      });
+
+      final attachments = <Map<String, Object?>>[];
+      final boundKinds = <String>[];
+      var uploadSessionIndex = 0;
+      var fileAssetIndex = 0;
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+          'GET /api/app/my/projects/project-owner-kind-stable':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _myProjectDetailPayload(
+                    projectId: 'project-owner-kind-stable',
+                    viewerProjectRelation: 'owner',
+                    state: 'submitted',
+                  ),
+                );
+              },
+          'GET /api/app/my/projects/project-owner-kind-stable/attachments':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _attachmentListResponse(
+                    'project-owner-kind-stable',
+                    attachments,
+                  ),
+                );
+              },
+          'GET /api/app/project/public-resources':
+              (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _publicResourceListResponse(
+                    const <Map<String, Object?>>[],
+                  ),
+                );
+              },
+          'POST /api/app/file/upload/init': (AppApiRequest request) async {
+            final body = request.body! as Map<String, Object?>;
+            expect(body['fileKind'], 'project_attachment');
+            expect(
+              body['mimeType'],
+              'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            );
+            uploadSessionIndex += 1;
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: <String, Object?>{
+                'uploadSessionId': 'upload-session-kind-$uploadSessionIndex',
+                'directUpload': const <String, Object?>{
+                  'url': 'https://oss.example.com/project-kind-stable',
+                  'method': 'PUT',
+                },
+                'confirm': const <String, Object?>{
+                  'endpoint': '/api/app/file/upload/confirm',
+                },
+              },
+            );
+          },
+          'POST /api/app/file/upload/confirm': (AppApiRequest request) async {
+            fileAssetIndex += 1;
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: <String, Object?>{
+                'fileAssetId': 'file-asset-kind-$fileAssetIndex',
+              },
+            );
+          },
+          'POST /api/app/my/projects/project-owner-kind-stable/attachments':
+              (AppApiRequest request) async {
+                final body = request.body! as Map<String, Object?>;
+                final attachmentKind = body['attachmentKind']! as String;
+                boundKinds.add(attachmentKind);
+                final item = _attachmentItem(
+                  attachmentId: 'attachment-kind-${attachments.length + 1}',
+                  projectId: 'project-owner-kind-stable',
+                  fileAssetId: body['fileAssetId']! as String,
+                  fileName: body['fileName']! as String,
+                  attachmentKind: attachmentKind,
+                  mimeType: body['mimeType']! as String,
+                  sortOrder: body['sortOrder']! as int,
+                );
+                attachments.insert(0, item);
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: item,
+                );
+              },
+        },
+        uploadHandler: (AppApiUploadRequest request) async {
+          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+        },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          exhibitionTransport: transport,
+          initialRoute: ExhibitionRoutes.myProjectDetailWithProjectId(
+            'project-owner-kind-stable',
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _scrollTo(tester, find.text('报价依据资料').last);
+      await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
+      expect(find.text('效果图待上传.docx'), findsOneWidget);
+
+      await _tapVisible(tester, find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'));
+      expect(find.text('效果图待上传.docx'), findsNothing);
+
+      await _tapVisible(tester, find.text('继续添加附件'));
+      expect(find.text('施工图待上传.docx'), findsOneWidget);
+
+      await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
+
+      expect(boundKinds, <String>['effect_image', 'construction_doc']);
+      expect(attachments, hasLength(2));
+    },
+  );
 
   testWidgets(
     'bind failure surfaces precise reason instead of generic fallback',

@@ -297,7 +297,14 @@ String? _controlledBusinessFailureMessage({
     'PROJECT_CANCELLATION_REQUEST_INVALID' => '取消申请参数无效，请检查后再试。',
     'PROJECT_CANCELLATION_RESPONSE_INVALID' => '取消响应参数无效，请检查后再试。',
     'PROJECT_BREACH_RECORD_INVALID' => '违约记录参数无效，请检查后再试。',
-    'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED' => '发布项目需先完成 200 元项目真实性诚意金冻结。',
+    'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED' =>
+      '发布项目需先补齐必传报价依据资料，并完成项目真实性诚意金绿色通道表态；选择支持或暂不支持均可继续发布。',
+    'PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE' =>
+      '发布项目需先补齐必传报价依据资料，并完成项目真实性诚意金绿色通道表态；选择支持或暂不支持均可继续发布。',
+    'PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_INVALID' =>
+      '绿色通道表态参数无效，请重新选择支持或暂不支持后再发布。',
+    'PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED' =>
+      '绿色通道表态暂未提交成功，请重新选择后再发布。',
     'PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED' =>
       '当前暂不能创建项目真实性诚意金订单，请刷新项目状态后再试。',
     'PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND' =>

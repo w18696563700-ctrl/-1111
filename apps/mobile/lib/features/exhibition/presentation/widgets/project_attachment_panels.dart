@@ -4,7 +4,8 @@ class _SelectedProjectAttachmentCard extends StatelessWidget {
   const _SelectedProjectAttachmentCard({
     required this.draft,
     required this.attachmentKind,
-    this.onPreview,
+    required this.onPreview,
+    required this.onOpen,
     this.previewing = false,
     this.onRemove,
   });
@@ -12,79 +13,206 @@ class _SelectedProjectAttachmentCard extends StatelessWidget {
   final _ResolvedProjectAttachmentDraft draft;
   final String attachmentKind;
   final VoidCallback? onPreview;
+  final VoidCallback? onOpen;
   final bool previewing;
   final VoidCallback? onRemove;
 
   @override
   Widget build(BuildContext context) {
+    final previewTooltip = _projectAttachmentCanOpenLocally(draft.mimeType)
+        ? _projectAttachmentDraftPreviewButtonLabel(draft.mimeType)
+        : '可尝试预览，无法预览时请使用打开';
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
+        padding: const EdgeInsets.all(12),
+        child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              draft.fileName,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppVisualTokens.brandGold.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Padding(
+                padding: EdgeInsets.all(9),
+                child: Icon(
+                  Icons.insert_drive_file_outlined,
+                  color: AppVisualTokens.brandGold,
+                  size: 22,
+                ),
+              ),
             ),
-            const SizedBox(height: 8),
-            _DetailLine(
-              label: '资料类型',
-              value: _projectAttachmentKindLabel(attachmentKind),
-              highlight: true,
-            ),
-            _DetailLine(
-              label: '文件类型',
-              value: _projectAttachmentFileTypeLabel(draft.extension),
-            ),
-            _DetailLine(
-              label: '文件大小',
-              value: _projectAttachmentSizeLabel(draft.sizeInBytes),
-            ),
-            if (onPreview != null || onRemove != null) ...<Widget>[
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  if (onPreview != null)
-                    OutlinedButton.icon(
-                      onPressed: previewing ? null : onPreview,
-                      icon: previewing
-                          ? const SizedBox(
-                              width: 16,
-                              height: 16,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : const Icon(Icons.visibility_outlined),
-                      label: Text(
-                        previewing
-                            ? '处理中'
-                            : _projectAttachmentDraftPreviewButtonLabel(
-                                draft.mimeType,
-                              ),
+                  Text(
+                    draft.fileName,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    crossAxisAlignment: WrapCrossAlignment.center,
+                    children: <Widget>[
+                      Text(
+                        '${_projectAttachmentFileTypeLabel(draft.extension)} · '
+                        '${_projectAttachmentSizeLabel(draft.sizeInBytes)}',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      _TinyStatusPill(
+                        label: '待确认',
+                        color: AppVisualTokens.brandGold,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: <Widget>[
+                      Tooltip(
+                        message: previewTooltip,
+                        child: OutlinedButton.icon(
+                          onPressed: previewing ? null : onPreview,
+                          icon: previewing
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.visibility_outlined),
+                          label: Text(previewing ? '处理中' : '预览'),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        onPressed: previewing ? null : onOpen,
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('打开'),
+                      ),
+                      if (onRemove != null)
+                        OutlinedButton.icon(
+                          onPressed: previewing ? null : onRemove,
+                          icon: const Icon(Icons.delete_outline_rounded),
+                          label: const Text('移除'),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: AppVisualTokens.brandGold.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 8,
+                      ),
+                      child: Text(
+                        '常见文件格式均可作为资料附件，确认无误后可上传并形成正式附件。',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
                       ),
                     ),
-                  if (onRemove != null)
-                    OutlinedButton.icon(
-                      onPressed: previewing ? null : onRemove,
-                      icon: const Icon(Icons.remove_circle_outline_rounded),
-                      label: const Text('移除当前附件'),
-                    ),
+                  ),
                 ],
               ),
-            ],
+            ),
           ],
         ),
       ),
     );
   }
+}
+
+class _TinyStatusPill extends StatelessWidget {
+  const _TinyStatusPill({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: color,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectAttachmentKindIcon extends StatelessWidget {
+  const _ProjectAttachmentKindIcon({
+    required this.kind,
+    required this.active,
+    required this.workbenchMode,
+  });
+
+  final String kind;
+  final bool active;
+  final bool workbenchMode;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final color = active ? AppVisualTokens.brandGold : colorScheme.outline;
+    final icon = workbenchMode
+        ? _projectAttachmentKindWorkbenchIcon(kind)
+        : active
+        ? Icons.check_circle_rounded
+        : Icons.radio_button_unchecked_rounded;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: workbenchMode ? 0.10 : 0),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Padding(
+        padding: EdgeInsets.all(workbenchMode ? 7 : 0),
+        child: Icon(icon, size: workbenchMode ? 20 : 22, color: color),
+      ),
+    );
+  }
+}
+
+IconData _projectAttachmentKindWorkbenchIcon(String kind) {
+  return switch (kind) {
+    _projectAttachmentKindEffectImage => Icons.image_outlined,
+    _projectAttachmentKindConstructionDoc => Icons.straighten_outlined,
+    _projectAttachmentKindMaterialSample => Icons.texture_outlined,
+    _projectAttachmentKindEquipmentMaterialList => Icons.inventory_2_outlined,
+    _projectAttachmentKindServiceList => Icons.assignment_outlined,
+    _ => Icons.insert_drive_file_outlined,
+  };
 }
 
 class _ProjectAttachmentKindPicker extends StatelessWidget {
@@ -131,15 +259,32 @@ class _ProjectAttachmentKindPicker extends StatelessWidget {
 class _ProjectAttachmentRequirementPanel extends StatelessWidget {
   const _ProjectAttachmentRequirementPanel({
     required this.attachments,
+    this.selectedDraftsByKind =
+        const <String, List<_ResolvedProjectAttachmentDraft>>{},
     this.selectedKind,
     this.onSelectKind,
     this.onAddKind,
+    this.onPreviewDraft,
+    this.onOpenDraft,
+    this.isDraftPreviewing,
+    this.onRemoveDraft,
+    this.workbenchMode = false,
   });
 
   final List<ProjectAttachmentReadModel> attachments;
+  final Map<String, List<_ResolvedProjectAttachmentDraft>> selectedDraftsByKind;
   final String? selectedKind;
   final ValueChanged<String>? onSelectKind;
   final ValueChanged<String>? onAddKind;
+  final ValueChanged<_ResolvedProjectAttachmentDraft>? onPreviewDraft;
+  final ValueChanged<_ResolvedProjectAttachmentDraft>? onOpenDraft;
+  final bool Function(_ResolvedProjectAttachmentDraft draft)? isDraftPreviewing;
+  final void Function(
+    String attachmentKind,
+    _ResolvedProjectAttachmentDraft draft,
+  )?
+  onRemoveDraft;
+  final bool workbenchMode;
 
   @override
   Widget build(BuildContext context) {
@@ -164,76 +309,200 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            Text(
-              '报价依据资料 checklist',
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+            Row(
+              children: <Widget>[
+                Expanded(
+                  child: Text(
+                    '报价依据资料 checklist',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ),
+                Icon(
+                  Icons.info_outline_rounded,
+                  size: 18,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  '资料说明',
+                  style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 10),
             ..._projectAttachmentKindOptions.map((
               _ProjectAttachmentKindOption option,
             ) {
               final count = countsByKind[option.value] ?? 0;
+              final selected = selectedKind == option.value;
+              final selectedDrafts =
+                  selectedDraftsByKind[option.value] ??
+                  const <_ResolvedProjectAttachmentDraft>[];
+              final draftCount = selectedDrafts.length;
               final satisfied = count > 0;
+              final statusLabel = draftCount > 0
+                  ? '待上传 $draftCount'
+                  : satisfied
+                  ? '已上传 $count'
+                  : '待补充';
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: <Widget>[
-                    Icon(
-                      satisfied
-                          ? Icons.check_circle_rounded
-                          : Icons.radio_button_unchecked_rounded,
-                      size: 18,
-                      color: satisfied
-                          ? Theme.of(context).colorScheme.primary
-                          : Theme.of(context).colorScheme.outline,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: selected
+                        ? AppVisualTokens.brandGold.withValues(alpha: 0.08)
+                        : Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: selected
+                          ? AppVisualTokens.brandGold.withValues(alpha: 0.42)
+                          : Theme.of(context).colorScheme.outlineVariant,
                     ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: InkWell(
-                        onTap: onSelectKind == null
-                            ? null
-                            : () => onSelectKind!(option.value),
-                        borderRadius: BorderRadius.circular(10),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          child: Text(
-                            option.label,
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(
-                                  fontWeight: FontWeight.w700,
-                                  color: selectedKind == option.value
-                                      ? Theme.of(context).colorScheme.primary
-                                      : null,
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.all(12),
+                    child: Column(
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            _ProjectAttachmentKindIcon(
+                              kind: option.value,
+                              active: selected || draftCount > 0 || satisfied,
+                              workbenchMode: workbenchMode,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: InkWell(
+                                onTap: onSelectKind == null
+                                    ? null
+                                    : () => onSelectKind!(option.value),
+                                borderRadius: BorderRadius.circular(10),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: _ProjectAttachmentKindTitle(
+                                    label: option.label,
+                                    requiredKind:
+                                        _projectRequiredQuoteBasisAttachmentKinds
+                                            .contains(option.value),
+                                    selected: selected,
+                                  ),
                                 ),
-                          ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              statusLabel,
+                              style: Theme.of(context).textTheme.bodySmall
+                                  ?.copyWith(
+                                    color: draftCount > 0 || satisfied
+                                        ? AppVisualTokens.brandGold
+                                        : Theme.of(
+                                            context,
+                                          ).colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                            ),
+                            if (onAddKind != null) ...<Widget>[
+                              const SizedBox(width: 8),
+                              if (draftCount > 0)
+                                _TinyStatusPill(
+                                  label: '已选择',
+                                  color: AppVisualTokens.brandGold,
+                                )
+                              else
+                                TextButton(
+                                  onPressed: () => onAddKind!(option.value),
+                                  child: const Text('添加'),
+                                ),
+                            ],
+                          ],
                         ),
-                      ),
+                        if (selected && selectedDrafts.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 12),
+                          ...selectedDrafts.asMap().entries.map((
+                            MapEntry<int, _ResolvedProjectAttachmentDraft>
+                            entry,
+                          ) {
+                            final draft = entry.value;
+                            final isLast =
+                                entry.key == selectedDrafts.length - 1;
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
+                              child: _SelectedProjectAttachmentCard(
+                                draft: draft,
+                                attachmentKind: option.value,
+                                onPreview: onPreviewDraft == null
+                                    ? null
+                                    : () => onPreviewDraft!(draft),
+                                onOpen: onOpenDraft == null
+                                    ? null
+                                    : () => onOpenDraft!(draft),
+                                previewing:
+                                    isDraftPreviewing?.call(draft) ?? false,
+                                onRemove: onRemoveDraft == null
+                                    ? null
+                                    : () => onRemoveDraft!(option.value, draft),
+                              ),
+                            );
+                          }),
+                        ],
+                      ],
                     ),
-                    Text(
-                      satisfied ? '已上传 $count' : '待补充',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: satisfied
-                            ? Theme.of(context).colorScheme.primary
-                            : Theme.of(context).colorScheme.onSurfaceVariant,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    if (onAddKind != null) ...<Widget>[
-                      const SizedBox(width: 8),
-                      TextButton(
-                        onPressed: () => onAddKind!(option.value),
-                        child: Text(satisfied ? '继续补' : '添加'),
-                      ),
-                    ],
-                  ],
+                  ),
                 ),
               );
             }),
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ProjectAttachmentKindTitle extends StatelessWidget {
+  const _ProjectAttachmentKindTitle({
+    required this.label,
+    required this.requiredKind,
+    required this.selected,
+  });
+
+  final String label;
+  final bool requiredKind;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final baseStyle = theme.textTheme.bodyLarge?.copyWith(
+      fontWeight: FontWeight.w900,
+      color: selected ? AppVisualTokens.brandGold : null,
+    );
+    return Text.rich(
+      TextSpan(
+        style: baseStyle,
+        children: <InlineSpan>[
+          TextSpan(text: label),
+          if (requiredKind)
+            TextSpan(
+              text: '（必填项）',
+              style: baseStyle?.copyWith(
+                color: colorScheme.error,
+                fontSize: 13,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+        ],
+      ),
+      maxLines: 2,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }
@@ -406,6 +675,7 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
     required this.onDelete,
     required this.autoloaded,
     this.showChecklist = true,
+    this.lightEmptyNotice = false,
   });
 
   final bool loading;
@@ -421,6 +691,7 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
   final ValueChanged<ProjectAttachmentReadModel> onDelete;
   final bool autoloaded;
   final bool showChecklist;
+  final bool lightEmptyNotice;
 
   @override
   Widget build(BuildContext context) {
@@ -469,7 +740,9 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
             _ProjectAttachmentRequirementPanel(attachments: attachments),
             const SizedBox(height: 12),
           ],
-          _EmptyNotice(title: '暂无报价依据资料', message: emptyMessage),
+          lightEmptyNotice
+              ? _ProjectAttachmentLightEmptyNotice(message: emptyMessage)
+              : _EmptyNotice(title: '暂无报价依据资料', message: emptyMessage),
         ],
       );
     }
@@ -509,6 +782,61 @@ class _ProjectAttachmentFormalListPanel extends StatelessWidget {
           );
         }),
       ],
+    );
+  }
+}
+
+class _ProjectAttachmentLightEmptyNotice extends StatelessWidget {
+  const _ProjectAttachmentLightEmptyNotice({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppVisualTokens.brandGold.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppVisualTokens.brandGold.withValues(alpha: 0.14),
+        ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Icon(
+              Icons.inventory_2_outlined,
+              size: 20,
+              color: AppVisualTokens.brandGold,
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    '暂无报价依据资料',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    message,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -755,12 +1083,110 @@ class _ProjectAttachmentThumbnailState
                         );
                       },
                 )
-              : Icon(
-                  Icons.insert_drive_file_outlined,
-                  color: colorScheme.onSurfaceVariant,
-                ),
+              : _ProjectAttachmentFileTypeBadge(attachment: widget.attachment),
         ),
       ),
     );
   }
+}
+
+class _ProjectAttachmentFileTypeBadge extends StatelessWidget {
+  const _ProjectAttachmentFileTypeBadge({required this.attachment});
+
+  final ProjectAttachmentReadModel attachment;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final extension =
+        _projectAttachmentExtension(attachment.fileName)?.toUpperCase() ??
+        _projectAttachmentMimeTypeShortLabel(attachment.mimeType);
+    final color = _projectAttachmentFileAccentColor(attachment.mimeType);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(
+              _projectAttachmentFileIcon(attachment.mimeType),
+              color: color,
+              size: 26,
+            ),
+            const SizedBox(height: 5),
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: colorScheme.surface.withValues(alpha: 0.82),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                child: Text(
+                  extension,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                    color: color,
+                    fontWeight: FontWeight.w900,
+                    fontSize: 10,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+IconData _projectAttachmentFileIcon(String mimeType) {
+  return switch (mimeType) {
+    'application/pdf' => Icons.picture_as_pdf_outlined,
+    'application/msword' ||
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' =>
+      Icons.article_outlined,
+    'application/vnd.ms-excel' ||
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    'text/csv' ||
+    'application/csv' => Icons.table_chart_outlined,
+    'application/vnd.ms-powerpoint' ||
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation' =>
+      Icons.slideshow_outlined,
+    'application/zip' ||
+    'application/vnd.rar' ||
+    'application/x-7z-compressed' => Icons.folder_zip_outlined,
+    _ => Icons.description_outlined,
+  };
+}
+
+Color _projectAttachmentFileAccentColor(String mimeType) {
+  return switch (mimeType) {
+    'application/pdf' => const Color(0xFFC62828),
+    'application/msword' ||
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document' =>
+      const Color(0xFF1976D2),
+    'application/vnd.ms-excel' ||
+    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    'text/csv' ||
+    'application/csv' => const Color(0xFF2E7D32),
+    'application/vnd.ms-powerpoint' ||
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation' =>
+      const Color(0xFFD84315),
+    'application/zip' ||
+    'application/vnd.rar' ||
+    'application/x-7z-compressed' => const Color(0xFF6D4C41),
+    _ => AppVisualTokens.brandGold,
+  };
+}
+
+String _projectAttachmentMimeTypeShortLabel(String mimeType) {
+  final label = _projectAttachmentMimeTypeLabel(mimeType);
+  final parts = label.split(' ');
+  return parts.first.trim().isEmpty ? 'FILE' : parts.first.trim();
 }

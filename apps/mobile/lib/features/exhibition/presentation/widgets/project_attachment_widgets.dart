@@ -12,6 +12,7 @@ class _ProjectAttachmentSection extends StatefulWidget {
     this.compactKindHints = false,
     this.showKindHint = true,
     this.showIdleUploadState = true,
+    this.workbenchMode = false,
     this.onListResultChanged,
   });
 
@@ -24,6 +25,7 @@ class _ProjectAttachmentSection extends StatefulWidget {
   final bool compactKindHints;
   final bool showKindHint;
   final bool showIdleUploadState;
+  final bool workbenchMode;
   final ValueChanged<ExhibitionLoadResult?>? onListResultChanged;
 
   @override
@@ -31,16 +33,27 @@ class _ProjectAttachmentSection extends StatefulWidget {
       _ProjectAttachmentSectionState();
 }
 
+class _PendingProjectAttachmentDraft {
+  const _PendingProjectAttachmentDraft({
+    required this.attachmentKind,
+    required this.draft,
+  });
+
+  final String attachmentKind;
+  final _ResolvedProjectAttachmentDraft draft;
+}
+
 class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
   String _selectedAttachmentKind = _projectAttachmentKindEffectImage;
-  final List<_ResolvedProjectAttachmentDraft> _selectedDrafts =
-      <_ResolvedProjectAttachmentDraft>[];
+  final Map<String, List<_ResolvedProjectAttachmentDraft>>
+  _selectedDraftsByKind = <String, List<_ResolvedProjectAttachmentDraft>>{};
   _ProjectAttachmentUploadUiStatus _uploadStatus =
       _ProjectAttachmentUploadUiStatus.idle;
   String? _uploadMessage;
   UploadDirective? _uploadDirective;
   String? _confirmedFileAssetId;
   _ResolvedProjectAttachmentDraft? _retryDraft;
+  String? _retryAttachmentKind;
   ExhibitionLoadResult? _listResult;
   bool _loadingList = false;
   String? _listFeedbackMessage;
@@ -64,10 +77,11 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       return;
     }
 
-    _selectedDrafts.clear();
+    _selectedDraftsByKind.clear();
     _uploadDirective = null;
     _confirmedFileAssetId = null;
     _retryDraft = null;
+    _retryAttachmentKind = null;
     _uploadStatus = _ProjectAttachmentUploadUiStatus.idle;
     _uploadMessage = null;
     _listResult = null;
@@ -84,26 +98,79 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     return '${draft.checksum}:${draft.fileName.toLowerCase()}';
   }
 
-  bool _containsDraft(_ResolvedProjectAttachmentDraft draft) {
-    final targetKey = _draftKey(draft);
-    return _selectedDrafts.any(
-      (_ResolvedProjectAttachmentDraft item) => _draftKey(item) == targetKey,
-    );
+  String _pendingDraftKey(
+    String attachmentKind,
+    _ResolvedProjectAttachmentDraft draft,
+  ) {
+    return '$attachmentKind:${_draftKey(draft)}';
   }
 
-  void _removeDraft(_ResolvedProjectAttachmentDraft draft) {
+  bool _containsDraft(
+    String attachmentKind,
+    _ResolvedProjectAttachmentDraft draft,
+  ) {
     final targetKey = _draftKey(draft);
-    _selectedDrafts.removeWhere(
+    final drafts = _selectedDraftsByKind[attachmentKind];
+    return drafts?.any(
+          (_ResolvedProjectAttachmentDraft item) =>
+              _draftKey(item) == targetKey,
+        ) ??
+        false;
+  }
+
+  void _removeDraft(
+    String attachmentKind,
+    _ResolvedProjectAttachmentDraft draft,
+  ) {
+    final targetKey = _draftKey(draft);
+    final drafts = _selectedDraftsByKind[attachmentKind];
+    if (drafts == null) {
+      return;
+    }
+    drafts.removeWhere(
       (_ResolvedProjectAttachmentDraft item) => _draftKey(item) == targetKey,
     );
-    _openingSelectedDraftIds.remove(targetKey);
+    if (drafts.isEmpty) {
+      _selectedDraftsByKind.remove(attachmentKind);
+    }
+    _openingSelectedDraftIds.remove(_draftKey(draft));
   }
 
   _ResolvedProjectAttachmentDraft? get _firstSelectedDraft {
-    if (_selectedDrafts.isEmpty) {
+    final queuedDrafts = _queuedSelectedDrafts;
+    if (queuedDrafts.isEmpty) {
       return null;
     }
-    return _selectedDrafts.first;
+    return queuedDrafts.first.draft;
+  }
+
+  int get _selectedDraftCount {
+    var count = 0;
+    for (final drafts in _selectedDraftsByKind.values) {
+      count += drafts.length;
+    }
+    return count;
+  }
+
+  bool get _hasSelectedDrafts => _selectedDraftCount > 0;
+
+  List<_PendingProjectAttachmentDraft> get _queuedSelectedDrafts {
+    final queued = <_PendingProjectAttachmentDraft>[];
+    for (final option in _projectAttachmentKindOptions) {
+      final drafts = _selectedDraftsByKind[option.value];
+      if (drafts == null || drafts.isEmpty) {
+        continue;
+      }
+      for (final draft in drafts) {
+        queued.add(
+          _PendingProjectAttachmentDraft(
+            attachmentKind: option.value,
+            draft: draft,
+          ),
+        );
+      }
+    }
+    return queued;
   }
 
   Future<void> _loadFormalAttachments({
@@ -142,6 +209,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
   }
 
   Future<void> _selectAttachment({bool append = false}) async {
+    final targetAttachmentKind = _selectedAttachmentKind;
     setState(() {
       _uploadStatus = _ProjectAttachmentUploadUiStatus.selecting;
       _uploadMessage = append ? '正在继续选择报价依据资料' : '正在选择报价依据资料';
@@ -149,19 +217,19 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
     final source = await _resolveProjectAttachmentPickSource(
       context: context,
-      attachmentKind: _selectedAttachmentKind,
+      attachmentKind: targetAttachmentKind,
     );
     if (!mounted) {
       return;
     }
     if (source == null) {
       setState(() {
-        _uploadStatus = _selectedDrafts.isEmpty
+        _uploadStatus = !_hasSelectedDrafts
             ? _ProjectAttachmentUploadUiStatus.idle
             : _ProjectAttachmentUploadUiStatus.selectedReady;
-        _uploadMessage = _selectedDrafts.isEmpty
+        _uploadMessage = !_hasSelectedDrafts
             ? '当前没有选择新附件，可稍后重新选择。'
-            : '当前没有继续添加新附件，已选中的 ${_selectedDrafts.length} 个附件仍可继续上传。';
+            : '当前没有继续添加新附件，已选中的 $_selectedDraftCount 个附件仍可继续上传。';
       });
       return;
     }
@@ -174,12 +242,12 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     }
     if (draft == null) {
       setState(() {
-        _uploadStatus = _selectedDrafts.isEmpty
+        _uploadStatus = !_hasSelectedDrafts
             ? _ProjectAttachmentUploadUiStatus.idle
             : _ProjectAttachmentUploadUiStatus.selectedReady;
-        _uploadMessage = _selectedDrafts.isEmpty
+        _uploadMessage = !_hasSelectedDrafts
             ? '当前没有选择新附件，可稍后重新选择。'
-            : '当前没有继续添加新附件，已选中的 ${_selectedDrafts.length} 个附件仍可继续上传。';
+            : '当前没有继续添加新附件，已选中的 $_selectedDraftCount 个附件仍可继续上传。';
       });
       return;
     }
@@ -194,19 +262,19 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     }
 
     if (!_projectAttachmentKindMatchesMimeType(
-      _selectedAttachmentKind,
+      targetAttachmentKind,
       resolved.mimeType,
     )) {
       setState(() {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.unsupportedType;
         _uploadMessage = _projectAttachmentUnsupportedTypeMessage(
-          _selectedAttachmentKind,
+          targetAttachmentKind,
         );
       });
       return;
     }
 
-    if (_containsDraft(resolved)) {
+    if (_containsDraft(targetAttachmentKind, resolved)) {
       setState(() {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.selectedReady;
         _uploadMessage = '${resolved.fileName} 已在待上传列表中，无需重复添加。';
@@ -215,22 +283,25 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     }
 
     setState(() {
-      _selectedDrafts.add(resolved);
+      final drafts = _selectedDraftsByKind.putIfAbsent(
+        targetAttachmentKind,
+        () => <_ResolvedProjectAttachmentDraft>[],
+      );
+      drafts.add(resolved);
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _retryDraft = null;
+      _retryAttachmentKind = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.selectedReady;
-      _uploadMessage = _selectedDrafts.length == 1
+      _uploadMessage = _selectedDraftCount == 1
           ? '已选中 ${resolved.fileName}，可以继续上传并形成正式附件。'
-          : '已加入 ${resolved.fileName}。当前共 ${_selectedDrafts.length} 个附件，可以继续添加后一次上传。';
+          : '已加入 ${resolved.fileName}。当前共 $_selectedDraftCount 个附件，可以继续添加后一次上传。';
     });
   }
 
   Future<void> _uploadSelectedAttachment() async {
     final projectId = widget.projectId;
-    final queuedDrafts = List<_ResolvedProjectAttachmentDraft>.from(
-      _selectedDrafts,
-    );
+    final queuedDrafts = _queuedSelectedDrafts;
     if (projectId == null || queuedDrafts.isEmpty) {
       setState(() {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.initFailed;
@@ -242,10 +313,11 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     final successNames = <String>[];
     var nextSortOrder = _projectAttachmentNextSortOrder(_attachments);
     final totalDraftCount = queuedDrafts.length;
-    for (final _ResolvedProjectAttachmentDraft draft in queuedDrafts) {
+    for (final pendingDraft in queuedDrafts) {
       final succeeded = await _uploadDraft(
         projectId: projectId,
-        draft: draft,
+        attachmentKind: pendingDraft.attachmentKind,
+        draft: pendingDraft.draft,
         draftIndex: successNames.length + 1,
         totalDraftCount: totalDraftCount,
         sortOrder: nextSortOrder,
@@ -274,9 +346,9 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
         return;
       }
       setState(() {
-        _removeDraft(draft);
+        _removeDraft(pendingDraft.attachmentKind, pendingDraft.draft);
       });
-      successNames.add(draft.fileName);
+      successNames.add(pendingDraft.draft.fileName);
       nextSortOrder += 1;
     }
 
@@ -284,6 +356,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _retryDraft = null;
+      _retryAttachmentKind = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
       _uploadMessage = successNames.length == 1
           ? '${successNames.first} 已形成报价依据资料。最终列表以后端资料读侧回读为准。'
@@ -302,6 +375,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
   Future<bool> _uploadDraft({
     required String projectId,
+    required String attachmentKind,
     required _ResolvedProjectAttachmentDraft draft,
     required int draftIndex,
     required int totalDraftCount,
@@ -315,6 +389,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _retryDraft = draft;
+      _retryAttachmentKind = attachmentKind;
     });
 
     final initResult = await ExhibitionConsumerLayer.instance.uploadInit(
@@ -370,6 +445,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
     return _confirmCurrentAttachment(
       directive,
+      attachmentKind: attachmentKind,
       draft: draft,
       draftIndex: draftIndex,
       totalDraftCount: totalDraftCount,
@@ -379,12 +455,15 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
   Future<bool> _confirmCurrentAttachment(
     UploadDirective directive, {
+    String? attachmentKind,
     _ResolvedProjectAttachmentDraft? draft,
     int? draftIndex,
     int? totalDraftCount,
     int? sortOrder,
   }) async {
     final resolvedDraft = draft ?? _retryDraft ?? _firstSelectedDraft;
+    final resolvedAttachmentKind =
+        attachmentKind ?? _retryAttachmentKind ?? _selectedAttachmentKind;
     if (resolvedDraft == null) {
       return false;
     }
@@ -412,6 +491,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       setState(() {
         _uploadDirective = directive;
         _retryDraft = resolvedDraft;
+        _retryAttachmentKind = resolvedAttachmentKind;
         _confirmedFileAssetId = null;
         _uploadStatus = _ProjectAttachmentUploadUiStatus.confirmFailed;
         _uploadMessage = '${resolvedDraft.fileName} 的确认结果未形成可绑定文件，请重新上传。';
@@ -421,8 +501,10 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
     _confirmedFileAssetId = fileAssetId;
     _retryDraft = resolvedDraft;
+    _retryAttachmentKind = resolvedAttachmentKind;
     return _bindConfirmedAttachment(
       fileAssetId: fileAssetId,
+      attachmentKind: resolvedAttachmentKind,
       draft: resolvedDraft,
       draftIndex: draftIndex,
       totalDraftCount: totalDraftCount,
@@ -432,6 +514,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
   Future<bool> _bindConfirmedAttachment({
     required String fileAssetId,
+    String? attachmentKind,
     _ResolvedProjectAttachmentDraft? draft,
     int? draftIndex,
     int? totalDraftCount,
@@ -439,6 +522,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
   }) async {
     final projectId = widget.projectId;
     final resolvedDraft = draft ?? _retryDraft ?? _firstSelectedDraft;
+    final resolvedAttachmentKind =
+        attachmentKind ?? _retryAttachmentKind ?? _selectedAttachmentKind;
     if (projectId == null || resolvedDraft == null) {
       return false;
     }
@@ -456,7 +541,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       command: ProjectAttachmentBindCommand(
         fileAssetId: fileAssetId,
         fileName: resolvedDraft.fileName,
-        attachmentKind: _selectedAttachmentKind,
+        attachmentKind: resolvedAttachmentKind,
         mimeType: resolvedDraft.mimeType,
         sortOrder: sortOrder ?? _projectAttachmentNextSortOrder(_attachments),
       ),
@@ -469,6 +554,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     if (!result.isSuccess) {
       setState(() {
         _retryDraft = resolvedDraft;
+        _retryAttachmentKind = resolvedAttachmentKind;
         _confirmedFileAssetId = fileAssetId;
         _uploadStatus = _ProjectAttachmentUploadUiStatus.bindFailed;
         _uploadMessage = _projectAttachmentBindFailureMessage(
@@ -562,22 +648,102 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     }
   }
 
-  void _removeSelectedDraftFromQueue(_ResolvedProjectAttachmentDraft draft) {
+  Future<void> _openSelectedDraft(_ResolvedProjectAttachmentDraft draft) async {
+    final draftId = _draftKey(draft);
+    if (_openingSelectedDraftIds.contains(draftId)) {
+      return;
+    }
+
+    setState(() => _openingSelectedDraftIds.add(draftId));
+    try {
+      final file = await _writeProjectAttachmentPreviewTempFile(
+        fileName: draft.fileName,
+        bytes: draft.bytes,
+      );
+      final opened = await _openProjectAttachmentLocalFile(file.path);
+      if (!mounted) {
+        return;
+      }
+      _showSectionMessage(
+        opened ? '已在系统中打开当前附件。' : '当前设备暂时不能直接打开这个附件，请上传成功后再试远程预览。',
+      );
+    } catch (_) {
+      if (mounted) {
+        _showSectionMessage('当前附件暂时无法打开，请稍后再试。');
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _openingSelectedDraftIds.remove(draftId));
+      }
+    }
+  }
+
+  Future<void> _showAttachmentKindSwitchSheet() async {
+    final selected = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '更换资料类型',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ..._projectAttachmentKindOptions.map((
+                  _ProjectAttachmentKindOption option,
+                ) {
+                  return ListTile(
+                    leading: Icon(
+                      option.value == _selectedAttachmentKind
+                          ? Icons.check_circle_rounded
+                          : Icons.radio_button_unchecked_rounded,
+                    ),
+                    title: Text(option.label),
+                    onTap: () => Navigator.of(context).pop(option.value),
+                  );
+                }),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (!mounted || selected == null) {
+      return;
+    }
+    setState(() => _selectedAttachmentKind = selected);
+  }
+
+  void _removeSelectedDraftFromQueue(
+    String attachmentKind,
+    _ResolvedProjectAttachmentDraft draft,
+  ) {
     setState(() {
-      final targetKey = _draftKey(draft);
-      _removeDraft(draft);
-      if (_retryDraft != null && _draftKey(_retryDraft!) == targetKey) {
+      final targetKey = _pendingDraftKey(attachmentKind, draft);
+      _removeDraft(attachmentKind, draft);
+      if (_retryDraft != null &&
+          _retryAttachmentKind != null &&
+          _pendingDraftKey(_retryAttachmentKind!, _retryDraft!) == targetKey) {
         _retryDraft = null;
+        _retryAttachmentKind = null;
         _uploadDirective = null;
         _confirmedFileAssetId = null;
       }
-      if (_selectedDrafts.isEmpty) {
+      if (!_hasSelectedDrafts) {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.idle;
         _uploadMessage = '当前待上传附件已清空，可重新选择。';
       } else {
         _uploadStatus = _ProjectAttachmentUploadUiStatus.selectedReady;
         _uploadMessage =
-            '已移除 ${draft.fileName}。剩余 ${_selectedDrafts.length} 个待上传附件。';
+            '已移除 ${draft.fileName}。剩余 $_selectedDraftCount 个待上传附件。';
       }
     });
   }
@@ -585,16 +751,22 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
   Future<void> _retryConfirmCurrentAttachment() async {
     final draft = _retryDraft;
     final directive = _uploadDirective;
-    if (draft == null || directive == null) {
+    final attachmentKind = _retryAttachmentKind;
+    if (draft == null || directive == null || attachmentKind == null) {
       return;
     }
-    final succeeded = await _confirmCurrentAttachment(directive, draft: draft);
+    final succeeded = await _confirmCurrentAttachment(
+      directive,
+      attachmentKind: attachmentKind,
+      draft: draft,
+    );
     if (!mounted || !succeeded) {
       return;
     }
     setState(() {
-      _removeDraft(draft);
+      _removeDraft(attachmentKind, draft);
       _retryDraft = null;
+      _retryAttachmentKind = null;
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
@@ -611,20 +783,23 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
 
   Future<void> _retryBindCurrentAttachment() async {
     final draft = _retryDraft;
+    final attachmentKind = _retryAttachmentKind;
     final fileAssetId = _confirmedFileAssetId;
-    if (draft == null || fileAssetId == null) {
+    if (draft == null || attachmentKind == null || fileAssetId == null) {
       return;
     }
     final succeeded = await _bindConfirmedAttachment(
       fileAssetId: fileAssetId,
+      attachmentKind: attachmentKind,
       draft: draft,
     );
     if (!mounted || !succeeded) {
       return;
     }
     setState(() {
-      _removeDraft(draft);
+      _removeDraft(attachmentKind, draft);
       _retryDraft = null;
+      _retryAttachmentKind = null;
       _uploadDirective = null;
       _confirmedFileAssetId = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
@@ -732,30 +907,14 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           selectedValue: _selectedAttachmentKind,
           onChanged: _canChooseAttachment
               ? (String value) {
-                  setState(() {
-                    _selectedAttachmentKind = value;
-                    if (_selectedDrafts.any(
-                      (_ResolvedProjectAttachmentDraft draft) =>
-                          !_projectAttachmentKindMatchesMimeType(
-                            value,
-                            draft.mimeType,
-                          ),
-                    )) {
-                      _selectedDrafts.clear();
-                      _openingSelectedDraftIds.clear();
-                      _retryDraft = null;
-                      _uploadDirective = null;
-                      _confirmedFileAssetId = null;
-                      _uploadStatus = _ProjectAttachmentUploadUiStatus.idle;
-                      _uploadMessage = null;
-                    }
-                  });
+                  setState(() => _selectedAttachmentKind = value);
                 }
               : null,
         ),
         const SizedBox(height: 12),
         _ProjectAttachmentRequirementPanel(
           attachments: _attachments,
+          selectedDraftsByKind: _selectedDraftsByKind,
           selectedKind: _selectedAttachmentKind,
           onSelectKind: _canChooseAttachment
               ? (String value) {
@@ -768,6 +927,15 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
                   _selectAttachment();
                 }
               : null,
+          onPreviewDraft: (draft) => _previewSelectedDraft(draft),
+          onOpenDraft: (draft) => _openSelectedDraft(draft),
+          isDraftPreviewing: (draft) =>
+              _openingSelectedDraftIds.contains(_draftKey(draft)),
+          onRemoveDraft: _canChooseAttachment
+              ? (attachmentKind, draft) =>
+                    _removeSelectedDraftFromQueue(attachmentKind, draft)
+              : null,
+          workbenchMode: widget.workbenchMode,
         ),
         if (widget.showKindHint) ...<Widget>[
           const SizedBox(height: 12),
@@ -775,36 +943,6 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
             option: kindOption,
             compactCopy: widget.compactKindHints,
           ),
-        ],
-        if (_selectedDrafts.isNotEmpty) ...<Widget>[
-          const SizedBox(height: 12),
-          Text(
-            '待上传附件（${_selectedDrafts.length}）',
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w800),
-          ),
-          const SizedBox(height: 8),
-          ..._selectedDrafts.asMap().entries.map((
-            MapEntry<int, _ResolvedProjectAttachmentDraft> entry,
-          ) {
-            final draft = entry.value;
-            final isLast = entry.key == _selectedDrafts.length - 1;
-            return Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 10),
-              child: _SelectedProjectAttachmentCard(
-                draft: draft,
-                attachmentKind: _selectedAttachmentKind,
-                onPreview: _projectAttachmentCanOpenLocally(draft.mimeType)
-                    ? () => _previewSelectedDraft(draft)
-                    : null,
-                previewing: _openingSelectedDraftIds.contains(_draftKey(draft)),
-                onRemove: _canChooseAttachment
-                    ? () => _removeSelectedDraftFromQueue(draft)
-                    : null,
-              ),
-            );
-          }),
         ],
         const SizedBox(height: 12),
         LayoutBuilder(
@@ -824,7 +962,14 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
                   ? () => _selectAttachment(append: true)
                   : null,
               icon: const Icon(Icons.add_rounded),
-              label: const Text('继续添加', textAlign: TextAlign.center),
+              label: const Text('继续添加附件', textAlign: TextAlign.center),
+            );
+            final switchKindButton = OutlinedButton.icon(
+              onPressed: _canChooseAttachment
+                  ? _showAttachmentKindSwitchSheet
+                  : null,
+              icon: const Icon(Icons.swap_horiz_rounded),
+              label: const Text('更换资料类型', textAlign: TextAlign.center),
             );
             final uploadButton = FilledButton(
               onPressed: _canUploadAttachment
@@ -833,10 +978,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               child: const Text('上传并形成正式附件', textAlign: TextAlign.center),
             );
 
-            // The published materials corridor intentionally keeps a queue-style
-            // intake so owners can continue adding multiple files before one
-            // controlled upload pass, with the upload CTA anchored on the right.
-            if (_selectedDrafts.isEmpty) {
+            if (!_hasSelectedDrafts) {
               return Align(
                 alignment: Alignment.centerLeft,
                 child: chooseButton,
@@ -847,26 +989,26 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               return Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Expanded(child: chooseButton),
-                      const SizedBox(width: 10),
-                      Expanded(child: continueButton),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Align(alignment: Alignment.centerRight, child: uploadButton),
+                  SizedBox(width: double.infinity, child: uploadButton),
+                  const SizedBox(height: 10),
+                  SizedBox(width: double.infinity, child: continueButton),
+                  const SizedBox(height: 10),
+                  SizedBox(width: double.infinity, child: switchKindButton),
                 ],
               );
             }
 
-            return Row(
+            return Column(
               children: <Widget>[
-                Expanded(flex: 4, child: chooseButton),
-                const SizedBox(width: 10),
-                Expanded(flex: 3, child: continueButton),
-                const SizedBox(width: 10),
-                Expanded(flex: 5, child: uploadButton),
+                SizedBox(width: double.infinity, child: uploadButton),
+                const SizedBox(height: 10),
+                Row(
+                  children: <Widget>[
+                    Expanded(child: continueButton),
+                    const SizedBox(width: 10),
+                    Expanded(child: switchKindButton),
+                  ],
+                ),
               ],
             );
           },
@@ -902,7 +1044,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
         ),
         if (widget.showIdleUploadState ||
             _uploadStatus != _ProjectAttachmentUploadUiStatus.idle ||
-            _selectedDrafts.isNotEmpty) ...<Widget>[
+            _hasSelectedDrafts) ...<Widget>[
           const SizedBox(height: 12),
           _ProjectAttachmentStatePanel(
             status: _uploadStatus,
@@ -927,6 +1069,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           onDelete: _deleteAttachment,
           autoloaded: widget.autoloadFormalList || _listResult != null,
           showChecklist: false,
+          lightEmptyNotice: widget.workbenchMode,
         ),
       ],
     );
@@ -949,7 +1092,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
   }
 
   bool get _canUploadAttachment {
-    return _selectedDrafts.isNotEmpty &&
+    return _hasSelectedDrafts &&
         _uploadStatus != _ProjectAttachmentUploadUiStatus.initStarting &&
         _uploadStatus != _ProjectAttachmentUploadUiStatus.directUploading &&
         _uploadStatus != _ProjectAttachmentUploadUiStatus.confirming &&

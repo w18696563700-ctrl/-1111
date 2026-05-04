@@ -237,6 +237,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 compactKindHints: true,
                 showKindHint: false,
                 showIdleUploadState: false,
+                workbenchMode: true,
                 emptyMessage: '请至少补充一类资料，方便接单方准确报价。',
                 onListResultChanged: _handleQuoteBasisAttachmentResult,
               ),
@@ -329,11 +330,14 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     required VoidCallback? onContinueAttachmentAction,
   }) {
     final children = <Widget>[
-      _DetailLine(label: '项目名称', value: title ?? '未提供'),
-      _DetailLine(label: '项目编号', value: projectNo ?? '未提供'),
-      _DetailLine(label: '当前阶段', value: stage.label, highlight: true),
-      _DetailLine(label: '待处理事项', value: pendingSummary, highlight: true),
+      _ProjectSummaryWorkbenchHeader(
+        title: title ?? '未提供',
+        projectNo: projectNo ?? '未提供',
+        stageLabel: stage.label,
+        pendingSummary: pendingSummary,
+      ),
       if (_summaryExpanded) ...<Widget>[
+        const SizedBox(height: 14),
         _DetailLine(label: '项目类型', value: _buildingTypeLabel(buildingType)),
         _DetailLine(
           label: '预算金额',
@@ -360,7 +364,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             highlight: true,
           ),
       ],
-      const SizedBox(height: 8),
+      const SizedBox(height: 14),
       Align(
         alignment: Alignment.centerRight,
         child: Wrap(
@@ -1264,5 +1268,160 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.hideCurrentSnackBar();
     messenger?.showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _ProjectSummaryWorkbenchHeader extends StatelessWidget {
+  const _ProjectSummaryWorkbenchHeader({
+    required this.title,
+    required this.projectNo,
+    required this.stageLabel,
+    required this.pendingSummary,
+  });
+
+  final String title;
+  final String projectNo;
+  final String stageLabel;
+  final String pendingSummary;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final showIllustration = constraints.maxWidth >= 310;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _ProjectSummaryLine(label: '项目名称', value: title),
+                      const SizedBox(height: 8),
+                      _ProjectSummaryLine(label: '项目编号', value: projectNo),
+                      const SizedBox(height: 8),
+                      _ProjectSummaryLine(
+                        label: '当前阶段',
+                        value: stageLabel,
+                        highlighted: true,
+                      ),
+                      const SizedBox(height: 8),
+                      _ProjectSummaryLine(
+                        label: '待处理事项',
+                        value: pendingSummary,
+                        highlighted: true,
+                        maxLines: 3,
+                      ),
+                    ],
+                  ),
+                ),
+                if (showIllustration) ...<Widget>[
+                  const SizedBox(width: 14),
+                  const _ProjectSummaryIllustration(),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectSummaryLine extends StatelessWidget {
+  const _ProjectSummaryLine({
+    required this.label,
+    required this.value,
+    this.highlighted = false,
+    this.maxLines = 2,
+  });
+
+  final String label;
+  final String value;
+  final bool highlighted;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: highlighted ? colorScheme.onSurface : null,
+              fontWeight: highlighted ? FontWeight.w900 : FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectSummaryIllustration extends StatelessWidget {
+  const _ProjectSummaryIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            Positioned(
+              right: 12,
+              top: 12,
+              child: Icon(
+                Icons.description_outlined,
+                size: 36,
+                color: colorScheme.primary.withValues(alpha: 0.55),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              bottom: 15,
+              child: Icon(
+                Icons.fact_check_outlined,
+                size: 30,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
