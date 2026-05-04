@@ -65,13 +65,15 @@ class AppShellScaffold extends StatelessWidget {
           ),
         ),
     ];
-    final hideRootExhibitionAppBar =
-        currentBuilding == AppBuilding.exhibition &&
+    final hideRootAppBar =
+        (currentBuilding == AppBuilding.exhibition ||
+            currentBuilding == AppBuilding.messages) &&
         titleOverride == null &&
+        titleContent == null &&
         !canPop;
 
     return Scaffold(
-      appBar: hideRootExhibitionAppBar
+      appBar: hideRootAppBar
           ? null
           : AppBar(
               automaticallyImplyLeading: false,

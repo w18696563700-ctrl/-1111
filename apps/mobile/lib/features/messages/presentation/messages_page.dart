@@ -13,6 +13,8 @@ part 'messages_page_support.dart';
 
 enum _MessagesInteractionTab { replies, likes, follows }
 
+enum _MessagesPrimaryTab { projectCommunication, forumInteraction }
+
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key, this.refreshSignal, this.entrySignal});
 
@@ -34,6 +36,9 @@ class _MessagesPageState extends State<MessagesPage> {
         ForumReadResult<ForumPagedCollectionView<ForumInteractionInboxItemView>>
       >{};
   _MessagesInteractionTab? _selectedTab;
+  _MessagesPrimaryTab _selectedPrimaryTab =
+      _MessagesPrimaryTab.projectCommunication;
+  late final PageController _primaryPageController;
   MessageInteractionListResult? _projectCommunicationResult;
   AppNotificationListResult? _notificationResult;
   ValueListenable<int>? _refreshSignal;
@@ -50,6 +55,7 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
+    _primaryPageController = PageController();
     _bindRefreshSignal(widget.refreshSignal);
     _bindEntrySignal(widget.entrySignal);
     _loadNotifications();
@@ -71,6 +77,7 @@ class _MessagesPageState extends State<MessagesPage> {
   void dispose() {
     _refreshSignal?.removeListener(_handleRefreshSignal);
     _entrySignal?.removeListener(_handleEntrySignal);
+    _primaryPageController.dispose();
     super.dispose();
   }
 
@@ -116,8 +123,12 @@ class _MessagesPageState extends State<MessagesPage> {
     }
     setState(() {
       _selectedTab = null;
+      _selectedPrimaryTab = _MessagesPrimaryTab.projectCommunication;
       _loading = false;
     });
+    if (_primaryPageController.hasClients) {
+      _primaryPageController.jumpToPage(0);
+    }
   }
 
   Future<void> _refreshAll({bool showLoading = true}) async {
@@ -207,69 +218,161 @@ class _MessagesPageState extends State<MessagesPage> {
       _projectCommunicationResult,
     );
 
-    return RefreshIndicator(
-      onRefresh: _refreshAll,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        children: <Widget>[
-          if (_notificationLoading || _notificationResult != null) ...<Widget>[
-            _MessagesNotificationCenterSection(
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+          child: _MessagesTopBar(
+            unreadCount: _notificationUnreadCount(_notificationResult),
+            loading: _notificationLoading,
+            notificationExpanded: _notificationCenterExpanded,
+            onToggleNotifications: () {
+              setState(
+                () =>
+                    _notificationCenterExpanded = !_notificationCenterExpanded,
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: _MessagesPrimaryNavigation(
+            selectedTab: _selectedPrimaryTab,
+            onSelectTab: _selectPrimaryTab,
+          ),
+        ),
+        if (_notificationCenterExpanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: _MessagesNotificationPanel(
               loading: _notificationLoading,
-              expanded: _notificationCenterExpanded,
               result: _notificationResult,
-              onToggleExpanded: () {
-                setState(
-                  () => _notificationCenterExpanded =
-                      !_notificationCenterExpanded,
-                );
-              },
               onOpen: _openNotification,
               onRetry: () => _loadNotifications(),
             ),
-            const SizedBox(height: 14),
-          ],
-          if (_projectCommunicationLoading ||
-              _projectCommunicationResult != null) ...<Widget>[
-            _MessagesProjectCommunicationSection(
-              loading: _projectCommunicationLoading,
-              result: _projectCommunicationResult,
-              items: projectCommunicationItems,
-              onOpen: (MessageInteractionItemView item) =>
-                  _openProjectCommunication(context, item),
-            ),
-            const SizedBox(height: 14),
-          ],
-          _MessagesForumInteractionSection(
-            selectedTab: selectedTab,
-            onSelectTab: (_MessagesInteractionTab tab) {
-              if (tab == selectedTab) {
-                setState(() {
-                  _selectedTab = null;
-                  _loading = false;
-                });
-                return;
-              }
-              setState(() => _selectedTab = tab);
-              _load(tab: tab);
-            },
-            loading: _loading,
-            state: state,
-            message: result?.message,
-            items: items,
-            onRetry: () {
-              final currentTab = _selectedTab;
-              if (currentTab == null) {
-                return;
-              }
-              _load(tab: currentTab);
-            },
-            onOpenSource: (ForumInteractionInboxItemView item) =>
-                _openSource(context, item),
           ),
-        ],
-      ),
+        Expanded(
+          child: PageView(
+            controller: _primaryPageController,
+            onPageChanged: (index) {
+              final tab = _primaryTabFromIndex(index);
+              setState(() => _selectedPrimaryTab = tab);
+              if (tab == _MessagesPrimaryTab.forumInteraction) {
+                _ensureForumTabLoaded();
+              }
+            },
+            children: <Widget>[
+              RefreshIndicator(
+                onRefresh: _refreshAll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  children: <Widget>[
+                    if (_projectCommunicationLoading ||
+                        _projectCommunicationResult != null)
+                      _MessagesProjectCommunicationSection(
+                        loading: _projectCommunicationLoading,
+                        result: _projectCommunicationResult,
+                        items: projectCommunicationItems,
+                        onOpen: (MessageInteractionItemView item) =>
+                            _openProjectCommunication(context, item),
+                      )
+                    else
+                      const _MessagesInlinePanel(
+                        title: '项目沟通正在加载',
+                        body: '正在读取主体会话列表。',
+                      ),
+                  ],
+                ),
+              ),
+              RefreshIndicator(
+                onRefresh: _refreshAll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  children: <Widget>[
+                    _MessagesForumInteractionSection(
+                      selectedTab: selectedTab,
+                      onSelectTab: _selectForumInteractionTab,
+                      loading: _loading,
+                      state: state,
+                      message: result?.message,
+                      items: items,
+                      onRetry: () {
+                        final currentTab = _selectedTab;
+                        if (currentTab == null) {
+                          return;
+                        }
+                        _load(tab: currentTab);
+                      },
+                      onOpenSource: (ForumInteractionInboxItemView item) =>
+                          _openSource(context, item),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
+  }
+
+  int _notificationUnreadCount(AppNotificationListResult? result) {
+    final data = result?.data;
+    if (result?.state == AppPageState.content && data != null) {
+      if (data.unread.total > 0) {
+        return data.unread.total;
+      }
+      return data.items.where((item) => item.unread).length;
+    }
+    return 0;
+  }
+
+  void _selectPrimaryTab(_MessagesPrimaryTab tab) {
+    if (tab == _selectedPrimaryTab) {
+      return;
+    }
+    setState(() => _selectedPrimaryTab = tab);
+    _primaryPageController.animateToPage(
+      _primaryTabIndex(tab),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+    if (tab == _MessagesPrimaryTab.forumInteraction) {
+      _ensureForumTabLoaded();
+    }
+  }
+
+  int _primaryTabIndex(_MessagesPrimaryTab tab) {
+    return switch (tab) {
+      _MessagesPrimaryTab.projectCommunication => 0,
+      _MessagesPrimaryTab.forumInteraction => 1,
+    };
+  }
+
+  _MessagesPrimaryTab _primaryTabFromIndex(int index) {
+    return index == 1
+        ? _MessagesPrimaryTab.forumInteraction
+        : _MessagesPrimaryTab.projectCommunication;
+  }
+
+  void _ensureForumTabLoaded() {
+    final selectedTab = _selectedTab ?? _MessagesInteractionTab.replies;
+    if (_selectedTab == null) {
+      setState(() => _selectedTab = selectedTab);
+    }
+    if (!_results.containsKey(selectedTab)) {
+      _load(tab: selectedTab);
+    }
+  }
+
+  void _selectForumInteractionTab(_MessagesInteractionTab tab) {
+    if (tab == _selectedTab && _results.containsKey(tab)) {
+      return;
+    }
+    setState(() => _selectedTab = tab);
+    _load(tab: tab);
   }
 
   List<MessageInteractionItemView> _projectCommunicationItems(
@@ -292,6 +395,14 @@ class _MessagesPageState extends State<MessagesPage> {
     BuildContext context,
     MessageInteractionItemView item,
   ) async {
+    if (!_canOpenProjectCommunication(item)) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(_projectCommunicationMissingContextMessage),
+        ),
+      );
+      return;
+    }
     await Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
     if (!mounted) {
       return;
@@ -299,6 +410,17 @@ class _MessagesPageState extends State<MessagesPage> {
     await _refreshAll(showLoading: false);
     await _reloadShellContext();
   }
+
+  bool _canOpenProjectCommunication(MessageInteractionItemView item) {
+    final params = item.routeTarget.params;
+    return _nonEmpty(item.conversationId) &&
+        _nonEmpty(item.projectId) &&
+        _nonEmpty(params['conversationId']) &&
+        _nonEmpty(params['projectId']) &&
+        _nonEmpty(item.routeTarget.routeLocation);
+  }
+
+  bool _nonEmpty(String? value) => value != null && value.trim().isNotEmpty;
 
   Future<void> _openNotification(AppNotificationItemView item) async {
     if (item.unread) {

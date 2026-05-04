@@ -20,6 +20,11 @@ AppApiClient _client(FakeAppApiTransport transport) {
   );
 }
 
+Future<void> _openNotificationPanel(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('消息中心'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('messages building renders bounded notification center', (
     WidgetTester tester,
@@ -99,13 +104,13 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('消息中心'), findsOneWidget);
-    expect(find.text('重要通知、项目沟通等消息'), findsOneWidget);
+    expect(find.text('消息中心'), findsNothing);
+    expect(find.text('重要通知、项目沟通等消息'), findsNothing);
     expect(find.text('有新的项目沟通消息'), findsNothing);
 
-    await tester.tap(find.text('消息中心'));
-    await tester.pumpAndSettle();
+    await _openNotificationPanel(tester);
 
+    expect(find.text('消息中心'), findsOneWidget);
     expect(find.text('项目沟通'), findsWidgets);
     expect(find.text('有新的项目沟通消息'), findsOneWidget);
     expect(find.text('报价确认已发送。'), findsOneWidget);
@@ -208,8 +213,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('消息中心'));
-      await tester.pumpAndSettle();
+      await _openNotificationPanel(tester);
 
       final reloadCountBeforeRead = shellConsumer.loadResultCount;
       await tester.tap(find.text('有新的项目沟通消息'));
@@ -394,8 +398,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('消息中心'));
-      await tester.pumpAndSettle();
+      await _openNotificationPanel(tester);
 
       expect(find.text('参与竞标申请'), findsWidgets);
       expect(find.text('有新的参与竞标申请'), findsOneWidget);

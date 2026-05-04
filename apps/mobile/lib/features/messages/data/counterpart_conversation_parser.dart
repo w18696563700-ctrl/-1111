@@ -2,6 +2,8 @@ import 'package:mobile/features/messages/data/counterpart_conversation_models.da
 import 'package:mobile/features/messages/data/messages_interaction_models.dart';
 import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
 
+const String _missingProjectContextMessage = '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
+
 CounterpartConversationDetailView parseCounterpartConversationDetail(
   Object? payload,
 ) {
@@ -223,8 +225,9 @@ parseProjectCommunicationMaterialReviewResponse(Object? payload) {
   );
 }
 
-ProjectCommunicationWorkbenchEntryView
-parseProjectCommunicationWorkbenchEntry(Object? payload) {
+ProjectCommunicationWorkbenchEntryView parseProjectCommunicationWorkbenchEntry(
+  Object? payload,
+) {
   final map = _requiredMap(payload, 'project communication workbench entry');
   final group = _enumValue(_requiredString(map, 'group'), const {
     'publisher_materials',
@@ -300,7 +303,10 @@ List<ProjectCommunicationWorkbenchSourceFileView> _parseWorkbenchSourceFiles(
   }
   return _requiredList(<String, Object?>{'sourceFiles': payload}, 'sourceFiles')
       .map<ProjectCommunicationWorkbenchSourceFileView>((item) {
-        final map = _requiredMap(item, 'project communication workbench source file');
+        final map = _requiredMap(
+          item,
+          'project communication workbench source file',
+        );
         return ProjectCommunicationWorkbenchSourceFileView(
           fileAssetId: _requiredString(map, 'fileAssetId'),
           fileName: _requiredString(map, 'fileName'),
@@ -803,16 +809,14 @@ String _enumValue(String value, Set<String> allowed, String context) {
 
 Map<String, String> _stringMap(Object? payload) {
   if (payload is! Map) {
-    throw const FormatException('route params must be an object');
+    throw const FormatException(_missingProjectContextMessage);
   }
   final result = <String, String>{};
   for (final MapEntry<Object?, Object?> entry in payload.entries) {
     final key = '${entry.key}'.trim();
     final value = entry.value;
     if (key.isEmpty || value is! String || value.trim().isEmpty) {
-      throw const FormatException(
-        'route params must contain non-empty strings',
-      );
+      throw const FormatException(_missingProjectContextMessage);
     }
     result[key] = value.trim();
   }

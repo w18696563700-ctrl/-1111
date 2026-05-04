@@ -5,11 +5,13 @@ class CounterpartConversationPage extends StatefulWidget {
     super.key,
     this.conversationId,
     this.projectId,
+    this.projectListSearchToggleSignal,
     this.onChatWindowActiveChanged,
   });
 
   final String? conversationId;
   final String? projectId;
+  final ValueListenable<int>? projectListSearchToggleSignal;
   final ValueChanged<bool>? onChatWindowActiveChanged;
 
   @override
@@ -20,6 +22,9 @@ class CounterpartConversationPage extends StatefulWidget {
 class _CounterpartConversationPageState
     extends State<CounterpartConversationPage>
     with WidgetsBindingObserver {
+  static const String _missingProjectContextMessage =
+      '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
+
   static const List<Duration> _reconnectDelays = <Duration>[
     Duration(seconds: 2),
     Duration(seconds: 5),
@@ -833,6 +838,13 @@ class _CounterpartConversationPageState
   Future<void> _openProjectCommunication(
     CounterpartConversationProjectGroupView group,
   ) async {
+    final data = _result?.data;
+    if (group.projectId.trim().isEmpty ||
+        data == null ||
+        data.counterpart.organizationId.trim().isEmpty) {
+      _showSnack(_missingProjectContextMessage);
+      return;
+    }
     await _stopRealtime();
     if (!mounted) {
       return;
@@ -851,9 +863,21 @@ class _CounterpartConversationPageState
     });
     _notifyChatWindowActive(true);
     _scheduleScrollToTop();
-    final data = _result?.data;
-    if (data != null) {
-      await _loadThreadAndMessages(data, projectId: group.projectId);
+    await _loadThreadAndMessages(data, projectId: group.projectId);
+    if (!mounted) {
+      return;
+    }
+    if (_selectedProjectId == group.projectId &&
+        _threadResult?.state != AppPageState.content) {
+      final message = _threadResult?.message ?? _missingProjectContextMessage;
+      await _backToProjectList();
+      if (mounted) {
+        _showSnack(
+          message.contains('threadId')
+              ? _missingProjectContextMessage
+              : message,
+        );
+      }
     }
   }
 
@@ -883,6 +907,10 @@ class _CounterpartConversationPageState
     final result = _result;
     final data = result?.data;
     final thread = _threadResult?.data;
+    final selectedGroup = data == null ? null : _selectedProjectGroup(data);
+    final selectedOrderId = selectedGroup == null
+        ? null
+        : _orderIdFromConversationGroup(selectedGroup);
     return PopScope(
       canPop: _selectedProjectId == null,
       onPopInvokedWithResult: (didPop, _) {
@@ -915,7 +943,23 @@ class _CounterpartConversationPageState
               ),
             ),
             if (data != null && result?.state == AppPageState.content)
-              if (_selectedProjectId != null && thread != null)
+              if (_selectedProjectId != null &&
+                  thread != null &&
+                  selectedGroup != null) ...<Widget>[
+                _SelectedProjectBusinessEntrypoints(
+                  group: selectedGroup,
+                  participationCard: _firstBusinessCard(
+                    selectedGroup,
+                    'bid_participation_request',
+                  ),
+                  orderId: selectedOrderId,
+                  loadingWorkbench: _loadingWorkbench,
+                  workbenchResult: _workbenchResult,
+                  onOpenNameAccess: _openBusinessCard,
+                  onOpenOrder: () => _openOrderDetail(selectedGroup),
+                  onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
+                  onOpenWorkbenchEntry: _openWorkbenchEntry,
+                ),
                 _ProjectCommunicationComposer(
                   controller: _messageController,
                   enabled: !_loadingThread,
@@ -924,6 +968,7 @@ class _CounterpartConversationPageState
                   onAttachFile: () => _sendAttachmentMessage(imageOnly: false),
                   onAttachImage: () => _sendAttachmentMessage(imageOnly: true),
                 ),
+              ],
           ],
         ),
       ),
@@ -938,16 +983,12 @@ class _CounterpartConversationPageState
     final selectedGroup = _selectedProjectGroup(data);
     if (_selectedProjectId == null || selectedGroup == null) {
       return <Widget>[
-        _CounterpartConversationHeader(
-          data: data,
-          onOpenSubjectCard: () => _openSubjectCard(data),
-          canOpenSubjectCard: _canOpenSubjectCard(data),
-          title: '当前沟通对象',
-        ),
-        const SizedBox(height: 16),
         _CounterpartProjectEntryList(
           data: data,
           groups: groups,
+          searchToggleSignal: widget.projectListSearchToggleSignal,
+          onOpenSubjectCard: () => _openSubjectCard(data),
+          canOpenSubjectCard: _canOpenSubjectCard(data),
           onOpenProjectCommunication: _openProjectCommunication,
         ),
       ];
@@ -965,27 +1006,10 @@ class _CounterpartConversationPageState
         currentOrganizationId: _currentOrganizationId(context),
         currentDisplayName: _currentDisplayName(context),
         currentAvatarUrl: _currentAvatarUrl(context),
+        onBackToProjectList: _backToProjectList,
         onOpenSubjectCard: () => _openSubjectCard(data),
         canOpenSubjectCard: _canOpenSubjectCard(data),
       ),
-      const SizedBox(height: 16),
-      _SelectedProjectBusinessEntrypoints(
-        group: selectedGroup,
-        participationCard: _firstBusinessCard(
-          selectedGroup,
-          'bid_participation_request',
-        ),
-        orderId: selectedOrderId,
-        loadingWorkbench: _loadingWorkbench,
-        workbenchResult: _workbenchResult,
-        onBackToProjectList: _backToProjectList,
-        onOpenNameAccess: _openBusinessCard,
-        onOpenOrder: () => _openOrderDetail(selectedGroup),
-        onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
-        onOpenWorkbenchEntry: _openWorkbenchEntry,
-      ),
-      const SizedBox(height: 12),
-      const _ConversationGuidanceBanner(),
       if (exitGovernanceSnapshot != null) ...<Widget>[
         const SizedBox(height: 16),
         _ProjectExitGovernanceStatusCard(
@@ -1316,22 +1340,20 @@ class _CounterpartConversationPageState
     }
     final response = result.data!;
     setState(() {
-      _workbenchResult = CounterpartConversationResult<
-        ProjectCommunicationWorkbenchView
-      >(
-        state: AppPageState.content,
-        method: result.method,
-        path: result.path,
-        data: ProjectCommunicationWorkbenchView(
-          projectId: response.projectId,
-          threadId: response.threadId,
-          viewerRole: response.viewerRole,
-          entries:
-              response.entries ??
-              _replaceWorkbenchEntry(response.entry),
-          generatedAt: response.updatedAt,
-        ),
-      );
+      _workbenchResult =
+          CounterpartConversationResult<ProjectCommunicationWorkbenchView>(
+            state: AppPageState.content,
+            method: result.method,
+            path: result.path,
+            data: ProjectCommunicationWorkbenchView(
+              projectId: response.projectId,
+              threadId: response.threadId,
+              viewerRole: response.viewerRole,
+              entries:
+                  response.entries ?? _replaceWorkbenchEntry(response.entry),
+              generatedAt: response.updatedAt,
+            ),
+          );
     });
     _showSnack(reviewAction == 'confirm' ? '已确认。' : '反馈已提交。');
     return true;

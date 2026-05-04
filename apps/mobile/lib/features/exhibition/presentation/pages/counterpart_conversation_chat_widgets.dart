@@ -90,69 +90,107 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final messages =
+    final thread = threadResult?.data;
+    final rawMessages =
         messageResult?.data?.items ?? const <ProjectCommunicationMessageView>[];
-    return _ActionCard(
-      title: '项目沟通记录',
-      summary: '消息与附件继续锚定当前项目，关键资料确认请在项目工作入口处理。',
-      children: <Widget>[
-        if (loadingThread || loadingMessages)
-          const _StateMessage(title: '正在同步沟通记录', body: '正在读取项目沟通消息。')
-        else if (threadResult != null &&
-            threadResult!.state != AppPageState.content)
-          _StateMessage(
-            title: '聊天暂不可用',
-            body: threadResult!.message ?? threadResult!.state.contractName,
-          )
-        else if (messageResult != null &&
-            messageResult!.state != AppPageState.content)
-          _StateMessage(
-            title: '消息读取失败',
-            body: messageResult!.message ?? messageResult!.state.contractName,
-          )
-        else if (messages.isEmpty && drafts.isEmpty)
-          const _StateMessage(title: '还没有项目沟通记录', body: '可以从底部输入框发送第一条项目沟通消息。')
-        else ...<Widget>[
-          for (final message in messages)
-            _ProjectCommunicationMessageBubble(
-              message: message,
-              isMine: _isMine(message.senderOrganizationId),
-              senderName: _senderName(message.senderOrganizationId),
-              roleLabel: _roleLabel(message.senderOrganizationId),
-              avatarUrl: _avatarUrl(message.senderOrganizationId),
-              attachmentPreview: attachmentPreviewForMessage(message),
-              attachmentPreviewLoading: attachmentPreviewLoadingForMessage(
-                message,
+    final messages = thread == null
+        ? rawMessages
+        : rawMessages
+              .where(
+                (message) =>
+                    message.threadId == thread.threadId &&
+                    message.projectId == thread.projectId,
+              )
+              .toList(growable: false);
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFAF8),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 280),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '项目沟通',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  if (onRefreshMessages != null)
+                    IconButton(
+                      onPressed: onRefreshMessages,
+                      tooltip: '手动同步',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.sync_rounded, size: 18),
+                    ),
+                ],
               ),
-              onPreviewAttachment: () => onPreviewAttachment(message),
-              onOpenConfirmationSoftLink: () =>
-                  onOpenConfirmationSoftLink(message),
-            ),
-          for (final draft in drafts)
-            _DraftProjectCommunicationMessageBubble(
-              draft: draft,
-              senderName: _fallbackCurrentName,
-              roleLabel: '我方',
-              avatarUrl: currentAvatarUrl,
-              onRetry: () => onRetryDraft(draft),
-            ),
-        ],
-        if (onRefreshMessages != null) ...<Widget>[
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.center,
-            child: TextButton.icon(
-              onPressed: onRefreshMessages,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              icon: const Icon(Icons.sync_rounded, size: 16),
-              label: const Text('手动同步'),
-            ),
+              const SizedBox(height: 6),
+              if (loadingThread || loadingMessages)
+                const _StateMessage(title: '正在同步沟通记录', body: '正在读取项目沟通消息。')
+              else if (threadResult != null &&
+                  threadResult!.state != AppPageState.content)
+                _StateMessage(
+                  title: '聊天暂不可用',
+                  body:
+                      threadResult!.message ?? threadResult!.state.contractName,
+                )
+              else if (messageResult != null &&
+                  messageResult!.state != AppPageState.content)
+                _StateMessage(
+                  title: '消息读取失败',
+                  body:
+                      messageResult!.message ??
+                      messageResult!.state.contractName,
+                )
+              else if (messages.isEmpty && drafts.isEmpty)
+                const SizedBox(
+                  height: 190,
+                  child: Center(
+                    child: _StateMessage(
+                      title: '还没有项目沟通记录',
+                      body: '可以从底部输入框发送第一条项目沟通消息。',
+                    ),
+                  ),
+                )
+              else ...<Widget>[
+                for (final message in messages)
+                  _ProjectCommunicationMessageBubble(
+                    message: message,
+                    isMine: _isMine(message.senderOrganizationId),
+                    senderName: _senderName(message.senderOrganizationId),
+                    roleLabel: _roleLabel(message.senderOrganizationId),
+                    avatarUrl: _avatarUrl(message.senderOrganizationId),
+                    attachmentPreview: attachmentPreviewForMessage(message),
+                    attachmentPreviewLoading:
+                        attachmentPreviewLoadingForMessage(message),
+                    onPreviewAttachment: () => onPreviewAttachment(message),
+                    onOpenConfirmationSoftLink: () =>
+                        onOpenConfirmationSoftLink(message),
+                  ),
+                for (final draft in drafts)
+                  _DraftProjectCommunicationMessageBubble(
+                    draft: draft,
+                    senderName: _fallbackCurrentName,
+                    roleLabel: '我方',
+                    avatarUrl: currentAvatarUrl,
+                    onRetry: () => onRetryDraft(draft),
+                  ),
+              ],
+            ],
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 

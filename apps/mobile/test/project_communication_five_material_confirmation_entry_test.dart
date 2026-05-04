@@ -57,9 +57,22 @@ Future<void> _enterProjectCommunication(WidgetTester tester) async {
 }
 
 Future<void> _expandWorkbenchGroup(WidgetTester tester, String label) async {
+  if (find.text(label).evaluate().isEmpty) {
+    await _openMaterialTools(tester);
+  }
   final group = find.text(label);
   await _ensureVisible(tester, group);
   await tester.tap(group.first);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openMaterialTools(WidgetTester tester) async {
+  var tools = find.widgetWithText(OutlinedButton, '资料确认 · 10项');
+  if (tools.evaluate().isEmpty) {
+    tools = find.widgetWithText(OutlinedButton, '资料确认单');
+  }
+  await _ensureVisible(tester, tools);
+  await tester.tap(tools);
   await tester.pumpAndSettle();
 }
 
@@ -423,6 +436,9 @@ void main() {
     await tester.pumpAndSettle();
     await _enterProjectCommunication(tester);
 
+    expect(find.text('资料确认 · 10项'), findsOneWidget);
+    expect(find.text('发布方资料'), findsNothing);
+    await _openMaterialTools(tester);
     await _ensureVisible(tester, find.text('发布方资料'));
     expect(find.text('发布方资料'), findsOneWidget);
     expect(find.text('竞标资料'), findsOneWidget);

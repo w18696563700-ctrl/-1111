@@ -791,7 +791,16 @@ class _CounterpartConversationRouteScaffold extends StatefulWidget {
 
 class _CounterpartConversationRouteScaffoldState
     extends State<_CounterpartConversationRouteScaffold> {
+  final ValueNotifier<int> _projectListSearchToggleSignal = ValueNotifier<int>(
+    0,
+  );
   bool _chatWindowActive = false;
+
+  @override
+  void dispose() {
+    _projectListSearchToggleSignal.dispose();
+    super.dispose();
+  }
 
   void _handleChatWindowActiveChanged(bool active) {
     if (_chatWindowActive == active || !mounted) {
@@ -804,13 +813,24 @@ class _CounterpartConversationRouteScaffoldState
   Widget build(BuildContext context) {
     return AppShellScaffold(
       currentBuilding: AppBuilding.messages,
-      titleOverride: widget.title,
-      titleContent: widget.titleContent,
-      appBarActions: widget.appBarActions,
+      titleOverride: null,
+      titleContent: widget.titleContent ?? const SizedBox.shrink(),
+      appBarActions: <Widget>[
+        ...widget.appBarActions,
+        if (!_chatWindowActive)
+          IconButton(
+            tooltip: '搜索项目',
+            onPressed: () {
+              _projectListSearchToggleSignal.value += 1;
+            },
+            icon: const Icon(Icons.search_rounded),
+          ),
+      ],
       showBottomNavigationBar: !_chatWindowActive,
       child: CounterpartConversationPage(
         conversationId: widget.conversationId,
         projectId: widget.projectId,
+        projectListSearchToggleSignal: _projectListSearchToggleSignal,
         onChatWindowActiveChanged: _handleChatWindowActiveChanged,
       ),
     );

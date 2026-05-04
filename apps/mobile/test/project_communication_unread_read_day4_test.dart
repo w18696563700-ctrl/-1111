@@ -91,6 +91,32 @@ void main() {
           'hasProjectUnread': true,
           'cards': const <Object?>[],
         },
+        <String, Object?>{
+          'projectId': 'project-2',
+          'projectDisplayTitle': '西洽会 - 成都',
+          'titleVisibility': 'visible',
+          'projectRelation': 'my_bid',
+          'projectState': 'published',
+          'projectPublishedAt': '2026-05-02T18:00:00Z',
+          'projectUpdatedAt': '2026-05-04T09:30:00Z',
+          'latestActivityAt': '2026-05-04T09:30:00Z',
+          'projectUnreadCount': 2,
+          'hasProjectUnread': true,
+          'cards': const <Object?>[],
+        },
+        <String, Object?>{
+          'projectId': 'project-3',
+          'projectDisplayTitle': '身份待确认项目',
+          'titleVisibility': 'visible',
+          'projectRelation': 'unknown',
+          'projectState': 'published',
+          'projectPublishedAt': '2026-05-03T18:00:00Z',
+          'projectUpdatedAt': '2026-05-04T08:30:00Z',
+          'latestActivityAt': '2026-05-04T08:30:00Z',
+          'projectUnreadCount': 0,
+          'hasProjectUnread': false,
+          'cards': const <Object?>[],
+        },
       ],
     });
 
@@ -98,10 +124,14 @@ void main() {
     expect(detail.hasUnread, isTrue);
     expect(detail.myPublishedUnreadCount, 3);
     expect(detail.myBidUnreadCount, 2);
-    expect(detail.projectGroups.single.projectUnreadCount, 3);
-    expect(detail.projectGroups.single.hasProjectUnread, isTrue);
     expect(
-      detail.projectGroups.single.latestUnreadMessageAt,
+      detail.projectGroups.map((group) => group.projectRelation),
+      containsAllInOrder(<String>['my_published', 'my_bid', 'unknown']),
+    );
+    expect(detail.projectGroups.first.projectUnreadCount, 3);
+    expect(detail.projectGroups.first.hasProjectUnread, isTrue);
+    expect(
+      detail.projectGroups.first.latestUnreadMessageAt,
       '2026-05-04T10:03:00Z',
     );
   });
