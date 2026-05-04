@@ -292,6 +292,35 @@ export class P0PayController {
     );
   }
 
+  @Post('server/projects/:projectId/deal-confirmations')
+  @HttpCode(200)
+  createProjectDealConfirmation(
+    @Param('projectId') projectId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.contractConfirmationService.createProjectDealConfirmation(
+      projectId,
+      body,
+      this.context(headers, request)
+    );
+  }
+
+  @Get('server/projects/:projectId/deal-confirmations/:dealConfirmationId')
+  getProjectDealConfirmation(
+    @Param('projectId') projectId: string,
+    @Param('dealConfirmationId') dealConfirmationId: string,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.contractConfirmationService.getProjectDealConfirmation(
+      projectId,
+      dealConfirmationId,
+      this.context(headers, request)
+    );
+  }
+
   @Get('server/exhibition/trade-tasks/:taskId/p0-pay-summary')
   getP0PaySummary(
     @Param('taskId') taskId: string,
