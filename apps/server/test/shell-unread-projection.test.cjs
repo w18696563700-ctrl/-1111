@@ -10,7 +10,11 @@ function createContext(requestId = 'shell-unread-visible-projection') {
   };
 }
 
-function createShellService({ visibleUnreadCount, rawUnreadCount }) {
+function createShellService({
+  visibleUnreadCount,
+  rawUnreadCount,
+  bidParticipationNotificationUnreadCount = 0,
+}) {
   const { ShellQueryService } = require('../dist/modules/shell/shell-query.service.js');
   const { ShellPresenter } = require('../dist/modules/shell/shell.presenter.js');
 
@@ -137,6 +141,11 @@ function createShellService({ visibleUnreadCount, rawUnreadCount }) {
         ];
       },
     },
+    {
+      async countBidParticipationRequestUnreadForShell() {
+        return bidParticipationNotificationUnreadCount;
+      },
+    },
   );
 }
 
@@ -149,6 +158,18 @@ test('shell unread summary follows visible message interactions projection', asy
   const result = await service.getContext(createContext());
 
   assert.equal(result.unreadSummary.messages, 0);
+});
+
+test('shell unread summary adds visible bid participation notification unread', async () => {
+  const service = createShellService({
+    visibleUnreadCount: 2,
+    rawUnreadCount: 0,
+    bidParticipationNotificationUnreadCount: 1,
+  });
+
+  const result = await service.getContext(createContext('shell-bid-participation-unread'));
+
+  assert.equal(result.unreadSummary.messages, 3);
 });
 
 test('shell unread summary falls back to raw project communication count when visible projection is absent', async () => {

@@ -13,12 +13,14 @@ final class AppNotificationUnreadView {
   const AppNotificationUnreadView({
     required this.total,
     required this.projectCommunication,
+    required this.bidParticipationRequest,
     required this.forumInteraction,
     required this.system,
   });
 
   final int total;
   final int projectCommunication;
+  final int bidParticipationRequest;
   final int forumInteraction;
   final int system;
 }

@@ -177,11 +177,7 @@ class _MessagesPageState extends State<MessagesPage> {
     if (loadToken == _latestReminderLoadToken &&
         (result.state == AppPageState.content ||
             result.state == AppPageState.empty)) {
-      _applyMessagesUnreadProjection(result);
       await _reloadShellContext();
-      if (mounted && loadToken == _latestReminderLoadToken) {
-        _applyMessagesUnreadProjection(result);
-      }
     }
   }
 
@@ -306,9 +302,18 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _openNotification(AppNotificationItemView item) async {
     if (item.unread) {
-      await MessagesConsumerLayer.instance.markNotificationsRead(<String>[
-        item.notificationId,
-      ]);
+      final result = await MessagesConsumerLayer.instance.markNotificationsRead(
+        <String>[item.notificationId],
+      );
+      if (result.state != AppPageState.content) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(result.message ?? '当前通知已读操作暂不可用，请稍后再试。')),
+        );
+        return;
+      }
       await _loadNotifications(showLoading: false);
       await _reloadShellContext();
     }
@@ -331,37 +336,6 @@ class _MessagesPageState extends State<MessagesPage> {
     } catch (_) {
       // Tests may mount this page without the full shell scope.
     }
-  }
-
-  void _applyMessagesUnreadProjection(MessageInteractionListResult result) {
-    try {
-      AppShellScope.read(context).applyMessagesUnreadProjection(
-        _projectCommunicationUnreadProjection(result),
-      );
-    } catch (_) {
-      // Tests may mount this page without the full shell scope.
-    }
-  }
-
-  int _projectCommunicationUnreadProjection(
-    MessageInteractionListResult result,
-  ) {
-    if (result.state == AppPageState.empty) {
-      return 0;
-    }
-    if (result.state != AppPageState.content) {
-      return 0;
-    }
-    return result.items
-        .where(
-          (MessageInteractionItemView item) =>
-              item.interactionType == 'counterpart_conversation',
-        )
-        .fold<int>(
-          0,
-          (int total, MessageInteractionItemView item) =>
-              total + item.conversationUnreadCount,
-        );
   }
 
   void _openSource(BuildContext context, ForumInteractionInboxItemView item) {

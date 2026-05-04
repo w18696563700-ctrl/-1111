@@ -1,9 +1,26 @@
 type AppNotificationUnreadProjection = {
   total?: unknown;
   projectCommunication?: unknown;
+  bidParticipationRequest?: unknown;
   forumInteraction?: unknown;
   system?: unknown;
 };
+
+const NOTIFICATION_TYPES = new Set([
+  'project_communication_message',
+  'project_clarification',
+  'project_key_reminder',
+  'forum_interaction',
+  'system_reminder',
+  'bid_participation_request'
+]);
+
+const NOTIFICATION_SOURCES = new Set([
+  'project_communication',
+  'forum_interaction',
+  'system',
+  'bid_participation_request'
+]);
 
 type AppNotificationListPayload = {
   items?: unknown;
@@ -46,15 +63,19 @@ export function readDevicePushTokenRegisterReadModel(value: unknown) {
 
 function readAppNotificationItemReadModel(value: unknown) {
   const root = asRecord(value) ?? {};
+  const type = readRequiredAllowedString(root.type, NOTIFICATION_TYPES, 'notification.type');
+  const source = readRequiredAllowedString(root.source, NOTIFICATION_SOURCES, 'notification.source');
+  const routeTarget = readRouteTarget(root.routeTarget);
+  assertBidParticipationRouteTarget(type, source, routeTarget);
   return {
-    notificationId: readOptionalString(root.notificationId) ?? '',
-    type: readOptionalString(root.type) ?? 'system_notice',
-    source: readOptionalString(root.source) ?? 'system',
-    title: readOptionalString(root.title) ?? '',
+    notificationId: readRequiredString(root.notificationId, 'notification.notificationId'),
+    type,
+    source,
+    title: readRequiredString(root.title, 'notification.title'),
     body: readOptionalString(root.body),
     projectId: readOptionalString(root.projectId),
     threadId: readOptionalString(root.threadId),
-    routeTarget: readRouteTarget(root.routeTarget),
+    routeTarget,
     createdAt: readOptionalString(root.createdAt),
     readAt: readOptionalString(root.readAt),
     unread: root.unread === true
@@ -74,18 +95,46 @@ function readUnread(value: unknown) {
   return {
     total: readNumber(unread?.total),
     projectCommunication: readNumber(unread?.projectCommunication),
+    bidParticipationRequest: readNumber(unread?.bidParticipationRequest),
     forumInteraction: readNumber(unread?.forumInteraction),
     system: readNumber(unread?.system)
   };
 }
 
 function emptyUnread() {
-  return { total: 0, projectCommunication: 0, forumInteraction: 0, system: 0 };
+  return {
+    total: 0,
+    projectCommunication: 0,
+    bidParticipationRequest: 0,
+    forumInteraction: 0,
+    system: 0
+  };
 }
 
 function readRouteTarget(value: unknown) {
   const routeTarget = asRecord(value);
   return routeTarget && Object.keys(routeTarget).length > 0 ? routeTarget : null;
+}
+
+function assertBidParticipationRouteTarget(
+  type: string,
+  source: string,
+  routeTarget: Record<string, unknown> | null
+) {
+  if (type !== 'bid_participation_request' && source !== 'bid_participation_request') {
+    return;
+  }
+  const routeParams = asRecord(routeTarget?.routeParams);
+  if (
+    routeTarget?.canonicalPath !== '/api/app/project/bid-participation/thread/detail' ||
+    routeTarget.localEntryKey !== 'bid_participation_request.open' ||
+    routeTarget.state !== 'enabled' ||
+    typeof routeParams?.threadId !== 'string' ||
+    typeof routeParams?.projectId !== 'string' ||
+    typeof routeParams?.requestId !== 'string'
+  ) {
+    throw new Error('Invalid bid participation request notification routeTarget.');
+  }
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {
@@ -94,6 +143,22 @@ function asRecord(value: unknown): Record<string, unknown> | null {
 
 function readOptionalString(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;
+}
+
+function readRequiredString(value: unknown, fieldName: string) {
+  const normalized = readOptionalString(value);
+  if (!normalized) {
+    throw new Error(`Invalid ${fieldName}.`);
+  }
+  return normalized;
+}
+
+function readRequiredAllowedString(value: unknown, allowed: Set<string>, fieldName: string) {
+  const normalized = readRequiredString(value, fieldName);
+  if (!allowed.has(normalized)) {
+    throw new Error(`Unsupported ${fieldName}.`);
+  }
+  return normalized;
 }
 
 function readNumber(value: unknown) {

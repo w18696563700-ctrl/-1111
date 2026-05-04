@@ -42,6 +42,9 @@ AppNotificationUnreadView parseAppNotificationUnread(Object? payload) {
   return AppNotificationUnreadView(
     total: _optionalNonNegativeInt(map?['total']),
     projectCommunication: _optionalNonNegativeInt(map?['projectCommunication']),
+    bidParticipationRequest: _optionalNonNegativeInt(
+      map?['bidParticipationRequest'],
+    ),
     forumInteraction: _optionalNonNegativeInt(map?['forumInteraction']),
     system: _optionalNonNegativeInt(map?['system']),
   );
@@ -59,6 +62,7 @@ AppNotificationRouteTargetView? parseAppNotificationRouteTarget(
     return null;
   }
   final localEntryKey = _nullableString(map['localEntryKey']);
+  final state = _nullableString(map['state']);
   final params = _parseParams(map['routeParams'] ?? map['params']);
   return AppNotificationRouteTargetView(
     canonicalPath: canonicalPath,
@@ -67,6 +71,7 @@ AppNotificationRouteTargetView? parseAppNotificationRouteTarget(
     routeLocation: _buildRouteLocation(
       canonicalPath: canonicalPath,
       localEntryKey: localEntryKey,
+      state: state,
       params: params,
     ),
   );
@@ -106,13 +111,16 @@ String? extractNotificationMessage(Object? payload) => extractMessage(payload);
 String? _buildRouteLocation({
   required String canonicalPath,
   required String? localEntryKey,
+  required String? state,
   required Map<String, String> params,
 }) {
-  final actionKey = localEntryKey == 'counterpart_conversation.open'
-      ? localEntryKey
-      : canonicalPath == '/api/app/message/counterpart-conversation/detail'
-      ? 'counterpart_conversation.open'
-      : null;
+  if (state != 'enabled') {
+    return null;
+  }
+  final actionKey = _resolveActionKey(
+    canonicalPath: canonicalPath,
+    localEntryKey: localEntryKey,
+  );
   if (actionKey == null) {
     return null;
   }
@@ -125,6 +133,28 @@ String? _buildRouteLocation({
     return null;
   }
   return routeLocation;
+}
+
+String? _resolveActionKey({
+  required String canonicalPath,
+  required String? localEntryKey,
+}) {
+  if (localEntryKey != null &&
+      messagesRegisteredEntryByActionKey.containsKey(localEntryKey)) {
+    return localEntryKey;
+  }
+  for (final entry in messagesRegisteredEntryByActionKey.entries) {
+    final definition = entry.value;
+    if (definition.canonicalPath != canonicalPath) {
+      continue;
+    }
+    if (localEntryKey == null ||
+        localEntryKey == definition.localEntryKey ||
+        localEntryKey == definition.actionKey) {
+      return entry.key;
+    }
+  }
+  return null;
 }
 
 Map<String, Object?> _requiredMap(Object? value, String label) {

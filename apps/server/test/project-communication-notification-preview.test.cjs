@@ -129,12 +129,69 @@ test('project communication message creates notification truth and noop push att
   assert.equal(savedAttempts[0].errorCode, 'no_device_token');
 });
 
+test('bid participation request creates owner notification without project communication message', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const savedNotifications = [];
+  const notificationRepository = {
+    create(value) {
+      return {
+        ...value,
+        createdAt: new Date('2026-05-04T07:30:00.000Z'),
+        updatedAt: new Date('2026-05-04T07:30:00.000Z'),
+      };
+    },
+    async save(value) {
+      savedNotifications.push(value);
+      return value;
+    },
+  };
+  const manager = {
+    getRepository(entity) {
+      if (String(entity?.name).includes('AppNotificationEntity')) return notificationRepository;
+      throw new Error('Unexpected repository ' + entity?.name);
+    },
+  };
+  const service = new NotificationService({}, {}, {}, createVerifier(), new NotificationPresenter());
+
+  const notification = await service.createBidParticipationRequestCreatedNotification(
+    {
+      id: 'request-1',
+      requesterOrganizationId: 'supplier-org',
+    },
+    {
+      id: 'project-1',
+      organizationId: 'publisher-org',
+    },
+    manager,
+  );
+
+  assert.equal(savedNotifications.length, 1);
+  assert.equal(notification.type, 'bid_participation_request');
+  assert.equal(notification.source, 'bid_participation_request');
+  assert.equal(notification.organizationId, 'publisher-org');
+  assert.equal(notification.userId, '');
+  assert.equal(notification.projectId, 'project-1');
+  assert.equal(notification.threadId, 'request-1');
+  assert.equal(notification.routeTarget.localEntryKey, 'bid_participation_request.open');
+  assert.equal(
+    notification.routeTarget.canonicalPath,
+    '/api/app/project/bid-participation/thread/detail',
+  );
+  assert.deepEqual(notification.routeTarget.routeParams, {
+    threadId: 'request-1',
+    projectId: 'project-1',
+    requestId: 'request-1',
+  });
+});
+
 test('notification mark read updates only actor-owned notifications and returns unread projection', async () => {
   const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
   const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
   const notifications = [
     createNotification({ id: 'n-1', source: 'project_communication', readAt: null }),
     createNotification({ id: 'n-2', source: 'forum_interaction', readAt: null }),
+    createNotification({ id: 'n-4', source: 'bid_participation_request', readAt: null }),
     createNotification({ id: 'n-3', organizationId: 'other-org', source: 'system', readAt: null }),
   ];
   const queryBuilder = {
@@ -156,8 +213,9 @@ test('notification mark read updates only actor-owned notifications and returns 
   assert.deepEqual(result.readNotificationIds, ['n-1']);
   assert.ok(notifications[0].readAt instanceof Date);
   assert.deepEqual(result.unread, {
-    total: 1,
+    total: 2,
     projectCommunication: 0,
+    bidParticipationRequest: 1,
     forumInteraction: 1,
     system: 0,
   });
@@ -187,6 +245,8 @@ test('file preview returns signed access without exposing objectKey', async () =
     { async findOneBy() { return thread; } },
     { async find() { return [message]; } },
     { async findOneBy() { return fileAsset; } },
+    { async findOneBy() { return null; } },
+    { async findOneBy() { return null; } },
     { async requireExistingThreadParticipant() { return { organizationId: 'owner-org' }; } },
     { async buildObjectAccessUrl(objectKey) { return 'https://signed.example/' + objectKey; } },
     { uploadSignedUrlExpiresSeconds: 60 },

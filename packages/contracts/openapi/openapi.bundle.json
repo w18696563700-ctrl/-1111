@@ -13110,7 +13110,8 @@
           "project_clarification",
           "project_key_reminder",
           "forum_interaction",
-          "system_reminder"
+          "system_reminder",
+          "bid_participation_request"
         ],
         "description": "Bounded notification type family for V1."
       },
@@ -13119,7 +13120,8 @@
         "enum": [
           "project_communication",
           "forum_interaction",
-          "system"
+          "system",
+          "bid_participation_request"
         ],
         "description": "Bounded source lane for messages-building notification center aggregation."
       },
@@ -13141,7 +13143,8 @@
               "/api/app/message/project-communication/thread",
               "/api/app/forum/interaction/inbox",
               "/api/app/project/clarification/list",
-              "/api/app/confirmation/softlink/detail"
+              "/api/app/confirmation/softlink/detail",
+              "/api/app/project/bid-participation/thread/detail"
             ]
           },
           "localEntryKey": {
@@ -13241,6 +13244,7 @@
         "required": [
           "total",
           "projectCommunication",
+          "bidParticipationRequest",
           "forumInteraction",
           "system"
         ],
@@ -13251,6 +13255,10 @@
             "minimum": 0
           },
           "projectCommunication": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bidParticipationRequest": {
             "type": "integer",
             "minimum": 0
           },

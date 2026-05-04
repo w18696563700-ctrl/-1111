@@ -5,6 +5,8 @@ import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
+import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectCommunicationMessageEntity } from '../project_communication/entities/project-communication-message.entity';
 import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
 import { AppNotificationEntity } from './entities/app-notification.entity';
@@ -154,6 +156,64 @@ export class NotificationService {
     return notification;
   }
 
+  async createBidParticipationRequestCreatedNotification(
+    request: BidParticipationRequestEntity,
+    project: ProjectEntity,
+    manager: EntityManager
+  ) {
+    const recipientOrganizationId = project.organizationId?.trim() ?? '';
+    if (!recipientOrganizationId || recipientOrganizationId === request.requesterOrganizationId) {
+      return null;
+    }
+    const notificationRepository = manager.getRepository(AppNotificationEntity);
+    const notification = notificationRepository.create({
+      id: randomUUID(),
+      userId: '',
+      organizationId: recipientOrganizationId,
+      type: 'bid_participation_request',
+      source: 'bid_participation_request',
+      title: '有新的参与竞标申请',
+      body: '有供应商提交了参与竞标申请，请进入审核线程处理。',
+      projectId: project.id,
+      threadId: request.id,
+      routeTarget: this.bidParticipationRequestRouteTarget(project.id, request.id),
+      readAt: null,
+      notificationState: 'active'
+    });
+    await notificationRepository.save(notification);
+    return notification;
+  }
+
+  async countBidParticipationRequestUnreadForShell(userId: string, organizationId: string) {
+    const normalizedUserId = userId.trim();
+    const normalizedOrganizationId = organizationId.trim();
+    if (!normalizedUserId && !normalizedOrganizationId) {
+      return 0;
+    }
+    const where = [];
+    if (normalizedUserId) {
+      where.push({
+        userId: normalizedUserId,
+        source: 'bid_participation_request',
+        readAt: IsNull(),
+        notificationState: 'active'
+      });
+    }
+    if (normalizedOrganizationId) {
+      where.push({
+        organizationId: normalizedOrganizationId,
+        source: 'bid_participation_request',
+        readAt: IsNull(),
+        notificationState: 'active'
+      });
+    }
+    if (!where.length) {
+      return 0;
+    }
+    const items = await this.notificationRepository.find({ where });
+    return new Set(items.map((item) => item.id)).size;
+  }
+
   private async countUnread(userId: string, organizationId: string) {
     const items = await this.notificationRepository.find({
       where: [
@@ -166,6 +226,8 @@ export class NotificationService {
       unread.total += 1;
       if (item.source === 'project_communication') {
         unread.projectCommunication += 1;
+      } else if (item.source === 'bid_participation_request') {
+        unread.bidParticipationRequest += 1;
       } else if (item.source === 'forum_interaction') {
         unread.forumInteraction += 1;
       } else if (item.source === 'system') {
@@ -223,6 +285,16 @@ export class NotificationService {
       localEntryKey: 'counterpart_conversation.open',
       requiredParams: ['conversationId', 'projectId'],
       routeParams: { conversationId, projectId, threadId },
+      state: 'enabled'
+    };
+  }
+
+  private bidParticipationRequestRouteTarget(projectId: string, requestId: string) {
+    return {
+      canonicalPath: '/api/app/project/bid-participation/thread/detail',
+      localEntryKey: 'bid_participation_request.open',
+      requiredParams: ['threadId', 'projectId', 'requestId'],
+      routeParams: { threadId: requestId, projectId, requestId },
       state: 'enabled'
     };
   }

@@ -4,6 +4,7 @@ import { AppNotificationEntity } from './entities/app-notification.entity';
 export type NotificationUnreadProjection = {
   total: number;
   projectCommunication: number;
+  bidParticipationRequest: number;
   forumInteraction: number;
   system: number;
 };
@@ -40,7 +41,13 @@ export class NotificationPresenter {
   }
 
   emptyUnread(): NotificationUnreadProjection {
-    return { total: 0, projectCommunication: 0, forumInteraction: 0, system: 0 };
+    return {
+      total: 0,
+      projectCommunication: 0,
+      bidParticipationRequest: 0,
+      forumInteraction: 0,
+      system: 0
+    };
   }
 
   private toRouteTarget(value: Record<string, unknown> | null | undefined) {

@@ -60,6 +60,7 @@ void main() {
               'unread': <String, Object?>{
                 'total': 1,
                 'projectCommunication': 1,
+                'bidParticipationRequest': 0,
                 'forumInteraction': 0,
                 'system': 0,
               },
@@ -78,6 +79,7 @@ void main() {
               'unread': <String, Object?>{
                 'total': 0,
                 'projectCommunication': 0,
+                'bidParticipationRequest': 0,
                 'forumInteraction': 0,
                 'system': 0,
               },
@@ -160,6 +162,7 @@ void main() {
                 'unread': <String, Object?>{
                   'total': 1,
                   'projectCommunication': 1,
+                  'bidParticipationRequest': 0,
                   'forumInteraction': 0,
                   'system': 0,
                 },
@@ -175,6 +178,7 @@ void main() {
                 'unread': <String, Object?>{
                   'total': 0,
                   'projectCommunication': 0,
+                  'bidParticipationRequest': 0,
                   'forumInteraction': 0,
                   'system': 0,
                 },
@@ -207,10 +211,212 @@ void main() {
       await tester.tap(find.text('消息中心'));
       await tester.pumpAndSettle();
 
+      final reloadCountBeforeRead = shellConsumer.loadResultCount;
       await tester.tap(find.text('有新的项目沟通消息'));
       await tester.pumpAndSettle();
 
-      expect(shellConsumer.loadResultCount, 1);
+      expect(shellConsumer.loadResultCount, reloadCountBeforeRead + 1);
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
+    },
+  );
+
+  testWidgets(
+    'messages page keeps shell badge from shell context when project communication is empty',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 1,
+                  'projectCommunication': 0,
+                  'bidParticipationRequest': 1,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final controller = AppBootstrapController(
+        shellContextConsumer: _FakeShellContextConsumer(messagesUnread: 1),
+      );
+      MessagesConsumerLayer.install(
+        MessagesConsumerLayer(client: _client(transport)),
+      );
+      ForumConsumerLayer.install(
+        ForumConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShellScope(
+            controller: controller,
+            child: const Scaffold(body: MessagesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '1');
+    },
+  );
+
+  testWidgets(
+    'bid participation notification marks read and opens existing review thread',
+    (WidgetTester tester) async {
+      String? openedRoute;
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'notificationId': 'notice-bpr-1',
+                    'type': 'bid_participation_request',
+                    'source': 'bid_participation_request',
+                    'title': '有新的参与竞标申请',
+                    'body': '有供应商提交了参与竞标申请，请进入审核线程处理。',
+                    'projectId': 'project-1',
+                    'threadId': 'request-1',
+                    'routeTarget': <String, Object?>{
+                      'canonicalPath':
+                          '/api/app/project/bid-participation/thread/detail',
+                      'localEntryKey': 'bid_participation_request.open',
+                      'requiredParams': <Object?>[
+                        'threadId',
+                        'projectId',
+                        'requestId',
+                      ],
+                      'routeParams': <String, Object?>{
+                        'threadId': 'request-1',
+                        'projectId': 'project-1',
+                        'requestId': 'request-1',
+                      },
+                      'state': 'enabled',
+                    },
+                    'createdAt': '2026-05-04T07:30:00Z',
+                    'readAt': null,
+                    'unread': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 1,
+                  'projectCommunication': 0,
+                  'bidParticipationRequest': 1,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+          'POST /api/app/notifications/read': (request) async {
+            expect(request.body, <String, Object?>{
+              'notificationIds': <String>['notice-bpr-1'],
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'readNotificationIds': <Object?>['notice-bpr-1'],
+                'unread': <String, Object?>{
+                  'total': 0,
+                  'projectCommunication': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final controller = AppBootstrapController(
+        shellContextConsumer: _FakeShellContextConsumer(),
+      );
+      MessagesConsumerLayer.install(
+        MessagesConsumerLayer(client: _client(transport)),
+      );
+      ForumConsumerLayer.install(
+        ForumConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          onGenerateRoute: (settings) {
+            openedRoute = settings.name;
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const Scaffold(body: Text('处理参与竞标申请')),
+            );
+          },
+          home: AppShellScope(
+            controller: controller,
+            child: const Scaffold(body: MessagesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('消息中心'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('参与竞标申请'), findsWidgets);
+      expect(find.text('有新的参与竞标申请'), findsOneWidget);
+
+      await tester.tap(find.text('有新的参与竞标申请'));
+      await tester.pumpAndSettle();
+
+      expect(
+        transport.requests
+            .where(
+              (request) =>
+                  request.canonicalPath == '/api/app/notifications/read',
+            )
+            .length,
+        1,
+      );
+      expect(
+        openedRoute,
+        contains('/exhibition/projects/bid-participation-thread'),
+      );
+      expect(find.text('处理参与竞标申请'), findsOneWidget);
       expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
     },
   );
@@ -334,6 +540,40 @@ void main() {
       );
     },
   );
+
+  test(
+    'bid participation notification routeTarget opens existing review thread',
+    () {
+      final item = parseAppNotificationItem(const <String, Object?>{
+        'notificationId': 'notice-bpr-1',
+        'type': 'bid_participation_request',
+        'source': 'bid_participation_request',
+        'title': '有新的参与竞标申请',
+        'body': '有供应商提交了参与竞标申请，请进入审核线程处理。',
+        'projectId': 'project-1',
+        'threadId': 'request-1',
+        'routeTarget': <String, Object?>{
+          'state': 'enabled',
+          'routeParams': <String, Object?>{
+            'threadId': 'request-1',
+            'projectId': 'project-1',
+            'requestId': 'request-1',
+          },
+          'canonicalPath': '/api/app/project/bid-participation/thread/detail',
+          'localEntryKey': 'bid_participation_request.open',
+          'requiredParams': <Object?>['threadId', 'projectId', 'requestId'],
+        },
+        'createdAt': '2026-05-04T07:30:00Z',
+        'readAt': null,
+        'unread': true,
+      });
+
+      expect(
+        item.routeTarget?.routeLocation,
+        '/exhibition/projects/bid-participation-thread?threadId=request-1&projectId=project-1&requestId=request-1',
+      );
+    },
+  );
 }
 
 final class _NoopRealtimeClient implements ProjectCommunicationRealtimeClient {
@@ -350,6 +590,9 @@ final class _NoopRealtimeClient implements ProjectCommunicationRealtimeClient {
 }
 
 final class _FakeShellContextConsumer implements AppShellContextConsumer {
+  _FakeShellContextConsumer({this.messagesUnread = 0});
+
+  final int messagesUnread;
   int loadResultCount = 0;
 
   @override
@@ -364,7 +607,7 @@ final class _FakeShellContextConsumer implements AppShellContextConsumer {
       path: AppShellContextCanonicalPaths.shellContext,
       data: AppShellContextData(
         organizationId: 'org-1',
-        unreadSummary: const <String, Object?>{'messages': 0},
+        unreadSummary: <String, Object?>{'messages': messagesUnread},
       ),
     );
   }

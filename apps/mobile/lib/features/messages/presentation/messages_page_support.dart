@@ -554,6 +554,7 @@ class _MessagesNotificationCard extends StatelessWidget {
   IconData _notificationIcon(String source) {
     return switch (source) {
       'project_communication' => Icons.forum_outlined,
+      'bid_participation_request' => Icons.assignment_turned_in_outlined,
       'forum_interaction' => Icons.dynamic_feed_outlined,
       _ => Icons.notifications_none_rounded,
     };
@@ -562,6 +563,7 @@ class _MessagesNotificationCard extends StatelessWidget {
   String _notificationSource(String source) {
     return switch (source) {
       'project_communication' => '项目沟通',
+      'bid_participation_request' => '参与竞标申请',
       'forum_interaction' => '论坛互动',
       _ => '系统提醒',
     };

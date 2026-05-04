@@ -9462,6 +9462,7 @@ components:
         - project_key_reminder
         - forum_interaction
         - system_reminder
+        - bid_participation_request
       description: Bounded notification type family for V1.
     AppNotificationSource:
       type: string
@@ -9469,6 +9470,7 @@ components:
         - project_communication
         - forum_interaction
         - system
+        - bid_participation_request
       description: Bounded source lane for messages-building notification center aggregation.
     AppNotificationRouteTarget:
       type: object
@@ -9490,6 +9492,7 @@ components:
             - /api/app/forum/interaction/inbox
             - /api/app/project/clarification/list
             - /api/app/confirmation/softlink/detail
+            - /api/app/project/bid-participation/thread/detail
         localEntryKey:
           type: string
         requiredParams:
@@ -9557,6 +9560,7 @@ components:
       required:
         - total
         - projectCommunication
+        - bidParticipationRequest
         - forumInteraction
         - system
       description: Server-owned notification-center unread projection.
@@ -9565,6 +9569,9 @@ components:
           type: integer
           minimum: 0
         projectCommunication:
+          type: integer
+          minimum: 0
+        bidParticipationRequest:
           type: integer
           minimum: 0
         forumInteraction:
