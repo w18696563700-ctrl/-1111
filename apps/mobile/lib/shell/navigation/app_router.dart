@@ -487,8 +487,8 @@ class AppRouter {
       ExhibitionRoutes.bidThread => '沟通与投标',
       ExhibitionRoutes.bidSubmit =>
         routeUri.queryParameters['mode'] == 'result' ? '竞标结果' : '竞标提交',
-      ExhibitionRoutes.orderDetail => '订单详情',
-      ExhibitionRoutes.contractDetail => '合同详情',
+      ExhibitionRoutes.orderDetail => '后续承接状态',
+      ExhibitionRoutes.contractDetail => '合同承接状态',
       ExhibitionRoutes.milestoneList => '里程碑列表',
       ExhibitionRoutes.milestoneSubmit => '里程碑提交',
       ExhibitionRoutes.inspectionDetail => '验收详情',

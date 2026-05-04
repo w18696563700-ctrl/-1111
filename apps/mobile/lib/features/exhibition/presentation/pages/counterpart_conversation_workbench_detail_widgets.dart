@@ -133,7 +133,7 @@ class _ProjectCommunicationMaterialReviewDetailPageState
     }
     setState(() {
       _loadingFiles = false;
-      _fileMessage = '成交确认入口暂不触发扣费，待后续门禁开启。';
+      _fileMessage = '合同与最终金额确认入口暂不触发扣费，待后续门禁开启。';
     });
   }
 

@@ -180,7 +180,7 @@ class _BidSubmissionSnapshotSheetState
                         ),
                         _DetailLine(label: '提交时间', value: data.submittedAt),
                         _DetailLine(
-                          label: '报价金额',
+                          label: '竞标报价',
                           value: _currencyText(data.quoteAmount),
                           highlight: true,
                         ),

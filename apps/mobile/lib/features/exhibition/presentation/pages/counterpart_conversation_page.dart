@@ -1262,7 +1262,7 @@ class _CounterpartConversationPageState
 
   void _openWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
     if (entry.group == 'deal_confirmation') {
-      _showSnack('合同确认和最终成交金额确认暂不触发扣费，待后续门禁开启。');
+      _showSnack('合同与最终金额确认入口暂不触发扣费，待后续门禁开启。');
       return;
     }
     Navigator.of(context).push(

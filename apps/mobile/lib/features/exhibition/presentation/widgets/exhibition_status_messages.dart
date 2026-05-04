@@ -52,7 +52,7 @@ String _frontStageLoadMessage({required String path}) {
     ExhibitionCanonicalPaths.projectDetail => '项目详情已经到位，可以先确认当前项目状态，再继续后续承接。',
     ExhibitionCanonicalPaths.bidResult =>
       '竞标结果已经到位，可以先确认当前项目下的最小结果回读，再决定是否回到项目详情继续。',
-    ExhibitionCanonicalPaths.orderDetail => '订单详情已经到位，可以先判断当前要推进里程碑还是进入后半链路入口。',
+    ExhibitionCanonicalPaths.orderDetail => '后续承接状态已经到位，可以先判断当前要推进里程碑还是进入后半链路入口。',
     ExhibitionCanonicalPaths.milestoneList => '里程碑清单已经到位，现在可以选择当前要推进的里程碑。',
     ExhibitionCanonicalPaths.ratingEntry =>
       '评价入口已经到位，可以先确认当前订单是否已承接评价锚点，再决定是否提交。',
@@ -84,9 +84,9 @@ String _frontStageSuccessMessage({required String path}) {
     ExhibitionCanonicalPaths.bidAward =>
       '当前定标桥接已受理，页面会同步刷新项目详情与我的项目，并继续保留最小结果承接。',
     ExhibitionCanonicalPaths.bidSelectAndCreateOrder =>
-      '合作方选择已受理，页面会同步刷新项目详情与我的项目，并继续以订单详情承接后续状态。',
+      '合作方选择已受理，页面会同步刷新项目详情与我的项目，并继续以后续承接状态承接。',
     ExhibitionCanonicalPaths.contractConfirm =>
-      '合同确认已受理，页面会继续回显最新合同状态，并同步刷新我的项目与项目工作台。',
+      '合同承接状态确认已受理，最终合同金额仍以最终金额确认入口为准。',
     ExhibitionCanonicalPaths.contractAmend =>
       '合同改单已受理，页面会继续回显最新合同状态，并同步刷新我的项目与项目工作台。',
     ExhibitionCanonicalPaths.orderCompleteRequest =>

@@ -865,7 +865,7 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
   Widget build(BuildContext context) {
     return _ActionCard(
       title: '项目工作入口',
-      summary: '围绕当前项目完成资料审阅、合同与成交金额确认。',
+      summary: '围绕当前项目处理资料审阅与后续确认入口。',
       children: <Widget>[
         Align(
           alignment: Alignment.centerLeft,

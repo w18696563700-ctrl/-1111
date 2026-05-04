@@ -49,8 +49,8 @@ class _ProjectCommunicationWorkbenchSectionState
       ),
       _WorkbenchGroupData(
         key: 'deal_confirmation',
-        title: '成交确认',
-        summary: '合同确认、最终成交金额',
+        title: '确认入口',
+        summary: '合同与最终金额确认入口；入口不代表已确认',
         entries: view.entries
             .where((entry) => entry.group == 'deal_confirmation')
             .toList(growable: false),

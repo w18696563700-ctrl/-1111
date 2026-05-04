@@ -75,7 +75,7 @@ extension _MyBidWorkspaceSupport on _MyProjectListPageState {
                     highlight: true,
                   ),
                   _DetailLine(
-                    label: '报价金额',
+                    label: '竞标报价',
                     value: _currencyText(item['quoteAmount']),
                     highlight: true,
                   ),

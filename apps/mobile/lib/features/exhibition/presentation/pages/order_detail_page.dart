@@ -69,8 +69,8 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
     final result = snapshot?.result;
 
     return _LoadPageFrame(
-      title: '订单详情',
-      summary: '查看当前订单状态，并继续处理完工、合同和互评入口。',
+      title: '后续承接状态',
+      summary: '查看 Order seed 承接状态；这里不代表最终合同金额已确认。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -182,7 +182,7 @@ class _OrderDetailPageState extends State<OrderDetailPage> {
               ExhibitionRoutes.contractDetailWithOrderId(order.orderId),
             );
           },
-          child: const Text('查看合同详情'),
+          child: const Text('查看合同承接状态'),
         ),
         const SizedBox(height: 12),
         if (ratingRoute != null)
