@@ -543,16 +543,27 @@ class AppRouter {
       );
     }
 
+    final currentBuilding = _exhibitionTradeRouteBuilding(routePath);
+
     return MaterialPageRoute<void>(
       settings: settings,
       builder: (_) => AppShellScaffold(
-        currentBuilding: AppBuilding.exhibition,
+        currentBuilding: currentBuilding,
         titleOverride: title,
         titleContent: titleContent,
         appBarActions: appBarActions,
         child: child,
       ),
     );
+  }
+
+  AppBuilding _exhibitionTradeRouteBuilding(String routePath) {
+    return switch (routePath) {
+      ExhibitionRoutes.myProjectList ||
+      ExhibitionRoutes.myProjectDetail ||
+      ExhibitionRoutes.projectEdit => AppBuilding.profile,
+      _ => AppBuilding.exhibition,
+    };
   }
 
   Route<dynamic>? _matchProfileRoute(RouteSettings settings) {

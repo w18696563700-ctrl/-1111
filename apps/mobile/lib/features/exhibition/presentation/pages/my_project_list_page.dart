@@ -37,6 +37,17 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
   final GlobalKey _highlightedProjectKey = GlobalKey();
   bool _highlightScrollScheduled = false;
 
+  void _setMyBidLoading(bool value) {
+    setState(() => _myBidLoading = value);
+  }
+
+  void _finishMyBidLoad(ExhibitionLoadResult result) {
+    setState(() {
+      _myBidResult = result;
+      _myBidLoading = false;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
