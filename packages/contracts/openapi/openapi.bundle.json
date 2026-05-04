@@ -3603,6 +3603,108 @@
         }
       }
     },
+    "/api/app/message/project-communication/workbench": {
+      "get": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Project communication workbench 10-entry read model for Flutter App",
+        "operationId": "getAppProjectCommunicationWorkbench",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "threadId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "counterpartOrganizationId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bidId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-owned project communication workbench read model. This path returns the fixed 10 downstream entries for material review and deal-confirmation handoff only. It must not make BFF or Flutter the owner of review state, final amount truth, order truth, contract truth, payment truth, or service-fee truth.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCommunicationWorkbenchReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled project communication forbidden response."
+          },
+          "404": {
+            "description": "Controlled project communication unavailable response."
+          }
+        }
+      }
+    },
+    "/api/app/message/project-communication/workbench/material-review": {
+      "post": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Project communication material review command for Flutter App",
+        "operationId": "reviewAppProjectCommunicationMaterial",
+        "requestBody": {
+          "required": true,
+          "description": "Material review command for the first eight workbench entries only. Deal-confirmation entries are intentionally excluded from this command and must use the dedicated deal-confirmations route family.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Material review accepted. The response carries the updated Server-owned entry and may carry the refreshed 10-entry list.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewAcceptedResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled material-review invalid response."
+          },
+          "403": {
+            "description": "Controlled material-review forbidden response."
+          },
+          "409": {
+            "description": "Controlled material-review invalid-state response."
+          }
+        }
+      }
+    },
     "/api/app/project/list": {
       "get": {
         "tags": [
@@ -3955,6 +4057,89 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/app/project/bid-participation/request": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Bid participation request create canonical path for Flutter App",
+        "operationId": "createAppBidParticipationRequest",
+        "requestBody": {
+          "required": true,
+          "description": "Create the current bidder's request to participate in the published project. Approved participation unlocks protected project name, quote-basis materials, file access, and bid-submit entry according to Server truth. This request must not become a project-name-only request, payment request, or client-owned approval state.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidParticipationRequestCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Bid participation request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationRequestAcceptedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `BID_PARTICIPATION_CONFLICT` or invalid-state response."
+          }
+        }
+      }
+    },
+    "/api/app/project/bid-participation/thread/detail": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Bid participation review thread detail canonical path for Flutter App",
+        "operationId": "getAppBidParticipationThreadDetail",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requestId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read model for the current bid-participation request and publisher review handoff. BFF and Flutter must not infer final review truth from local UI state.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationThreadDetailReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "404": {
+            "description": "Controlled `BID_PARTICIPATION_UNAVAILABLE` response."
           }
         }
       }
@@ -4637,6 +4822,130 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/app/my/projects/{projectId}/bid-participation/pending": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Publisher pending bid-participation requests canonical path for Flutter App",
+        "operationId": "getAppPendingBidParticipationRequests",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Publisher-scoped pending bid-participation requests for one current project. Server owns request state and review availability.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationPendingListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          }
+        }
+      }
+    },
+    "/api/app/my/projects/{projectId}/bid-participation/{requestId}/approve": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Publisher approve bid-participation request canonical path for Flutter App",
+        "operationId": "approveAppBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Bid participation request approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `BID_PARTICIPATION_INVALID_STATE` response."
+          }
+        }
+      }
+    },
+    "/api/app/my/projects/{projectId}/bid-participation/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Publisher reject bid-participation request canonical path for Flutter App",
+        "operationId": "rejectAppBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Bid participation request rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `BID_PARTICIPATION_INVALID_STATE` response."
           }
         }
       }
@@ -5937,6 +6246,92 @@
         }
       }
     },
+    "/server/project-communication/workbench": {
+      "get": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Internal truth pair for app-facing project communication workbench",
+        "operationId": "getProjectCommunicationWorkbench",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "threadId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "counterpartOrganizationId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bidId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal 10-entry workbench read model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCommunicationWorkbenchReadModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/project-communication/workbench/material-review": {
+      "post": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Internal truth pair for app-facing project communication material review",
+        "operationId": "reviewProjectCommunicationMaterial",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Internal material review accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/server/projects": {
       "get": {
         "tags": [
@@ -6317,6 +6712,157 @@
         }
       }
     },
+    "/server/projects/bid-participation/request": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth create pair for app-facing bid participation request",
+        "operationId": "createBidParticipationRequest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidParticipationRequestCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Internal bid participation request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationRequestAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/bid-participation/thread/detail": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth read pair for app-facing bid participation thread detail",
+        "operationId": "getBidParticipationThreadDetail",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requestId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal bid participation thread detail read model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationThreadDetailReadModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/{projectId}/deal-confirmations": {
+      "post": {
+        "tags": [
+          "ProjectPricing"
+        ],
+        "summary": "Internal truth pair for app-facing deal-confirmation create or advance",
+        "operationId": "upsertProjectDealConfirmation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Internal truth pair for `POST /api/app/project/{projectId}/deal-confirmations`. Server may reuse the existing ContractConfirmation entity and service, but this project-family path is the only internal pair for the current app-facing final amount confirmation surface.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealConfirmationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Internal deal confirmation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealConfirmationAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/{projectId}/deal-confirmations/{dealConfirmationId}": {
+      "get": {
+        "tags": [
+          "ProjectPricing"
+        ],
+        "summary": "Internal truth pair for app-facing deal-confirmation detail",
+        "operationId": "getProjectDealConfirmation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dealConfirmationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal deal confirmation detail read model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealConfirmationReadModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/server/projects/{projectId}/attachments": {
       "get": {
         "tags": [
@@ -6530,6 +7076,115 @@
         }
       }
     },
+    "/server/my/projects/{projectId}/bid-participation/pending": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for publisher pending bid-participation requests",
+        "operationId": "getPendingBidParticipationRequests",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal publisher pending bid-participation request list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationPendingListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/my/projects/{projectId}/bid-participation/{requestId}/approve": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for publisher approve bid-participation request",
+        "operationId": "approveBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Internal bid participation request approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/my/projects/{projectId}/bid-participation/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for publisher reject bid-participation request",
+        "operationId": "rejectBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Internal bid participation request rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/server/uploads/init": {
       "post": {
         "tags": [
@@ -6599,11 +7254,29 @@
         "tags": [
           "Bid"
         ],
-        "summary": "Bid submission skeleton",
+        "summary": "Internal truth pair for app-facing bid submit",
         "operationId": "submitBid",
+        "requestBody": {
+          "required": true,
+          "description": "Internal truth pair for `POST /api/app/bid/submit`. This request writes `Bid.quoteAmount` and the three confirmed bid attachment FileAsset references. `Bid.quoteAmount` remains bid quote truth only and must not be reinterpreted as final confirmed contract amount.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidSubmitRequest"
+              }
+            }
+          }
+        },
         "responses": {
           "202": {
-            "description": "Placeholder until contract freeze"
+            "description": "Internal bid submit accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidSubmitAcceptedResponse"
+                }
+              }
+            }
           }
         }
       }
@@ -14727,14 +15400,549 @@
           }
         }
       },
+      "BidParticipationRequestStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "description": "Server-owned bid participation request state. Flutter and BFF must not invent or finalize this state locally.\n"
+      },
+      "BidParticipationRequestCreateRequest": {
+        "type": "object",
+        "required": [
+          "projectId"
+        ],
+        "description": "Create request for the current bidder's participation request in one published project. This is not a standalone project-name request and carries no approval state.\n",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        }
+      },
+      "BidParticipationRequestAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "projectId",
+          "status",
+          "threadId"
+        ],
+        "description": "Bid participation request accepted response. `status` remains Server-owned and must not be inferred by BFF or Flutter.\n",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BidParticipationRequestStatus"
+          },
+          "threadId": {
+            "type": "string"
+          }
+        }
+      },
+      "BidParticipationRequesterReadModel": {
+        "type": "object",
+        "required": [
+          "organizationId",
+          "displayName",
+          "avatarUrl"
+        ],
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BidParticipationPrimaryReviewAction": {
+        "type": "object",
+        "required": [
+          "actionKey",
+          "enabled",
+          "availableDecisions"
+        ],
+        "properties": {
+          "actionKey": {
+            "type": "string",
+            "enum": [
+              "bid_participation.review"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "availableDecisions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "approve",
+                "reject"
+              ]
+            }
+          }
+        }
+      },
+      "BidParticipationThreadDetailReadModel": {
+        "type": "object",
+        "required": [
+          "threadId",
+          "threadType",
+          "projectId",
+          "requestId",
+          "requestStatus",
+          "displayTitle",
+          "requesterOrganization",
+          "items",
+          "primaryReviewAction"
+        ],
+        "description": "Bid participation review thread detail. It may carry message-like display items and review handoff, but Server remains the request-state truth owner.\n",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "threadType": {
+            "type": "string",
+            "enum": [
+              "bid_participation_review"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "requestStatus": {
+            "$ref": "#/components/schemas/BidParticipationRequestStatus"
+          },
+          "displayTitle": {
+            "type": "string"
+          },
+          "requesterOrganization": {
+            "$ref": "#/components/schemas/BidParticipationRequesterReadModel"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "primaryReviewAction": {
+            "$ref": "#/components/schemas/BidParticipationPrimaryReviewAction"
+          }
+        }
+      },
+      "BidParticipationPendingListResponse": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "requests"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BidParticipationThreadDetailReadModel"
+            }
+          }
+        }
+      },
+      "BidParticipationReviewAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "projectId",
+          "status"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          }
+        }
+      },
+      "ProjectCommunicationWorkbenchEntryKey": {
+        "type": "string",
+        "enum": [
+          "publisher_effect_image_review",
+          "publisher_construction_doc_review",
+          "publisher_material_sample_review",
+          "publisher_equipment_material_list_review",
+          "publisher_service_list_review",
+          "bid_project_understanding_review",
+          "bid_quote_sheet_review",
+          "bid_schedule_plan_review",
+          "contract_confirmation",
+          "final_confirmed_amount_confirmation"
+        ]
+      },
+      "ProjectCommunicationWorkbenchGroup": {
+        "type": "string",
+        "enum": [
+          "publisher_materials",
+          "bid_materials",
+          "deal_confirmation"
+        ]
+      },
+      "ProjectCommunicationMaterialReviewState": {
+        "type": "string",
+        "enum": [
+          "unsubmitted",
+          "pending_review",
+          "confirmed",
+          "needs_supplement"
+        ],
+        "description": "Server-owned material review state. Deal-confirmation entries must not carry this state as final amount truth.\n"
+      },
+      "ProjectCommunicationWorkbenchRouteTarget": {
+        "type": "object",
+        "required": [
+          "actionKey",
+          "canonicalPath",
+          "params"
+        ],
+        "properties": {
+          "actionKey": {
+            "type": "string"
+          },
+          "canonicalPath": {
+            "type": "string"
+          },
+          "params": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ProjectCommunicationWorkbenchTruthAnchor": {
+        "type": "object",
+        "required": [
+          "truthOwner",
+          "subjectType",
+          "projectId",
+          "threadId",
+          "bidId",
+          "dealConfirmationId"
+        ],
+        "description": "Structured Server truth anchor for workbench entries. Flutter must not parse labels or summaries to derive business truth.\n",
+        "properties": {
+          "truthOwner": {
+            "type": "string",
+            "enum": [
+              "server"
+            ]
+          },
+          "subjectType": {
+            "type": "string",
+            "enum": [
+              "publisher_quote_basis_material",
+              "bid_submission_material",
+              "deal_confirmation"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "bidId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "dealConfirmationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ProjectCommunicationWorkbenchEntry": {
+        "type": "object",
+        "required": [
+          "entryKey",
+          "group",
+          "label",
+          "summary",
+          "projectId",
+          "threadId",
+          "bidId",
+          "viewerRole",
+          "subjectOwnerRole",
+          "availabilityState",
+          "reviewState",
+          "actionState",
+          "attachmentCount",
+          "latestFeedbackText",
+          "latestFeedbackAt",
+          "reviewedAt",
+          "routeTarget",
+          "truthAnchor"
+        ],
+        "properties": {
+          "entryKey": {
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntryKey"
+          },
+          "group": {
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchGroup"
+          },
+          "label": {
+            "type": "string"
+          },
+          "summary": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "bidId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "viewerRole": {
+            "type": "string",
+            "enum": [
+              "publisher",
+              "bidder",
+              "unknown"
+            ]
+          },
+          "subjectOwnerRole": {
+            "type": "string",
+            "enum": [
+              "publisher",
+              "bidder",
+              "platform"
+            ]
+          },
+          "availabilityState": {
+            "type": "string",
+            "enum": [
+              "unsubmitted",
+              "readable",
+              "unavailable"
+            ]
+          },
+          "reviewState": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "actionState": {
+            "type": "string",
+            "enum": [
+              "enabled",
+              "readonly",
+              "blocked"
+            ]
+          },
+          "attachmentCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "latestFeedbackText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "latestFeedbackAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "reviewedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          },
+          "routeTarget": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectCommunicationWorkbenchRouteTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "truthAnchor": {
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchTruthAnchor"
+          }
+        }
+      },
+      "ProjectCommunicationWorkbenchReadModel": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "threadId",
+          "viewerRole",
+          "entries",
+          "generatedAt"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "viewerRole": {
+            "type": "string",
+            "enum": [
+              "publisher",
+              "bidder",
+              "unknown"
+            ]
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectCommunicationMaterialReviewRequest": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "threadId",
+          "entryKey",
+          "reviewAction",
+          "idempotencyKey"
+        ],
+        "description": "Material review command for the eight material entries only. It must not accept `contract_confirmation` or `final_confirmed_amount_confirmation`.\n",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "bidId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entryKey": {
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntryKey"
+          },
+          "reviewAction": {
+            "type": "string",
+            "enum": [
+              "confirm",
+              "request_supplement"
+            ]
+          },
+          "feedbackReasonCodes": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "default": [
+
+            ]
+          },
+          "feedbackText": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "sourceVersionToken": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "idempotencyKey": {
+            "type": "string"
+          }
+        }
+      },
+      "ProjectCommunicationMaterialReviewAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "entry"
+        ],
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+            }
+          }
+        }
+      },
       "BidSubmitRequest": {
         "type": "object",
         "required": [
           "projectId",
           "quoteAmount",
-          "proposalSummary"
+          "proposalSummary",
+          "projectUnderstandingFileAssetId",
+          "quoteSheetFileAssetId",
+          "schedulePlanFileAssetId"
         ],
-        "description": "Minimum bid submit command request only. This request is frozen to the current Flutter App page-submitted fields and must not be expanded into bid comparison, shortlist, or award-management truth.\n",
+        "description": "Minimum bid submit command request only. This request is frozen to the current Flutter App page-submitted fields: bid quote, proposal summary, and three confirmed bid attachment FileAsset ids. `quoteAmount` is `Bid.quoteAmount` only and must not become final confirmed contract amount, order amount truth, compare scoring truth, shortlist truth, or award-management truth.\n",
         "properties": {
           "projectId": {
             "type": "string"
@@ -14744,6 +15952,18 @@
           },
           "proposalSummary": {
             "type": "string"
+          },
+          "projectUnderstandingFileAssetId": {
+            "type": "string",
+            "description": "Confirmed FileAsset id for the project-understanding bid material."
+          },
+          "quoteSheetFileAssetId": {
+            "type": "string",
+            "description": "Confirmed FileAsset id for the quote-sheet bid material."
+          },
+          "schedulePlanFileAssetId": {
+            "type": "string",
+            "description": "Confirmed FileAsset id for the schedule-plan bid material."
           }
         }
       },
@@ -15173,9 +16393,10 @@
           "currency",
           "contractFileAssetIds",
           "confirmationRole",
+          "platformServiceFeeRecalculationAwarenessConfirmed",
           "idempotencyKey"
         ],
-        "description": "Create-or-advance request for the current bounded deal-confirmation object only.\n",
+        "description": "Create-or-advance request for the current bounded deal-confirmation object only. This request confirms awareness that platform service-fee calculation may read `finalConfirmedAmount` later, but this field does not open service-fee charge, payment, settlement, invoice, or wallet behavior in the current V1 boundary.\n",
         "properties": {
           "selectedBidId": {
             "type": "string"
@@ -15198,6 +16419,9 @@
               "publisher",
               "factory"
             ]
+          },
+          "platformServiceFeeRecalculationAwarenessConfirmed": {
+            "type": "boolean"
           },
           "idempotencyKey": {
             "type": "string"
@@ -15730,7 +16954,7 @@
         "required": [
           "orderId"
         ],
-        "description": "Minimum contract confirm command request only. This request carries the current `orderId` continuation anchor used by the existing `contract/detail` carrier and must not expand into full contract edit semantics.\n",
+        "description": "Minimum contract confirm command request only. This request carries the current `orderId` continuation anchor used by the existing `contract/detail` carrier and must not expand into full contract edit semantics. This request must not carry `finalConfirmedAmount`, `quoteAmount`, `totalAmount`, service-fee fields, payment fields, settlement fields, or invoice fields; final contract amount confirmation is only admitted through the deal-confirmations route family.\n",
         "properties": {
           "orderId": {
             "type": "string"
