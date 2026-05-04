@@ -15,6 +15,10 @@ layer: L0 SSOT
 
 ## Current Round Registrations
 
+### 2026-05-04 Project Create To Publish Mainline Closure Lock
+
+- [project_create_to_publish_mainline_closure_lock_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/project_create_to_publish_mainline_closure_lock_addendum.md) is the formal `L0` closure lock for the ordinary exhibition project create-to-publish chain, freezing `创建项目 -> 草稿 -> 预发布补资料 -> 绿色通道表态 -> 确认发布 -> 竞标中`, blocking future ad hoc page-name, routing, gate-condition, quote-basis, sincerity-green-channel, upload-truth, BFF, Server, contracts, or cloud changes unless a new reopening gate is approved.
+
 ### 2026-05-02 Project Showcase Public Pool Recovery
 
 - [project_showcase_public_pool_recovery_exit_boundary_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/project_showcase_public_pool_recovery_exit_boundary_freeze_addendum.md) is the formal `L0` truth freeze for recovering the project showcase public pool and correcting the exit-governance boundary, freezing `state=published + publishedAt + non-expired` as the ordinary public-list eligibility, blocking `submitted / converted_to_order / awarded / archived` from ordinary showcase list, isolating verification samples from the formal public pool, and keeping cloud writes blocked until a separate controlled-sample recovery confirmation.
