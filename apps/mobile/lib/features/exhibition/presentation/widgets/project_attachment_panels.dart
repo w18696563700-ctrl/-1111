@@ -25,115 +25,138 @@ class _SelectedProjectAttachmentCard extends StatelessWidget {
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
       ),
       child: Padding(
-        padding: const EdgeInsets.all(12),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
         child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+          crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: AppVisualTokens.brandGold.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Padding(
-                padding: EdgeInsets.all(9),
-                child: Icon(
-                  Icons.insert_drive_file_outlined,
-                  color: AppVisualTokens.brandGold,
-                  size: 22,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
+            _ProjectAttachmentFileTypeIcon(extension: draft.extension),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Text(
                     draft.fileName,
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.titleSmall?.copyWith(
                       fontWeight: FontWeight.w900,
                     ),
                   ),
                   const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6,
-                    runSpacing: 6,
-                    crossAxisAlignment: WrapCrossAlignment.center,
+                  Row(
                     children: <Widget>[
-                      Text(
-                        '${_projectAttachmentFileTypeLabel(draft.extension)} · '
-                        '${_projectAttachmentSizeLabel(draft.sizeInBytes)}',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      Expanded(
+                        child: Text(
+                          '${_projectAttachmentFileTypeLabel(draft.extension)} · '
+                          '${_projectAttachmentSizeLabel(draft.sizeInBytes)}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
                         ),
                       ),
+                      const SizedBox(width: 6),
                       _TinyStatusPill(
                         label: '待确认',
                         color: AppVisualTokens.brandGold,
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 8,
-                    children: <Widget>[
-                      Tooltip(
-                        message: previewTooltip,
-                        child: OutlinedButton.icon(
-                          onPressed: previewing ? null : onPreview,
-                          icon: previewing
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.visibility_outlined),
-                          label: Text(previewing ? '处理中' : '预览'),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        onPressed: previewing ? null : onOpen,
-                        icon: const Icon(Icons.open_in_new_rounded),
-                        label: const Text('打开'),
-                      ),
-                      if (onRemove != null)
-                        OutlinedButton.icon(
-                          onPressed: previewing ? null : onRemove,
-                          icon: const Icon(Icons.delete_outline_rounded),
-                          label: const Text('移除'),
-                        ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: AppVisualTokens.brandGold.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 8,
-                      ),
-                      child: Text(
-                        '常见文件格式均可作为资料附件，确认无误后可上传并形成正式附件。',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                          height: 1.35,
-                        ),
-                      ),
-                    ),
-                  ),
                 ],
+              ),
+            ),
+            const SizedBox(width: 6),
+            Tooltip(
+              message: previewTooltip,
+              child: IconButton(
+                key: ValueKey<String>(
+                  'project-attachment-draft-preview-$attachmentKind-${draft.fileName}',
+                ),
+                onPressed: previewing ? null : onPreview,
+                icon: previewing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.visibility_outlined),
+                tooltip: '预览',
+              ),
+            ),
+            IconButton(
+              key: ValueKey<String>(
+                'project-attachment-draft-open-$attachmentKind-${draft.fileName}',
+              ),
+              onPressed: previewing ? null : onOpen,
+              icon: const Icon(Icons.open_in_new_rounded),
+              tooltip: '打开',
+            ),
+            IconButton(
+              key: ValueKey<String>(
+                'project-attachment-draft-remove-$attachmentKind-${draft.fileName}',
+              ),
+              onPressed: previewing ? null : onRemove,
+              icon: const Icon(Icons.delete_outline_rounded),
+              tooltip: '移除',
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectAttachmentFileTypeIcon extends StatelessWidget {
+  const _ProjectAttachmentFileTypeIcon({required this.extension});
+
+  final String extension;
+
+  @override
+  Widget build(BuildContext context) {
+    final normalized = extension.toLowerCase();
+    final color = switch (normalized) {
+      'png' || 'jpg' || 'jpeg' || 'webp' || 'gif' => const Color(0xFF2E7D32),
+      'pdf' => const Color(0xFFE53935),
+      'doc' || 'docx' => const Color(0xFF1976D2),
+      'xls' || 'xlsx' || 'csv' => const Color(0xFF2E7D32),
+      _ => AppVisualTokens.brandGold,
+    };
+    final icon = switch (normalized) {
+      'png' || 'jpg' || 'jpeg' || 'webp' || 'gif' => Icons.image_outlined,
+      'pdf' => Icons.picture_as_pdf_outlined,
+      'doc' || 'docx' => Icons.article_outlined,
+      'xls' || 'xlsx' || 'csv' => Icons.table_chart_outlined,
+      _ => Icons.insert_drive_file_outlined,
+    };
+    final label = normalized.isEmpty ? 'FILE' : normalized.toUpperCase();
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: SizedBox(
+        width: 42,
+        height: 42,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Icon(icon, size: 18, color: color),
+            const SizedBox(height: 1),
+            Text(
+              label.length > 4 ? label.substring(0, 4) : label,
+              style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                color: color,
+                fontWeight: FontWeight.w900,
+                fontSize: 9,
               ),
             ),
           ],
@@ -141,6 +164,300 @@ class _SelectedProjectAttachmentCard extends StatelessWidget {
       ),
     );
   }
+}
+
+class _ProjectAttachmentFilterPill extends StatelessWidget {
+  const _ProjectAttachmentFilterPill({
+    required this.label,
+    this.selected = false,
+  });
+
+  final String label;
+  final bool selected;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected ? AppVisualTokens.brandGold : colorScheme.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? AppVisualTokens.brandGold
+                : colorScheme.outlineVariant,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: selected ? Colors.white : colorScheme.onSurface,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectAttachmentAutoUploadNotice extends StatelessWidget {
+  const _ProjectAttachmentAutoUploadNotice();
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: AppVisualTokens.brandGold.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            const Icon(
+              Icons.lightbulb_outline_rounded,
+              color: AppVisualTokens.brandGold,
+              size: 18,
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '选择文件后将自动上传，上传成功后可删除或重新上传。',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectAttachmentCompactRecordRow extends StatelessWidget {
+  const _ProjectAttachmentCompactRecordRow({
+    required this.attachment,
+    required this.openingPreview,
+    required this.deleting,
+    required this.onPreview,
+    required this.onOpen,
+    required this.onDelete,
+  });
+
+  final ProjectAttachmentReadModel attachment;
+  final bool openingPreview;
+  final bool deleting;
+  final VoidCallback? onPreview;
+  final VoidCallback? onOpen;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final extension = _projectAttachmentExtension(attachment.fileName) ?? '';
+    final meta = <String>[
+      _projectAttachmentMimeTypeLabel(attachment.mimeType),
+      _projectAttachmentTimestampLabel(attachment.createdAt),
+      '已确认',
+    ].join(' · ');
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 9),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final compactActions = constraints.maxWidth < 330;
+            return Row(
+              children: <Widget>[
+                _ProjectAttachmentFileTypeIcon(extension: extension),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        attachment.fileName,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        meta,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 4),
+                IconButton(
+                  key: ValueKey<String>(
+                    'project-attachment-preview-${attachment.attachmentId}',
+                  ),
+                  onPressed: openingPreview || deleting ? null : onPreview,
+                  icon: openingPreview
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.visibility_outlined),
+                  tooltip: _projectAttachmentRecordPreviewButtonLabel(
+                    attachment.mimeType,
+                  ),
+                ),
+                if (!compactActions)
+                  IconButton(
+                    key: ValueKey<String>(
+                      'project-attachment-open-${attachment.attachmentId}',
+                    ),
+                    onPressed: openingPreview || deleting ? null : onOpen,
+                    icon: const Icon(Icons.open_in_new_rounded),
+                    tooltip: '打开',
+                  ),
+                if (!compactActions)
+                  IconButton(
+                    key: ValueKey<String>(
+                      'project-attachment-delete-${attachment.attachmentId}',
+                    ),
+                    onPressed: openingPreview || deleting ? null : onDelete,
+                    icon: deleting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.delete_outline_rounded),
+                    tooltip: '删除当前资料',
+                  ),
+                IconButton(
+                  key: ValueKey<String>(
+                    'project-attachment-more-${attachment.attachmentId}',
+                  ),
+                  onPressed: deleting
+                      ? null
+                      : () => _showProjectAttachmentMoreSheet(
+                          context,
+                          attachment: attachment,
+                          onPreview: onPreview,
+                          onOpen: onOpen,
+                          onDelete: onDelete,
+                        ),
+                  icon: const Icon(Icons.more_horiz_rounded),
+                  tooltip: '更多',
+                ),
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+void _showProjectAttachmentMoreSheet(
+  BuildContext context, {
+  required ProjectAttachmentReadModel attachment,
+  required VoidCallback? onPreview,
+  required VoidCallback? onOpen,
+  required VoidCallback? onDelete,
+}) {
+  showModalBottomSheet<void>(
+    context: context,
+    showDragHandle: true,
+    builder: (BuildContext context) {
+      return SafeArea(
+        child: SingleChildScrollView(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  attachment.fileName,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    OutlinedButton.icon(
+                      onPressed: onPreview == null
+                          ? null
+                          : () {
+                              Navigator.of(context).pop();
+                              onPreview();
+                            },
+                      icon: const Icon(Icons.visibility_outlined),
+                      label: const Text('预览'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onOpen == null
+                          ? null
+                          : () {
+                              Navigator.of(context).pop();
+                              onOpen();
+                            },
+                      icon: const Icon(Icons.open_in_new_rounded),
+                      label: const Text('打开'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: onDelete == null
+                          ? null
+                          : () {
+                              Navigator.of(context).pop();
+                              onDelete();
+                            },
+                      icon: const Icon(Icons.delete_outline_rounded),
+                      label: const Text('删除当前资料'),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                _DetailLine(label: '完整文件名', value: attachment.fileName),
+                _DetailLine(label: 'FileAsset', value: attachment.fileAssetId),
+                _DetailLine(label: '文件类型', value: attachment.mimeType),
+                _DetailLine(
+                  label: '可见范围',
+                  value: _projectAttachmentVisibilityLabel(
+                    attachment.visibility,
+                  ),
+                ),
+                _DetailLine(label: '排序序号', value: '${attachment.sortOrder}'),
+                _DetailLine(label: '创建时间', value: attachment.createdAt),
+                if (attachment.createdBy != null)
+                  _DetailLine(label: '创建人', value: attachment.createdBy!),
+              ],
+            ),
+          ),
+        ),
+      );
+    },
+  );
 }
 
 class _TinyStatusPill extends StatelessWidget {
@@ -262,18 +579,24 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
     this.selectedDraftsByKind =
         const <String, List<_ResolvedProjectAttachmentDraft>>{},
     this.selectedKind,
+    this.openingAttachmentIds = const <String>{},
+    this.deletingAttachmentIds = const <String>{},
     this.onSelectKind,
     this.onAddKind,
     this.onPreviewDraft,
     this.onOpenDraft,
     this.isDraftPreviewing,
     this.onRemoveDraft,
+    this.onPreviewAttachment,
+    this.onDeleteAttachment,
     this.workbenchMode = false,
   });
 
   final List<ProjectAttachmentReadModel> attachments;
   final Map<String, List<_ResolvedProjectAttachmentDraft>> selectedDraftsByKind;
   final String? selectedKind;
+  final Set<String> openingAttachmentIds;
+  final Set<String> deletingAttachmentIds;
   final ValueChanged<String>? onSelectKind;
   final ValueChanged<String>? onAddKind;
   final ValueChanged<_ResolvedProjectAttachmentDraft>? onPreviewDraft;
@@ -284,10 +607,17 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
     _ResolvedProjectAttachmentDraft draft,
   )?
   onRemoveDraft;
+  final ValueChanged<ProjectAttachmentReadModel>? onPreviewAttachment;
+  final ValueChanged<ProjectAttachmentReadModel>? onDeleteAttachment;
   final bool workbenchMode;
 
   @override
   Widget build(BuildContext context) {
+    final attachmentsByKind = <String, List<ProjectAttachmentReadModel>>{
+      for (final option in _projectAttachmentKindOptions)
+        option.value: <ProjectAttachmentReadModel>[],
+    };
+    final unknownAttachments = <ProjectAttachmentReadModel>[];
     final countsByKind = <String, int>{
       for (final option in _projectAttachmentKindOptions) option.value: 0,
     };
@@ -295,8 +625,22 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
       final current = countsByKind[attachment.attachmentKind];
       if (current != null) {
         countsByKind[attachment.attachmentKind] = current + 1;
+        attachmentsByKind[attachment.attachmentKind]!.add(attachment);
+      } else {
+        unknownAttachments.add(attachment);
       }
     }
+    final pendingCount = selectedDraftsByKind.values.fold<int>(
+      0,
+      (int total, List<_ResolvedProjectAttachmentDraft> drafts) =>
+          total + drafts.length,
+    );
+    final missingKindCount = _projectAttachmentKindOptions.where((
+      _ProjectAttachmentKindOption option,
+    ) {
+      return (countsByKind[option.value] ?? 0) == 0 &&
+          (selectedDraftsByKind[option.value]?.isEmpty ?? true);
+    }).length;
 
     return DecoratedBox(
       decoration: BoxDecoration(
@@ -312,12 +656,13 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
             Row(
               children: <Widget>[
                 Expanded(
-                  child: Text(
-                    '报价依据资料 checklist',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
+                  child: workbenchMode
+                      ? const SizedBox.shrink()
+                      : Text(
+                          '报价依据资料 checklist',
+                          style: Theme.of(context).textTheme.titleSmall
+                              ?.copyWith(fontWeight: FontWeight.w800),
+                        ),
                 ),
                 Icon(
                   Icons.info_outline_rounded,
@@ -334,17 +679,42 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 10),
+            if (workbenchMode) ...<Widget>[
+              const SizedBox(height: 8),
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: <Widget>[
+                    _ProjectAttachmentFilterPill(
+                      label: '全部类型 5',
+                      selected: true,
+                    ),
+                    _ProjectAttachmentFilterPill(
+                      label: '待补充 $missingKindCount',
+                    ),
+                    _ProjectAttachmentFilterPill(label: '待上传 $pendingCount'),
+                    _ProjectAttachmentFilterPill(
+                      label: '已上传 ${attachments.length}',
+                    ),
+                  ],
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
             ..._projectAttachmentKindOptions.map((
               _ProjectAttachmentKindOption option,
             ) {
               final count = countsByKind[option.value] ?? 0;
               final selected = selectedKind == option.value;
+              final formalAttachments =
+                  attachmentsByKind[option.value] ??
+                  const <ProjectAttachmentReadModel>[];
               final selectedDrafts =
                   selectedDraftsByKind[option.value] ??
                   const <_ResolvedProjectAttachmentDraft>[];
               final draftCount = selectedDrafts.length;
               final satisfied = count > 0;
+              final expanded = selected || draftCount > 0 || satisfied;
               final statusLabel = draftCount > 0
                   ? '待上传 $draftCount'
                   : satisfied
@@ -367,6 +737,9 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                   child: Padding(
                     padding: const EdgeInsets.all(12),
                     child: Column(
+                      key: ValueKey<String>(
+                        'project-attachment-kind-${option.value}',
+                      ),
                       children: <Widget>[
                         Row(
                           children: <Widget>[
@@ -418,13 +791,29 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                                 )
                               else
                                 TextButton(
+                                  key: ValueKey<String>(
+                                    'project-attachment-add-${option.value}',
+                                  ),
                                   onPressed: () => onAddKind!(option.value),
                                   child: const Text('添加'),
                                 ),
                             ],
+                            if (formalAttachments.isNotEmpty) ...<Widget>[
+                              const SizedBox(width: 4),
+                              Icon(
+                                expanded
+                                    ? Icons.keyboard_arrow_up_rounded
+                                    : Icons.keyboard_arrow_down_rounded,
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                              ),
+                            ],
                           ],
                         ),
-                        if (selected && selectedDrafts.isNotEmpty) ...<Widget>[
+                        if (expanded &&
+                            (selectedDrafts.isNotEmpty ||
+                                formalAttachments.isNotEmpty)) ...<Widget>[
                           const SizedBox(height: 12),
                           ...selectedDrafts.asMap().entries.map((
                             MapEntry<int, _ResolvedProjectAttachmentDraft>
@@ -452,6 +841,34 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                               ),
                             );
                           }),
+                          ...formalAttachments.asMap().entries.map((
+                            MapEntry<int, ProjectAttachmentReadModel> entry,
+                          ) {
+                            final attachment = entry.value;
+                            final isLast =
+                                entry.key == formalAttachments.length - 1;
+                            return Padding(
+                              padding: EdgeInsets.only(bottom: isLast ? 0 : 8),
+                              child: _ProjectAttachmentCompactRecordRow(
+                                attachment: attachment,
+                                openingPreview: openingAttachmentIds.contains(
+                                  attachment.attachmentId,
+                                ),
+                                deleting: deletingAttachmentIds.contains(
+                                  attachment.attachmentId,
+                                ),
+                                onPreview: onPreviewAttachment == null
+                                    ? null
+                                    : () => onPreviewAttachment!(attachment),
+                                onOpen: onPreviewAttachment == null
+                                    ? null
+                                    : () => onPreviewAttachment!(attachment),
+                                onDelete: onDeleteAttachment == null
+                                    ? null
+                                    : () => onDeleteAttachment!(attachment),
+                              ),
+                            );
+                          }),
                         ],
                       ],
                     ),
@@ -459,6 +876,42 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                 ),
               );
             }),
+            if (unknownAttachments.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 6),
+              ExpansionTile(
+                tilePadding: EdgeInsets.zero,
+                title: const Text('待确认归属附件'),
+                children: unknownAttachments
+                    .map(
+                      (ProjectAttachmentReadModel attachment) =>
+                          _ProjectAttachmentCompactRecordRow(
+                            attachment: attachment,
+                            openingPreview: openingAttachmentIds.contains(
+                              attachment.attachmentId,
+                            ),
+                            deleting: deletingAttachmentIds.contains(
+                              attachment.attachmentId,
+                            ),
+                            onPreview: onPreviewAttachment == null
+                                ? null
+                                : () => onPreviewAttachment!(attachment),
+                            onOpen: onPreviewAttachment == null
+                                ? null
+                                : () => onPreviewAttachment!(attachment),
+                            onDelete: onDeleteAttachment == null
+                                ? null
+                                : () => onDeleteAttachment!(attachment),
+                          ),
+                    )
+                    .toList(growable: false),
+              ),
+            ],
+            if (workbenchMode && attachments.isEmpty && pendingCount == 0) ...[
+              const SizedBox(height: 8),
+              const _ProjectAttachmentLightEmptyNotice(
+                message: '请至少补充一类资料，方便接单方准确报价。',
+              ),
+            ],
           ],
         ),
       ),

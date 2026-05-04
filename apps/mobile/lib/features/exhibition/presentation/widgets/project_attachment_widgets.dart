@@ -13,6 +13,7 @@ class _ProjectAttachmentSection extends StatefulWidget {
     this.showKindHint = true,
     this.showIdleUploadState = true,
     this.workbenchMode = false,
+    this.autoUploadOnSelect = false,
     this.onListResultChanged,
   });
 
@@ -26,6 +27,7 @@ class _ProjectAttachmentSection extends StatefulWidget {
   final bool showKindHint;
   final bool showIdleUploadState;
   final bool workbenchMode;
+  final bool autoUploadOnSelect;
   final ValueChanged<ExhibitionLoadResult?>? onListResultChanged;
 
   @override
@@ -208,9 +210,13 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     widget.onListResultChanged?.call(result);
   }
 
-  Future<void> _selectAttachment({bool append = false}) async {
-    final targetAttachmentKind = _selectedAttachmentKind;
+  Future<void> _selectAttachment({
+    bool append = false,
+    String? attachmentKind,
+  }) async {
+    final targetAttachmentKind = attachmentKind ?? _selectedAttachmentKind;
     setState(() {
+      _selectedAttachmentKind = targetAttachmentKind;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.selecting;
       _uploadMessage = append ? '正在继续选择报价依据资料' : '正在选择报价依据资料';
     });
@@ -293,10 +299,15 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _retryDraft = null;
       _retryAttachmentKind = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.selectedReady;
-      _uploadMessage = _selectedDraftCount == 1
+      _uploadMessage = widget.autoUploadOnSelect
+          ? '已选择 ${resolved.fileName}，正在自动上传并形成正式附件。'
+          : _selectedDraftCount == 1
           ? '已选中 ${resolved.fileName}，可以继续上传并形成正式附件。'
           : '已加入 ${resolved.fileName}。当前共 $_selectedDraftCount 个附件，可以继续添加后一次上传。';
     });
+    if (widget.autoUploadOnSelect && widget.projectId != null) {
+      unawaited(_uploadSelectedAttachment());
+    }
   }
 
   Future<void> _uploadSelectedAttachment() async {
@@ -630,12 +641,15 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
         fileName: draft.fileName,
         bytes: draft.bytes,
       );
-      final opened = await _openProjectAttachmentLocalFile(file.path);
+      final opened = await _openProjectAttachmentLocalFile(
+        file.path,
+        mimeType: draft.mimeType,
+      );
       if (!mounted) {
         return;
       }
       _showSectionMessage(
-        opened ? '已在系统中打开当前附件。' : '当前设备暂时不能直接打开这个附件，请上传成功后再试远程预览。',
+        opened ? '已打开当前附件预览。' : '当前设备暂时不能直接打开这个附件，请上传成功后再试远程预览。',
       );
     } catch (_) {
       if (mounted) {
@@ -660,12 +674,15 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
         fileName: draft.fileName,
         bytes: draft.bytes,
       );
-      final opened = await _openProjectAttachmentLocalFile(file.path);
+      final opened = await _openProjectAttachmentLocalFile(
+        file.path,
+        mimeType: draft.mimeType,
+      );
       if (!mounted) {
         return;
       }
       _showSectionMessage(
-        opened ? '已在系统中打开当前附件。' : '当前设备暂时不能直接打开这个附件，请上传成功后再试远程预览。',
+        opened ? '已打开当前附件预览。' : '当前设备暂时不能直接打开这个附件，请上传成功后再试远程预览。',
       );
     } catch (_) {
       if (mounted) {
@@ -678,7 +695,7 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     }
   }
 
-  Future<void> _showAttachmentKindSwitchSheet() async {
+  Future<String?> _showAttachmentKindSwitchSheet() async {
     final selected = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -717,9 +734,18 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       },
     );
     if (!mounted || selected == null) {
-      return;
+      return null;
     }
     setState(() => _selectedAttachmentKind = selected);
+    return selected;
+  }
+
+  Future<void> _selectAttachmentFromKindSheet() async {
+    final selected = await _showAttachmentKindSwitchSheet();
+    if (!mounted || selected == null) {
+      return;
+    }
+    await _selectAttachment(attachmentKind: selected);
   }
 
   void _removeSelectedDraftFromQueue(
@@ -869,11 +895,33 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       return;
     }
 
-    setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
+    final previewFile = await _downloadProjectAttachmentPreviewTempFile(
+      accessUrl: access.accessUrl,
+      fileName: attachment.fileName,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (previewFile != null) {
+      final opened = await _openProjectAttachmentLocalFile(
+        previewFile.path,
+        mimeType: attachment.mimeType,
+      );
+      if (!mounted) {
+        return;
+      }
+      if (opened) {
+        setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
+        _showSectionMessage('已打开资料预览。');
+        return;
+      }
+    }
+
     final opened = await _openProjectAttachmentUrl(access.accessUrl);
     if (!mounted) {
       return;
     }
+    setState(() => _openingAttachmentIds.remove(attachment.attachmentId));
     _showSectionMessage(opened ? '资料链接已打开。' : '资料链接已生成，但当前设备未能直接打开，请稍后再试。');
   }
 
@@ -903,29 +951,30 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           ),
           const SizedBox(height: 12),
         ],
-        _ProjectAttachmentKindPicker(
-          selectedValue: _selectedAttachmentKind,
-          onChanged: _canChooseAttachment
-              ? (String value) {
-                  setState(() => _selectedAttachmentKind = value);
-                }
-              : null,
-        ),
-        const SizedBox(height: 12),
+        if (!widget.workbenchMode) ...<Widget>[
+          _ProjectAttachmentKindPicker(
+            selectedValue: _selectedAttachmentKind,
+            onChanged: _canChooseAttachment
+                ? (String value) {
+                    setState(() => _selectedAttachmentKind = value);
+                  }
+                : null,
+          ),
+          const SizedBox(height: 12),
+        ],
         _ProjectAttachmentRequirementPanel(
           attachments: _attachments,
           selectedDraftsByKind: _selectedDraftsByKind,
           selectedKind: _selectedAttachmentKind,
+          openingAttachmentIds: _openingAttachmentIds,
+          deletingAttachmentIds: _deletingAttachmentIds,
           onSelectKind: _canChooseAttachment
               ? (String value) {
                   setState(() => _selectedAttachmentKind = value);
                 }
               : null,
           onAddKind: _canChooseAttachment
-              ? (String value) {
-                  setState(() => _selectedAttachmentKind = value);
-                  _selectAttachment();
-                }
+              ? (String value) => _selectAttachment(attachmentKind: value)
               : null,
           onPreviewDraft: (draft) => _previewSelectedDraft(draft),
           onOpenDraft: (draft) => _openSelectedDraft(draft),
@@ -935,6 +984,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               ? (attachmentKind, draft) =>
                     _removeSelectedDraftFromQueue(attachmentKind, draft)
               : null,
+          onPreviewAttachment: _previewAttachment,
+          onDeleteAttachment: _deleteAttachment,
           workbenchMode: widget.workbenchMode,
         ),
         if (widget.showKindHint) ...<Widget>[
@@ -949,11 +1000,17 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
           builder: (BuildContext context, BoxConstraints constraints) {
             final chooseButton = FilledButton.tonalIcon(
               onPressed: _canChooseAttachment
-                  ? () => _selectAttachment()
+                  ? widget.workbenchMode
+                        ? _selectAttachmentFromKindSheet
+                        : () => _selectAttachment()
                   : null,
               icon: const Icon(Icons.attach_file_rounded),
               label: Text(
-                _projectAttachmentChooseActionLabel(_selectedAttachmentKind),
+                widget.workbenchMode
+                    ? '选择资料类型并上传'
+                    : _projectAttachmentChooseActionLabel(
+                        _selectedAttachmentKind,
+                      ),
                 textAlign: TextAlign.center,
               ),
             );
@@ -966,7 +1023,9 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
             );
             final switchKindButton = OutlinedButton.icon(
               onPressed: _canChooseAttachment
-                  ? _showAttachmentKindSwitchSheet
+                  ? () {
+                      unawaited(_showAttachmentKindSwitchSheet());
+                    }
                   : null,
               icon: const Icon(Icons.swap_horiz_rounded),
               label: const Text('更换资料类型', textAlign: TextAlign.center),
@@ -975,10 +1034,13 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               onPressed: _canUploadAttachment
                   ? _uploadSelectedAttachment
                   : null,
-              child: const Text('上传并形成正式附件', textAlign: TextAlign.center),
+              child: Text(
+                widget.autoUploadOnSelect ? '重试上传' : '上传并形成正式附件',
+                textAlign: TextAlign.center,
+              ),
             );
 
-            if (!_hasSelectedDrafts) {
+            if (!_hasSelectedDrafts || widget.autoUploadOnSelect) {
               return Align(
                 alignment: Alignment.centerLeft,
                 child: chooseButton,
@@ -1042,6 +1104,10 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
               ),
           ],
         ),
+        if (widget.workbenchMode) ...<Widget>[
+          const SizedBox(height: 10),
+          const _ProjectAttachmentAutoUploadNotice(),
+        ],
         if (widget.showIdleUploadState ||
             _uploadStatus != _ProjectAttachmentUploadUiStatus.idle ||
             _hasSelectedDrafts) ...<Widget>[
@@ -1052,25 +1118,27 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
             selectedDraft: _firstSelectedDraft,
           ),
         ],
-        const SizedBox(height: 16),
-        _ProjectAttachmentFormalListPanel(
-          loading: _loadingList,
-          result: _listResult,
-          attachments: _attachments,
-          emptyMessage: widget.emptyMessage,
-          canContinue: widget.projectId != null,
-          feedbackMessage: _listFeedbackMessage,
-          deletingAttachmentIds: _deletingAttachmentIds,
-          onRetry: widget.projectId == null
-              ? null
-              : () => _loadFormalAttachments(forceRefresh: true),
-          openingAttachmentIds: _openingAttachmentIds,
-          onPreview: _previewAttachment,
-          onDelete: _deleteAttachment,
-          autoloaded: widget.autoloadFormalList || _listResult != null,
-          showChecklist: false,
-          lightEmptyNotice: widget.workbenchMode,
-        ),
+        if (!widget.workbenchMode) ...<Widget>[
+          const SizedBox(height: 16),
+          _ProjectAttachmentFormalListPanel(
+            loading: _loadingList,
+            result: _listResult,
+            attachments: _attachments,
+            emptyMessage: widget.emptyMessage,
+            canContinue: widget.projectId != null,
+            feedbackMessage: _listFeedbackMessage,
+            deletingAttachmentIds: _deletingAttachmentIds,
+            onRetry: widget.projectId == null
+                ? null
+                : () => _loadFormalAttachments(forceRefresh: true),
+            openingAttachmentIds: _openingAttachmentIds,
+            onPreview: _previewAttachment,
+            onDelete: _deleteAttachment,
+            autoloaded: widget.autoloadFormalList || _listResult != null,
+            showChecklist: false,
+            lightEmptyNotice: widget.workbenchMode,
+          ),
+        ],
       ],
     );
   }

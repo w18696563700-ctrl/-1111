@@ -54,6 +54,9 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
                   : '必传：效果图、尺寸图 / 施工图、材质图 / 材料样板；其余两类建议继续补齐。',
               statusLabel: quoteBasis.requiredSummaryLabel,
               emphasized: quoteBasis.allRequiredKindsPresent,
+              accentColor: quoteBasis.allRequiredKindsPresent
+                  ? _prepublishReadyGreen
+                  : null,
               action: OutlinedButton(
                 onPressed: quoteBasis.loading ? null : onAddAttachments,
                 child: Text(
@@ -73,6 +76,9 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
                   ? '已表态'
                   : '待表态',
               emphasized: _sincerityGreenChannelChoiceCompleted(sincerity),
+              accentColor: _sincerityGreenChannelChoiceCompleted(sincerity)
+                  ? _prepublishReadyGreen
+                  : null,
               action: sincerity?.canContinuePayment == true
                   ? OutlinedButton(
                       onPressed: continuingSincerity || pricingLoading
@@ -248,8 +254,19 @@ class _PrepublishTodoGrid extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
-        final useTwoColumns = constraints.maxWidth >= 300;
-        if (!useTwoColumns) {
+        if (constraints.maxWidth >= 360) {
+          return Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              for (var index = 0; index < children.length; index++) ...[
+                if (index > 0) const SizedBox(width: 10),
+                Expanded(child: children[index]),
+              ],
+            ],
+          );
+        }
+
+        if (constraints.maxWidth < 300) {
           return Column(
             children: <Widget>[
               for (var index = 0; index < children.length; index++) ...[
@@ -300,82 +317,85 @@ class _PrepublishTodoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-    final activeColor = accentColor ?? colorScheme.primary;
+    final stateColor = emphasized
+        ? (accentColor ?? _prepublishReadyGreen)
+        : AppVisualTokens.brandGold;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 150),
+      constraints: const BoxConstraints(minHeight: 118),
       child: DecoratedBox(
         decoration: BoxDecoration(
-          color: emphasized
-              ? activeColor.withValues(alpha: 0.10)
-              : colorScheme.surfaceContainerLow,
+          color: stateColor.withValues(alpha: emphasized ? 0.10 : 0.06),
           borderRadius: BorderRadius.circular(18),
           border: Border.all(
-            color: emphasized
-                ? activeColor.withValues(alpha: 0.24)
-                : colorScheme.outlineVariant,
+            color: stateColor.withValues(alpha: emphasized ? 0.30 : 0.20),
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
+          padding: const EdgeInsets.all(10),
+          child: LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final compact = constraints.maxWidth < 125;
+              return Column(
+                mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  DecoratedBox(
-                    decoration: BoxDecoration(
-                      color: (emphasized ? activeColor : colorScheme.outline)
-                          .withValues(alpha: 0.10),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(7),
-                      child: Icon(
-                        icon,
-                        size: 18,
-                        color: emphasized ? activeColor : colorScheme.outline,
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: stateColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(compact ? 6 : 7),
+                          child: Icon(
+                            icon,
+                            size: compact ? 16 : 18,
+                            color: stateColor,
+                          ),
+                        ),
                       ),
+                      const SizedBox(width: 7),
+                      Expanded(
+                        child: Text(
+                          title,
+                          maxLines: compact ? 2 : 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: theme.textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w900,
+                            height: 1.16,
+                            fontSize: compact ? 12 : null,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  _TinyStatusPill(label: statusLabel, color: stateColor),
+                  const SizedBox(height: 7),
+                  Text(
+                    body,
+                    maxLines: compact ? 2 : 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.34,
+                      fontSize: compact ? 11 : null,
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                        height: 1.2,
-                      ),
+                  const SizedBox(height: 8),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerRight,
+                      child: action,
                     ),
                   ),
                 ],
-              ),
-              const SizedBox(height: 8),
-              if (accentColor != null && emphasized)
-                _TinyStatusPill(label: statusLabel, color: activeColor)
-              else
-                _StatusPill(
-                  label: statusLabel,
-                  tone: emphasized
-                      ? _ActionCardTone.emphasis
-                      : _ActionCardTone.muted,
-                ),
-              const SizedBox(height: 8),
-              Text(
-                body,
-                maxLines: 3,
-                overflow: TextOverflow.ellipsis,
-                style: theme.textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  height: 1.42,
-                ),
-              ),
-              const SizedBox(height: 10),
-              Align(alignment: Alignment.centerRight, child: action),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -406,27 +426,89 @@ class _PrepublishGreenChannelTodoTile extends StatelessWidget {
           '支持机制 ${summary.supportFreezeCount} / 暂不支持 ${summary.opposeFreezeCount}',
       statusLabel: completed ? '已选择' : '待选择',
       emphasized: completed,
-      action: Wrap(
-        spacing: 6,
-        runSpacing: 6,
-        alignment: WrapAlignment.end,
-        children: <Widget>[
-          _SincerityFreezeFeedbackButton(
-            label: '支持项目真实性诚意金机制 ${summary.supportFreezeCount}',
-            choice: 'support_freeze',
-            selected: summary.myChoice == 'support_freeze',
-            submittingChoice: submittingChoice,
-            onChoice: onChoice,
-          ),
-          _SincerityFreezeFeedbackButton(
-            label: '暂不支持项目真实性诚意金机制 ${summary.opposeFreezeCount}',
-            choice: 'oppose_freeze',
-            selected: summary.myChoice == 'oppose_freeze',
-            submittingChoice: submittingChoice,
-            onChoice: onChoice,
-          ),
-        ],
+      accentColor: completed ? _prepublishReadyGreen : null,
+      action: _PrepublishGreenChannelChoiceAction(
+        summary: summary,
+        submittingChoice: submittingChoice,
+        onChoice: onChoice,
       ),
+    );
+  }
+}
+
+class _PrepublishGreenChannelChoiceAction extends StatelessWidget {
+  const _PrepublishGreenChannelChoiceAction({
+    required this.summary,
+    required this.submittingChoice,
+    required this.onChoice,
+  });
+
+  final _ProjectAuthenticitySincerityFreezeFeedbackSummary summary;
+  final String? submittingChoice;
+  final ValueChanged<String>? onChoice;
+
+  @override
+  Widget build(BuildContext context) {
+    return OutlinedButton(
+      onPressed: onChoice == null
+          ? null
+          : () => _showPrepublishGreenChannelChoiceSheet(context),
+      child: Text(
+        summary.myChoice == null ? '去表态' : '改表态',
+        textAlign: TextAlign.center,
+      ),
+    );
+  }
+
+  List<Widget> _choiceButtons() {
+    return <Widget>[
+      _SincerityFreezeFeedbackButton(
+        label: '支持项目真实性诚意金机制 ${summary.supportFreezeCount}',
+        choice: 'support_freeze',
+        selected: summary.myChoice == 'support_freeze',
+        submittingChoice: submittingChoice,
+        onChoice: onChoice,
+      ),
+      _SincerityFreezeFeedbackButton(
+        label: '暂不支持项目真实性诚意金机制 ${summary.opposeFreezeCount}',
+        choice: 'oppose_freeze',
+        selected: summary.myChoice == 'oppose_freeze',
+        submittingChoice: submittingChoice,
+        onChoice: onChoice,
+      ),
+    ];
+  }
+
+  void _showPrepublishGreenChannelChoiceSheet(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Text(
+                  '绿色通道表态',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w900,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                ..._choiceButtons().map(
+                  (Widget child) => Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: child,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

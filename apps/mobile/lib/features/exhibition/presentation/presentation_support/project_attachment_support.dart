@@ -6,6 +6,10 @@ typedef ProjectAttachmentSourceChooser =
 typedef ProjectAttachmentExternalUrlOpener = Future<bool> Function(Uri uri);
 typedef ProjectAttachmentRemoteImageBytesLoader =
     Future<List<int>?> Function(Uri uri);
+typedef ProjectAttachmentLocalFileOpener =
+    Future<bool> Function(String path, String? mimeType);
+typedef ProjectAttachmentPreviewTempFileWriter =
+    Future<File> Function({required String fileName, required List<int> bytes});
 
 const String _projectAttachmentBusinessType = 'project';
 const String _projectAttachmentFileKind = 'project_attachment';
@@ -34,6 +38,8 @@ final class ProjectAttachmentDebugOverrides {
   static ProjectAttachmentSourceChooser? _sourceChooserOverride;
   static ProjectAttachmentExternalUrlOpener? _externalUrlOpener;
   static ProjectAttachmentRemoteImageBytesLoader? _remoteImageBytesLoader;
+  static ProjectAttachmentLocalFileOpener? _localFileOpener;
+  static ProjectAttachmentPreviewTempFileWriter? _previewTempFileWriter;
 
   static void installPicker(ProjectAttachmentPicker? picker) {
     _pickerOverride = picker;
@@ -55,6 +61,16 @@ final class ProjectAttachmentDebugOverrides {
     _remoteImageBytesLoader = loader;
   }
 
+  static void installLocalFileOpener(ProjectAttachmentLocalFileOpener? opener) {
+    _localFileOpener = opener;
+  }
+
+  static void installPreviewTempFileWriter(
+    ProjectAttachmentPreviewTempFileWriter? writer,
+  ) {
+    _previewTempFileWriter = writer;
+  }
+
   static void clearSession() {}
 
   static void reset() {
@@ -62,6 +78,8 @@ final class ProjectAttachmentDebugOverrides {
     _sourceChooserOverride = null;
     _externalUrlOpener = null;
     _remoteImageBytesLoader = null;
+    _localFileOpener = null;
+    _previewTempFileWriter = null;
     clearSession();
   }
 }
@@ -546,6 +564,7 @@ String _projectAttachmentRecordPreviewButtonLabel(String mimeType) {
 }
 
 const int _projectAttachmentRemoteImagePreviewMaxBytes = 12 * 1024 * 1024;
+const int _projectAttachmentRemoteFilePreviewMaxBytes = 25 * 1024 * 1024;
 
 int _projectAttachmentNextSortOrder(List<ProjectAttachmentReadModel> items) {
   if (items.isEmpty) {
@@ -718,9 +737,10 @@ Future<bool> _openProjectAttachmentUrl(String accessUrl) async {
   return false;
 }
 
-Future<List<int>?> _loadProjectAttachmentRemoteImageBytes(
-  String accessUrl,
-) async {
+Future<List<int>?> _loadProjectAttachmentRemoteBytes(
+  String accessUrl, {
+  required int maxBytes,
+}) async {
   final uri = Uri.tryParse(accessUrl);
   if (uri == null || (uri.scheme != 'http' && uri.scheme != 'https')) {
     return null;
@@ -739,7 +759,7 @@ Future<List<int>?> _loadProjectAttachmentRemoteImageBytes(
     if (response.statusCode < 200 || response.statusCode >= 300) {
       return null;
     }
-    if (response.contentLength > _projectAttachmentRemoteImagePreviewMaxBytes) {
+    if (response.contentLength > maxBytes) {
       return null;
     }
 
@@ -747,7 +767,7 @@ Future<List<int>?> _loadProjectAttachmentRemoteImageBytes(
     final buffer = BytesBuilder(copy: false);
     await for (final chunk in response) {
       totalBytes += chunk.length;
-      if (totalBytes > _projectAttachmentRemoteImagePreviewMaxBytes) {
+      if (totalBytes > maxBytes) {
         return null;
       }
       buffer.add(chunk);
@@ -766,10 +786,39 @@ Future<List<int>?> _loadProjectAttachmentRemoteImageBytes(
   }
 }
 
+Future<List<int>?> _loadProjectAttachmentRemoteImageBytes(String accessUrl) {
+  return _loadProjectAttachmentRemoteBytes(
+    accessUrl,
+    maxBytes: _projectAttachmentRemoteImagePreviewMaxBytes,
+  );
+}
+
+Future<File?> _downloadProjectAttachmentPreviewTempFile({
+  required String accessUrl,
+  required String fileName,
+}) async {
+  final bytes = await _loadProjectAttachmentRemoteBytes(
+    accessUrl,
+    maxBytes: _projectAttachmentRemoteFilePreviewMaxBytes,
+  );
+  if (bytes == null || bytes.isEmpty) {
+    return null;
+  }
+  return _writeProjectAttachmentPreviewTempFile(
+    fileName: fileName,
+    bytes: bytes,
+  );
+}
+
 Future<File> _writeProjectAttachmentPreviewTempFile({
   required String fileName,
   required List<int> bytes,
 }) async {
+  final override = ProjectAttachmentDebugOverrides._previewTempFileWriter;
+  if (override != null) {
+    return override(fileName: fileName, bytes: bytes);
+  }
+
   final safeName = fileName.trim().replaceAll(
     RegExp(r'[\\/\u0000-\u001F]'),
     '_',
@@ -782,7 +831,26 @@ Future<File> _writeProjectAttachmentPreviewTempFile({
   return file;
 }
 
-Future<bool> _openProjectAttachmentLocalFile(String path) async {
+Future<bool> _openProjectAttachmentLocalFile(
+  String path, {
+  String? mimeType,
+}) async {
+  final override = ProjectAttachmentDebugOverrides._localFileOpener;
+  if (override != null) {
+    return override(path, mimeType);
+  }
+
+  try {
+    final result = await OpenFilex.open(path, type: mimeType);
+    if (result.type == ResultType.done) {
+      return true;
+    }
+  } on PlatformException {
+    // Fall through to desktop process open below.
+  } on IOException {
+    // Fall through to desktop process open below.
+  }
+
   try {
     if (Platform.isMacOS) {
       final result = await Process.run('open', <String>[path]);

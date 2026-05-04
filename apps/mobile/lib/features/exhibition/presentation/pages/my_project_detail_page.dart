@@ -238,6 +238,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 showKindHint: false,
                 showIdleUploadState: false,
                 workbenchMode: true,
+                autoUploadOnSelect: true,
                 emptyMessage: '请至少补充一类资料，方便接单方准确报价。',
                 onListResultChanged: _handleQuoteBasisAttachmentResult,
               ),

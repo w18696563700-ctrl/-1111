@@ -239,6 +239,34 @@ Future<void> _tapVisible(WidgetTester tester, Finder finder) async {
   await tester.pumpAndSettle();
 }
 
+Finder _attachmentAddButton(String attachmentKind) {
+  return find.byKey(ValueKey<String>('project-attachment-add-$attachmentKind'));
+}
+
+Finder _attachmentPreviewButton(String attachmentId) {
+  return find.byKey(
+    ValueKey<String>('project-attachment-preview-$attachmentId'),
+  );
+}
+
+Finder _attachmentDeleteButton(String attachmentId) {
+  return find.byKey(
+    ValueKey<String>('project-attachment-delete-$attachmentId'),
+  );
+}
+
+Finder _attachmentMoreButton(String attachmentId) {
+  return find.byKey(ValueKey<String>('project-attachment-more-$attachmentId'));
+}
+
+Finder _draftPreviewButton(String attachmentKind, String fileName) {
+  return find.byKey(
+    ValueKey<String>(
+      'project-attachment-draft-preview-$attachmentKind-$fileName',
+    ),
+  );
+}
+
 void main() {
   setUp(() {
     ProjectAttachmentDebugOverrides.reset();
@@ -307,6 +335,8 @@ void main() {
     String? downloadedAccessUrl;
     ProjectPublicResourceDownloadedFile? downloadedResourceFile;
     Uri? openedAttachmentUri;
+    String? openedAttachmentPath;
+    String? openedAttachmentMimeType;
     Uri? loadedImageUri;
     ProjectPublicResourceDebugOverrides.installLocalDownloader((
       ProjectPublicResourceFileAccessReadModel access,
@@ -325,6 +355,18 @@ void main() {
       openedAttachmentUri = uri;
       return true;
     });
+    ProjectAttachmentDebugOverrides.installLocalFileOpener((
+      String path,
+      String? mimeType,
+    ) async {
+      openedAttachmentPath = path;
+      openedAttachmentMimeType = mimeType;
+      return true;
+    });
+    ProjectAttachmentDebugOverrides.installPreviewTempFileWriter(
+      ({required String fileName, required List<int> bytes}) async =>
+          File('/tmp/$fileName'),
+    );
     ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader((
       Uri uri,
     ) async {
@@ -504,21 +546,20 @@ void main() {
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.textContaining('当前只对 owner 私域可见'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
-    expect(find.widgetWithText(ChoiceChip, '效果图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '材质图 / 材料样板'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '设备物料清单'), findsOneWidget);
-    expect(find.widgetWithText(ChoiceChip, '服务清单'), findsOneWidget);
+    expect(find.text('全部类型 5'), findsOneWidget);
+    expect(find.text('效果图（必填项）', findRichText: true), findsOneWidget);
+    expect(find.text('尺寸图 / 施工图（必填项）', findRichText: true), findsOneWidget);
+    expect(find.text('材质图 / 材料样板（必填项）', findRichText: true), findsOneWidget);
+    expect(find.text('设备物料清单'), findsOneWidget);
+    expect(find.text('服务清单'), findsOneWidget);
     expect(find.textContaining('全格式文件'), findsNothing);
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '材质图 / 材料样板'));
     expect(find.textContaining('展馆和展位图'), findsNothing);
     expect(find.textContaining('展商手册'), findsNothing);
-    expect(find.text('现场效果图.png'), findsNothing);
-    expect(find.text('效果图'), findsWidgets);
-    await _tapVisible(tester, find.text('高级信息').first);
+    expect(find.text('现场效果图.png'), findsOneWidget);
+    await _tapVisible(tester, _attachmentMoreButton('attachment-existing-1'));
     expect(find.text('完整文件名：现场效果图.png'), findsOneWidget);
     expect(find.textContaining('接单方在竞标第二步查看'), findsOneWidget);
-    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
+    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览'));
     expect(find.text('图片预览'), findsOneWidget);
     expect(
       loadedImageUri?.toString(),
@@ -528,25 +569,35 @@ void main() {
     await tester.tap(find.byIcon(Icons.close_rounded));
     await tester.pumpAndSettle();
 
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'));
-    await _tapVisible(tester, find.text('选择尺寸图 / 施工图', skipOffstage: false));
-    await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
+    await _tapVisible(tester, _attachmentAddButton('construction_doc'));
 
-    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '预览文件'));
-    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览文件'));
+    await _scrollTo(tester, find.text('construction-plan.docx'));
+    await _scrollTo(tester, _attachmentPreviewButton('attachment-docx-1'));
+    await tester.tap(
+      _attachmentPreviewButton('attachment-docx-1'),
+      warnIfMissed: false,
+    );
+    await tester.pump();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(seconds: 1)),
+    );
+    await tester.pump();
     expect(
-      openedAttachmentUri?.toString(),
+      loadedImageUri?.toString(),
       'https://files.example.com/construction-plan.docx',
     );
-
-    await _tapVisible(
-      tester,
-      find.widgetWithText(OutlinedButton, '删除当前资料').first,
+    expect(openedAttachmentPath, contains('construction-plan.docx'));
+    expect(
+      openedAttachmentMimeType,
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
     );
+    expect(openedAttachmentUri, isNull);
+
+    await _tapVisible(tester, _attachmentDeleteButton('attachment-docx-1'));
     await tester.pumpAndSettle();
 
-    expect(find.widgetWithText(OutlinedButton, '预览文件'), findsNothing);
-    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
+    expect(find.text('construction-plan.docx'), findsNothing);
+    expect(find.text('现场效果图.png'), findsOneWidget);
 
     await _scrollTo(tester, find.text('公共资源下载区'));
     expect(find.text('公共资源下载区'), findsOneWidget);
@@ -674,18 +725,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('报价依据资料').last);
-    await _tapVisible(tester, find.widgetWithText(ChoiceChip, '服务清单'));
+    expect(find.text('全部类型 5'), findsOneWidget);
     expect(find.textContaining('全格式文件'), findsNothing);
 
-    await _tapVisible(tester, find.text('选择服务清单', skipOffstage: false));
-    expect(find.text('服务清单资料.zip'), findsOneWidget);
-    expect(find.textContaining('ZIP 压缩包'), findsOneWidget);
-
-    await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
-    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '下载文件'));
+    await _tapVisible(tester, _attachmentAddButton('service_list'));
+    await _scrollTo(tester, find.text('服务清单资料.zip'));
 
     expect(find.text('服务清单'), findsWidgets);
-    expect(find.widgetWithText(OutlinedButton, '下载文件'), findsOneWidget);
+    expect(find.text('服务清单资料.zip'), findsOneWidget);
+    expect(find.textContaining('ZIP 压缩包'), findsOneWidget);
   });
 
   testWidgets('selected effect image previews before upload', (
@@ -734,6 +782,16 @@ void main() {
                     ),
                   );
                 },
+            'POST /api/app/file/upload/init': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 503,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'code': 'UPLOAD_TEMPORARILY_UNAVAILABLE',
+                  'message': 'upload unavailable in this preview test',
+                },
+              );
+            },
           },
     );
 
@@ -748,10 +806,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('报价依据资料').last);
-    await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
+    await _tapVisible(tester, _attachmentAddButton('effect_image'));
     expect(find.text('效果图样张.png'), findsOneWidget);
 
-    await _tapVisible(tester, find.text('预览').first);
+    await _tapVisible(tester, _draftPreviewButton('effect_image', '效果图样张.png'));
     expect(find.text('图片预览'), findsOneWidget);
   });
 
@@ -834,7 +892,10 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('报价依据资料').last);
-      await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
+      await _tapVisible(
+        tester,
+        _attachmentPreviewButton('attachment-access-failed-1'),
+      );
       expect(find.text('当前资料读取服务暂不可用，请稍后再试。'), findsOneWidget);
       expect(find.textContaining('unrecognized error code'), findsNothing);
     },
@@ -935,7 +996,10 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('报价依据资料').last);
-    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '预览图片'));
+    await _tapVisible(
+      tester,
+      _attachmentPreviewButton('attachment-image-fallback-1'),
+    );
 
     expect(
       loadedImageUri?.toString(),
@@ -949,7 +1013,7 @@ void main() {
     expect(find.textContaining('FILE_ACCESS_FAILED'), findsNothing);
   });
 
-  testWidgets('selected attachments can continue add and batch upload', (
+  testWidgets('selected attachments auto upload and keep compact rows', (
     WidgetTester tester,
   ) async {
     final drafts = <ProjectAttachmentDraft>[
@@ -1081,22 +1145,20 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('报价依据资料').last);
-    await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
+    await _tapVisible(tester, _attachmentAddButton('effect_image'));
     expect(find.text('待上传附件（1）'), findsNothing);
-    expect(find.text('待上传 1'), findsOneWidget);
-    expect(find.text('已选择'), findsOneWidget);
+    expect(attachments, hasLength(1));
+    expect(find.text('已上传 1'), findsWidgets);
     expect(find.text('效果图_A.png'), findsOneWidget);
 
-    await _tapVisible(tester, find.text('继续添加附件'));
+    await _tapVisible(tester, _attachmentAddButton('effect_image'));
     expect(find.text('待上传附件（2）'), findsNothing);
-    expect(find.text('待上传 2'), findsOneWidget);
-    expect(find.text('效果图_B.webp'), findsOneWidget);
-
-    await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
-
     expect(attachments, hasLength(2));
-    expect(find.text('已上传 2'), findsOneWidget);
-    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsWidgets);
+    expect(find.text('已上传 2'), findsWidgets);
+    expect(find.text('效果图_B.webp'), findsOneWidget);
+    expect(find.text('上传并形成正式附件', skipOffstage: false), findsNothing);
+    expect(_attachmentPreviewButton('attachment-batch-1'), findsOneWidget);
+    expect(_attachmentPreviewButton('attachment-batch-2'), findsOneWidget);
   });
 
   testWidgets(
@@ -1232,16 +1294,12 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('报价依据资料').last);
-      await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
+      await _tapVisible(tester, _attachmentAddButton('effect_image'));
       expect(find.text('效果图待上传.docx'), findsOneWidget);
+      expect(boundKinds, <String>['effect_image']);
 
-      await _tapVisible(tester, find.widgetWithText(ChoiceChip, '尺寸图 / 施工图'));
-      expect(find.text('效果图待上传.docx'), findsNothing);
-
-      await _tapVisible(tester, find.text('继续添加附件'));
+      await _tapVisible(tester, _attachmentAddButton('construction_doc'));
       expect(find.text('施工图待上传.docx'), findsOneWidget);
-
-      await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
 
       expect(boundKinds, <String>['effect_image', 'construction_doc']);
       expect(attachments, hasLength(2));
@@ -1350,8 +1408,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('报价依据资料').last);
-      await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
-      await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
+      await _tapVisible(tester, _attachmentAddButton('effect_image'));
 
       expect(find.text('正式附件绑定未完成'), findsOneWidget);
       expect(find.text('当前资料文件与项目绑定不一致，请重新上传后再试。'), findsOneWidget);
@@ -1461,8 +1518,7 @@ void main() {
       await tester.pumpAndSettle();
 
       await _scrollTo(tester, find.text('报价依据资料').last);
-      await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
-      await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
+      await _tapVisible(tester, _attachmentAddButton('effect_image'));
 
       expect(find.text('正式附件绑定未完成'), findsOneWidget);
       expect(find.text('当前云端 BFF 尚未部署项目附件写入路由，请先同步云端后再试。'), findsOneWidget);
@@ -1578,10 +1634,12 @@ void main() {
     await tester.pumpAndSettle();
 
     await _scrollTo(tester, find.text('报价依据资料').last);
-    await _tapVisible(tester, find.text('选择效果图', skipOffstage: false));
-    await _tapVisible(tester, find.text('上传并形成正式附件', skipOffstage: false));
+    await _tapVisible(tester, _attachmentAddButton('effect_image'));
 
-    expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
+    expect(
+      _attachmentPreviewButton('attachment-bind-without-created-by'),
+      findsOneWidget,
+    );
     expect(find.text('正式附件绑定未完成'), findsNothing);
     expect(find.textContaining('contract drift'), findsNothing);
   });
@@ -1769,7 +1827,7 @@ void main() {
       expect(find.text('当前说明'), findsNothing);
       expect(find.textContaining('upload confirm 只确认 FileAsset'), findsNothing);
       expect(find.textContaining('用于补充效果图或展示图'), findsNothing);
-      expect(find.text('edit-effect-preview.png'), findsNothing);
+      expect(find.text('edit-effect-preview.png'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '预览图片'), findsOneWidget);
     },
