@@ -1206,7 +1206,7 @@ void main() {
       expect(find.textContaining('统一社会信用代码'), findsOneWidget);
       expect(find.text('外部核验'), findsOneWidget);
       expect(find.text('企查查'), findsOneWidget);
-      expect(find.text('跳转第三方平台核验工商信息，结果不作为平台真值。'), findsOneWidget);
+      expect(find.text('优先打开企查查 App 核验工商信息，结果不作为平台真值。'), findsOneWidget);
       expect(find.text('查看旧竞标主体卡'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('评价对方'),

@@ -148,7 +148,7 @@ class _CounterpartConversationSubjectSheetState
                 const SizedBox(height: 16),
                 _ActionCard(
                   title: '外部核验',
-                  summary: '跳转第三方平台核验工商信息，结果不作为平台真值。',
+                  summary: '优先打开企查查 App 核验工商信息，结果不作为平台真值。',
                   children: <Widget>[
                     SizedBox(
                       width: double.infinity,
@@ -235,24 +235,11 @@ class _CounterpartConversationSubjectSheetState
       _showSubjectMessage('当前主体缺少可用于外部查询的名称。');
       return;
     }
-    final url = Uri.https('www.qcc.com', '/web/search', <String, String>{
-      'key': keyword,
-    }).toString();
-    try {
-      final opened = await launchUrlString(
-        url,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!mounted || opened) {
-        return;
-      }
-      _showSubjectMessage('当前无法打开企查查，请稍后再试。');
-    } catch (_) {
-      if (!mounted) {
-        return;
-      }
-      _showSubjectMessage('当前无法打开企查查，请稍后再试。');
+    final opened = await _launchQichachaByKeyword(keyword);
+    if (!mounted || opened) {
+      return;
     }
+    _showSubjectMessage('当前无法打开企查查，请稍后再试。');
   }
 
   String? _counterpartQichachaKeyword() {
