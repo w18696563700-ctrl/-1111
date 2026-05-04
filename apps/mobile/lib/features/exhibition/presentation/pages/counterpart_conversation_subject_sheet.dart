@@ -4,7 +4,6 @@ Future<void> showCounterpartConversationSubjectSheet(
   BuildContext context, {
   required CounterpartConversationDetailView data,
   required CounterpartConversationProjectGroupView? projectGroup,
-  required String? bidId,
   Future<void> Function()? onRatingSubmitted,
 }) {
   return showModalBottomSheet<void>(
@@ -16,7 +15,6 @@ Future<void> showCounterpartConversationSubjectSheet(
       child: _CounterpartConversationSubjectSheet(
         data: data,
         projectGroup: projectGroup,
-        bidId: bidId,
         onRatingSubmitted: onRatingSubmitted,
       ),
     ),
@@ -27,13 +25,11 @@ class _CounterpartConversationSubjectSheet extends StatefulWidget {
   const _CounterpartConversationSubjectSheet({
     required this.data,
     required this.projectGroup,
-    required this.bidId,
     required this.onRatingSubmitted,
   });
 
   final CounterpartConversationDetailView data;
   final CounterpartConversationProjectGroupView? projectGroup;
-  final String? bidId;
   final Future<void> Function()? onRatingSubmitted;
 
   @override
@@ -151,6 +147,24 @@ class _CounterpartConversationSubjectSheetState
                 ),
                 const SizedBox(height: 16),
                 _ActionCard(
+                  title: '外部核验',
+                  summary: '跳转第三方平台核验工商信息，结果不作为平台真值。',
+                  children: <Widget>[
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton.icon(
+                        key: const ValueKey<String>(
+                          'counterpart_qichacha_button',
+                        ),
+                        onPressed: _openQichacha,
+                        icon: const Icon(Icons.open_in_new_rounded),
+                        label: const Text('企查查'),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _ActionCard(
                   title: '评价对方',
                   summary: projectEnded
                       ? '项目已进入结束态时才允许评价；提交仍以后端评价真值为准。'
@@ -207,29 +221,55 @@ class _CounterpartConversationSubjectSheetState
                     ),
                   ],
                 ),
-                if (widget.bidId != null) ...<Widget>[
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton.icon(
-                      onPressed: () => _showTradingImParticipantCardSheet(
-                        context,
-                        projectId:
-                            group?.projectId ?? widget.data.focusProjectId,
-                        bidId: widget.bidId,
-                        participantOrganizationId: counterpart.organizationId,
-                      ),
-                      icon: const Icon(Icons.badge_outlined),
-                      label: const Text('查看旧竞标主体卡'),
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _openQichacha() async {
+    final keyword = _counterpartQichachaKeyword();
+    if (keyword == null) {
+      _showSubjectMessage('当前主体缺少可用于外部查询的名称。');
+      return;
+    }
+    final url = Uri.https('www.qcc.com', '/web/search', <String, String>{
+      'key': keyword,
+    }).toString();
+    try {
+      final opened = await launchUrlString(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!mounted || opened) {
+        return;
+      }
+      _showSubjectMessage('当前无法打开企查查，请稍后再试。');
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      _showSubjectMessage('当前无法打开企查查，请稍后再试。');
+    }
+  }
+
+  String? _counterpartQichachaKeyword() {
+    final counterpart = widget.data.counterpart;
+    return _normalizeQichachaKeyword(
+          counterpart.certificationSummary?.legalName,
+        ) ??
+        _normalizeQichachaKeyword(counterpart.companyName) ??
+        _normalizeQichachaKeyword(counterpart.displayName);
+  }
+
+  String? _normalizeQichachaKeyword(String? value) {
+    final normalized = value?.trim();
+    if (normalized == null || normalized.isEmpty || normalized == '未提供') {
+      return null;
+    }
+    return normalized;
   }
 
   String _certificationStatusLabel(String? status) {
@@ -295,13 +335,15 @@ class _CounterpartConversationSubjectSheetState
         return;
       }
     }
-    ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-      SnackBar(
-        content: Text(
-          submitted ? '评价已提交，信用联动以后端为准。' : result.message ?? '评价提交失败，请刷新后重试。',
-        ),
-      ),
+    _showSubjectMessage(
+      submitted ? '评价已提交，信用联动以后端为准。' : result.message ?? '评价提交失败，请刷新后重试。',
     );
+  }
+
+  void _showSubjectMessage(String message) {
+    ScaffoldMessenger.maybeOf(context)
+      ?..hideCurrentSnackBar()
+      ..showSnackBar(SnackBar(content: Text(message)));
   }
 
   String _scoreLabel(int score) {

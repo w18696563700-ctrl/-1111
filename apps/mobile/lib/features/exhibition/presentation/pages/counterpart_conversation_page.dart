@@ -1381,7 +1381,6 @@ class _CounterpartConversationPageState
       context,
       data: data,
       projectGroup: group,
-      bidId: _firstBidId(group),
       onRatingSubmitted: _load,
     );
   }

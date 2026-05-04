@@ -212,6 +212,7 @@ Map<String, Object?> _detailPayload({
   Map<String, Object?>? orderSummary,
   Map<String, Object?>? ratingEntry,
   bool includeOrderCard = false,
+  bool omitQichachaKeyword = false,
 }) {
   final participationDefinition =
       messagesRegisteredEntryByActionKey['bid_participation_request.open']!;
@@ -219,25 +220,34 @@ Map<String, Object?> _detailPayload({
       messagesRegisteredEntryByActionKey['bid_thread.open']!;
   final orderDetailDefinition =
       messagesRegisteredEntryByActionKey['order_detail.open']!;
+  final counterpartPayload = omitQichachaKeyword
+      ? const <String, Object?>{
+          'organizationId': 'org-counterpart',
+          'displayName': '未提供',
+          'companyName': '未提供',
+          'avatarUrl': null,
+          'role': 'counterpart',
+        }
+      : const <String, Object?>{
+          'organizationId': 'org-counterpart',
+          'displayName': '重庆涪川展览工厂',
+          'nickname': '江北嘴嘴帅',
+          'companyName': '重庆涪川展览工厂',
+          'avatarUrl': null,
+          'role': 'counterpart',
+          'certificationSummary': <String, Object?>{
+            'certificationStatus': 'approved',
+            'legalName': '重庆涪川展览工厂',
+            'usccMasked': '9150****1234',
+            'businessType': '有限责任公司',
+            'address': '重庆市',
+            'establishedAt': '2020-01-01',
+            'reviewedAt': '2026-04-29T09:00:00Z',
+          },
+        };
   return <String, Object?>{
     'conversationId': 'conversation-1',
-    'counterpart': const <String, Object?>{
-      'organizationId': 'org-counterpart',
-      'displayName': '重庆涪川展览工厂',
-      'nickname': '江北嘴嘴帅',
-      'companyName': '重庆涪川展览工厂',
-      'avatarUrl': null,
-      'role': 'counterpart',
-      'certificationSummary': <String, Object?>{
-        'certificationStatus': 'approved',
-        'legalName': '重庆涪川展览工厂',
-        'usccMasked': '9150****1234',
-        'businessType': '有限责任公司',
-        'address': '重庆市',
-        'establishedAt': '2020-01-01',
-        'reviewedAt': '2026-04-29T09:00:00Z',
-      },
-    },
+    'counterpart': counterpartPayload,
     'summary': <String, Object?>{
       'focusProjectId': 'project-1',
       'title': includeOrderCard ? '订单状态已更新' : '项目沟通',
@@ -1194,6 +1204,16 @@ void main() {
       expect(find.text('对方主体'), findsOneWidget);
       expect(find.textContaining('认证主体'), findsOneWidget);
       expect(find.textContaining('统一社会信用代码'), findsOneWidget);
+      expect(find.text('外部核验'), findsOneWidget);
+      expect(find.text('企查查'), findsOneWidget);
+      expect(find.text('跳转第三方平台核验工商信息，结果不作为平台真值。'), findsOneWidget);
+      expect(find.text('查看旧竞标主体卡'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('评价对方'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('评价对方'), findsOneWidget);
       expect(find.text('当前项目尚未结束，评价入口不会开放。'), findsOneWidget);
 
@@ -1215,8 +1235,52 @@ void main() {
       expect(find.text('对方主体'), findsOneWidget);
       expect(find.textContaining('认证主体'), findsOneWidget);
       expect(find.textContaining('统一社会信用代码'), findsOneWidget);
+      expect(find.text('企查查'), findsOneWidget);
+      expect(find.text('查看旧竞标主体卡'), findsNothing);
+      await tester.scrollUntilVisible(
+        find.text('评价对方'),
+        120,
+        scrollable: find.byType(Scrollable).last,
+      );
+      await tester.pumpAndSettle();
       expect(find.text('评价对方'), findsOneWidget);
       expect(find.text('当前项目尚未结束，评价入口不会开放。'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'counterpart subject sheet blocks qichacha when no searchable name exists',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _detailPayload(omitQichachaKeyword: true),
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('未提供').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('对方主体'), findsOneWidget);
+      expect(find.text('企查查'), findsOneWidget);
+      expect(find.text('查看旧竞标主体卡'), findsNothing);
+
+      await tester.tap(
+        find.byKey(const ValueKey<String>('counterpart_qichacha_button')),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('当前主体缺少可用于外部查询的名称。'), findsOneWidget);
     },
   );
 
