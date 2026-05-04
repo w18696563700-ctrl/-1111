@@ -20,10 +20,7 @@ String _membershipPurchasePriceText(ProfileMembershipPurchaseOfferView offer) {
 }
 
 String _membershipMoney(num amount, String currency) {
-  final normalized = amount == amount.roundToDouble()
-      ? amount.toInt().toString()
-      : amount.toStringAsFixed(2);
-  return currency == 'CNY' ? '$normalized 元' : '$currency $normalized';
+  return MoneyFormatter.yuan(amount, currency: currency);
 }
 
 String _membershipPaymentResultSubtitle(

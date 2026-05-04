@@ -27,6 +27,7 @@ import 'package:mobile/features/profile/presentation/profile_feature_status_copy
 import 'package:mobile/features/profile/presentation/profile_organization_capability_copy.dart';
 import 'package:mobile/features/profile/presentation/profile_personal_edit_support.dart';
 import 'package:mobile/features/profile/presentation/profile_visible_copy.dart';
+import 'package:mobile/shared/format/money_formatter.dart';
 import 'package:mobile/shared/ui/app_visual_tokens.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';

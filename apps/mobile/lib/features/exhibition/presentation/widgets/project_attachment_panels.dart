@@ -1313,136 +1313,73 @@ class _ProjectAttachmentFormalRecordCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final isImage = _projectAttachmentIsImageMimeType(attachment.mimeType);
     final meta = <String>[
-      _projectAttachmentMimeTypeLabel(attachment.mimeType),
       _projectAttachmentTimestampLabel(attachment.createdAt),
     ].join(' · ');
 
     return SizedBox(
       width: double.infinity,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surfaceContainerLow,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(
-            color: Theme.of(context).colorScheme.outlineVariant,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          AttachmentTile(
+            fileName: attachment.fileName,
+            fileTypeLabel: _projectAttachmentMimeTypeLabel(attachment.mimeType),
+            subtitle: meta,
+            statusLabel: _projectAttachmentKindLabel(attachment.attachmentKind),
+            statusTone: AppStatusTone.info,
+            leadingIcon: isImage
+                ? Icons.image_outlined
+                : Icons.insert_drive_file_outlined,
+            opening: openingPreview,
+            deleting: deleting,
+            onOpen: onPreview,
+            onDelete: onDelete,
           ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  _ProjectAttachmentThumbnail(attachment: attachment),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(
-                          _projectAttachmentKindLabel(
-                            attachment.attachmentKind,
-                          ),
-                          style: Theme.of(context).textTheme.titleSmall
-                              ?.copyWith(fontWeight: FontWeight.w800),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          isImage ? '图片资料' : '文件资料',
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w700,
-                              ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          meta,
-                          style: Theme.of(context).textTheme.bodySmall
-                              ?.copyWith(
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurfaceVariant,
-                                height: 1.35,
-                              ),
-                        ),
-                      ],
+          const SizedBox(height: 8),
+          AppCard(
+            padding: const EdgeInsets.all(14),
+            backgroundColor: Theme.of(context).colorScheme.surfaceContainerLow,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                _ProjectAttachmentThumbnail(attachment: attachment),
+                const SizedBox(height: 6),
+                ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  childrenPadding: EdgeInsets.zero,
+                  title: Text(
+                    '高级信息',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.w800,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: <Widget>[
-                  OutlinedButton.icon(
-                    onPressed: openingPreview || deleting ? null : onPreview,
-                    icon: openingPreview
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.visibility_outlined),
-                    label: Text(
-                      openingPreview
-                          ? '处理中'
-                          : _projectAttachmentRecordPreviewButtonLabel(
-                              attachment.mimeType,
-                            ),
+                  children: <Widget>[
+                    _DetailLine(label: '完整文件名', value: attachment.fileName),
+                    _DetailLine(
+                      label: 'FileAsset',
+                      value: attachment.fileAssetId,
                     ),
-                  ),
-                  OutlinedButton.icon(
-                    onPressed: deleting || openingPreview ? null : onDelete,
-                    icon: deleting
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.delete_outline_rounded),
-                    label: Text(deleting ? '正在删除' : '删除当前资料'),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 6),
-              ExpansionTile(
-                tilePadding: EdgeInsets.zero,
-                childrenPadding: EdgeInsets.zero,
-                title: Text(
-                  '高级信息',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w800,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  ),
+                    _DetailLine(label: '文件类型', value: attachment.mimeType),
+                    _DetailLine(
+                      label: '可见范围',
+                      value: _projectAttachmentVisibilityLabel(
+                        attachment.visibility,
+                      ),
+                    ),
+                    _DetailLine(
+                      label: '排序序号',
+                      value: '${attachment.sortOrder}',
+                    ),
+                    _DetailLine(label: '创建时间', value: attachment.createdAt),
+                    if (attachment.createdBy != null)
+                      _DetailLine(label: '创建人', value: attachment.createdBy!),
+                  ],
                 ),
-                children: <Widget>[
-                  _DetailLine(label: '完整文件名', value: attachment.fileName),
-                  _DetailLine(
-                    label: 'FileAsset',
-                    value: attachment.fileAssetId,
-                  ),
-                  _DetailLine(label: '文件类型', value: attachment.mimeType),
-                  _DetailLine(
-                    label: '可见范围',
-                    value: _projectAttachmentVisibilityLabel(
-                      attachment.visibility,
-                    ),
-                  ),
-                  _DetailLine(label: '排序序号', value: '${attachment.sortOrder}'),
-                  _DetailLine(label: '创建时间', value: attachment.createdAt),
-                  if (attachment.createdBy != null)
-                    _DetailLine(label: '创建人', value: attachment.createdBy!),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
+        ],
       ),
     );
   }

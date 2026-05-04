@@ -705,36 +705,8 @@ Future<bool> _openProjectAttachmentUrl(String accessUrl) async {
     return override(uri);
   }
 
-  try {
-    final opened = await launchUrlString(
-      uri.toString(),
-      mode: LaunchMode.externalApplication,
-    );
-    if (opened) {
-      return true;
-    }
-    if (Platform.isMacOS) {
-      final result = await Process.run('open', <String>[uri.toString()]);
-      return result.exitCode == 0;
-    }
-    if (Platform.isLinux) {
-      final result = await Process.run('xdg-open', <String>[uri.toString()]);
-      return result.exitCode == 0;
-    }
-    if (Platform.isWindows) {
-      final result = await Process.run('cmd', <String>[
-        '/c',
-        'start',
-        '',
-        uri.toString(),
-      ]);
-      return result.exitCode == 0;
-    }
-  } on ProcessException {
-    return false;
-  }
-
-  return false;
+  final result = await FileOpenCoordinator.instance.openExternalUri(uri);
+  return result.opened;
 }
 
 Future<List<int>?> _loadProjectAttachmentRemoteBytes(
@@ -840,39 +812,11 @@ Future<bool> _openProjectAttachmentLocalFile(
     return override(path, mimeType);
   }
 
-  try {
-    final result = await OpenFilex.open(path, type: mimeType);
-    if (result.type == ResultType.done) {
-      return true;
-    }
-  } on PlatformException {
-    // Fall through to desktop process open below.
-  } on IOException {
-    // Fall through to desktop process open below.
-  }
-
-  try {
-    if (Platform.isMacOS) {
-      final result = await Process.run('open', <String>[path]);
-      return result.exitCode == 0;
-    }
-    if (Platform.isLinux) {
-      final result = await Process.run('xdg-open', <String>[path]);
-      return result.exitCode == 0;
-    }
-    if (Platform.isWindows) {
-      final result = await Process.run('cmd', <String>[
-        '/c',
-        'start',
-        '',
-        path,
-      ]);
-      return result.exitCode == 0;
-    }
-  } on ProcessException {
-    return false;
-  }
-  return false;
+  final result = await FileOpenCoordinator.instance.openPath(
+    path: path,
+    mimeType: mimeType,
+  );
+  return result.opened;
 }
 
 String _projectAttachmentDeleteFailureMessage(ExhibitionActionResult result) {
