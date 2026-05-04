@@ -982,8 +982,12 @@ export class ProjectService {
       return this.rewriteLifecycleInvalidStateMessage(action);
     }
 
-    if (action === 'publish' && code === 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED') {
-      return '发布项目需先完成 200 元项目真实性诚意金冻结。';
+    if (
+      action === 'publish' &&
+      (code === 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED' ||
+        code === 'PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE')
+    ) {
+      return '发布项目需先补齐必传报价依据资料，并完成项目真实性诚意金绿色通道表态；选择支持或暂不支持均可继续发布。';
     }
 
     if (invalidMessage && code) {

@@ -48,7 +48,7 @@ module ContractsGeneration
     validate_truth_metadata!(openapi, error_codes)
 
     bundle_content = JSON.pretty_generate(openapi) + "\n"
-    app_api_types_content = build_app_api_types(openapi)
+    app_api_types_content = "#{build_app_api_types(openapi).rstrip}\n"
     error_codes_content = build_error_codes_ts(error_codes)
     index_content = build_index_ts
 

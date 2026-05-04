@@ -12,6 +12,7 @@ import { BidEntity } from '../bid/entities/bid.entity';
 import { ProjectOrderEntity } from '../order/entities/project-order.entity';
 import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
 import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
+import { ProjectAuthenticitySincerityFreezeFeedbackEntity } from '../p0_pay/entities/project-authenticity-sincerity-freeze-feedback.entity';
 import { ProjectAttachmentFileAccessController } from './project-attachment-file-access.controller';
 import { ProjectAttachmentFileAccessService } from './project-attachment-file-access.service';
 import { ProjectAttachmentController } from './project-attachment.controller';
@@ -30,6 +31,7 @@ import { ProjectEntity } from './entities/project.entity';
 import { ProjectController } from './project.controller';
 import { ProjectExitGovernanceService } from './project-exit-governance.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
+import { ProjectPublishGateService } from './project-publish-gate.service';
 import { ProjectPresenter } from './project.presenter';
 import { ProjectQueryService } from './project-query.service';
 import { ProjectWriteService } from './project-write.service';
@@ -46,7 +48,8 @@ import { ProjectWriteService } from './project-write.service';
       BidEntity,
       ProjectOrderEntity,
       InquiryQuoteDepositEntity,
-      PlatformServiceFeeAuthorizationEntity
+      PlatformServiceFeeAuthorizationEntity,
+      ProjectAuthenticitySincerityFreezeFeedbackEntity
     ]),
     ProjectPublishAuditModule,
     AuthModule,
@@ -68,6 +71,7 @@ import { ProjectWriteService } from './project-write.service';
     ProjectBidMaterialPresenter,
     ProjectPublicResourcePresenter,
     ProjectQueryService,
+    ProjectPublishGateService,
     ProjectLifecycleService,
     ProjectExitGovernanceService,
     ProjectWriteService,

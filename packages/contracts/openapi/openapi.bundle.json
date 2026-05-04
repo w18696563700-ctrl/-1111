@@ -3806,7 +3806,7 @@
         "tags": [
           "Project"
         ],
-        "summary": "Publish submitted project canonical path for Flutter App with pre-publish pricing gate",
+        "summary": "Publish submitted project canonical path for Flutter App with green-channel feedback gate",
         "operationId": "publishAppProject",
         "requestBody": {
           "required": true,
@@ -3820,7 +3820,7 @@
         },
         "responses": {
           "202": {
-            "description": "Project publish accepted only when the current submitted project has either completed the required `200 元项目真实性诚意金` payment or is admitted without that pricing gate. This path must not auto-create a sincerity order, auto-charge, or silently treat publish success as pricing consumption success.\n",
+            "description": "Project publish accepted only when the current submitted project has the three required quote-basis attachment kinds and the current publisher has submitted the project-authenticity-sincerity green channel feedback choice. This path must not auto-create a sincerity order, auto-charge, or silently treat publish success as pricing consumption success.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -3830,7 +3830,7 @@
             }
           },
           "409": {
-            "description": "Controlled publish pricing-gate or invalid-state response. Server must fail closed with `PROJECT_AUTHENTICITY_SINCERITY_REQUIRED` or `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the required `200 元项目真实性诚意金` truth is not in an admitted paid state for publish.\n"
+            "description": "Controlled publish pricing-gate or invalid-state response. Server must fail closed with `PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE`, `PROJECT_AUTHENTICITY_SINCERITY_REQUIRED`, or `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the required quote-basis attachment truth, green-channel feedback truth, or project state is not admitted for publish.\n"
           }
         }
       }
@@ -4135,6 +4135,54 @@
           },
           "404": {
             "description": "Controlled sincerity-order not-found response. Server must return `PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND` when the targeted current order is absent or not visible.\n"
+          }
+        }
+      }
+    },
+    "/api/app/project/{projectId}/authenticity-sincerity/freeze-feedback": {
+      "post": {
+        "tags": [
+          "ProjectPricing"
+        ],
+        "summary": "Project authenticity sincerity green-channel feedback canonical path for Flutter App",
+        "operationId": "submitAppProjectAuthenticitySincerityFreezeFeedback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Submit or replace the current user's green-channel feedback choice for the current project's `项目真实性诚意金` mechanism. The choice is a publish-gate input during the internal-test stage, not payment, freeze, refund, or finance truth.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Feedback accepted and current summary returned. Repeated submission for the same `userId + projectId` replaces the effective choice.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled invalid feedback choice response. Server must return `PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_INVALID` when `choice` is outside `support_freeze / oppose_freeze`.\n"
+          },
+          "409": {
+            "description": "Controlled rejected feedback response. Server must return `PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED` when the current actor, organization, or project boundary cannot write feedback.\n"
           }
         }
       }
@@ -13834,6 +13882,7 @@
         "enum": [
           "pending_payment",
           "paid",
+          "internal_test_no_freeze_required",
           "refund_pending",
           "refunded",
           "withheld",
@@ -14074,13 +14123,30 @@
             "format": "date-time"
           },
           "publishGateStatus": {
-            "type": "string"
+            "type": "string",
+            "description": "`satisfied` means paid/frozen truth satisfies the formal gate. `internal_test_no_freeze_allowed` means current internal-test green-channel feedback truth admits publish without real fund freeze.\n"
           },
           "formalResultProcessingRequired": {
             "type": "boolean"
           },
           "nextAction": {
             "$ref": "#/components/schemas/PricingNextActionToken"
+          },
+          "sincerityFreezePolicyNotice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freezeFeedbackSummary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -14391,6 +14457,97 @@
           "updatedAt": {
             "type": "string",
             "format": "date-time"
+          }
+        }
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackChoice": {
+        "type": "string",
+        "enum": [
+          "support_freeze",
+          "oppose_freeze"
+        ]
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackSummary": {
+        "type": "object",
+        "required": [
+          "supportFreezeCount",
+          "opposeFreezeCount",
+          "myChoice",
+          "updatedAt"
+        ],
+        "description": "Current green-channel feedback summary for one project only. This summary is publish-gate input during internal test, not payment or finance truth.\n",
+        "properties": {
+          "supportFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opposeFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "myChoice": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackChoice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackRequest": {
+        "type": "object",
+        "required": [
+          "choice"
+        ],
+        "properties": {
+          "choice": {
+            "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackChoice"
+          }
+        }
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackResponse": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "myChoice",
+          "supportFreezeCount",
+          "opposeFreezeCount",
+          "updatedAt"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "myChoice": {
+            "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackChoice"
+          },
+          "supportFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opposeFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "traceId": {
+            "type": [
+              "string",
+              "null"
+            ]
           }
         }
       },
