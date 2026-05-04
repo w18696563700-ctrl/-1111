@@ -318,10 +318,7 @@ String _participantCardStatusLabel(String value) {
 String _participantCardLocationText(String provinceName, String cityName) {
   final province = _participantCardNormalizeText(provinceName);
   final city = _participantCardNormalizeText(cityName);
-  final parts = <String>[
-    if (province != null) province,
-    if (city != null && city != province) city,
-  ];
+  final parts = <String>[?province, if (city != null && city != province) city];
   return parts.isEmpty ? '未提供' : parts.join(' / ');
 }
 

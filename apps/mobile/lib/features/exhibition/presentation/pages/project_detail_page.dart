@@ -31,6 +31,10 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   bool _submittingReport = false;
   int _p0PaySummaryLoadToken = 0;
 
+  void _setProjectReportSubmitting(bool value) {
+    setState(() => _submittingReport = value);
+  }
+
   @override
   void initState() {
     super.initState();

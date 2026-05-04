@@ -930,9 +930,10 @@ class _SelectedProjectBusinessEntrypoints extends StatelessWidget {
       ],
     );
   }
-
 }
 
+// Kept as the reserved fallback workbench surface for unreadable project context.
+// ignore: unused_element
 class _UnknownProjectWorkbenchSection extends StatelessWidget {
   const _UnknownProjectWorkbenchSection();
 

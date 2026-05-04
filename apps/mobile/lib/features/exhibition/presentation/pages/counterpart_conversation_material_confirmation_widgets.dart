@@ -1,5 +1,7 @@
 part of '../exhibition_trade_pages.dart';
 
+// Kept as the reserved publisher-side material confirmation surface.
+// ignore: unused_element
 class _PublisherConfirmationSection extends StatelessWidget {
   const _PublisherConfirmationSection({
     required this.snapshot,
@@ -174,6 +176,8 @@ class _PublisherConfirmationTile extends StatelessWidget {
   }
 }
 
+// Kept as the reserved bidder-side material confirmation surface.
+// ignore: unused_element
 class _BidderMaterialSection extends StatelessWidget {
   const _BidderMaterialSection({
     required this.snapshot,

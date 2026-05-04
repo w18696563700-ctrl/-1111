@@ -268,7 +268,7 @@ class _TargetEnterpriseInfoSuccessState extends StatelessWidget {
         Expanded(
           child: ListView.separated(
             itemCount: fields.length,
-            separatorBuilder: (_, __) => const SizedBox(height: 10),
+            separatorBuilder: (_, _) => const SizedBox(height: 10),
             itemBuilder: (BuildContext context, int index) {
               final item = fields[index];
               return _FormalInfoFieldRow(field: item);

@@ -61,6 +61,13 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
 
+  void _setBidAttachmentPreviewOpening(
+    _BidSubmitAttachmentSlotState slot,
+    bool value,
+  ) {
+    setState(() => slot.previewOpening = value);
+  }
+
   @override
   void initState() {
     super.initState();

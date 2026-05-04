@@ -64,6 +64,8 @@ final class _PublisherConfirmationSnapshot {
     this.unavailableMessage,
   });
 
+  // Kept for publisher confirmation handoff once this surface is reconnected.
+  // ignore: unused_element
   factory _PublisherConfirmationSnapshot.fromConfirmedKeys(
     Set<String> confirmedKeys,
   ) {
@@ -82,6 +84,8 @@ final class _PublisherConfirmationSnapshot {
     );
   }
 
+  // Kept for publisher confirmation handoff once this surface is reconnected.
+  // ignore: unused_element
   factory _PublisherConfirmationSnapshot.unavailable(String message) {
     return _PublisherConfirmationSnapshot(
       unavailableMessage: message,
@@ -161,6 +165,8 @@ final class _ProjectMaterialConfirmationSnapshot {
     this.unavailableMessage,
   });
 
+  // Kept for bidder material confirmation loading handoff.
+  // ignore: unused_element
   factory _ProjectMaterialConfirmationSnapshot.loading() {
     return _ProjectMaterialConfirmationSnapshot(
       loading: true,
@@ -237,7 +243,9 @@ const Set<String> _projectMaterialConfirmationKindSet = <String>{
   _projectMaterialConfirmationServiceList,
 };
 
+// Kept for bid-material payload conversion once the material surface is reconnected.
 _ProjectMaterialConfirmationSnapshot
+// ignore: unused_element
 _projectMaterialConfirmationSnapshotFromBidMaterials(
   ExhibitionLoadResult result,
 ) {
