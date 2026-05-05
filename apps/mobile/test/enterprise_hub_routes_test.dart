@@ -1672,12 +1672,15 @@ void main() {
     expect(find.text('优秀公司'), findsNothing);
     expect(find.text('查看企业信息'), findsWidgets);
     expect(find.text('西南会展搭建有限公司'), findsOneWidget);
-    expect(find.text('展陈搭建资质齐全。'), findsNothing);
+    expect(find.text('展陈搭建资质齐全。'), findsOneWidget);
     expect(find.text('公司样本摘要'), findsNothing);
-    expect(find.text('展会类型'), findsNothing);
+    expect(find.text('展会类型'), findsWidgets);
     expect(find.text('项目规模'), findsNothing);
     expect(find.text('https://example.com/cover.png'), findsNothing);
     expect(find.text('https://example.com/album-1.png'), findsNothing);
+    expect(find.text('信任背书'), findsOneWidget);
+    expect(find.text('公司介绍'), findsOneWidget);
+    expect(find.text('核心优势'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.byKey(
@@ -1718,12 +1721,12 @@ void main() {
     expect(find.text('核心能力'), findsNothing);
 
     await tester.scrollUntilVisible(
-      find.text('详细介绍'),
+      find.text('公司介绍'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    expect(find.text('详细介绍'), findsOneWidget);
+    expect(find.text('公司介绍'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('交付稳定'),
@@ -2543,7 +2546,26 @@ void main() {
       await tester.pump(const Duration(milliseconds: 300));
 
       expect(find.text('进入公司列表'), findsOneWidget);
-      expect(find.text('查看公司详情'), findsOneWidget);
+      expect(find.text('查看公司详情'), findsNothing);
+      expect(find.text('优秀公司'), findsNothing);
+      expect(find.text('西南会展搭建有限公司'), findsOneWidget);
+
+      await tester.tap(find.text('西南会展搭建有限公司').first);
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
+
+      expect(find.text('公司真实详情'), findsWidgets);
+      expect(
+        find.text('当前还没有读取到真实企业详情；页面保持受控阻断，不把空态或错误态伪装成实体已接通。'),
+        findsNothing,
+      );
+
+      await pumpHome();
+      await tester.tap(find.text('公司'));
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 300));
+      await tester.pump(const Duration(milliseconds: 300));
 
       await tester.ensureVisible(find.text('进入公司列表'));
       await tester.tap(find.text('进入公司列表'));

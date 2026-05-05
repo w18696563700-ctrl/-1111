@@ -263,7 +263,9 @@ class _HomeEnterpriseModulePanelState
               child: _HomeEnterpriseRecommendationCard(
                 title: item.name,
                 summary: _homeEnterpriseCardSummary(item),
-                badgeLabel: _homeEnterpriseCardBadgeLabel(item),
+                badgeLabel: item.boardType == EnterpriseBoardType.company
+                    ? null
+                    : _homeEnterpriseCardBadgeLabel(item),
                 actionLabel: _homeEnterpriseDetailActionLabel(item.boardType),
                 onPressed: () => widget.onOpenEnterpriseItem(item),
               ),

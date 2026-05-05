@@ -47,48 +47,77 @@ extension _EnterpriseWorkbenchCompanyHomepage
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
-                _buildCompanyIdentityCard(
-                  readiness: readiness,
-                  latestApplication: latestApplication,
-                  publishedData: publishedData,
-                ),
-                const SizedBox(height: 16),
-                _buildCompanyStatusCard(
-                  result: result,
-                  publishedWorkbenchResult: publishedWorkbenchResult,
-                  readiness: readiness,
-                  latestApplication: latestApplication,
-                  publishedData: publishedData,
-                ),
-                const SizedBox(height: 16),
-                _buildCompanyQuickEntrySection(),
-                const SizedBox(height: 16),
-                _buildCompanyCompletenessCard(readiness),
-                const SizedBox(height: 16),
-                _buildCompanyModuleEntrySection(
-                  readiness: readiness,
-                  showUpstreamTruthSection: showUpstreamTruthSection,
-                  showCertificationSummarySection:
-                      showCertificationSummarySection,
-                ),
-                if (_boardType == EnterpriseBoardType.factory) ...<Widget>[
+                if (_boardType == EnterpriseBoardType.company) ...<Widget>[
+                  _buildCompanyCompletenessCard(readiness),
                   const SizedBox(height: 16),
-                  _buildCompanyActivityEmptySection(),
+                  _buildCompanyIdentityCard(
+                    readiness: readiness,
+                    latestApplication: latestApplication,
+                    publishedData: publishedData,
+                  ),
                   const SizedBox(height: 16),
-                  _buildCompanyAnalyticsEmptySection(),
+                  _buildCompanyPreviewSection(publishedData: publishedData),
+                  const SizedBox(height: 16),
+                  _buildCompanyQuickEntrySection(),
+                  const SizedBox(height: 16),
+                  _buildCompanyModuleEntrySection(
+                    readiness: readiness,
+                    showUpstreamTruthSection: showUpstreamTruthSection,
+                    showCertificationSummarySection:
+                        showCertificationSummarySection,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCompanyStatusCard(
+                    result: result,
+                    publishedWorkbenchResult: publishedWorkbenchResult,
+                    readiness: readiness,
+                    latestApplication: latestApplication,
+                    publishedData: publishedData,
+                  ),
+                ] else ...<Widget>[
+                  _buildCompanyIdentityCard(
+                    readiness: readiness,
+                    latestApplication: latestApplication,
+                    publishedData: publishedData,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCompanyStatusCard(
+                    result: result,
+                    publishedWorkbenchResult: publishedWorkbenchResult,
+                    readiness: readiness,
+                    latestApplication: latestApplication,
+                    publishedData: publishedData,
+                  ),
+                  const SizedBox(height: 16),
+                  _buildCompanyQuickEntrySection(),
+                  const SizedBox(height: 16),
+                  _buildCompanyCompletenessCard(readiness),
+                  const SizedBox(height: 16),
+                  _buildCompanyModuleEntrySection(
+                    readiness: readiness,
+                    showUpstreamTruthSection: showUpstreamTruthSection,
+                    showCertificationSummarySection:
+                        showCertificationSummarySection,
+                  ),
+                  if (_boardType == EnterpriseBoardType.factory) ...<Widget>[
+                    const SizedBox(height: 16),
+                    _buildCompanyActivityEmptySection(),
+                    const SizedBox(height: 16),
+                    _buildCompanyAnalyticsEmptySection(),
+                  ],
+                  const SizedBox(height: 16),
+                  _buildCompanyFeaturedCasesSection(),
+                  const SizedBox(height: 16),
+                  _buildCompanyPrimaryContactSection(),
+                  if (_boardType == EnterpriseBoardType.factory) ...<Widget>[
+                    const SizedBox(height: 16),
+                    _buildFactoryHighlightSection(),
+                  ],
+                  const SizedBox(height: 16),
+                  _buildCompanyNextStepSection(readiness),
+                  const SizedBox(height: 16),
+                  _buildCompanyPreviewSection(publishedData: publishedData),
                 ],
-                const SizedBox(height: 16),
-                _buildCompanyFeaturedCasesSection(),
-                const SizedBox(height: 16),
-                _buildCompanyPrimaryContactSection(),
-                if (_boardType == EnterpriseBoardType.factory) ...<Widget>[
-                  const SizedBox(height: 16),
-                  _buildFactoryHighlightSection(),
-                ],
-                const SizedBox(height: 16),
-                _buildCompanyNextStepSection(readiness),
-                const SizedBox(height: 16),
-                _buildCompanyPreviewSection(publishedData: publishedData),
               ],
             ),
           ),
@@ -125,9 +154,13 @@ extension _EnterpriseWorkbenchCompanyHomepage
     final tags = _companyHomepageTags();
     return EnterpriseSectionCard(
       key: const ValueKey<String>('company-workbench-identity-card'),
-      title: '${_companyWorkbenchSubjectDisplayLabel()}工作台',
+      title: _boardType == EnterpriseBoardType.company
+          ? '公司展示预览'
+          : '${_companyWorkbenchSubjectDisplayLabel()}工作台',
       subtitle: _isPublishedChangeMode
-          ? '当前维护待发布变更稿，线上展示仍以 liveSnapshot 为准。'
+          ? '当前展示待发布变更稿效果；线上公开展示仍以 liveSnapshot 为准。'
+          : _boardType == EnterpriseBoardType.company
+          ? '当前只展示工作台资料预览，不代表线上公司详情已发布。'
           : '当前只维护组织侧${_companyWorkbenchSubjectDisplayLabel()}资料，不作为线上公开详情页。',
       actions: <Widget>[
         FilledButton.tonalIcon(
