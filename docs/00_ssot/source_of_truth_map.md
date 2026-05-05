@@ -31,6 +31,7 @@ layer: L0 SSOT
 ### 2026-05-05 Forum Route Matrix Alignment V1
 
 - [forum_route_matrix_alignment_v1_truth_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/forum_route_matrix_alignment_v1_truth_freeze_addendum.md) is the formal `L0` truth freeze for aligning the Forum app-facing route matrix across OpenAPI, generated contracts, BFF source routes, and Server source routes, freezing the `30` active `/api/app/forum/*` routes, confirming `author/follow` as the active V1 follow command, superseding historical `topic/follow` references unless separately reopened, materializing `draft/delete` across BFF and Server source, and blocking UI redesign, cloud deployment, database writes, and runtime-success claims in this round.
+- [forum_module_closure_lock_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/forum_module_closure_lock_addendum.md) is the formal `L0` closure lock for the Forum module, freezing the current minimum closed loop across browsing, draft publish, post detail, media preview, interaction, author profile, my-assets, reports, and forum-derived inbox, and making future Forum changes default `No-Go` unless a new formal reopening gate is approved.
 
 ### 2026-05-05 Message Building Business Transit And Deal Confirmation V1
 
