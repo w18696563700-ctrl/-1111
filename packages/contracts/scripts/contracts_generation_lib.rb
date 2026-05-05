@@ -508,6 +508,11 @@ module ContractsGeneration
     deal_confirmation_statuses = schemas.fetch('DealConfirmationStatus').fetch('enum')
     pricing_currency_codes = schemas.fetch('PricingCurrencyCode').fetch('enum')
     project_bid_material_kinds = schemas.fetch('ProjectBidMaterialKind').fetch('enum')
+    project_album_photo_categories = schemas.fetch('ProjectAlbumPhotoCategory').fetch('enum')
+    project_album_photo_states = schemas.fetch('ProjectAlbumPhotoReadModel')
+      .fetch('properties')
+      .fetch('photoState')
+      .fetch('enum')
     workbench_entry_keys = schemas.fetch('ProjectCommunicationWorkbenchEntryKey').fetch('enum')
     workbench_groups = schemas.fetch('ProjectCommunicationWorkbenchGroup').fetch('enum')
     material_review_states = schemas.fetch('ProjectCommunicationMaterialReviewState').fetch('enum')
@@ -685,6 +690,42 @@ module ContractsGeneration
       export interface ProjectBidMaterialListResponse {
         projectId: string;
         attachments: ProjectBidMaterialReadModel[];
+      }
+
+      export const PROJECT_ALBUM_PHOTO_CATEGORIES = #{json_array(project_album_photo_categories)} as const;
+      export type ProjectAlbumPhotoCategory = (typeof PROJECT_ALBUM_PHOTO_CATEGORIES)[number];
+
+      export const PROJECT_ALBUM_PHOTO_STATES = #{json_array(project_album_photo_states)} as const;
+      export type ProjectAlbumPhotoState = (typeof PROJECT_ALBUM_PHOTO_STATES)[number];
+
+      export interface ProjectAlbumPhotoBindRequest {
+        fileAssetId: string;
+        category: ProjectAlbumPhotoCategory;
+        caption?: string | null;
+        sortOrder?: number | null;
+      }
+
+      export interface ProjectAlbumPhotoReadModel {
+        photoId: string;
+        projectId: string;
+        fileAssetId: string;
+        category: ProjectAlbumPhotoCategory;
+        caption: string | null;
+        mimeType: string;
+        sortOrder: number;
+        photoState: ProjectAlbumPhotoState;
+        uploadedByUserId: string;
+        uploadedByActorId?: string | null;
+        uploadedByOrganizationId: string;
+        createdAt: string;
+        removedAt?: string | null;
+      }
+
+      export interface ProjectAlbumPhotoListReadModel {
+        projectId: string;
+        limit: number;
+        photoCount: number;
+        items: ProjectAlbumPhotoReadModel[];
       }
 
       export const DEAL_CONFIRMATION_STATUSES = #{json_array(deal_confirmation_statuses)} as const;

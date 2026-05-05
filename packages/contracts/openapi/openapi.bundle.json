@@ -4504,6 +4504,137 @@
         }
       }
     },
+    "/api/app/project/{projectId}/album/photos": {
+      "get": {
+        "tags": [
+          "Project"
+        ],
+        "summary": "Project album photo list canonical path for Flutter App",
+        "operationId": "getAppProjectAlbumPhotos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-owned project evidence album list. This response carries FileAsset-backed photo records only; it must not expose objectKey, create a fulfillment album, or become acceptance/dispute truth.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAlbumPhotoListReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `PROJECT_ALBUM_FORBIDDEN` response."
+          },
+          "404": {
+            "description": "Controlled `PROJECT_ALBUM_UNAVAILABLE` response."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Project"
+        ],
+        "summary": "Bind a confirmed FileAsset as a project album photo",
+        "operationId": "bindAppProjectAlbumPhoto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Bind a FileAsset already confirmed through the shared upload three-step flow. The FileAsset must belong to the same project, current organization, and `project_album_photo` file kind.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectAlbumPhotoBindRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Project album photo bound.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAlbumPhotoReadModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled `PROJECT_ALBUM_INVALID` response."
+          },
+          "403": {
+            "description": "Controlled `PROJECT_ALBUM_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `PROJECT_ALBUM_LIMIT_EXCEEDED` response."
+          }
+        }
+      }
+    },
+    "/api/app/project/{projectId}/album/photos/{photoId}": {
+      "delete": {
+        "tags": [
+          "Project"
+        ],
+        "summary": "Remove a project album photo via canonical path for Flutter App",
+        "operationId": "deleteAppProjectAlbumPhoto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photoId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Project album photo marked removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAlbumPhotoReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `PROJECT_ALBUM_FORBIDDEN` response."
+          },
+          "404": {
+            "description": "Controlled `PROJECT_ALBUM_UNAVAILABLE` response."
+          }
+        }
+      }
+    },
     "/api/app/project/{projectId}/pricing-summary": {
       "get": {
         "tags": [
@@ -16842,7 +16973,7 @@
           "reviewAction",
           "idempotencyKey"
         ],
-        "description": "Material review command for the eight material entries only. It must not accept `contract_confirmation` or `final_confirmed_amount_confirmation`.\n",
+        "description": "Material review command for the eight material entries only. It must not accept `contract_confirmation` or `final_confirmed_amount_confirmation`. `publisher_materials` review may omit `bidId` before bid submit; `bid_materials` review must carry a concrete `bidId`.\n",
         "properties": {
           "projectId": {
             "type": "string"
@@ -16854,7 +16985,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Conditional material-review anchor. It is optional only for `publisher_materials` entries because publisher quote-basis confirmation happens before bid submit can create a bid. It is required for `bid_materials` entries and must not be used for contract or final-amount confirmation.\n"
           },
           "entryKey": {
             "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntryKey"
@@ -16905,6 +17037,148 @@
             "type": "array",
             "items": {
               "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+            }
+          }
+        }
+      },
+      "ProjectAlbumPhotoCategory": {
+        "type": "string",
+        "enum": [
+          "contract",
+          "progress",
+          "final",
+          "defect"
+        ],
+        "description": "Bounded project album evidence category. These categories are for evidence display only and do not open fulfillment, acceptance, dispute, settlement, or public case-gallery truth.\n"
+      },
+      "ProjectAlbumPhotoBindRequest": {
+        "type": "object",
+        "required": [
+          "fileAssetId",
+          "category"
+        ],
+        "description": "Bind a confirmed FileAsset to the current project album. The upload itself must already have completed the shared init -> direct upload -> confirm flow; this command must not accept objectKey.\n",
+        "properties": {
+          "fileAssetId": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ProjectAlbumPhotoCategory"
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "sortOrder": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "ProjectAlbumPhotoReadModel": {
+        "type": "object",
+        "required": [
+          "photoId",
+          "projectId",
+          "fileAssetId",
+          "category",
+          "mimeType",
+          "sortOrder",
+          "photoState",
+          "uploadedByUserId",
+          "uploadedByOrganizationId",
+          "createdAt"
+        ],
+        "description": "Server-owned project album photo read model. The FileAsset id is the durable truth anchor; preview image URLs must be obtained through the bounded file preview/access surface and objectKey must never be exposed.\n",
+        "properties": {
+          "photoId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "fileAssetId": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ProjectAlbumPhotoCategory"
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "photoState": {
+            "type": "string",
+            "enum": [
+              "active",
+              "removed"
+            ]
+          },
+          "uploadedByUserId": {
+            "type": "string"
+          },
+          "uploadedByActorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uploadedByOrganizationId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "removedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectAlbumPhotoListReadModel": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "limit",
+          "photoCount",
+          "items"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "photoCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAlbumPhotoReadModel"
             }
           }
         }
