@@ -35,6 +35,8 @@ AppNotificationItemView parseAppNotificationItem(Object? payload) {
     routeTargetAvailability: parseAppNotificationRouteTargetAvailability(
       map['routeTargetAvailability'],
       routeTarget: routeTarget,
+      source: _requiredString(map, 'source'),
+      type: _requiredString(map, 'type'),
     ),
     createdAt: _nullableString(map['createdAt']),
     readAt: _nullableString(map['readAt']),
@@ -46,9 +48,25 @@ AppNotificationRouteTargetAvailabilityView
 parseAppNotificationRouteTargetAvailability(
   Object? payload, {
   required AppNotificationRouteTargetView? routeTarget,
+  required String source,
+  required String type,
 }) {
   final map = _optionalMap(payload);
   if (map == null || map.isEmpty) {
+    final fallbackRouteTarget = _legacyProjectCommunicationFallback(
+      routeTarget: routeTarget,
+      source: source,
+      type: type,
+    );
+    if (fallbackRouteTarget != null) {
+      return AppNotificationRouteTargetAvailabilityView(
+        state: 'unavailable',
+        reasonCode: 'LEGACY_PROJECT_COMMUNICATION_AVAILABILITY_MISSING',
+        reasonText: '入口已失效，可从主体项目列表重新进入。',
+        fallbackAction: 'open_subject_list',
+        fallbackRouteTarget: fallbackRouteTarget,
+      );
+    }
     final canLocate = routeTarget?.routeLocation?.trim().isNotEmpty == true;
     return AppNotificationRouteTargetAvailabilityView(
       state: canLocate ? 'available' : 'missing_context',
@@ -70,6 +88,49 @@ parseAppNotificationRouteTargetAvailability(
         _nullableString(map['reasonText']) ?? '当前通知暂时无法定位，请稍后重试或从对应入口进入。',
     fallbackAction: _nullableString(map['fallbackAction']) ?? 'none',
     fallbackRouteTarget: fallbackRouteTarget,
+  );
+}
+
+AppNotificationRouteTargetView? _legacyProjectCommunicationFallback({
+  required AppNotificationRouteTargetView? routeTarget,
+  required String source,
+  required String type,
+}) {
+  if (routeTarget == null) {
+    return null;
+  }
+  final isProjectCommunication =
+      source == 'project_communication' ||
+      type == 'project_communication_message' ||
+      routeTarget.canonicalPath ==
+          '/api/app/message/counterpart-conversation/detail';
+  if (!isProjectCommunication) {
+    return null;
+  }
+  final conversationId = routeTarget.params['conversationId']?.trim();
+  final projectId = routeTarget.params['projectId']?.trim();
+  if (conversationId == null ||
+      conversationId.isEmpty ||
+      projectId == null ||
+      projectId.isEmpty) {
+    return null;
+  }
+  return AppNotificationRouteTargetView(
+    canonicalPath: routeTarget.canonicalPath,
+    localEntryKey: routeTarget.localEntryKey,
+    params: Map<String, String>.unmodifiable(<String, String>{
+      'conversationId': conversationId,
+      'projectId': projectId,
+    }),
+    routeLocation: _buildRouteLocation(
+      canonicalPath: routeTarget.canonicalPath,
+      localEntryKey: routeTarget.localEntryKey,
+      state: 'enabled',
+      params: <String, String>{
+        'conversationId': conversationId,
+        'projectId': projectId,
+      },
+    ),
   );
 }
 

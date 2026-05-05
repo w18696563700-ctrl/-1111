@@ -1156,6 +1156,26 @@ class _CounterpartConversationPageState
   Widget _buildFailureCard(
     CounterpartConversationResult<CounterpartConversationDetailView>? result,
   ) {
+    if (_isStaleCounterpartContainerFailure(result)) {
+      return _ActionCard(
+        title: '项目沟通入口已失效',
+        children: <Widget>[
+          const _StateMessage(title: '受控提示', body: '入口已失效，可从主体项目列表重新进入。'),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: <Widget>[
+              FilledButton.tonal(
+                onPressed: _returnToPreviousEntry,
+                child: const Text('返回消息列表'),
+              ),
+              OutlinedButton(onPressed: _load, child: const Text('重试')),
+            ],
+          ),
+        ],
+      );
+    }
     return _ActionCard(
       title: result?.message ?? '当前对方沟通容器暂不可用',
       children: <Widget>[
@@ -1167,6 +1187,27 @@ class _CounterpartConversationPageState
         FilledButton.tonal(onPressed: _load, child: const Text('重试')),
       ],
     );
+  }
+
+  bool _isStaleCounterpartContainerFailure(
+    CounterpartConversationResult<CounterpartConversationDetailView>? result,
+  ) {
+    final errorCode = result?.errorCode ?? '';
+    final message = result?.message ?? '';
+    return errorCode.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+        message.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+        message.contains('当前对方沟通容器暂不可用');
+  }
+
+  void _returnToPreviousEntry() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(const SnackBar(content: Text('请从消息页主体项目列表重新进入。')));
   }
 
   void _openBusinessCard(CounterpartConversationBusinessCardView card) {

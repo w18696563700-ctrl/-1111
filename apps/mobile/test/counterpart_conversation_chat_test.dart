@@ -677,6 +677,37 @@ void main() {
     ProjectAttachmentDebugOverrides.reset();
   });
 
+  testWidgets(
+    'stale counterpart conversation failure uses Chinese fallback without technical code',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/counterpart-conversation/detail':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 503,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'code': 'COUNTERPART_CONVERSATION_UNAVAILABLE',
+                        'message': '当前对方沟通容器暂不可用，请稍后再试。',
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+
+      expect(find.text('项目沟通入口已失效'), findsOneWidget);
+      expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
+      expect(find.text('返回消息列表'), findsOneWidget);
+      expect(find.text('COUNTERPART_CONVERSATION_UNAVAILABLE'), findsNothing);
+      expect(find.text('当前对方沟通容器暂不可用，请稍后再试。'), findsNothing);
+    },
+  );
+
   test(
     'project communication realtime client refreshes and forwards auth headers',
     () async {

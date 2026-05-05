@@ -166,6 +166,8 @@ class _MessagesNotificationPanel extends StatelessWidget {
     required this.selectedFilter,
     required this.onSelectFilter,
     required this.onOpen,
+    required this.onDismiss,
+    required this.onDismissMany,
     required this.onRetry,
     required this.onLoadMore,
   });
@@ -175,6 +177,8 @@ class _MessagesNotificationPanel extends StatelessWidget {
   final _MessagesNotificationFilter selectedFilter;
   final ValueChanged<_MessagesNotificationFilter> onSelectFilter;
   final ValueChanged<AppNotificationItemView> onOpen;
+  final ValueChanged<AppNotificationItemView> onDismiss;
+  final ValueChanged<List<AppNotificationItemView>> onDismissMany;
   final VoidCallback onRetry;
   final VoidCallback onLoadMore;
 
@@ -191,10 +195,20 @@ class _MessagesNotificationPanel extends StatelessWidget {
     final unreadCount = unread?.total ?? 0;
     final failed = _notificationFailed(result);
     final hasMore = data?.hasMore == true;
-    final maxListHeight = (maxPanelHeight - 108).clamp(132.0, maxPanelHeight);
+    final unavailableUnreadItems = items
+        .where(
+          (item) => item.unread && !item.routeTargetAvailability.isAvailable,
+        )
+        .toList(growable: false);
+    final reservedHeight = unavailableUnreadItems.isNotEmpty ? 144.0 : 108.0;
+    final maxListHeight = (maxPanelHeight - reservedHeight).clamp(
+      132.0,
+      maxPanelHeight,
+    );
     final listHeight = _notificationPanelListHeight(
       itemCount: items.length,
       hasMore: hasMore,
+      actionItemCount: unavailableUnreadItems.length,
       maxHeight: maxListHeight.toDouble(),
     );
     return ConstrainedBox(
@@ -251,6 +265,28 @@ class _MessagesNotificationPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 9),
               ],
+              if (unavailableUnreadItems.isNotEmpty &&
+                  !loading &&
+                  !failed) ...<Widget>[
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton.icon(
+                    onPressed: () => onDismissMany(unavailableUnreadItems),
+                    icon: const Icon(Icons.cleaning_services_rounded, size: 16),
+                    label: Text('清理失效提醒 ${unavailableUnreadItems.length}'),
+                    style: TextButton.styleFrom(
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      visualDensity: VisualDensity.compact,
+                      minimumSize: const Size(0, 30),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 6),
+              ],
               if (loading)
                 const LinearProgressIndicator(minHeight: 5)
               else if (failed)
@@ -289,6 +325,7 @@ class _MessagesNotificationPanel extends StatelessWidget {
                       return _MessagesNotificationCard(
                         item: item,
                         onOpen: () => onOpen(item),
+                        onDismiss: () => onDismiss(item),
                       );
                     },
                   ),
@@ -304,10 +341,13 @@ class _MessagesNotificationPanel extends StatelessWidget {
 double _notificationPanelListHeight({
   required int itemCount,
   required bool hasMore,
+  required int actionItemCount,
   required double maxHeight,
 }) {
   final contentHeight =
-      itemCount * 66.0 + (itemCount - 1).clamp(0, itemCount) * 6.0;
+      itemCount * 66.0 +
+      actionItemCount * 34.0 +
+      (itemCount - 1).clamp(0, itemCount) * 6.0;
   final loadMoreHeight = hasMore ? 42.0 : 0.0;
   return (contentHeight + loadMoreHeight).clamp(96.0, maxHeight).toDouble();
 }
@@ -702,10 +742,15 @@ String _notificationFailureMessage(String? message) {
 }
 
 class _MessagesNotificationCard extends StatelessWidget {
-  const _MessagesNotificationCard({required this.item, required this.onOpen});
+  const _MessagesNotificationCard({
+    required this.item,
+    required this.onOpen,
+    required this.onDismiss,
+  });
 
   final AppNotificationItemView item;
   final VoidCallback onOpen;
+  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -720,6 +765,9 @@ class _MessagesNotificationCard extends StatelessWidget {
     final body = availability.isAvailable
         ? item.body?.trim()
         : _notificationFailureMessage(availability.reasonText);
+    final showFallbackAction =
+        !availability.isAvailable && availability.canOpenFallback;
+    final showDismissAction = !availability.isAvailable && item.unread;
     return Material(
       color: item.unread ? const Color(0xFFFFFBF6) : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -731,125 +779,166 @@ class _MessagesNotificationCard extends StatelessWidget {
         onTap: onOpen,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(10, 8, 9, 8),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              SizedBox(
-                width: 36,
-                height: 36,
-                child: Stack(
-                  clipBehavior: Clip.none,
-                  children: <Widget>[
-                    Positioned.fill(
-                      child: DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: theme.colorScheme.primaryContainer.withValues(
-                            alpha: 0.38,
-                          ),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Icon(
-                          _notificationIcon(item.source),
-                          size: 19,
-                          color: theme.colorScheme.primary,
-                        ),
-                      ),
-                    ),
-                    if (item.unread)
-                      Positioned(
-                        top: -1,
-                        right: -1,
-                        child: DecoratedBox(
-                          decoration: BoxDecoration(
-                            color: theme.colorScheme.error,
-                            border: Border.all(
-                              color: theme.colorScheme.surface,
-                              width: 1.5,
-                            ),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: const SizedBox(width: 9, height: 9),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Row(
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  SizedBox(
+                    width: 36,
+                    height: 36,
+                    child: Stack(
+                      clipBehavior: Clip.none,
                       children: <Widget>[
-                        Flexible(
-                          child: Text(
-                            '$sourceLabel · ${item.title}',
+                        Positioned.fill(
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              color: theme.colorScheme.primaryContainer
+                                  .withValues(alpha: 0.38),
+                              borderRadius: BorderRadius.circular(999),
+                            ),
+                            child: Icon(
+                              _notificationIcon(item.source),
+                              size: 19,
+                              color: theme.colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                        if (item.unread)
+                          Positioned(
+                            top: -1,
+                            right: -1,
+                            child: DecoratedBox(
+                              decoration: BoxDecoration(
+                                color: theme.colorScheme.error,
+                                border: Border.all(
+                                  color: theme.colorScheme.surface,
+                                  width: 1.5,
+                                ),
+                                borderRadius: BorderRadius.circular(999),
+                              ),
+                              child: const SizedBox(width: 9, height: 9),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        Row(
+                          children: <Widget>[
+                            Flexible(
+                              child: Text(
+                                '$sourceLabel · ${item.title}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: theme.textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  height: 1.15,
+                                ),
+                              ),
+                            ),
+                            if (!canLocate) ...<Widget>[
+                              const SizedBox(width: 6),
+                              const _MessagesMetaPill(label: '暂不可定位'),
+                            ] else if (!availability.isAvailable) ...<Widget>[
+                              const SizedBox(width: 6),
+                              const _MessagesMetaPill(label: '入口已失效'),
+                            ],
+                          ],
+                        ),
+                        if (body != null && body.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 3),
+                          Text(
+                            body,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: theme.textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              height: 1.15,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              height: 1.18,
                             ),
                           ),
-                        ),
-                        if (!canLocate) ...<Widget>[
-                          const SizedBox(width: 6),
-                          const _MessagesMetaPill(label: '暂不可定位'),
-                        ] else if (!availability.isAvailable) ...<Widget>[
-                          const SizedBox(width: 6),
-                          const _MessagesMetaPill(label: '入口已失效'),
                         ],
                       ],
                     ),
-                    if (body != null && body.isNotEmpty) ...<Widget>[
-                      const SizedBox(height: 3),
-                      Text(
-                        body,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          height: 1.18,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 54,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      mainAxisSize: MainAxisSize.min,
+                      children: <Widget>[
+                        if (timeLabel != null)
+                          Text(
+                            timeLabel,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            textAlign: TextAlign.right,
+                            style: theme.textTheme.labelSmall?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        if (canLocate) ...<Widget>[
+                          const SizedBox(height: 4),
+                          Icon(
+                            Icons.chevron_right_rounded,
+                            size: 20,
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(width: 8),
-              SizedBox(
-                width: 54,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+              if (showFallbackAction || showDismissAction) ...<Widget>[
+                const SizedBox(height: 7),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.end,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    if (timeLabel != null)
-                      Text(
-                        timeLabel,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w700,
-                        ),
+                    if (showFallbackAction)
+                      TextButton.icon(
+                        onPressed: onOpen,
+                        icon: const Icon(Icons.list_alt_rounded, size: 16),
+                        label: const Text('从主体列表进入'),
+                        style: _notificationActionButtonStyle(context),
                       ),
-                    if (canLocate) ...<Widget>[
-                      const SizedBox(height: 4),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 20,
-                        color: theme.colorScheme.onSurfaceVariant,
+                    if (showFallbackAction && showDismissAction)
+                      const SizedBox(width: 6),
+                    if (showDismissAction)
+                      TextButton.icon(
+                        onPressed: onDismiss,
+                        icon: const Icon(Icons.done_rounded, size: 16),
+                        label: const Text('忽略此提醒'),
+                        style: _notificationActionButtonStyle(context),
                       ),
-                    ],
                   ],
                 ),
-              ),
+              ],
             ],
           ),
         ),
       ),
+    );
+  }
+
+  ButtonStyle _notificationActionButtonStyle(BuildContext context) {
+    return TextButton.styleFrom(
+      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.compact,
+      minimumSize: const Size(0, 30),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      textStyle: Theme.of(
+        context,
+      ).textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w800),
     );
   }
 

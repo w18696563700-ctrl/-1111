@@ -317,6 +317,13 @@ void main() {
                         'projectId',
                       ],
                     },
+                    'routeTargetAvailability': <String, Object?>{
+                      'state': 'available',
+                      'reasonCode': 'ROUTE_TARGET_AVAILABLE',
+                      'reasonText': '当前通知入口可用。',
+                      'fallbackAction': 'none',
+                      'fallbackRouteTarget': null,
+                    },
                     'createdAt': '2026-05-01T08:00:00Z',
                     'readAt': null,
                     'unread': true,
@@ -402,7 +409,8 @@ void main() {
   testWidgets(
     'stale project notification opens subject fallback without marking read',
     (WidgetTester tester) async {
-      String? openedRoute;
+      var dismissed = false;
+      var readRequests = 0;
       final transport = FakeAppApiTransport(
         handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
           'GET /api/app/message/interactions': (request) async {
@@ -416,6 +424,27 @@ void main() {
             );
           },
           'GET /api/app/notifications/list': (request) async {
+            if (dismissed) {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'items': <Object?>[],
+                  'page': <String, Object?>{
+                    'nextCursor': null,
+                    'hasMore': false,
+                  },
+                  'unread': <String, Object?>{
+                    'total': 0,
+                    'projectCommunication': 0,
+                    'businessTodo': 0,
+                    'bidParticipationRequest': 0,
+                    'forumInteraction': 0,
+                    'system': 0,
+                  },
+                },
+              );
+            }
             return AppApiResponse(
               statusCode: 200,
               uri: request.uri,
@@ -482,7 +511,26 @@ void main() {
             );
           },
           'POST /api/app/notifications/read': (request) async {
-            throw AssertionError('stale notification must not be marked read');
+            readRequests += 1;
+            dismissed = true;
+            expect(request.body, <String, Object?>{
+              'notificationIds': <String>['notice-stale-1'],
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'readNotificationIds': <Object?>['notice-stale-1'],
+                'unread': <String, Object?>{
+                  'total': 0,
+                  'projectCommunication': 0,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
           },
         },
       );
@@ -493,16 +541,7 @@ void main() {
       addTearDown(ForumConsumerLayer.reset);
 
       await tester.pumpWidget(
-        MaterialApp(
-          onGenerateRoute: (settings) {
-            openedRoute = settings.name;
-            return MaterialPageRoute<void>(
-              settings: settings,
-              builder: (_) => const Scaffold(body: Text('主体项目列表')),
-            );
-          },
-          home: const Scaffold(body: MessagesPage()),
-        ),
+        MaterialApp(home: const Scaffold(body: MessagesPage())),
       );
       await tester.pumpAndSettle();
 
@@ -510,14 +549,15 @@ void main() {
 
       expect(find.text('入口已失效'), findsOneWidget);
       expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
+      expect(find.text('从主体列表进入'), findsOneWidget);
+      expect(find.text('忽略此提醒'), findsOneWidget);
+      expect(find.text('清理失效提醒 1'), findsOneWidget);
 
       await tester.tap(find.textContaining('有新的项目沟通消息'));
       await tester.pumpAndSettle();
 
-      expect(find.text('主体项目列表'), findsOneWidget);
-      expect(openedRoute, contains('conversationId=org-1'));
-      expect(openedRoute, contains('projectId=project-1'));
-      expect(openedRoute, isNot(contains('threadId=')));
+      expect(find.text('当前没有新的项目沟通'), findsOneWidget);
+      expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
       expect(
         transport.requests
             .where(
@@ -527,6 +567,15 @@ void main() {
             .length,
         0,
       );
+      expect(readRequests, 0);
+
+      await _openNotificationPanel(tester);
+      await tester.tap(find.text('清理失效提醒 1'));
+      await tester.pumpAndSettle();
+
+      expect(readRequests, 1);
+      expect(find.text('未读 0'), findsOneWidget);
+      expect(find.text('全部当前为空'), findsOneWidget);
     },
   );
 
