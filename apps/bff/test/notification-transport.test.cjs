@@ -86,6 +86,7 @@ test('notification routes forward to Server without owning unread truth', async 
         unread: {
           total: 7,
           projectCommunication: 1,
+          businessTodo: 1,
           bidParticipationRequest: 1,
           forumInteraction: 0,
           system: 5,
@@ -98,6 +99,7 @@ test('notification routes forward to Server without owning unread truth', async 
         unread: {
           total: 6,
           projectCommunication: 0,
+          businessTodo: 1,
           bidParticipationRequest: 1,
           forumInteraction: 0,
           system: 5,
@@ -109,12 +111,13 @@ test('notification routes forward to Server without owning unread truth', async 
 
   const headers = { authorization: 'Bearer app', 'x-organization-id': 'org-1' };
   const registered = await service.registerDeviceToken({ platform: 'ios', provider: 'apns', deviceToken: 'raw-token', appInstallationId: 'install-1' }, headers);
-  const list = await service.listNotifications('20', undefined, headers);
+  const list = await service.listNotifications({ pageSize: '20', source: 'business_todo' }, headers);
   const read = await service.markRead({ notificationIds: ['n-1'] }, headers);
 
   assert.deepEqual(registered, { registered: true, tokenId: 'token-1', platform: 'ios', provider: 'apns' });
   assert.equal(list.items.length, 2);
   assert.equal(list.unread.projectCommunication, 1);
+  assert.equal(list.unread.businessTodo, 1);
   assert.equal(list.unread.bidParticipationRequest, 1);
   assert.equal(list.unread.total, 7);
   assert.equal(list.items[1].type, 'bid_participation_request');
@@ -128,6 +131,7 @@ test('notification routes forward to Server without owning unread truth', async 
   assert.deepEqual(read.unread, {
     total: 6,
     projectCommunication: 0,
+    businessTodo: 1,
     bidParticipationRequest: 1,
     forumInteraction: 0,
     system: 5,
@@ -138,6 +142,7 @@ test('notification routes forward to Server without owning unread truth', async 
     '/server/notifications/read',
   ]);
   assert.equal(calls[1].options.params.pageSize, '20');
+  assert.equal(calls[1].options.params.source, 'business_todo');
   assert.equal(calls[1].options.headers['x-organization-id'], 'org-1');
 });
 
@@ -157,12 +162,12 @@ test('notification read-model fails controlled on unsupported notification type'
         },
       ],
       page: { nextCursor: null, hasMore: false },
-      unread: { total: 1, projectCommunication: 0, bidParticipationRequest: 0, forumInteraction: 0, system: 1 },
+      unread: { total: 1, projectCommunication: 0, businessTodo: 0, bidParticipationRequest: 0, forumInteraction: 0, system: 1 },
     };
   });
 
   await assert.rejects(
-    () => service.listNotifications(undefined, undefined, { authorization: 'Bearer app' }),
+    () => service.listNotifications({}, { authorization: 'Bearer app' }),
     (error) => {
       assert.equal(error.getStatus(), 502);
       assert.equal(error.getResponse().code, 'NOTIFICATION_UNAVAILABLE');

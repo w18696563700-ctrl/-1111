@@ -1,6 +1,7 @@
 type AppNotificationUnreadProjection = {
   total?: unknown;
   projectCommunication?: unknown;
+  businessTodo?: unknown;
   bidParticipationRequest?: unknown;
   forumInteraction?: unknown;
   system?: unknown;
@@ -18,6 +19,7 @@ const NOTIFICATION_TYPES = new Set([
 const NOTIFICATION_SOURCES = new Set([
   'project_communication',
   'forum_interaction',
+  'business_todo',
   'system',
   'bid_participation_request'
 ]);
@@ -95,6 +97,7 @@ function readUnread(value: unknown) {
   return {
     total: readNumber(unread?.total),
     projectCommunication: readNumber(unread?.projectCommunication),
+    businessTodo: readNumber(unread?.businessTodo),
     bidParticipationRequest: readNumber(unread?.bidParticipationRequest),
     forumInteraction: readNumber(unread?.forumInteraction),
     system: readNumber(unread?.system)
@@ -105,6 +108,7 @@ function emptyUnread() {
   return {
     total: 0,
     projectCommunication: 0,
+    businessTodo: 0,
     bidParticipationRequest: 0,
     forumInteraction: 0,
     system: 0

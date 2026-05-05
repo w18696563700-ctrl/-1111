@@ -28,6 +28,13 @@ const PAGE_SIZE_DEFAULT = 30;
 const PAGE_SIZE_MAX = 50;
 const DEVICE_PLATFORMS = new Set(['ios', 'android']);
 const PUSH_PROVIDERS = new Set(['apns', 'fcm']);
+const NOTIFICATION_SOURCE_FILTERS: Record<string, string[] | null> = {
+  all: null,
+  project_communication: ['project_communication'],
+  forum_interaction: ['forum_interaction'],
+  business_todo: ['business_todo', 'bid_participation_request'],
+  system: ['system']
+};
 
 @Injectable()
 export class NotificationService {
@@ -75,6 +82,7 @@ export class NotificationService {
     const session = await requireVerifiedCurrentSessionContext(context, this.sessionVerifier);
     const limit = this.readPageSize(query.pageSize);
     const cursor = this.readOptionalDate(query.cursor);
+    const sourceFilter = this.readSourceFilter(query.source ?? query.lane);
     const orgId = session.organizationId ?? '';
     const builder = this.notificationRepository
       .createQueryBuilder('n')
@@ -88,6 +96,9 @@ export class NotificationService {
       .take(limit + 1);
     if (cursor) {
       builder.andWhere('n.created_at < :cursor', { cursor });
+    }
+    if (sourceFilter) {
+      builder.andWhere('n.source IN (:...sources)', { sources: sourceFilter });
     }
     const [items, unread] = await Promise.all([
       builder.getMany(),
@@ -226,7 +237,10 @@ export class NotificationService {
       unread.total += 1;
       if (item.source === 'project_communication') {
         unread.projectCommunication += 1;
+      } else if (item.source === 'business_todo') {
+        unread.businessTodo += 1;
       } else if (item.source === 'bid_participation_request') {
+        unread.businessTodo += 1;
         unread.bidParticipationRequest += 1;
       } else if (item.source === 'forum_interaction') {
         unread.forumInteraction += 1;
@@ -355,6 +369,18 @@ export class NotificationService {
       throw notificationInvalid('Field `pageSize` must be a positive integer.');
     }
     return Math.min(parsed, PAGE_SIZE_MAX);
+  }
+
+  private readSourceFilter(value: unknown) {
+    const normalized = this.readOptionalString(value);
+    if (!normalized) {
+      return null;
+    }
+    const filter = NOTIFICATION_SOURCE_FILTERS[normalized];
+    if (filter === undefined) {
+      throw notificationInvalid('Field `source` must be all, project_communication, forum_interaction, business_todo, or system.');
+    }
+    return filter;
   }
 
   private readOptionalDate(value: unknown) {

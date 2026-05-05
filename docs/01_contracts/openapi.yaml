@@ -2602,12 +2602,32 @@ paths:
             type: integer
             minimum: 1
             maximum: 50
+        - in: query
+          name: source
+          required: false
+          description: >
+            Optional notification source lane filter. `all` or omitted returns
+            all notification items. `business_todo` is a notification-center
+            lane and does not replace project-communication
+            `businessTodoSummary`.
+          schema:
+            $ref: '#/components/schemas/AppNotificationSourceLane'
+        - in: query
+          name: lane
+          required: false
+          description: >
+            Compatibility alias for `source`. When both are provided, `source`
+            takes precedence.
+          schema:
+            $ref: '#/components/schemas/AppNotificationSourceLane'
       responses:
         "200":
           description: >
             Minimal notification-center list. It may aggregate only project
             communication notifications, forum interaction reminders, and
-            system reminders.
+            system reminders. The `unread` projection is global for the
+            current actor / organization and remains explainable across all
+            source buckets even when the returned item list is filtered.
           content:
             application/json:
               schema:
@@ -10600,9 +10620,22 @@ components:
       enum:
         - project_communication
         - forum_interaction
+        - business_todo
         - system
         - bid_participation_request
       description: Bounded source lane for messages-building notification center aggregation.
+    AppNotificationSourceLane:
+      type: string
+      enum:
+        - all
+        - project_communication
+        - forum_interaction
+        - business_todo
+        - system
+      description: >
+        App-facing notification list filter lane. `business_todo` is a
+        notification-center grouping lane; project-communication business red
+        points still read `businessTodoSummary` and `entries[].badgeCount`.
     AppNotificationRouteTarget:
       type: object
       required:
@@ -10691,15 +10724,22 @@ components:
       required:
         - total
         - projectCommunication
+        - businessTodo
         - bidParticipationRequest
         - forumInteraction
         - system
-      description: Server-owned notification-center unread projection.
+      description: >
+        Server-owned notification-center unread projection. `businessTodo`
+        carries V1 business-todo notification unread. `bidParticipationRequest`
+        remains a compatibility bucket and must not create a second UI truth.
       properties:
         total:
           type: integer
           minimum: 0
         projectCommunication:
+          type: integer
+          minimum: 0
+        businessTodo:
           type: integer
           minimum: 0
         bidParticipationRequest:

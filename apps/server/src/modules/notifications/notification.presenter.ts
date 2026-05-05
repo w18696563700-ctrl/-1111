@@ -4,6 +4,7 @@ import { AppNotificationEntity } from './entities/app-notification.entity';
 export type NotificationUnreadProjection = {
   total: number;
   projectCommunication: number;
+  businessTodo: number;
   bidParticipationRequest: number;
   forumInteraction: number;
   system: number;
@@ -44,6 +45,7 @@ export class NotificationPresenter {
     return {
       total: 0,
       projectCommunication: 0,
+      businessTodo: 0,
       bidParticipationRequest: 0,
       forumInteraction: 0,
       system: 0

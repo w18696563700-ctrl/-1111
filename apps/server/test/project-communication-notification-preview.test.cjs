@@ -215,10 +215,55 @@ test('notification mark read updates only actor-owned notifications and returns 
   assert.deepEqual(result.unread, {
     total: 2,
     projectCommunication: 0,
+    businessTodo: 1,
     bidParticipationRequest: 1,
     forumInteraction: 1,
     system: 0,
   });
+});
+
+test('notification list supports source filter while unread projection stays global', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const notifications = [
+    createNotification({ id: 'n-1', source: 'project_communication', readAt: null }),
+    createNotification({ id: 'n-2', source: 'forum_interaction', readAt: null }),
+    createNotification({ id: 'n-3', source: 'bid_participation_request', type: 'bid_participation_request', readAt: null }),
+  ];
+  const queryCalls = [];
+  const queryBuilder = {
+    where(statement, params) { queryCalls.push({ method: 'where', statement, params }); return this; },
+    andWhere(statement, params) { queryCalls.push({ method: 'andWhere', statement, params }); return this; },
+    orderBy() { return this; },
+    addOrderBy() { return this; },
+    take() { return this; },
+    async getMany() { return [notifications[2]]; },
+  };
+  const repository = {
+    createQueryBuilder() { return queryBuilder; },
+    async find() {
+      return notifications;
+    },
+  };
+  const service = new NotificationService(repository, {}, {}, createVerifier('recipient-org'), new NotificationPresenter());
+
+  const result = await service.listNotifications({ source: 'business_todo' }, createContext({ organizationId: 'recipient-org' }));
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].source, 'bid_participation_request');
+  assert.deepEqual(result.unread, {
+    total: 3,
+    projectCommunication: 1,
+    businessTodo: 1,
+    bidParticipationRequest: 1,
+    forumInteraction: 1,
+    system: 0,
+  });
+  assert.ok(queryCalls.some((call) =>
+    call.statement === 'n.source IN (:...sources)' &&
+    call.params.sources.includes('bid_participation_request') &&
+    call.params.sources.includes('business_todo')
+  ));
 });
 
 test('file preview returns signed access without exposing objectKey', async () => {
