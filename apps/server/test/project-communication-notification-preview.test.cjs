@@ -266,6 +266,65 @@ test('notification list supports source filter while unread projection stays glo
   ));
 });
 
+test('notification list annotates stale project communication route target with fallback', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const notifications = [
+    createNotification({
+      id: 'n-stale',
+      projectId: 'project-1',
+      threadId: 'thread-1',
+      routeTarget: {
+        canonicalPath: '/api/app/message/counterpart-conversation/detail',
+        localEntryKey: 'counterpart_conversation.open',
+        requiredParams: ['conversationId', 'projectId'],
+        routeParams: {
+          conversationId: 'sender-org',
+          projectId: 'project-1',
+          threadId: 'thread-1',
+        },
+        state: 'enabled',
+      },
+    }),
+  ];
+  const queryBuilder = {
+    where() { return this; },
+    andWhere() { return this; },
+    orderBy() { return this; },
+    addOrderBy() { return this; },
+    take() { return this; },
+    async getMany() { return notifications; },
+  };
+  const repository = {
+    createQueryBuilder() { return queryBuilder; },
+    async find() { return notifications; },
+  };
+  const threadRepository = {
+    async findOneBy() { return null; },
+  };
+  const service = new NotificationService(
+    repository,
+    {},
+    {},
+    createVerifier('recipient-org'),
+    new NotificationPresenter(),
+    threadRepository,
+  );
+
+  const result = await service.listNotifications({}, createContext({ organizationId: 'recipient-org' }));
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].routeTargetAvailability.state, 'expired');
+  assert.equal(result.items[0].routeTargetAvailability.reasonCode, 'PROJECT_COMMUNICATION_THREAD_NOT_FOUND');
+  assert.equal(result.items[0].routeTargetAvailability.fallbackAction, 'open_subject_list');
+  assert.deepEqual(result.items[0].routeTargetAvailability.fallbackRouteTarget.routeParams, {
+    conversationId: 'sender-org',
+    projectId: 'project-1',
+  });
+  assert.equal(result.unread.total, 1);
+  assert.equal(result.unread.projectCommunication, 1);
+});
+
 test('file preview returns signed access without exposing objectKey', async () => {
   const {
     ProjectCommunicationFilePreviewService,

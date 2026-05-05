@@ -54,6 +54,13 @@ test('notification routes forward to Server without owning unread truth', async 
             projectId: 'project-1',
             threadId: 'thread-1',
             routeTarget: { canonicalPath: '/api/app/message/project-communication/messages' },
+            routeTargetAvailability: {
+              state: 'missing_context',
+              reasonCode: 'PROJECT_COMMUNICATION_CONTEXT_MISSING',
+              reasonText: '入口已失效，可从主体项目列表重新进入。',
+              fallbackAction: 'none',
+              fallbackRouteTarget: null,
+            },
             createdAt: '2026-05-01T08:00:00.000Z',
             readAt: null,
             unread: true,
@@ -76,6 +83,13 @@ test('notification routes forward to Server without owning unread truth', async 
                 requestId: 'request-1',
               },
               state: 'enabled',
+            },
+            routeTargetAvailability: {
+              state: 'available',
+              reasonCode: 'ROUTE_TARGET_AVAILABLE',
+              reasonText: '当前通知入口可用。',
+              fallbackAction: 'none',
+              fallbackRouteTarget: null,
             },
             createdAt: '2026-05-04T07:30:00.000Z',
             readAt: null,
@@ -122,6 +136,9 @@ test('notification routes forward to Server without owning unread truth', async 
   assert.equal(list.unread.total, 7);
   assert.equal(list.items[1].type, 'bid_participation_request');
   assert.equal(list.items[1].source, 'bid_participation_request');
+  assert.equal(list.items[0].routeTargetAvailability.state, 'missing_context');
+  assert.equal(list.items[0].routeTargetAvailability.reasonCode, 'PROJECT_COMMUNICATION_CONTEXT_MISSING');
+  assert.equal(list.items[1].routeTargetAvailability.state, 'available');
   assert.deepEqual(list.items[1].routeTarget.routeParams, {
     threadId: 'request-1',
     projectId: 'project-1',

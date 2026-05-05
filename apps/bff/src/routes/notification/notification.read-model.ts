@@ -24,6 +24,16 @@ const NOTIFICATION_SOURCES = new Set([
   'bid_participation_request'
 ]);
 
+const ROUTE_TARGET_AVAILABILITY_STATES = new Set([
+  'available',
+  'unavailable',
+  'expired',
+  'forbidden',
+  'missing_context'
+]);
+
+const ROUTE_TARGET_FALLBACK_ACTIONS = new Set(['none', 'open_subject_list']);
+
 type AppNotificationListPayload = {
   items?: unknown;
   page?: unknown;
@@ -68,6 +78,7 @@ function readAppNotificationItemReadModel(value: unknown) {
   const type = readRequiredAllowedString(root.type, NOTIFICATION_TYPES, 'notification.type');
   const source = readRequiredAllowedString(root.source, NOTIFICATION_SOURCES, 'notification.source');
   const routeTarget = readRouteTarget(root.routeTarget);
+  const routeTargetAvailability = readRouteTargetAvailability(root.routeTargetAvailability);
   assertBidParticipationRouteTarget(type, source, routeTarget);
   return {
     notificationId: readRequiredString(root.notificationId, 'notification.notificationId'),
@@ -78,6 +89,7 @@ function readAppNotificationItemReadModel(value: unknown) {
     projectId: readOptionalString(root.projectId),
     threadId: readOptionalString(root.threadId),
     routeTarget,
+    routeTargetAvailability,
     createdAt: readOptionalString(root.createdAt),
     readAt: readOptionalString(root.readAt),
     unread: root.unread === true
@@ -118,6 +130,30 @@ function emptyUnread() {
 function readRouteTarget(value: unknown) {
   const routeTarget = asRecord(value);
   return routeTarget && Object.keys(routeTarget).length > 0 ? routeTarget : null;
+}
+
+function readRouteTargetAvailability(value: unknown) {
+  const root = asRecord(value);
+  if (!root) {
+    throw new Error('Invalid notification.routeTargetAvailability.');
+  }
+  const state = readRequiredAllowedString(
+    root.state,
+    ROUTE_TARGET_AVAILABILITY_STATES,
+    'notification.routeTargetAvailability.state'
+  );
+  const fallbackAction = readRequiredAllowedString(
+    root.fallbackAction,
+    ROUTE_TARGET_FALLBACK_ACTIONS,
+    'notification.routeTargetAvailability.fallbackAction'
+  );
+  return {
+    state,
+    reasonCode: readRequiredString(root.reasonCode, 'notification.routeTargetAvailability.reasonCode'),
+    reasonText: readRequiredString(root.reasonText, 'notification.routeTargetAvailability.reasonText'),
+    fallbackAction,
+    fallbackRouteTarget: readRouteTarget(root.fallbackRouteTarget)
+  };
 }
 
 function assertBidParticipationRouteTarget(

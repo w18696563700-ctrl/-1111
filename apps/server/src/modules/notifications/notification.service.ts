@@ -13,7 +13,11 @@ import { AppNotificationEntity } from './entities/app-notification.entity';
 import { DevicePushTokenEntity } from './entities/device-push-token.entity';
 import { PushDeliveryAttemptEntity } from './entities/push-delivery-attempt.entity';
 import { notificationForbidden, notificationInvalid, pushTokenInvalid } from './notification.errors';
-import { NotificationPresenter } from './notification.presenter';
+import {
+  NotificationListItemProjection,
+  NotificationPresenter,
+  NotificationRouteTargetAvailability
+} from './notification.presenter';
 
 type RegisterDeviceTokenCommand = {
   platform: 'ios' | 'android';
@@ -45,7 +49,9 @@ export class NotificationService {
     private readonly tokenRepository: Repository<DevicePushTokenEntity>,
     private readonly dataSource: DataSource,
     private readonly sessionVerifier: CurrentSessionVerificationService,
-    private readonly presenter: NotificationPresenter
+    private readonly presenter: NotificationPresenter,
+    @InjectRepository(ProjectCommunicationThreadEntity)
+    private readonly threadRepository?: Repository<ProjectCommunicationThreadEntity>
   ) {}
 
   async registerDeviceToken(payload: Record<string, unknown>, context: RequestContext) {
@@ -104,7 +110,8 @@ export class NotificationService {
       builder.getMany(),
       this.countUnread(session.userId, orgId)
     ]);
-    return this.presenter.toList(items, unread, limit);
+    const projectedItems = await this.withRouteTargetAvailability(items, orgId);
+    return this.presenter.toList(projectedItems, unread, limit);
   }
 
   async markRead(payload: Record<string, unknown>, context: RequestContext) {
@@ -293,6 +300,101 @@ export class NotificationService {
     );
   }
 
+  private async withRouteTargetAvailability(
+    items: AppNotificationEntity[],
+    organizationId: string
+  ): Promise<NotificationListItemProjection[]> {
+    return Promise.all(
+      items.map(async (item) => ({
+        item,
+        routeTargetAvailability: await this.resolveRouteTargetAvailability(item, organizationId)
+      }))
+    );
+  }
+
+  private async resolveRouteTargetAvailability(
+    item: AppNotificationEntity,
+    organizationId: string
+  ): Promise<NotificationRouteTargetAvailability> {
+    const routeTarget = this.toRouteTargetRecord(item.routeTarget);
+    if (!routeTarget) {
+      return this.unavailableRouteTarget(
+        'missing_context',
+        'ROUTE_TARGET_MISSING',
+        '当前通知暂时无法定位，请稍后重试或从对应入口进入。'
+      );
+    }
+    if (!this.isProjectCommunicationRouteTarget(item, routeTarget)) {
+      return this.genericRouteTargetAvailability(routeTarget);
+    }
+    const conversationId = this.routeParam(routeTarget, 'conversationId');
+    const projectId = this.routeParam(routeTarget, 'projectId') ?? this.normalizeRouteString(item.projectId);
+    const threadId = this.routeParam(routeTarget, 'threadId') ?? this.normalizeRouteString(item.threadId);
+    const fallbackRouteTarget =
+      conversationId && projectId ? this.projectCommunicationSubjectListRouteTarget(projectId, conversationId) : null;
+    if (!conversationId || !projectId || !threadId) {
+      return this.unavailableRouteTarget(
+        'missing_context',
+        'PROJECT_COMMUNICATION_CONTEXT_MISSING',
+        fallbackRouteTarget
+          ? '入口已失效，可从主体项目列表重新进入。'
+          : '当前通知暂时无法定位，请稍后重试或从对应入口进入。',
+        fallbackRouteTarget
+      );
+    }
+    if (!this.threadRepository) {
+      return this.availableRouteTarget();
+    }
+    const thread = await this.threadRepository.findOneBy({ id: threadId, projectId });
+    if (!thread) {
+      return this.unavailableRouteTarget(
+        'expired',
+        'PROJECT_COMMUNICATION_THREAD_NOT_FOUND',
+        '入口已失效，可从主体项目列表重新进入。',
+        fallbackRouteTarget
+      );
+    }
+    if (thread.threadState !== 'open') {
+      return this.unavailableRouteTarget(
+        'unavailable',
+        'PROJECT_COMMUNICATION_THREAD_NOT_OPEN',
+        '入口已失效，可从主体项目列表重新进入。',
+        fallbackRouteTarget
+      );
+    }
+    const belongsToThread =
+      organizationId === thread.ownerOrganizationId || organizationId === thread.counterpartOrganizationId;
+    if (!belongsToThread) {
+      return this.unavailableRouteTarget(
+        'forbidden',
+        'PROJECT_COMMUNICATION_THREAD_FORBIDDEN',
+        '当前账号暂无权限查看该项目沟通入口。'
+      );
+    }
+    const conversationBelongsToThread =
+      conversationId === thread.ownerOrganizationId || conversationId === thread.counterpartOrganizationId;
+    if (!conversationBelongsToThread) {
+      return this.unavailableRouteTarget(
+        'missing_context',
+        'PROJECT_COMMUNICATION_COUNTERPART_MISMATCH',
+        '入口已失效，可从主体项目列表重新进入。',
+        fallbackRouteTarget
+      );
+    }
+    return this.availableRouteTarget();
+  }
+
+  private genericRouteTargetAvailability(routeTarget: Record<string, unknown>): NotificationRouteTargetAvailability {
+    if (routeTarget.state !== 'enabled') {
+      return this.unavailableRouteTarget(
+        'unavailable',
+        'ROUTE_TARGET_UNAVAILABLE',
+        '当前通知入口暂不可用，请稍后重试或从对应入口进入。'
+      );
+    }
+    return this.availableRouteTarget();
+  }
+
   private projectCommunicationRouteTarget(projectId: string, threadId: string, conversationId: string) {
     return {
       canonicalPath: '/api/app/message/counterpart-conversation/detail',
@@ -301,6 +403,66 @@ export class NotificationService {
       routeParams: { conversationId, projectId, threadId },
       state: 'enabled'
     };
+  }
+
+  private projectCommunicationSubjectListRouteTarget(projectId: string, conversationId: string) {
+    return {
+      canonicalPath: '/api/app/message/counterpart-conversation/detail',
+      localEntryKey: 'counterpart_conversation.open',
+      requiredParams: ['conversationId', 'projectId'],
+      routeParams: { conversationId, projectId },
+      state: 'enabled'
+    };
+  }
+
+  private isProjectCommunicationRouteTarget(item: AppNotificationEntity, routeTarget: Record<string, unknown>) {
+    return (
+      item.source === 'project_communication' ||
+      item.type === 'project_communication_message' ||
+      routeTarget.canonicalPath === '/api/app/message/counterpart-conversation/detail'
+    );
+  }
+
+  private availableRouteTarget(): NotificationRouteTargetAvailability {
+    return {
+      state: 'available',
+      reasonCode: 'ROUTE_TARGET_AVAILABLE',
+      reasonText: '当前通知入口可用。',
+      fallbackAction: 'none',
+      fallbackRouteTarget: null
+    };
+  }
+
+  private unavailableRouteTarget(
+    state: Exclude<NotificationRouteTargetAvailability['state'], 'available'>,
+    reasonCode: string,
+    reasonText: string,
+    fallbackRouteTarget: Record<string, unknown> | null = null
+  ): NotificationRouteTargetAvailability {
+    return {
+      state,
+      reasonCode,
+      reasonText,
+      fallbackAction: fallbackRouteTarget ? 'open_subject_list' : 'none',
+      fallbackRouteTarget
+    };
+  }
+
+  private toRouteTargetRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const record = value as Record<string, unknown>;
+    return Object.keys(record).length > 0 ? record : null;
+  }
+
+  private routeParam(routeTarget: Record<string, unknown>, key: string) {
+    const routeParams = this.toRouteTargetRecord(routeTarget.routeParams);
+    return this.normalizeRouteString(routeParams?.[key]);
+  }
+
+  private normalizeRouteString(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
   private bidParticipationRequestRouteTarget(projectId: string, requestId: string) {
