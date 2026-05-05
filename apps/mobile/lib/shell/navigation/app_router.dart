@@ -162,7 +162,7 @@ class AppRouter {
       ExhibitionRoutes.forumFollowing => '关注',
       ExhibitionRoutes.forumTopics => '话题分类',
       ExhibitionRoutes.forumComments => '评论互动区',
-      ExhibitionRoutes.forumPublish => '发帖',
+      ExhibitionRoutes.forumPublish => '发帖草稿编辑页',
       ExhibitionRoutes.forumDrafts => '草稿',
       ExhibitionRoutes.forumSearch => '搜索',
       _ when authorId != null => '作者主页',

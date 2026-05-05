@@ -333,7 +333,7 @@ void main() {
     await tester.enterText(find.byType(TextField).at(1), '这是一条用于验证草稿失败提示的正文。');
     await tester.pump();
 
-    await tester.tap(find.text('保存草稿'));
+    await tester.tap(find.text('保存草稿并跳转至草稿箱发布帖子'));
     await tester.pumpAndSettle();
 
     const expectedMessage = '当前登录状态已失效，请重新登录后再保存草稿';
@@ -376,7 +376,7 @@ void main() {
     );
     await tester.pump();
 
-    await tester.tap(find.text('保存草稿'));
+    await tester.tap(find.text('保存草稿并跳转至草稿箱发布帖子'));
     await tester.pumpAndSettle();
 
     expect(find.text('云端 BFF 暂时不可达，草稿没有保存，请稍后重试'), findsOneWidget);
@@ -384,112 +384,110 @@ void main() {
     expect(find.textContaining('Bad Gateway'), findsNothing);
   });
 
-  testWidgets('forum pending media resumes upload after manual draft save', (
-    WidgetTester tester,
-  ) async {
-    ForumPublishMediaDebugOverrides.installPicker(
-      (_) async => const <ForumPublishMediaDraft>[
-        ForumPublishMediaDraft(
-          fileName: '现场照片.jpg',
-          bytes: <int>[1, 2, 3, 4, 5, 6],
+  testWidgets(
+    'forum pending media starts automatically after content is ready',
+    (WidgetTester tester) async {
+      ForumPublishMediaDebugOverrides.installPicker(
+        (_) async => const <ForumPublishMediaDraft>[
+          ForumPublishMediaDraft(
+            fileName: '现场照片.jpg',
+            bytes: <int>[1, 2, 3, 4, 5, 6],
+          ),
+        ],
+      );
+      addTearDown(ForumPublishMediaDebugOverrides.reset);
+
+      var uploadInitCount = 0;
+      var uploadConfirmCount = 0;
+
+      await tester.pumpWidget(
+        buildForumTestAppWithOverrides(
+          initialRoute: ExhibitionRoutes.forumPublish,
+          exhibitionHandlerOverrides:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/file/upload/init':
+                    (AppApiRequest request) async {
+                      uploadInitCount += 1;
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'uploadSessionId': 'upload-session-image-1',
+                          'directUpload': <String, Object?>{
+                            'url': 'https://upload.example.com/forum-image-1',
+                            'method': 'PUT',
+                            'headers': <String, Object?>{
+                              'content-type': 'image/jpeg',
+                            },
+                          },
+                          'confirm': <String, Object?>{
+                            'endpoint': '/api/app/file/upload/confirm',
+                          },
+                        },
+                      );
+                    },
+                'POST /api/app/file/upload/confirm':
+                    (AppApiRequest request) async {
+                      uploadConfirmCount += 1;
+                      return AppApiResponse(
+                        statusCode: 200,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'fileAssetId': 'asset-image-1',
+                        },
+                      );
+                    },
+              },
+          exhibitionUploadHandler: (AppApiUploadRequest request) async {
+            return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
+          },
+          forumHandlerOverrides:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'POST /api/app/forum/draft/save':
+                    (AppApiRequest request) async {
+                      return AppApiResponse(
+                        statusCode: 202,
+                        uri: request.uri,
+                        body: const <String, Object?>{
+                          'draftId': 'draft-saved-1',
+                          'state': 'ready_to_publish',
+                          'updatedAt': '2026-03-31T10:40:00Z',
+                        },
+                      );
+                    },
+              },
         ),
-      ],
-    );
-    addTearDown(ForumPublishMediaDebugOverrides.reset);
+      );
+      await tester.pumpAndSettle();
 
-    var uploadInitCount = 0;
-    var uploadConfirmCount = 0;
+      await tester.drag(find.byType(ListView).first, const Offset(0, -280));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('添加图片'));
+      await tester.pumpAndSettle();
 
-    await tester.pumpWidget(
-      buildForumTestAppWithOverrides(
-        initialRoute: ExhibitionRoutes.forumPublish,
-        exhibitionHandlerOverrides:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'POST /api/app/file/upload/init': (AppApiRequest request) async {
-                uploadInitCount += 1;
-                return AppApiResponse(
-                  statusCode: 200,
-                  uri: request.uri,
-                  body: const <String, Object?>{
-                    'uploadSessionId': 'upload-session-image-1',
-                    'directUpload': <String, Object?>{
-                      'url': 'https://upload.example.com/forum-image-1',
-                      'method': 'PUT',
-                      'headers': <String, Object?>{
-                        'content-type': 'image/jpeg',
-                      },
-                    },
-                    'confirm': <String, Object?>{
-                      'endpoint': '/api/app/file/upload/confirm',
-                    },
-                  },
-                );
-              },
-              'POST /api/app/file/upload/confirm':
-                  (AppApiRequest request) async {
-                    uploadConfirmCount += 1;
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: const <String, Object?>{
-                        'fileAssetId': 'asset-image-1',
-                      },
-                    );
-                  },
-            },
-        exhibitionUploadHandler: (AppApiUploadRequest request) async {
-          return AppApiResponse(statusCode: 200, uri: Uri.parse(request.url));
-        },
-        forumHandlerOverrides:
-            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-              'POST /api/app/forum/draft/save': (AppApiRequest request) async {
-                return AppApiResponse(
-                  statusCode: 202,
-                  uri: request.uri,
-                  body: const <String, Object?>{
-                    'draftId': 'draft-saved-1',
-                    'state': 'ready_to_publish',
-                    'updatedAt': '2026-03-31T10:40:00Z',
-                  },
-                );
-              },
-            },
-      ),
-    );
-    await tester.pumpAndSettle();
+      expect(uploadInitCount, 0);
+      expect(find.text('现场照片.jpg'), findsWidgets);
+      expect(find.text('正文图片'), findsOneWidget);
+      expect(find.text('图片预览'), findsOneWidget);
+      expect(find.text('附件已选中，请先填写分类、标题和正文'), findsOneWidget);
 
-    await tester.drag(find.byType(ListView).first, const Offset(0, -280));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('添加图片'));
-    await tester.pumpAndSettle();
+      await tester.drag(find.byType(ListView).first, const Offset(0, 320));
+      await tester.pumpAndSettle();
+      await tester.enterText(find.byType(TextField).first, '先补内容再续传');
+      await tester.enterText(find.byType(TextField).last, '这条用来验证保存草稿后会继续上传。');
+      await tester.pump();
 
-    expect(uploadInitCount, 0);
-    expect(find.text('现场照片.jpg'), findsWidgets);
-    expect(find.text('正文图片'), findsOneWidget);
-    expect(find.text('图片预览'), findsOneWidget);
-    expect(find.text('附件已选中，请先填写分类、标题和正文'), findsOneWidget);
+      await tester.drag(find.byType(ListView).first, const Offset(0, -320));
+      await tester.pumpAndSettle();
+      await tester.pump(const Duration(milliseconds: 200));
+      await tester.pumpAndSettle();
 
-    await tester.drag(find.byType(ListView).first, const Offset(0, 320));
-    await tester.pumpAndSettle();
-    await tester.enterText(find.byType(TextField).first, '先补内容再续传');
-    await tester.enterText(find.byType(TextField).last, '这条用来验证保存草稿后会继续上传。');
-    await tester.pump();
-
-    await tester.drag(find.byType(ListView).first, const Offset(0, -320));
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(seconds: 4));
-    await tester.pumpAndSettle();
-    await tester.tap(find.widgetWithText(OutlinedButton, '保存草稿'));
-    await tester.pumpAndSettle();
-    await tester.pump(const Duration(milliseconds: 200));
-    await tester.pumpAndSettle();
-
-    expect(uploadInitCount, 1);
-    expect(uploadConfirmCount, 1);
-    expect(find.text('开始上传'), findsNothing);
-    expect(find.text('上传确认完成，请保存草稿'), findsOneWidget);
-    expect(find.text('附件已上传完成，请点击“保存草稿”承接到当前草稿'), findsOneWidget);
-  });
+      expect(uploadInitCount, 1);
+      expect(uploadConfirmCount, 1);
+      expect(find.text('开始上传'), findsNothing);
+      expect(find.text('上传确认完成，等待保存草稿'), findsOneWidget);
+    },
+  );
 
   testWidgets('forum selected file preview offers local open action', (
     WidgetTester tester,

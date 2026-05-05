@@ -93,7 +93,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
                 _bodyController.text.trim().isEmpty)) ...<Widget>[
           const SizedBox(height: 10),
           Text(
-            '标题和正文写完后，请先保存草稿；保存后可直接继续发布，离开后也可从草稿箱继续。',
+            '标题和正文写完后，请保存草稿；保存后会自动进入草稿箱，由草稿箱承接发布。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -264,7 +264,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
         ),
         const SizedBox(height: 8),
         Text(
-          '当前稳定路径是先保存草稿，再继续发布。可添加图片、视频或 PDF/文档；若当前还没保存草稿，会先提示补齐内容并在保存后继续上传。',
+          '当前入口只负责编辑草稿。图片、视频或 PDF/文档会在内容补齐后自动上传；保存草稿后进入草稿箱发布帖子。',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -275,7 +275,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           _mediaSectionNotice(
             context,
             icon: Icons.info_outline_rounded,
-            message: '附件已选中，请先填写分类、标题和正文，再点击“保存草稿”，系统会继续上传。',
+            message: '附件已选中，请先填写分类、标题和正文；内容补齐后系统会自动上传。',
           ),
         ],
         if (_hasFailedMedia) ...<Widget>[
@@ -293,7 +293,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           _mediaSectionNotice(
             context,
             icon: Icons.verified_rounded,
-            message: '附件上传确认已完成，请先保存草稿，避免发布时因为附件未承接被拦住。',
+            message: '附件上传确认已完成，保存草稿后会承接附件并进入草稿箱。',
           ),
         ],
         const SizedBox(height: 12),
@@ -425,7 +425,11 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
   Widget _mediaItemCard(BuildContext context, _ForumComposerMediaItem item) {
     final theme = Theme.of(context);
     final canRemove = !item.isTransferActive;
-    final canUpload = item.canStartUpload && !_saving && !_publishing;
+    final canUpload =
+        item.stage == _ForumComposerMediaStage.uploadFailed &&
+        item.canStartUpload &&
+        !_saving &&
+        !_publishing;
     final uploadLabel = item.stage == _ForumComposerMediaStage.uploadFailed
         ? '重新上传'
         : '开始上传';
@@ -997,7 +1001,6 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
   Widget _composerBottomBar(
     BuildContext context, {
     required bool canSaveDraft,
-    required bool canPublish,
     required String? helperText,
   }) {
     final theme = Theme.of(context);
@@ -1029,16 +1032,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
               Row(
                 children: <Widget>[
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: canSaveDraft ? _saveDraft : null,
-                      child: Text(_saving ? '保存中' : '保存草稿'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
                     child: FilledButton(
-                      onPressed: canPublish ? _publish : null,
-                      child: Text(_publishing ? '发布中' : '发布'),
+                      onPressed: canSaveDraft ? _saveDraft : null,
+                      child: Text(_saving ? '保存中' : '保存草稿并跳转至草稿箱发布帖子'),
                     ),
                   ),
                 ],

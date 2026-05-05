@@ -51,7 +51,11 @@ class _ForumComposerInlineImageGrid extends StatelessWidget {
               item: item,
               onPreview: () => onPreview(item),
               onRemove: item.isTransferActive ? null : () => onRemove(item),
-              onUpload: item.canStartUpload && !saving && !publishing
+              onUpload:
+                  item.stage == _ForumComposerMediaStage.uploadFailed &&
+                      item.canStartUpload &&
+                      !saving &&
+                      !publishing
                   ? () => onUpload(item)
                   : null,
             );
