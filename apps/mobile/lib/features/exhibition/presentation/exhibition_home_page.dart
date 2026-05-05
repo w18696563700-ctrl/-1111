@@ -13,6 +13,7 @@ import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_clie
 import 'package:mobile/features/exhibition/data/exhibition_home_location_context_store.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_board_surface.dart';
 import 'package:mobile/features/exhibition/presentation/forum/forum_shared_components.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shared/widgets/app_page_state_view.dart';

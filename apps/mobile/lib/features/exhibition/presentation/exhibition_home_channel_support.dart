@@ -93,6 +93,14 @@ String _homeEnterpriseCardSummary(EnterpriseHubListItem item) {
   return '当前实体已接入公开展示，可继续查看详情。';
 }
 
+String? _homeEnterpriseCardLocationLabel(EnterpriseHubListItem item) {
+  final parts = <String>[
+    item.provinceName.trim(),
+    item.cityName.trim(),
+  ].where((String value) => value.isNotEmpty).toSet().toList(growable: false);
+  return parts.isEmpty ? null : parts.join(' / ');
+}
+
 String _homeEnterpriseDetailActionLabel(EnterpriseBoardType boardType) {
   return switch (boardType) {
     EnterpriseBoardType.company => '查看公司详情',

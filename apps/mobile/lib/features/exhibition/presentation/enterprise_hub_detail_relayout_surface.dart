@@ -26,6 +26,7 @@ class EnterpriseDetailRelayoutSurface extends StatelessWidget {
         data.header.primaryBoardType == EnterpriseBoardType.company;
     if (isCompany) {
       return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: <Widget>[
           EnterpriseDetailOverviewCard(data: data),
           const SizedBox(height: 16),
@@ -63,6 +64,7 @@ class EnterpriseDetailRelayoutSurface extends StatelessWidget {
     }
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         EnterpriseDetailOverviewCard(data: data),
         const SizedBox(height: 16),

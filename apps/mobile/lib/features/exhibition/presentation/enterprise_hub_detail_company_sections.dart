@@ -40,36 +40,55 @@ class EnterpriseDetailCompanyTrustSummarySection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final summaryItems = <EnterpriseDetailMetricItem>[
+    final summaryItems = <EnterpriseDetailCompanyTrustMetricItem>[
       if (enterpriseDetailLocationSummaryValue(data) case final String location)
-        EnterpriseDetailMetricItem(label: '服务地区', value: location),
-      EnterpriseDetailMetricItem(
-        label: '认证状态',
+        EnterpriseDetailCompanyTrustMetricItem(
+          icon: Icons.location_on_outlined,
+          label: '服务区域',
+          value: location,
+        ),
+      EnterpriseDetailCompanyTrustMetricItem(
+        icon: Icons.verified_user_outlined,
+        label: '平台认证',
         value: enterpriseDetailVerificationLabel(
           data.header.verificationStatus,
         ),
       ),
-      if (enterpriseDetailPreviewList(data.boardProfile['serviceItems'])
-          case final String value when value != '暂未补充')
-        EnterpriseDetailMetricItem(label: '服务项目', value: value),
       if (data.basicInfo.teamSizeRange case final String teamSize
           when teamSize.trim().isNotEmpty)
-        EnterpriseDetailMetricItem(label: '团队规模', value: teamSize.trim()),
+        EnterpriseDetailCompanyTrustMetricItem(
+          icon: Icons.groups_2_outlined,
+          label: '团队规模',
+          value: teamSize.trim(),
+        )
+      else if (data.basicInfo.foundedAt case final String foundedAt
+          when foundedAt.trim().isNotEmpty)
+        EnterpriseDetailCompanyTrustMetricItem(
+          icon: Icons.event_available_outlined,
+          label: '成立时间',
+          value: foundedAt.trim(),
+        ),
       if (data.reviewSummary.avgScore != null)
-        EnterpriseDetailMetricItem(
+        EnterpriseDetailCompanyTrustMetricItem(
+          icon: Icons.star_rate_rounded,
           label: '综合评分',
           value: data.reviewSummary.avgScore!.toStringAsFixed(1),
+        )
+      else if (data.reviewSummary.reviewCount != null)
+        EnterpriseDetailCompanyTrustMetricItem(
+          icon: Icons.rate_review_outlined,
+          label: '客户评价',
+          value: '${data.reviewSummary.reviewCount}',
         ),
     ].take(4).toList(growable: false);
 
     return EnterpriseSectionCard(
       title: '信任背书',
-      subtitle: '仅展示公开详情已返回的地区、认证、服务能力和评价摘要。',
       child: Wrap(
         spacing: 10,
         runSpacing: 10,
         children: summaryItems
-            .map((item) => EnterpriseDetailMetricTile(item: item))
+            .map((item) => EnterpriseDetailCompanyTrustMetricCard(item: item))
             .toList(growable: false),
       ),
     );
@@ -103,7 +122,6 @@ class _EnterpriseDetailCompanyIntroSectionState
     final canExpand = text.length > 96;
     return EnterpriseSectionCard(
       title: '公司介绍',
-      subtitle: '先展示摘要，避免长文直接铺满首屏。',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -212,7 +230,7 @@ class EnterpriseDetailCompanyCaseSection extends StatelessWidget {
       title: '案例展示',
       subtitle: '只展示公开详情返回的案例，最多展示 6 个。',
       child: SizedBox(
-        height: 204,
+        height: 158,
         child: ListView.separated(
           scrollDirection: Axis.horizontal,
           physics: const BouncingScrollPhysics(),
@@ -267,17 +285,12 @@ class EnterpriseDetailCompanyBasicInfoSection extends StatelessWidget {
       title: '基本信息',
       subtitle: '公开详情中的关键企业信息，便于快速判断匹配度。',
       child: Column(
-        children: rows
-            .map(
-              (row) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: EnterpriseDetailInfoRow(
-                  label: row.label,
-                  value: row.value,
-                ),
-              ),
-            )
-            .toList(growable: false),
+        children: <Widget>[
+          for (var index = 0; index < rows.length; index += 1) ...<Widget>[
+            EnterpriseDetailCompanyInfoTile(row: rows[index]),
+            if (index != rows.length - 1) const SizedBox(height: 8),
+          ],
+        ],
       ),
     );
   }

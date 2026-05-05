@@ -262,11 +262,16 @@ class _HomeEnterpriseModulePanelState
               padding: const EdgeInsets.only(bottom: 10),
               child: _HomeEnterpriseRecommendationCard(
                 title: item.name,
-                summary: _homeEnterpriseCardSummary(item),
+                summary:
+                    enterpriseBoardCardSummaryText(item) ??
+                    _homeEnterpriseCardSummary(item),
                 badgeLabel: item.boardType == EnterpriseBoardType.company
                     ? null
                     : _homeEnterpriseCardBadgeLabel(item),
                 actionLabel: _homeEnterpriseDetailActionLabel(item.boardType),
+                imageUrl: item.logoUrl,
+                locationLabel: _homeEnterpriseCardLocationLabel(item),
+                chips: enterpriseBoardCardSummaryChips(item),
                 onPressed: () => widget.onOpenEnterpriseItem(item),
               ),
             ),
