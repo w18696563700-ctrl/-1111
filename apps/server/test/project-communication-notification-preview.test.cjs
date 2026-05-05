@@ -247,6 +247,7 @@ test('file preview returns signed access without exposing objectKey', async () =
     { async findOneBy() { return fileAsset; } },
     { async findOneBy() { return null; } },
     { async findOneBy() { return null; } },
+    { async findOneBy() { return null; } },
     { async requireExistingThreadParticipant() { return { organizationId: 'owner-org' }; } },
     { async buildObjectAccessUrl(objectKey) { return 'https://signed.example/' + objectKey; } },
     { uploadSignedUrlExpiresSeconds: 60 },
@@ -261,6 +262,44 @@ test('file preview returns signed access without exposing objectKey', async () =
   assert.equal(result.canPreview, true);
   assert.equal(result.fileName, '方案.png');
   assert.equal(result.accessUrl, 'https://signed.example/private/object-key.png');
+  assert.equal(result.objectKey, undefined);
+});
+
+test('file preview allows active project album photos without exposing objectKey', async () => {
+  const {
+    ProjectCommunicationFilePreviewService,
+  } = require('../dist/modules/project_communication/project-communication-file-preview.service.js');
+  const thread = { id: 'thread-1', projectId: 'project-1' };
+  const fileAsset = {
+    id: 'asset-1',
+    businessType: 'project',
+    businessId: 'project-1',
+    fileKind: 'project_album_photo',
+    objectKey: 'private/album-photo.png',
+    mimeType: 'image/png',
+    size: 5678,
+  };
+  const service = new ProjectCommunicationFilePreviewService(
+    { async findOneBy() { return thread; } },
+    { async find() { return []; } },
+    { async findOneBy() { return fileAsset; } },
+    { async findOneBy() { return null; } },
+    { async findOneBy() { return null; } },
+    { async findOneBy() { return { caption: '现场证据图' }; } },
+    { async requireExistingThreadParticipant() { return { organizationId: 'owner-org' }; } },
+    { async buildObjectAccessUrl(objectKey) { return 'https://signed.example/' + objectKey; } },
+    { uploadSignedUrlExpiresSeconds: 60 },
+  );
+
+  const result = await service.getPreviewAccess(
+    { projectId: 'project-1', threadId: 'thread-1', fileAssetId: 'asset-1' },
+    createContext(),
+  );
+
+  assert.equal(result.previewType, 'image');
+  assert.equal(result.canPreview, true);
+  assert.equal(result.fileName, '现场证据图');
+  assert.equal(result.accessUrl, 'https://signed.example/private/album-photo.png');
   assert.equal(result.objectKey, undefined);
 });
 
