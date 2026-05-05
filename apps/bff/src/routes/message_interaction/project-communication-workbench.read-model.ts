@@ -18,6 +18,21 @@ const SUBJECT_OWNER_ROLES = new Set(['publisher', 'bidder', 'platform']);
 const AVAILABILITY_STATES = new Set(['unsubmitted', 'readable', 'unavailable']);
 const REVIEW_STATES = new Set(['unsubmitted', 'pending_review', 'confirmed', 'needs_supplement']);
 const ACTION_STATES = new Set(['enabled', 'readonly', 'blocked']);
+const CHAT_LOCK_REASON_CODES = new Set([
+  'bid_participation_review_pending',
+  'publisher_material_confirmation_pending',
+  'bid_submission_pending',
+  'bid_material_confirmation_pending',
+  'deal_confirmation_pending'
+]);
+const CHAT_REQUIRED_NEXT_ACTIONS = new Set([
+  'review_bid_participation',
+  'confirm_publisher_materials',
+  'submit_bid_materials',
+  'confirm_bid_materials',
+  'open_deal_confirmation',
+  'none'
+]);
 
 export function readProjectCommunicationWorkbenchReadModel(value: unknown) {
   const source = requireRecord(value, 'Project communication workbench response is invalid.');
@@ -25,6 +40,8 @@ export function readProjectCommunicationWorkbenchReadModel(value: unknown) {
     projectId: readString(source.projectId, 'projectId'),
     threadId: readString(source.threadId, 'threadId'),
     viewerRole: readEnum(source.viewerRole, 'viewerRole', VIEWER_ROLES),
+    businessTodoSummary: readBusinessTodoSummary(source.businessTodoSummary),
+    chatAvailability: readChatAvailability(source.chatAvailability),
     entries: readArray(source.entries, 'entries').map(readWorkbenchEntry),
     generatedAt: readString(source.generatedAt, 'generatedAt')
   };
@@ -65,12 +82,58 @@ function readWorkbenchEntry(value: unknown) {
     reviewState,
     actionState: readEnum(source.actionState, 'entry.actionState', ACTION_STATES),
     attachmentCount: readNonNegativeNumber(source.attachmentCount, 'entry.attachmentCount'),
+    badgeCount: readNonNegativeNumber(source.badgeCount, 'entry.badgeCount'),
+    disabledReason: readNullableString(source.disabledReason),
     sourceFiles: readSourceFiles(source.sourceFiles),
     latestFeedbackText: readNullableString(source.latestFeedbackText),
     latestFeedbackAt: readNullableString(source.latestFeedbackAt),
     reviewedAt: readNullableString(source.reviewedAt),
     routeTarget: readNullableRecord(source.routeTarget),
     truthAnchor: readRecord(source.truthAnchor, 'entry.truthAnchor')
+  };
+}
+
+function readBusinessTodoSummary(value: unknown) {
+  const source = requireRecord(value, 'Project communication businessTodoSummary is invalid.');
+  const summary = {
+    bidParticipationReviewPendingCount: readNonNegativeNumber(
+      source.bidParticipationReviewPendingCount,
+      'businessTodoSummary.bidParticipationReviewPendingCount'
+    ),
+    publisherMaterialReviewPendingCount: readNonNegativeNumber(
+      source.publisherMaterialReviewPendingCount,
+      'businessTodoSummary.publisherMaterialReviewPendingCount'
+    ),
+    bidMaterialReviewPendingCount: readNonNegativeNumber(
+      source.bidMaterialReviewPendingCount,
+      'businessTodoSummary.bidMaterialReviewPendingCount'
+    ),
+    dealConfirmationPendingCount: readNonNegativeNumber(
+      source.dealConfirmationPendingCount,
+      'businessTodoSummary.dealConfirmationPendingCount'
+    )
+  };
+  return {
+    ...summary,
+    totalPendingCount: readNonNegativeNumber(source.totalPendingCount, 'businessTodoSummary.totalPendingCount')
+  };
+}
+
+function readChatAvailability(value: unknown) {
+  const source = requireRecord(value, 'Project communication chatAvailability is invalid.');
+  const lockReasonCode =
+    source.lockReasonCode === null
+      ? null
+      : readEnum(source.lockReasonCode, 'chatAvailability.lockReasonCode', CHAT_LOCK_REASON_CODES);
+  return {
+    canSendMessage: readBoolean(source.canSendMessage, 'chatAvailability.canSendMessage'),
+    lockReasonCode,
+    lockReasonText: readNullableString(source.lockReasonText),
+    requiredNextAction: readEnum(
+      source.requiredNextAction,
+      'chatAvailability.requiredNextAction',
+      CHAT_REQUIRED_NEXT_ACTIONS
+    )
   };
 }
 
@@ -128,6 +191,13 @@ function readEnum(value: unknown, field: string, allowed: Set<string>) {
 function readNonNegativeNumber(value: unknown, field: string) {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     throw new Error(`Field \`${field}\` must be a non-negative number.`);
+  }
+  return value;
+}
+
+function readBoolean(value: unknown, field: string) {
+  if (typeof value !== 'boolean') {
+    throw new Error(`Field \`${field}\` must be a boolean.`);
   }
   return value;
 }

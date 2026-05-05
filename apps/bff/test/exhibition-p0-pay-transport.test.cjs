@@ -992,6 +992,7 @@ test('project pricing canonical routes forward 4000 authorization, sincerity fee
       currency: 'CNY',
       contractFileAssetIds: ['file-1'],
       confirmationRole: 'publisher',
+      platformServiceFeeRecalculationAwarenessConfirmed: true,
       idempotencyKey: 'idem-deal',
     },
     {},

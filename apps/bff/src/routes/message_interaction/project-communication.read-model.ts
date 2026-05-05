@@ -1,5 +1,21 @@
 type Payload = Record<string, unknown>;
 
+const CHAT_LOCK_REASON_CODES = new Set([
+  'bid_participation_review_pending',
+  'publisher_material_confirmation_pending',
+  'bid_submission_pending',
+  'bid_material_confirmation_pending',
+  'deal_confirmation_pending'
+]);
+const CHAT_REQUIRED_NEXT_ACTIONS = new Set([
+  'review_bid_participation',
+  'confirm_publisher_materials',
+  'submit_bid_materials',
+  'confirm_bid_materials',
+  'open_deal_confirmation',
+  'none'
+]);
+
 export function readProjectCommunicationThreadReadModel(value: unknown) {
   const source = requireRecord(value, 'Project communication thread response is invalid.');
   return {
@@ -7,11 +23,30 @@ export function readProjectCommunicationThreadReadModel(value: unknown) {
     projectId: readString(source.projectId, 'projectId'),
     ownerOrganizationId: readString(source.ownerOrganizationId, 'ownerOrganizationId'),
     counterpartOrganizationId: readString(source.counterpartOrganizationId, 'counterpartOrganizationId'),
+    chatAvailability: readChatAvailability(source.chatAvailability),
     threadState: readString(source.threadState, 'threadState'),
     lastMessageId: readNullableString(source.lastMessageId),
     lastMessageAt: readNullableString(source.lastMessageAt),
     createdAt: readString(source.createdAt, 'createdAt'),
     updatedAt: readString(source.updatedAt, 'updatedAt')
+  };
+}
+
+function readChatAvailability(value: unknown) {
+  const source = requireRecord(value, 'Project communication chatAvailability is invalid.');
+  const lockReasonCode =
+    source.lockReasonCode === null
+      ? null
+      : readEnum(source.lockReasonCode, 'chatAvailability.lockReasonCode', CHAT_LOCK_REASON_CODES);
+  return {
+    canSendMessage: readBoolean(source.canSendMessage, 'chatAvailability.canSendMessage'),
+    lockReasonCode,
+    lockReasonText: readNullableString(source.lockReasonText),
+    requiredNextAction: readEnum(
+      source.requiredNextAction,
+      'chatAvailability.requiredNextAction',
+      CHAT_REQUIRED_NEXT_ACTIONS
+    )
   };
 }
 
@@ -110,6 +145,21 @@ function readReadState(value: unknown) {
     throw new Error('Field `readState` is unsupported in project communication response.');
   }
   return normalized;
+}
+
+function readEnum(value: unknown, field: string, allowed: Set<string>) {
+  const normalized = readString(value, field);
+  if (!allowed.has(normalized)) {
+    throw new Error(`Field \`${field}\` is unsupported in project communication response.`);
+  }
+  return normalized;
+}
+
+function readBoolean(value: unknown, field: string) {
+  if (typeof value !== 'boolean') {
+    throw new Error(`Field \`${field}\` is required in project communication response.`);
+  }
+  return value;
 }
 
 function readNullableString(value: unknown) {

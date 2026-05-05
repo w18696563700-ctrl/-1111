@@ -65,6 +65,21 @@ function createHarness(options = {}) {
     },
   ];
   const reviews = options.reviews ?? [];
+  const businessState = options.businessState ?? {
+    businessTodoSummary: {
+      bidParticipationReviewPendingCount: 0,
+      publisherMaterialReviewPendingCount: 1,
+      bidMaterialReviewPendingCount: 0,
+      dealConfirmationPendingCount: 0,
+      totalPendingCount: 1,
+    },
+    chatAvailability: {
+      canSendMessage: false,
+      lockReasonCode: 'publisher_material_confirmation_pending',
+      lockReasonText: '请先确认发布方提供的报价依据资料。',
+      requiredNextAction: 'confirm_publisher_materials',
+    },
+  };
 
   const threadRepo = {
     async findOneBy(where) {
@@ -161,9 +176,137 @@ function createHarness(options = {}) {
     dataSource,
     accessService,
     new ProjectCommunicationWorkbenchPresenter(),
+    {
+      async buildForThread(input) {
+        assert.equal(input.thread.id, 'thread-1');
+        return businessState;
+      },
+    },
   );
   return { service, reviews };
 }
+
+function createBusinessStateHarness(options = {}) {
+  const {
+    ProjectCommunicationBusinessStateService,
+  } = require('../dist/modules/project_communication/project-communication-business-state.service.js');
+  const bid = options.bid ?? null;
+  const attachments = options.attachments ?? [];
+  const reviews = options.reviews ?? [];
+  const confirmations = options.confirmations ?? [];
+  const pendingParticipationCount = options.pendingParticipationCount ?? 0;
+  const service = new ProjectCommunicationBusinessStateService(
+    {
+      async countBy() {
+        return pendingParticipationCount;
+      },
+    },
+    {
+      async findOneBy() {
+        return bid;
+      },
+    },
+    {
+      async find() {
+        return attachments;
+      },
+    },
+    {
+      async findBy(where) {
+        return reviews.filter(
+          (review) =>
+            review.projectId === where.projectId &&
+            review.bidId === where.bidId &&
+            review.reviewerOrganizationId === where.reviewerOrganizationId,
+        );
+      },
+    },
+    {
+      async find() {
+        return confirmations;
+      },
+    },
+  );
+  return service;
+}
+
+test('business state keeps ordinary unread separate from owner bid participation todo', async () => {
+  const service = createBusinessStateHarness({ pendingParticipationCount: 1 });
+  const result = await service.buildForPair({
+    projectId: 'project-1',
+    ownerOrganizationId: 'org-publisher',
+    counterpartOrganizationId: 'org-bidder',
+    viewerOrganizationId: 'org-publisher',
+  });
+
+  assert.equal(result.businessTodoSummary.bidParticipationReviewPendingCount, 1);
+  assert.equal(result.businessTodoSummary.totalPendingCount, 1);
+  assert.equal(result.chatAvailability.canSendMessage, false);
+  assert.equal(result.chatAvailability.lockReasonCode, 'bid_participation_review_pending');
+  assert.equal(result.chatAvailability.requiredNextAction, 'review_bid_participation');
+});
+
+test('business state locks bidder chat on pending publisher material confirmation before bid submit', async () => {
+  const service = createBusinessStateHarness({
+    attachments: [
+      {
+        id: 'att-effect',
+        projectId: 'project-1',
+        fileAssetId: 'file-effect',
+        attachmentKind: 'effect_image',
+        visibility: 'owner_private',
+        sortOrder: 0,
+        createdAt: new Date('2026-05-02T01:10:00.000Z'),
+      },
+    ],
+  });
+  const result = await service.buildForPair({
+    projectId: 'project-1',
+    ownerOrganizationId: 'org-publisher',
+    counterpartOrganizationId: 'org-bidder',
+    viewerOrganizationId: 'org-bidder',
+  });
+
+  assert.equal(result.businessTodoSummary.publisherMaterialReviewPendingCount, 1);
+  assert.equal(result.chatAvailability.canSendMessage, false);
+  assert.equal(result.chatAvailability.lockReasonCode, 'publisher_material_confirmation_pending');
+  assert.equal(result.chatAvailability.requiredNextAction, 'confirm_publisher_materials');
+});
+
+test('business state leaves final amount pending as a communication prompt, not a chat lock', async () => {
+  const service = createBusinessStateHarness({
+    bid: {
+      id: 'bid-1',
+      projectId: 'project-1',
+      bidderOrganizationId: 'org-bidder',
+      organizationId: 'org-bidder',
+      projectUnderstandingFileAssetId: 'file-understanding',
+      quoteSheetFileAssetId: 'file-quote',
+      schedulePlanFileAssetId: 'file-schedule',
+      updatedAt: new Date('2026-05-02T01:05:00.000Z'),
+    },
+    confirmations: [
+      {
+        taskId: 'project-1',
+        publisherOrganizationId: 'org-publisher',
+        factoryOrganizationId: 'org-bidder',
+        publisherConfirmedAt: new Date('2026-05-02T02:00:00.000Z'),
+        factoryConfirmedAt: null,
+        contractStatus: 'pending_counterparty_confirm',
+      },
+    ],
+  });
+  const result = await service.buildForPair({
+    projectId: 'project-1',
+    ownerOrganizationId: 'org-publisher',
+    counterpartOrganizationId: 'org-bidder',
+    viewerOrganizationId: 'org-bidder',
+  });
+
+  assert.equal(result.businessTodoSummary.dealConfirmationPendingCount, 1);
+  assert.equal(result.chatAvailability.canSendMessage, true);
+  assert.equal(result.chatAvailability.requiredNextAction, 'open_deal_confirmation');
+});
 
 test('workbench exposes 10 fixed entries and pending publisher material for bidder', async () => {
   const { service } = createHarness();
@@ -173,10 +316,14 @@ test('workbench exposes 10 fixed entries and pending publisher material for bidd
   );
 
   assert.equal(result.entries.length, 10);
+  assert.equal(result.businessTodoSummary.publisherMaterialReviewPendingCount, 1);
+  assert.equal(result.chatAvailability.canSendMessage, false);
   assert.equal(result.entries[0].entryKey, 'publisher_effect_image_review');
   assert.equal(result.entries[0].label, '效果图确认');
   assert.equal(result.entries[0].reviewState, 'pending_review');
   assert.equal(result.entries[0].actionState, 'enabled');
+  assert.equal(result.entries[0].badgeCount, 1);
+  assert.equal(result.entries[1].disabledReason, '当前资料尚未提交。');
   assert.equal(result.entries[6].entryKey, 'bid_quote_sheet_review');
   assert.equal(result.entries[8].entryKey, 'contract_confirmation');
 });

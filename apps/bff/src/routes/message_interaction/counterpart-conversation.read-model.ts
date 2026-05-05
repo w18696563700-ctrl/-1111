@@ -37,6 +37,13 @@ export type CounterpartConversationDetailReadModel = {
     projectUnreadCount: number;
     hasProjectUnread: boolean;
     latestUnreadMessageAt: string | null;
+    businessTodoSummary: {
+      bidParticipationReviewPendingCount: number;
+      publisherMaterialReviewPendingCount: number;
+      bidMaterialReviewPendingCount: number;
+      dealConfirmationPendingCount: number;
+      totalPendingCount: number;
+    };
     pricingSummary?: Record<string, unknown>;
     orderSummary: {
       orderId: string;
@@ -212,10 +219,40 @@ function readProjectGroup(value: unknown) {
       "projectGroup.hasProjectUnread",
     ),
     latestUnreadMessageAt: readNullableString(record.latestUnreadMessageAt),
+    businessTodoSummary: readBusinessTodoSummary(record.businessTodoSummary),
     ...(pricingSummary ? { pricingSummary } : {}),
     orderSummary,
     ratingEntry: readRatingEntry(record.ratingEntry),
     cards: withOrderBusinessCard(cards, orderSummary, latestActivityAt),
+  };
+}
+
+function readBusinessTodoSummary(value: unknown) {
+  const record = requireRecord(
+    value,
+    "Counterpart conversation businessTodoSummary must be an object.",
+  );
+  return {
+    bidParticipationReviewPendingCount: readRequiredNonNegativeNumber(
+      record.bidParticipationReviewPendingCount,
+      "businessTodoSummary.bidParticipationReviewPendingCount",
+    ),
+    publisherMaterialReviewPendingCount: readRequiredNonNegativeNumber(
+      record.publisherMaterialReviewPendingCount,
+      "businessTodoSummary.publisherMaterialReviewPendingCount",
+    ),
+    bidMaterialReviewPendingCount: readRequiredNonNegativeNumber(
+      record.bidMaterialReviewPendingCount,
+      "businessTodoSummary.bidMaterialReviewPendingCount",
+    ),
+    dealConfirmationPendingCount: readRequiredNonNegativeNumber(
+      record.dealConfirmationPendingCount,
+      "businessTodoSummary.dealConfirmationPendingCount",
+    ),
+    totalPendingCount: readRequiredNonNegativeNumber(
+      record.totalPendingCount,
+      "businessTodoSummary.totalPendingCount",
+    ),
   };
 }
 
@@ -693,6 +730,16 @@ function readOptionalNonNegativeNumber(
   if (value == null) {
     return fallback;
   }
+  const parsed = readRequiredNumber(value, fieldName);
+  if (parsed < 0) {
+    throw new Error(
+      `Counterpart conversation response returned a negative \`${fieldName}\`.`,
+    );
+  }
+  return parsed;
+}
+
+function readRequiredNonNegativeNumber(value: unknown, fieldName: string) {
   const parsed = readRequiredNumber(value, fieldName);
   if (parsed < 0) {
     throw new Error(

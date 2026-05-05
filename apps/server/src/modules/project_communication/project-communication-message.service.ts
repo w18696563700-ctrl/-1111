@@ -10,6 +10,7 @@ import { ProjectCommunicationReadCursorEntity } from './entities/project-communi
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
+import { ProjectCommunicationBusinessStateService } from './project-communication-business-state.service';
 import {
   projectCommunicationInvalid,
   projectCommunicationUnavailable
@@ -65,6 +66,7 @@ export class ProjectCommunicationMessageService {
     private readonly auditService: ProjectPublishAuditService,
     private readonly presenter: ProjectCommunicationPresenter,
     private readonly realtimeEvents: ProjectCommunicationRealtimeEventService,
+    private readonly businessStateService?: ProjectCommunicationBusinessStateService,
     private readonly notifications?: NotificationService
   ) {}
 
@@ -80,13 +82,20 @@ export class ProjectCommunicationMessageService {
         manager
       );
       const repository = manager.getRepository(ProjectCommunicationThreadEntity);
+      const presentThread = async (thread: ProjectCommunicationThreadEntity) => {
+        const state = await this.buildBusinessStateForThread({
+          thread,
+          viewerOrganizationId: pair.organizationId
+        });
+        return this.presenter.toThread(thread, state.chatAvailability);
+      };
       const existing = await repository.findOneBy({
         projectId: pair.project.id,
         ownerOrganizationId: pair.ownerOrganizationId,
         counterpartOrganizationId: pair.counterpartOrganizationId
       });
       if (existing) {
-        return this.presenter.toThread(existing);
+        return presentThread(existing);
       }
 
       const thread = repository.create({
@@ -110,11 +119,11 @@ export class ProjectCommunicationMessageService {
           counterpartOrganizationId: pair.counterpartOrganizationId
         });
         if (raced) {
-          return this.presenter.toThread(raced);
+          return presentThread(raced);
         }
         throw error;
       }
-      return this.presenter.toThread(thread);
+      return presentThread(thread);
     });
   }
 
@@ -159,6 +168,15 @@ export class ProjectCommunicationMessageService {
       );
       if (existing) {
         return this.presenter.toMessage(existing);
+      }
+      const businessState = await this.buildBusinessStateForThread({
+        thread,
+        viewerOrganizationId: actor.organizationId
+      });
+      if (!businessState.chatAvailability.canSendMessage) {
+        throw projectCommunicationInvalid(
+          businessState.chatAvailability.lockReasonText ?? '当前项目沟通暂不可发送消息。'
+        );
       }
       await this.ensureMessagePayload(command, actor.organizationId, thread.projectId, manager);
 
@@ -225,6 +243,30 @@ export class ProjectCommunicationMessageService {
       this.realtimeEvents.publishMessageCreated(createdMessage);
     }
     return result;
+  }
+
+  private async buildBusinessStateForThread(input: {
+    thread: ProjectCommunicationThreadEntity;
+    viewerOrganizationId: string;
+  }) {
+    if (this.businessStateService) {
+      return this.businessStateService.buildForThread(input);
+    }
+    return {
+      businessTodoSummary: {
+        bidParticipationReviewPendingCount: 0,
+        publisherMaterialReviewPendingCount: 0,
+        bidMaterialReviewPendingCount: 0,
+        dealConfirmationPendingCount: 0,
+        totalPendingCount: 0
+      },
+      chatAvailability: {
+        canSendMessage: true,
+        lockReasonCode: null,
+        lockReasonText: null,
+        requiredNextAction: 'none'
+      }
+    } as const;
   }
 
   async listRealtimeEvents(query: Record<string, unknown>, context: RequestContext) {

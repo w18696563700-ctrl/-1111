@@ -37,6 +37,8 @@ function createEntry(entryKey, group, label, reviewState = 'pending_review') {
     reviewState: material ? reviewState : null,
     actionState: material ? 'enabled' : 'blocked',
     attachmentCount: material ? 1 : 0,
+    badgeCount: material ? 1 : 0,
+    disabledReason: material ? null : '请先完成资料确认和报价确认后再进入最终确认。',
     latestFeedbackText: null,
     latestFeedbackAt: null,
     reviewedAt: null,
@@ -68,6 +70,19 @@ function createWorkbenchResponse() {
     projectId: 'project-1',
     threadId: 'thread-1',
     viewerRole: 'bidder',
+    businessTodoSummary: {
+      bidParticipationReviewPendingCount: 0,
+      publisherMaterialReviewPendingCount: 1,
+      bidMaterialReviewPendingCount: 0,
+      dealConfirmationPendingCount: 0,
+      totalPendingCount: 1,
+    },
+    chatAvailability: {
+      canSendMessage: false,
+      lockReasonCode: 'publisher_material_confirmation_pending',
+      lockReasonText: '请先确认发布方提供的报价依据资料。',
+      requiredNextAction: 'confirm_publisher_materials',
+    },
     generatedAt: '2026-05-02T02:00:00.000Z',
     entries: [
       createEntry('publisher_effect_image_review', 'publisher_materials', '效果图确认'),
@@ -189,6 +204,9 @@ test('BFF forwards workbench GET and preserves server review state', async () =>
   });
   assert.equal(result.entries[0].attachmentCount, 3);
   assert.equal(result.entries[0].reviewState, 'pending_review');
+  assert.equal(result.entries[0].badgeCount, 1);
+  assert.equal(result.businessTodoSummary.publisherMaterialReviewPendingCount, 1);
+  assert.equal(result.chatAvailability.canSendMessage, false);
 });
 
 test('BFF forwards material review POST without accepting deal entries', async () => {
