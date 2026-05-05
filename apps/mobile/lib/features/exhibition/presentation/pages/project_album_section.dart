@@ -58,6 +58,7 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
   String? _feedback;
   final Set<String> _deletingPhotoIds = <String>{};
   final Set<String> _loadingPreviewPhotoIds = <String>{};
+  final Set<String> _loadingThumbnailPhotoIds = <String>{};
   final Set<String> _savingPhotoIds = <String>{};
   final Map<String, ProjectCommunicationFilePreviewAccessView> _previewCache =
       <String, ProjectCommunicationFilePreviewAccessView>{};
@@ -77,6 +78,7 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
       _deletingPhotoIds.clear();
       _savingPhotoIds.clear();
       _loadingPreviewPhotoIds.clear();
+      _loadingThumbnailPhotoIds.clear();
       _previewCache.clear();
       _load();
     }
@@ -108,6 +110,31 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
       _result = result;
       _loading = false;
     });
+    _loadVisibleThumbnailAccesses();
+  }
+
+  void _selectCategory(String category) {
+    setState(() => _selectedCategory = category);
+    _loadVisibleThumbnailAccesses();
+  }
+
+  void _loadVisibleThumbnailAccesses() {
+    for (final photo in _selectedPhotos) {
+      unawaited(_loadThumbnailAccess(photo));
+    }
+  }
+
+  Future<void> _loadThumbnailAccess(ProjectAlbumPhotoView photo) async {
+    if (_previewCache.containsKey(photo.fileAssetId) ||
+        _loadingThumbnailPhotoIds.contains(photo.photoId)) {
+      return;
+    }
+    setState(() => _loadingThumbnailPhotoIds.add(photo.photoId));
+    await _loadPhotoAccess(photo, onBusyChanged: (_) {}, onFailure: (_) {});
+    if (!mounted) {
+      return;
+    }
+    setState(() => _loadingThumbnailPhotoIds.remove(photo.photoId));
   }
 
   Future<void> _deletePhoto(ProjectAlbumPhotoView photo) async {
@@ -296,8 +323,7 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
                 return ChoiceChip(
                   label: Text('${item.label} $count'),
                   selected: item.value == _selectedCategory,
-                  onSelected: (_) =>
-                      setState(() => _selectedCategory = item.value),
+                  onSelected: (_) => _selectCategory(item.value),
                 );
               })
               .toList(growable: false),
@@ -351,6 +377,12 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
               padding: const EdgeInsets.only(bottom: 10),
               child: _ProjectAlbumPhotoTile(
                 photo: photo,
+                thumbnailUrl: _projectAlbumPreviewImageUrl(
+                  _previewCache[photo.fileAssetId],
+                ),
+                thumbnailLoading: _loadingThumbnailPhotoIds.contains(
+                  photo.photoId,
+                ),
                 deleting: _deletingPhotoIds.contains(photo.photoId),
                 loadingPreview: _loadingPreviewPhotoIds.contains(photo.photoId),
                 saving: _savingPhotoIds.contains(photo.photoId),

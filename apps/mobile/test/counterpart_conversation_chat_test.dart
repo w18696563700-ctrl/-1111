@@ -1870,6 +1870,7 @@ void main() {
       var albumLoadCount = 0;
       var bindCount = 0;
       var deleteCount = 0;
+      var previewAccessCount = 0;
       ProjectAttachmentDebugOverrides.installPicker(
         () async => const ProjectAttachmentDraft(
           fileName: 'progress.png',
@@ -1973,6 +1974,32 @@ void main() {
                   body: _albumPhotoPayload(),
                 );
               },
+          'GET /api/app/file/preview/access': (AppApiRequest request) async {
+            previewAccessCount += 1;
+            expect(request.uri.queryParameters, <String, String>{
+              'projectId': 'project-1',
+              'threadId': 'project-thread-1',
+              'fileAssetId': 'file-album-1',
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'fileAssetId': 'file-album-1',
+                'projectId': 'project-1',
+                'threadId': 'project-thread-1',
+                'previewType': 'image',
+                'canPreview': true,
+                'fileName': 'progress.png',
+                'mimeType': 'image/png',
+                'accessUrl': 'https://signed.example/album-progress.png',
+                'expiresAt': '2026-05-06T10:10:00Z',
+                'contentLengthBytes': 4,
+                'downloadAvailable': true,
+                'fallbackReason': null,
+              },
+            );
+          },
           'DELETE /api/app/project/project-1/album/photos/photo-1':
               (AppApiRequest request) async {
                 deleteCount += 1;
@@ -2016,6 +2043,11 @@ void main() {
       expect(find.textContaining('照片已进入项目相册'), findsOneWidget);
       expect(find.text('共 1 / 50 张'), findsOneWidget);
       expect(find.text('相册照片'), findsOneWidget);
+      expect(previewAccessCount, 1);
+      expect(
+        find.byKey(const ValueKey<String>('project-album-thumbnail-photo-1')),
+        findsOneWidget,
+      );
       expect(find.textContaining('progress.png'), findsNothing);
       expect(find.textContaining('file-album-1'), findsNothing);
       expect(find.byTooltip('保存到本地'), findsOneWidget);
@@ -2028,8 +2060,8 @@ void main() {
       await tester.pumpAndSettle();
       await tester.tap(find.byTooltip('预览'));
       await tester.pumpAndSettle();
-      expect(find.text('照片预览'), findsOneWidget);
-      await tester.tap(find.text('关闭'));
+      expect(find.text('图片预览'), findsOneWidget);
+      await tester.tap(find.byIcon(Icons.close_rounded).last);
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(

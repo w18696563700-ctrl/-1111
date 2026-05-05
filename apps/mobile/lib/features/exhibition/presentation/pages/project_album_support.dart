@@ -166,6 +166,8 @@ class _ProjectAlbumFeedbackBanner extends StatelessWidget {
 class _ProjectAlbumPhotoTile extends StatelessWidget {
   const _ProjectAlbumPhotoTile({
     required this.photo,
+    required this.thumbnailUrl,
+    required this.thumbnailLoading,
     required this.deleting,
     required this.loadingPreview,
     required this.saving,
@@ -175,6 +177,8 @@ class _ProjectAlbumPhotoTile extends StatelessWidget {
   });
 
   final ProjectAlbumPhotoView photo;
+  final String? thumbnailUrl;
+  final bool thumbnailLoading;
   final bool deleting;
   final bool loadingPreview;
   final bool saving;
@@ -195,20 +199,13 @@ class _ProjectAlbumPhotoTile extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(10, 8, 8, 8),
         child: Row(
           children: <Widget>[
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(
-                  alpha: 0.34,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Icon(
-                  Icons.image_outlined,
-                  size: 22,
-                  color: theme.colorScheme.primary,
-                ),
+            InkWell(
+              borderRadius: BorderRadius.circular(12),
+              onTap: loadingPreview ? null : onPreview,
+              child: _ProjectAlbumPhotoThumbnail(
+                photoId: photo.photoId,
+                imageUrl: thumbnailUrl,
+                loading: thumbnailLoading,
               ),
             ),
             const SizedBox(width: 10),
@@ -285,6 +282,84 @@ class _ProjectAlbumPhotoTile extends StatelessWidget {
   }
 }
 
+class _ProjectAlbumPhotoThumbnail extends StatelessWidget {
+  const _ProjectAlbumPhotoThumbnail({
+    required this.photoId,
+    required this.imageUrl,
+    required this.loading,
+  });
+
+  final String photoId;
+  final String? imageUrl;
+  final bool loading;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final normalizedImageUrl = imageUrl?.trim();
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(12),
+      child: SizedBox.square(
+        dimension: 44,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: theme.colorScheme.primaryContainer.withValues(alpha: 0.34),
+          ),
+          child: _buildContent(theme, normalizedImageUrl),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildContent(ThemeData theme, String? normalizedImageUrl) {
+    if (normalizedImageUrl != null && normalizedImageUrl.isNotEmpty) {
+      return Image.network(
+        normalizedImageUrl,
+        key: ValueKey<String>('project-album-thumbnail-$photoId'),
+        fit: BoxFit.cover,
+        loadingBuilder:
+            (
+              BuildContext context,
+              Widget child,
+              ImageChunkEvent? loadingProgress,
+            ) {
+              if (loadingProgress == null) {
+                return child;
+              }
+              return const Center(
+                child: SizedBox.square(
+                  dimension: 16,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              );
+            },
+        errorBuilder: (_, _, _) =>
+            _ProjectAlbumThumbnailFallback(color: theme.colorScheme.primary),
+      );
+    }
+    if (loading) {
+      return const Center(
+        child: SizedBox.square(
+          dimension: 16,
+          child: CircularProgressIndicator(strokeWidth: 2),
+        ),
+      );
+    }
+    return _ProjectAlbumThumbnailFallback(color: theme.colorScheme.primary);
+  }
+}
+
+class _ProjectAlbumThumbnailFallback extends StatelessWidget {
+  const _ProjectAlbumThumbnailFallback({required this.color});
+
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(child: Icon(Icons.image_outlined, size: 22, color: color));
+  }
+}
+
 String _projectAlbumCreatedAtLabel(String createdAt) {
   final parsed = DateTime.tryParse(createdAt);
   if (parsed == null) {
@@ -306,4 +381,18 @@ String _projectAlbumCategorySummary(String category) {
     'defect' => '瑕疵、整改、争议辅助',
     _ => '项目证据照片',
   };
+}
+
+String? _projectAlbumPreviewImageUrl(
+  ProjectCommunicationFilePreviewAccessView? access,
+) {
+  final accessUrl = access?.accessUrl?.trim();
+  if (access == null ||
+      !access.canPreview ||
+      access.previewType != 'image' ||
+      accessUrl == null ||
+      accessUrl.isEmpty) {
+    return null;
+  }
+  return accessUrl;
 }
