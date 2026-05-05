@@ -862,6 +862,9 @@ class _ProjectCommunicationComposer extends StatelessWidget {
     required this.controller,
     required this.enabled,
     required this.sending,
+    required this.lockReasonText,
+    required this.requiredNextAction,
+    required this.onOpenRequiredAction,
     required this.onSend,
     required this.onAttachFile,
     required this.onAttachImage,
@@ -870,6 +873,9 @@ class _ProjectCommunicationComposer extends StatelessWidget {
   final TextEditingController controller;
   final bool enabled;
   final bool sending;
+  final String? lockReasonText;
+  final String? requiredNextAction;
+  final VoidCallback? onOpenRequiredAction;
   final VoidCallback onSend;
   final VoidCallback onAttachFile;
   final VoidCallback onAttachImage;
@@ -878,6 +884,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final actionLabel = _requiredActionLabel;
     return AnimatedPadding(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -896,6 +903,43 @@ class _ProjectCommunicationComposer extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
+                if (!enabled && lockReasonText != null) ...<Widget>[
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 16,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          lockReasonText!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (actionLabel != null &&
+                      onOpenRequiredAction != null) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: onOpenRequiredAction,
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: Text(actionLabel),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: <Widget>[
                     _ComposerActionButton(
@@ -926,7 +970,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                         onSubmitted: (_) =>
                             enabled && !sending ? onSend() : null,
                         decoration: InputDecoration(
-                          hintText: enabled ? '围绕当前项目说点什么...' : '沟通暂不可用',
+                          hintText: enabled ? '围绕当前项目说点什么...' : '业务节点完成后可继续沟通',
                           filled: true,
                           isDense: true,
                           border: OutlineInputBorder(
@@ -955,6 +999,17 @@ class _ProjectCommunicationComposer extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? get _requiredActionLabel {
+    return switch (requiredNextAction) {
+      'review_bid_participation' => '去处理申请',
+      'confirm_publisher_materials' => '打开资料确认单',
+      'submit_bid_materials' => '去提交竞标资料',
+      'confirm_bid_materials' => '打开资料确认单',
+      'open_deal_confirmation' => '打开成交确认',
+      _ => null,
+    };
   }
 }
 

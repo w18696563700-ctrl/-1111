@@ -133,6 +133,9 @@ Map<String, Object?> _detailPayload({String projectRelation = 'my_bid'}) {
         'latestActivityAt': '2026-05-04T10:00:00Z',
         'projectUnreadCount': 0,
         'hasProjectUnread': false,
+        'businessTodoSummary': _businessTodoSummary(
+          publisherMaterialReviewPendingCount: 3,
+        ),
         'cards': <Object?>[],
       },
     ],
@@ -140,16 +143,56 @@ Map<String, Object?> _detailPayload({String projectRelation = 'my_bid'}) {
 }
 
 Map<String, Object?> _threadPayload() {
-  return const <String, Object?>{
+  return <String, Object?>{
     'threadId': 'thread-1',
     'projectId': 'project-1',
     'ownerOrganizationId': 'org-owner',
     'counterpartOrganizationId': 'org-counterpart',
+    'chatAvailability': _chatAvailability(
+      canSendMessage: false,
+      lockReasonCode: 'publisher_material_confirmation_pending',
+      lockReasonText: '请先确认发布方提供的报价依据资料。',
+      requiredNextAction: 'confirm_publisher_materials',
+    ),
     'threadState': 'active',
     'lastMessageId': null,
     'lastMessageAt': null,
     'createdAt': '2026-05-04T10:00:00Z',
     'updatedAt': '2026-05-04T10:00:00Z',
+  };
+}
+
+Map<String, Object?> _businessTodoSummary({
+  int bidParticipationReviewPendingCount = 0,
+  int publisherMaterialReviewPendingCount = 0,
+  int bidMaterialReviewPendingCount = 0,
+  int dealConfirmationPendingCount = 0,
+}) {
+  final total =
+      bidParticipationReviewPendingCount +
+      publisherMaterialReviewPendingCount +
+      bidMaterialReviewPendingCount +
+      dealConfirmationPendingCount;
+  return <String, Object?>{
+    'bidParticipationReviewPendingCount': bidParticipationReviewPendingCount,
+    'publisherMaterialReviewPendingCount': publisherMaterialReviewPendingCount,
+    'bidMaterialReviewPendingCount': bidMaterialReviewPendingCount,
+    'dealConfirmationPendingCount': dealConfirmationPendingCount,
+    'totalPendingCount': total,
+  };
+}
+
+Map<String, Object?> _chatAvailability({
+  bool canSendMessage = true,
+  String? lockReasonCode,
+  String? lockReasonText,
+  String requiredNextAction = 'none',
+}) {
+  return <String, Object?>{
+    'canSendMessage': canSendMessage,
+    'lockReasonCode': lockReasonCode,
+    'lockReasonText': lockReasonText,
+    'requiredNextAction': requiredNextAction,
   };
 }
 
@@ -184,6 +227,8 @@ Map<String, Object?> _workbenchEntry({
     'reviewState': material ? reviewState : null,
     'actionState': material ? actionState : 'blocked',
     'attachmentCount': material ? attachmentCount : 0,
+    'badgeCount': material && reviewState == 'pending_review' ? 1 : 0,
+    'disabledReason': material && attachmentCount == 0 ? '当前资料尚未提交。' : null,
     'latestFeedbackText': latestFeedbackText,
     'latestFeedbackAt': latestFeedbackText == null
         ? null
@@ -307,6 +352,15 @@ Map<String, Object?> _workbenchPayload({
     'projectId': 'project-1',
     'threadId': 'thread-1',
     'viewerRole': 'bidder',
+    'businessTodoSummary': _businessTodoSummary(
+      publisherMaterialReviewPendingCount: 3,
+    ),
+    'chatAvailability': _chatAvailability(
+      canSendMessage: false,
+      lockReasonCode: 'publisher_material_confirmation_pending',
+      lockReasonText: '请先确认发布方提供的报价依据资料。',
+      requiredNextAction: 'confirm_publisher_materials',
+    ),
     'entries': _workbenchEntries(
       effectState: effectState,
       quoteState: quoteState,
@@ -579,7 +633,8 @@ void main() {
     await tester.tap(find.text('最终成交金额确认'));
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('暂不触发扣费'), findsOneWidget);
+    expect(find.textContaining('不触发支付'), findsOneWidget);
+    expect(find.textContaining('deal-confirmations'), findsWidgets);
     expect(
       transport.requests.where(
         (request) =>

@@ -286,6 +286,81 @@ void main() {
   );
 
   testWidgets(
+    'messages page syncs shell badge from notification unread total only',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'notificationId': 'notice-1',
+                    'type': 'project_communication_message',
+                    'source': 'project_communication',
+                    'title': '有新的项目沟通消息',
+                    'body': '这条 item 是未读，但 total 为 0。',
+                    'projectId': 'project-1',
+                    'threadId': 'thread-1',
+                    'routeTarget': null,
+                    'createdAt': '2026-05-01T08:00:00Z',
+                    'readAt': null,
+                    'unread': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 0,
+                  'projectCommunication': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final controller = AppBootstrapController(
+        shellContextConsumer: _FakeShellContextConsumer(messagesUnread: 9),
+      );
+      MessagesConsumerLayer.install(
+        MessagesConsumerLayer(client: _client(transport)),
+      );
+      ForumConsumerLayer.install(
+        ForumConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShellScope(
+            controller: controller,
+            child: const Scaffold(body: MessagesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
+    },
+  );
+
+  testWidgets(
     'bid participation notification marks read and opens existing review thread',
     (WidgetTester tester) async {
       String? openedRoute;

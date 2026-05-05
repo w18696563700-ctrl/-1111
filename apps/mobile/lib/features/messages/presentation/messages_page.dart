@@ -188,7 +188,7 @@ class _MessagesPageState extends State<MessagesPage> {
     if (loadToken == _latestReminderLoadToken &&
         (result.state == AppPageState.content ||
             result.state == AppPageState.empty)) {
-      await _reloadShellContext();
+      await _reloadShellContextPreservingNotificationUnread();
     }
   }
 
@@ -205,6 +205,7 @@ class _MessagesPageState extends State<MessagesPage> {
       _notificationResult = result;
       _notificationLoading = false;
     });
+    _syncShellMessagesUnreadBadge(result);
   }
 
   @override
@@ -320,13 +321,28 @@ class _MessagesPageState extends State<MessagesPage> {
 
   int _notificationUnreadCount(AppNotificationListResult? result) {
     final data = result?.data;
-    if (result?.state == AppPageState.content && data != null) {
-      if (data.unread.total > 0) {
-        return data.unread.total;
-      }
-      return data.items.where((item) => item.unread).length;
+    if ((result?.state == AppPageState.content ||
+            result?.state == AppPageState.empty) &&
+        data != null) {
+      return data.unread.total;
     }
     return 0;
+  }
+
+  void _syncShellMessagesUnreadBadge(AppNotificationListResult result) {
+    final data = result.data;
+    if (data == null) {
+      return;
+    }
+    _syncShellMessagesUnreadCount(data.unread.total);
+  }
+
+  void _syncShellMessagesUnreadCount(int unreadCount) {
+    try {
+      AppShellScope.read(context).applyMessagesUnreadProjection(unreadCount);
+    } catch (_) {
+      // Some focused widget tests mount MessagesPage outside the full shell.
+    }
   }
 
   void _selectPrimaryTab(_MessagesPrimaryTab tab) {
@@ -408,7 +424,7 @@ class _MessagesPageState extends State<MessagesPage> {
       return;
     }
     await _refreshAll(showLoading: false);
-    await _reloadShellContext();
+    await _reloadShellContextPreservingNotificationUnread();
   }
 
   bool _canOpenProjectCommunication(MessageInteractionItemView item) {
@@ -437,7 +453,11 @@ class _MessagesPageState extends State<MessagesPage> {
         return;
       }
       await _loadNotifications(showLoading: false);
-      await _reloadShellContext();
+      await _reloadShellContextPreservingNotificationUnread();
+      final unread = result.unread;
+      if (unread != null) {
+        _syncShellMessagesUnreadCount(unread.total);
+      }
     }
     if (!mounted) {
       return;
@@ -457,6 +477,14 @@ class _MessagesPageState extends State<MessagesPage> {
       await AppShellScope.read(context).reloadShellContext();
     } catch (_) {
       // Tests may mount this page without the full shell scope.
+    }
+  }
+
+  Future<void> _reloadShellContextPreservingNotificationUnread() async {
+    await _reloadShellContext();
+    final notificationResult = _notificationResult;
+    if (notificationResult != null) {
+      _syncShellMessagesUnreadBadge(notificationResult);
     }
   }
 

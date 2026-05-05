@@ -322,7 +322,21 @@ class _WorkbenchEntryTile extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
           child: Row(
             children: <Widget>[
-              Icon(_icon(entry), color: style.foreground),
+              Stack(
+                clipBehavior: Clip.none,
+                children: <Widget>[
+                  Icon(_icon(entry), color: style.foreground),
+                  if (entry.badgeCount > 0)
+                    Positioned(
+                      right: -7,
+                      top: -7,
+                      child: _BusinessTodoBadge(
+                        count: entry.badgeCount,
+                        compact: true,
+                      ),
+                    ),
+                ],
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(

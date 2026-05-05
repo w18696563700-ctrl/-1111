@@ -271,6 +271,9 @@ Map<String, Object?> _detailPayload({
         'latestActivityAt': '2026-05-04T10:00:00Z',
         'projectUnreadCount': 1,
         'hasProjectUnread': true,
+        'businessTodoSummary': _businessTodoSummary(
+          bidParticipationReviewPendingCount: 1,
+        ),
         'orderSummary': orderSummary,
         'ratingEntry': ratingEntry,
         'cards': <Object?>[
@@ -357,6 +360,40 @@ Map<String, Object?> _detailPayload({
   };
 }
 
+Map<String, Object?> _businessTodoSummary({
+  int bidParticipationReviewPendingCount = 0,
+  int publisherMaterialReviewPendingCount = 0,
+  int bidMaterialReviewPendingCount = 0,
+  int dealConfirmationPendingCount = 0,
+}) {
+  final total =
+      bidParticipationReviewPendingCount +
+      publisherMaterialReviewPendingCount +
+      bidMaterialReviewPendingCount +
+      dealConfirmationPendingCount;
+  return <String, Object?>{
+    'bidParticipationReviewPendingCount': bidParticipationReviewPendingCount,
+    'publisherMaterialReviewPendingCount': publisherMaterialReviewPendingCount,
+    'bidMaterialReviewPendingCount': bidMaterialReviewPendingCount,
+    'dealConfirmationPendingCount': dealConfirmationPendingCount,
+    'totalPendingCount': total,
+  };
+}
+
+Map<String, Object?> _chatAvailability({
+  bool canSendMessage = true,
+  String? lockReasonCode,
+  String? lockReasonText,
+  String requiredNextAction = 'none',
+}) {
+  return <String, Object?>{
+    'canSendMessage': canSendMessage,
+    'lockReasonCode': lockReasonCode,
+    'lockReasonText': lockReasonText,
+    'requiredNextAction': requiredNextAction,
+  };
+}
+
 Map<String, Object?> _twoProjectDetailPayload() {
   final participationDefinition =
       messagesRegisteredEntryByActionKey['bid_participation_request.open']!;
@@ -384,6 +421,11 @@ Map<String, Object?> _twoProjectDetailPayload() {
       'latestActivityAt': latestActivityAt,
       'projectUnreadCount': projectId == 'project-luzhou' ? 2 : 0,
       'hasProjectUnread': projectId == 'project-luzhou',
+      'businessTodoSummary': _businessTodoSummary(
+        bidParticipationReviewPendingCount: projectId == 'project-luzhou'
+            ? 1
+            : 0,
+      ),
       'orderSummary': null,
       'ratingEntry': null,
       'cards': <Object?>[
@@ -481,12 +523,14 @@ Map<String, Object?> _twoProjectDetailPayload() {
 Map<String, Object?> _threadPayload({
   String threadId = 'project-thread-1',
   String projectId = 'project-1',
+  Map<String, Object?>? chatAvailability,
 }) {
   return <String, Object?>{
     'threadId': threadId,
     'projectId': projectId,
     'ownerOrganizationId': 'org-owner',
     'counterpartOrganizationId': 'org-counterpart',
+    'chatAvailability': chatAvailability ?? _chatAvailability(),
     'threadState': 'open',
     'lastMessageId': null,
     'lastMessageAt': null,
@@ -1247,6 +1291,62 @@ void main() {
       expect(find.text('当前项目尚未结束，评价入口不会开放。'), findsOneWidget);
     },
   );
+
+  testWidgets('locked composer opens bid submit from Server required action', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/message/counterpart-conversation/detail':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _detailPayload(),
+                  );
+                },
+            'GET /api/app/message/project-communication/thread':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: _threadPayload(
+                      chatAvailability: _chatAvailability(
+                        canSendMessage: false,
+                        lockReasonCode: 'bid_submission_pending',
+                        lockReasonText: '请先完成竞标报价与三项附件提交。',
+                        requiredNextAction: 'submit_bid_materials',
+                      ),
+                    ),
+                  );
+                },
+            'GET /api/app/message/project-communication/messages':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'items': <Object?>[],
+                      'nextCursor': null,
+                    },
+                  );
+                },
+          },
+    );
+
+    await tester.pumpWidget(_buildPage(transport));
+    await tester.pumpAndSettle();
+    await _enterFirstProjectCommunication(tester);
+
+    expect(find.text('请先完成竞标报价与三项附件提交。'), findsOneWidget);
+    expect(find.text('去提交竞标资料'), findsOneWidget);
+
+    await tester.tap(find.text('去提交竞标资料'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('route opened'), findsOneWidget);
+  });
 
   testWidgets(
     'counterpart subject sheet blocks qichacha when no searchable name exists',

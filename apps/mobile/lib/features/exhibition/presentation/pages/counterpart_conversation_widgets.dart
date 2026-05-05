@@ -751,6 +751,8 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
       group.latestUnreadMessageAt,
     );
     final hasUnread = group.hasProjectUnread && group.projectUnreadCount > 0;
+    final businessTodoCount = group.businessTodoSummary.totalPendingCount;
+    final hasBusinessTodo = businessTodoCount > 0;
     const maskedTitleColor = Color(0xFF1F7A3A);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -873,6 +875,13 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
+              if (hasBusinessTodo) ...<Widget>[
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: _BusinessTodoBadge(count: businessTodoCount),
+                ),
+                const SizedBox(height: 8),
+              ],
               FilledButton.icon(
                 onPressed: onOpen,
                 icon: compact
@@ -967,6 +976,9 @@ class _SelectedProjectBusinessEntrypointsState
     final materialConfirmationLabel = materialConfirmationCount == null
         ? '资料确认单'
         : '资料确认 · $materialConfirmationCount项';
+    final todoSummary =
+        widget.workbenchResult?.data?.businessTodoSummary ??
+        widget.group.businessTodoSummary;
     final theme = Theme.of(context);
     return Material(
       color: theme.colorScheme.surface,
@@ -1008,6 +1020,8 @@ class _SelectedProjectBusinessEntrypointsState
                     child: _ProjectToolEntryButton(
                       icon: Icons.fact_check_outlined,
                       label: '进入审核',
+                      badgeCount:
+                          todoSummary.bidParticipationReviewPendingCount,
                       enabled: widget.participationCard != null,
                       onPressed: widget.participationCard == null
                           ? null
@@ -1032,6 +1046,7 @@ class _SelectedProjectBusinessEntrypointsState
                     child: _ProjectToolEntryButton(
                       icon: Icons.folder_open_outlined,
                       label: materialConfirmationLabel,
+                      badgeCount: todoSummary.materialReviewPendingCount,
                       enabled: true,
                       selected: _toolsVisible,
                       onPressed: () =>
@@ -1064,6 +1079,7 @@ class _ProjectToolEntryButton extends StatelessWidget {
     required this.enabled,
     required this.onPressed,
     this.selected = false,
+    this.badgeCount = 0,
   });
 
   final IconData icon;
@@ -1071,39 +1087,56 @@ class _ProjectToolEntryButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback? onPressed;
   final bool selected;
+  final int badgeCount;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return OutlinedButton(
-      onPressed: enabled ? onPressed : null,
-      style: OutlinedButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-        side: BorderSide(
-          color: selected
-              ? theme.colorScheme.primary
-              : theme.colorScheme.outlineVariant,
-        ),
-        backgroundColor: selected
-            ? theme.colorScheme.primaryContainer.withValues(alpha: 0.28)
-            : theme.colorScheme.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: <Widget>[
-          Icon(icon, size: 18),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: theme.textTheme.labelSmall?.copyWith(
-              fontWeight: FontWeight.w800,
+    return Stack(
+      clipBehavior: Clip.none,
+      children: <Widget>[
+        Positioned.fill(
+          child: OutlinedButton(
+            onPressed: enabled ? onPressed : null,
+            style: OutlinedButton.styleFrom(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+              side: BorderSide(
+                color: selected
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.outlineVariant,
+              ),
+              backgroundColor: selected
+                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.28)
+                  : theme.colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                Icon(icon, size: 18),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 58),
+        if (badgeCount > 0)
+          Positioned(
+            right: -3,
+            top: -5,
+            child: _BusinessTodoBadge(count: badgeCount, compact: true),
+          ),
+      ],
     );
   }
 }
@@ -1221,6 +1254,38 @@ class _ProjectUnreadPill extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _BusinessTodoBadge extends StatelessWidget {
+  const _BusinessTodoBadge({required this.count, this.compact = false});
+
+  final int count;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final label = count > 99 ? '99+' : '$count';
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: theme.colorScheme.error,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Padding(
+        padding: EdgeInsets.symmetric(
+          horizontal: compact ? 6 : 8,
+          vertical: compact ? 2 : 4,
+        ),
+        child: Text(
+          label,
+          style: theme.textTheme.labelSmall?.copyWith(
+            color: theme.colorScheme.onError,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );

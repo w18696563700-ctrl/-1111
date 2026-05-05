@@ -50,12 +50,99 @@ ProjectCommunicationThreadView parseProjectCommunicationThread(
       map,
       'counterpartOrganizationId',
     ),
+    chatAvailability: _parseOptionalChatAvailability(map['chatAvailability']),
     threadState: _requiredString(map, 'threadState'),
     lastMessageId: _nullableString(map['lastMessageId']),
     lastMessageAt: _nullableString(map['lastMessageAt']),
     createdAt: _requiredString(map, 'createdAt'),
     updatedAt: _requiredString(map, 'updatedAt'),
   );
+}
+
+ProjectCommunicationBusinessTodoSummaryView _parseBusinessTodoSummary(
+  Object? payload,
+) {
+  final map = _requiredMap(payload, 'project communication business todo');
+  return ProjectCommunicationBusinessTodoSummaryView(
+    bidParticipationReviewPendingCount: _nonNegativeInt(
+      map['bidParticipationReviewPendingCount'],
+      'bidParticipationReviewPendingCount',
+    ),
+    publisherMaterialReviewPendingCount: _nonNegativeInt(
+      map['publisherMaterialReviewPendingCount'],
+      'publisherMaterialReviewPendingCount',
+    ),
+    bidMaterialReviewPendingCount: _nonNegativeInt(
+      map['bidMaterialReviewPendingCount'],
+      'bidMaterialReviewPendingCount',
+    ),
+    dealConfirmationPendingCount: _nonNegativeInt(
+      map['dealConfirmationPendingCount'],
+      'dealConfirmationPendingCount',
+    ),
+    totalPendingCount: _nonNegativeInt(
+      map['totalPendingCount'],
+      'totalPendingCount',
+    ),
+  );
+}
+
+ProjectCommunicationBusinessTodoSummaryView _parseOptionalBusinessTodoSummary(
+  Object? payload,
+) {
+  if (payload == null) {
+    return const ProjectCommunicationBusinessTodoSummaryView(
+      bidParticipationReviewPendingCount: 0,
+      publisherMaterialReviewPendingCount: 0,
+      bidMaterialReviewPendingCount: 0,
+      dealConfirmationPendingCount: 0,
+      totalPendingCount: 0,
+    );
+  }
+  return _parseBusinessTodoSummary(payload);
+}
+
+ProjectCommunicationChatAvailabilityView _parseChatAvailability(
+  Object? payload,
+) {
+  final map = _requiredMap(payload, 'project communication chat availability');
+  final rawLockReasonCode = _nullableString(map['lockReasonCode']);
+  return ProjectCommunicationChatAvailabilityView(
+    canSendMessage: _requiredBool(map, 'canSendMessage'),
+    lockReasonCode: rawLockReasonCode == null
+        ? null
+        : _enumValue(rawLockReasonCode, const <String>{
+            'bid_participation_review_pending',
+            'publisher_material_confirmation_pending',
+            'bid_submission_pending',
+            'bid_material_confirmation_pending',
+            'deal_confirmation_pending',
+          }, 'lockReasonCode'),
+    lockReasonText: _nullableString(map['lockReasonText']),
+    requiredNextAction:
+        _enumValue(_requiredString(map, 'requiredNextAction'), const <String>{
+          'review_bid_participation',
+          'confirm_publisher_materials',
+          'submit_bid_materials',
+          'confirm_bid_materials',
+          'open_deal_confirmation',
+          'none',
+        }, 'requiredNextAction'),
+  );
+}
+
+ProjectCommunicationChatAvailabilityView _parseOptionalChatAvailability(
+  Object? payload,
+) {
+  if (payload == null) {
+    return const ProjectCommunicationChatAvailabilityView(
+      canSendMessage: false,
+      lockReasonCode: null,
+      lockReasonText: '当前项目沟通状态正在同步，请稍后重试。',
+      requiredNextAction: 'none',
+    );
+  }
+  return _parseChatAvailability(payload);
 }
 
 ProjectCommunicationMessageListView parseProjectCommunicationMessages(
@@ -191,6 +278,10 @@ ProjectCommunicationWorkbenchView parseProjectCommunicationWorkbench(
       'bidder',
       'unknown',
     }, 'viewerRole'),
+    businessTodoSummary: _parseOptionalBusinessTodoSummary(
+      map['businessTodoSummary'],
+    ),
+    chatAvailability: _parseOptionalChatAvailability(map['chatAvailability']),
     entries: _requiredList(map, 'entries')
         .map<ProjectCommunicationWorkbenchEntryView>(
           parseProjectCommunicationWorkbenchEntry,
@@ -286,6 +377,8 @@ ProjectCommunicationWorkbenchEntryView parseProjectCommunicationWorkbenchEntry(
       'blocked',
     }, 'actionState'),
     attachmentCount: _requiredInt(map, 'attachmentCount'),
+    badgeCount: _optionalNonNegativeInt(map['badgeCount'], 'badgeCount'),
+    disabledReason: _nullableString(map['disabledReason']),
     sourceFiles: _parseWorkbenchSourceFiles(map['sourceFiles']),
     latestFeedbackText: _nullableString(map['latestFeedbackText']),
     latestFeedbackAt: _nullableString(map['latestFeedbackAt']),
@@ -485,6 +578,9 @@ CounterpartConversationProjectGroupView _parseProjectGroup(Object? payload) {
     ),
     hasProjectUnread:
         _optionalBool(map['hasProjectUnread'], 'hasProjectUnread') ?? false,
+    businessTodoSummary: _parseOptionalBusinessTodoSummary(
+      map['businessTodoSummary'],
+    ),
     orderSummary: _parseOrderSummary(
       map['orderSummary'] ??
           map['order'] ??
@@ -794,6 +890,13 @@ int _optionalNonNegativeInt(Object? value, String field) {
   if (value == null) {
     return 0;
   }
+  if (value is int && value >= 0) {
+    return value;
+  }
+  throw FormatException('field "$field" must be a non-negative int');
+}
+
+int _nonNegativeInt(Object? value, String field) {
   if (value is int && value >= 0) {
     return value;
   }

@@ -65,19 +65,24 @@ class AppShellScaffold extends StatelessWidget {
           ),
         ),
     ];
+    final suppressMessagesRootBack =
+        currentBuilding == AppBuilding.messages &&
+        titleOverride == null &&
+        titleContent == null;
+    final allowBack = canPop && !suppressMessagesRootBack;
     final hideRootAppBar =
         (currentBuilding == AppBuilding.exhibition ||
             currentBuilding == AppBuilding.messages) &&
         titleOverride == null &&
         titleContent == null &&
-        !canPop;
+        !allowBack;
 
     return Scaffold(
       appBar: hideRootAppBar
           ? null
           : AppBar(
               automaticallyImplyLeading: false,
-              leading: canPop
+              leading: allowBack
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       onPressed: () {
@@ -100,7 +105,7 @@ class AppShellScaffold extends StatelessWidget {
               ],
             ),
           ),
-          if (canPop)
+          if (allowBack)
             Positioned(
               left: 0,
               top: 0,

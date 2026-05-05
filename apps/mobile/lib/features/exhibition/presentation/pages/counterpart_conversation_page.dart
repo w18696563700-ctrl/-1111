@@ -485,6 +485,85 @@ class _CounterpartConversationPageState
     });
   }
 
+  bool _canSendProjectCommunication() {
+    return _threadResult?.data?.chatAvailability.canSendMessage == true;
+  }
+
+  String _chatLockMessage([ProjectCommunicationThreadView? thread]) {
+    final availability =
+        thread?.chatAvailability ?? _threadResult?.data?.chatAvailability;
+    final text = availability?.lockReasonText?.trim();
+    if (text != null && text.isNotEmpty) {
+      return text;
+    }
+    return '当前项目沟通暂不可发送消息，请先完成业务待办。';
+  }
+
+  void _openChatRequiredAction() {
+    final action = _threadResult?.data?.chatAvailability.requiredNextAction;
+    final data = _result?.data;
+    final group = data == null ? null : _selectedProjectGroup(data);
+    if (action == null || action == 'none') {
+      _showSnack('当前没有需要处理的业务待办。');
+      return;
+    }
+    if (group == null) {
+      _showSnack('无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。');
+      return;
+    }
+    switch (action) {
+      case 'review_bid_participation':
+        final card = _firstBusinessCard(group, 'bid_participation_request');
+        if (card == null) {
+          _showSnack('当前没有可处理的参与竞标申请。');
+          return;
+        }
+        _openBusinessCard(card);
+        return;
+      case 'confirm_publisher_materials':
+        _openFirstPendingWorkbenchEntry(<String>{'publisher_materials'});
+        return;
+      case 'submit_bid_materials':
+        Navigator.of(
+          context,
+        ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(group.projectId));
+        return;
+      case 'confirm_bid_materials':
+        _openFirstPendingWorkbenchEntry(<String>{'bid_materials'});
+        return;
+      case 'open_deal_confirmation':
+        _openFirstPendingWorkbenchEntry(<String>{'deal_confirmation'});
+        return;
+      default:
+        _showSnack(_chatLockMessage());
+    }
+  }
+
+  void _openFirstPendingWorkbenchEntry(Set<String> groups) {
+    final entries = _workbenchResult?.data?.entries;
+    if (entries == null) {
+      _showSnack('资料确认单状态暂不可读，请稍后重试。');
+      return;
+    }
+    ProjectCommunicationWorkbenchEntryView? entry;
+    for (final item in entries) {
+      if (!groups.contains(item.group)) {
+        continue;
+      }
+      if (item.badgeCount > 0 ||
+          item.reviewState == 'pending_review' ||
+          item.actionState == 'enabled') {
+        entry = item;
+        break;
+      }
+    }
+    if (entry == null) {
+      _showSnack('当前没有可处理的资料确认项。');
+      return;
+    }
+    _openWorkbenchEntry(entry);
+  }
+
   Future<void> _sendCurrentMessage() async {
     final body = _messageController.text.trim();
     final thread = _threadResult?.data;
@@ -492,6 +571,10 @@ class _CounterpartConversationPageState
       if (body.isEmpty) {
         _showSnack('请输入要发送的文字。');
       }
+      return;
+    }
+    if (!thread.chatAvailability.canSendMessage) {
+      _showSnack(_chatLockMessage(thread));
       return;
     }
     if (_shouldShowContactSoftPrompt(body)) {
@@ -517,6 +600,10 @@ class _CounterpartConversationPageState
   Future<void> _sendAttachmentMessage({required bool imageOnly}) async {
     final thread = _threadResult?.data;
     if (thread == null || _sending) {
+      return;
+    }
+    if (!thread.chatAvailability.canSendMessage) {
+      _showSnack(_chatLockMessage(thread));
       return;
     }
     final outcome = await _pickAndUploadProjectCommunicationAttachment(
@@ -962,8 +1049,12 @@ class _CounterpartConversationPageState
                 ),
                 _ProjectCommunicationComposer(
                   controller: _messageController,
-                  enabled: !_loadingThread,
+                  enabled: !_loadingThread && _canSendProjectCommunication(),
                   sending: _sending,
+                  lockReasonText: _chatLockMessage(),
+                  requiredNextAction:
+                      _threadResult?.data?.chatAvailability.requiredNextAction,
+                  onOpenRequiredAction: _openChatRequiredAction,
                   onSend: _sendCurrentMessage,
                   onAttachFile: () => _sendAttachmentMessage(imageOnly: false),
                   onAttachImage: () => _sendAttachmentMessage(imageOnly: true),
@@ -1286,7 +1377,7 @@ class _CounterpartConversationPageState
 
   void _openWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
     if (entry.group == 'deal_confirmation') {
-      _showSnack('合同与最终金额确认入口暂不触发扣费，待后续门禁开启。');
+      _openDealConfirmationEntry(entry);
       return;
     }
     Navigator.of(context).push(
@@ -1297,6 +1388,67 @@ class _CounterpartConversationPageState
           onFeedback: _submitWorkbenchFeedback,
         ),
       ),
+    );
+  }
+
+  Future<void> _openDealConfirmationEntry(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final canonicalPath =
+        entry.routeTarget?.canonicalPath ??
+        ExhibitionCanonicalPaths.projectDealConfirmations(entry.projectId);
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    entry.label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '请上传合同文件并填写最终成交价；双方确认完成后，Server 才会持久化 finalConfirmedAmount。',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '当前入口只承接 deal-confirmations，不触发支付、服务费扣费或 /contract/confirm。',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _InfoBand(
+                    icon: Icons.verified_outlined,
+                    text: '唯一路径：$canonicalPath',
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('知道了'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1339,6 +1491,11 @@ class _CounterpartConversationPageState
       return false;
     }
     final response = result.data!;
+    final previousWorkbench = _workbenchResult?.data;
+    if (previousWorkbench == null) {
+      _showSnack('当前资料确认状态暂不可读，请刷新后重试。');
+      return false;
+    }
     setState(() {
       _workbenchResult =
           CounterpartConversationResult<ProjectCommunicationWorkbenchView>(
@@ -1349,6 +1506,8 @@ class _CounterpartConversationPageState
               projectId: response.projectId,
               threadId: response.threadId,
               viewerRole: response.viewerRole,
+              businessTodoSummary: previousWorkbench.businessTodoSummary,
+              chatAvailability: previousWorkbench.chatAvailability,
               entries:
                   response.entries ?? _replaceWorkbenchEntry(response.entry),
               generatedAt: response.updatedAt,
@@ -1421,6 +1580,7 @@ class _CounterpartConversationPageState
             latestUnreadMessageAt: group.latestUnreadMessageAt,
             projectUnreadCount: group.projectUnreadCount,
             hasProjectUnread: group.hasProjectUnread,
+            businessTodoSummary: group.businessTodoSummary,
             orderSummary: group.orderSummary,
             ratingEntry: group.ratingEntry,
             cards: _sortedBusinessCards(group.cards),
