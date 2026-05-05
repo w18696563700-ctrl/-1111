@@ -965,6 +965,9 @@ void main() {
       await _ensureVisible(tester, find.widgetWithText(OutlinedButton, '后续承接'));
       await tester.tap(find.widgetWithText(OutlinedButton, '后续承接'));
       await tester.pumpAndSettle();
+      await _ensureVisible(tester, find.text('订单种子'));
+      await tester.tap(find.text('订单种子'));
+      await tester.pumpAndSettle();
 
       await _ensureVisible(tester, find.text('申请完工'));
       expect(find.text('申请完工'), findsOneWidget);
@@ -1157,6 +1160,9 @@ void main() {
       await _enterFirstProjectCommunication(tester);
       await _ensureVisible(tester, find.widgetWithText(OutlinedButton, '后续承接'));
       await tester.tap(find.widgetWithText(OutlinedButton, '后续承接'));
+      await tester.pumpAndSettle();
+      await _ensureVisible(tester, find.text('订单种子'));
+      await tester.tap(find.text('订单种子'));
       await tester.pumpAndSettle();
 
       await _ensureVisible(tester, find.text('确认完成'));
@@ -1746,6 +1752,9 @@ void main() {
       final openOrderButton = find.widgetWithText(OutlinedButton, '后续承接');
       await _ensureVisible(tester, openOrderButton);
       await tester.tap(openOrderButton);
+      await tester.pumpAndSettle();
+      await _ensureVisible(tester, find.text('订单种子'));
+      await tester.tap(find.text('订单种子'));
       await tester.pumpAndSettle();
 
       expect(orderDetailCount, 1);

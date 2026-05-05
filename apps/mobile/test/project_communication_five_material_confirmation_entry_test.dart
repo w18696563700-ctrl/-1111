@@ -67,7 +67,7 @@ Future<void> _expandWorkbenchGroup(WidgetTester tester, String label) async {
 }
 
 Future<void> _openMaterialTools(WidgetTester tester) async {
-  var tools = find.widgetWithText(OutlinedButton, '资料确认 · 10项');
+  var tools = find.widgetWithText(OutlinedButton, '资料确认 · 8项');
   if (tools.evaluate().isEmpty) {
     tools = find.widgetWithText(OutlinedButton, '资料确认单');
   }
@@ -481,60 +481,68 @@ _baseHandlers({String projectRelation = 'my_bid'}) {
 }
 
 void main() {
-  testWidgets('workbench folds groups by default and keeps 10 fixed entries', (
-    WidgetTester tester,
-  ) async {
-    final transport = FakeAppApiTransport(handlers: _baseHandlers());
+  testWidgets(
+    'workbench folds material groups by default and keeps 8 material entries',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(handlers: _baseHandlers());
 
-    await tester.pumpWidget(_buildPage(transport));
-    await tester.pumpAndSettle();
-    await _enterProjectCommunication(tester);
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
 
-    expect(find.text('资料确认 · 10项'), findsOneWidget);
-    expect(find.text('发布方资料'), findsNothing);
-    await _openMaterialTools(tester);
-    await _ensureVisible(tester, find.text('发布方资料'));
-    expect(find.text('发布方资料'), findsOneWidget);
-    expect(find.text('竞标资料'), findsOneWidget);
-    expect(find.text('成交确认'), findsOneWidget);
-    expect(find.text('需补充'), findsOneWidget);
-    expect(find.text('有待确认资料'), findsOneWidget);
-    expect(find.text('2 项暂不可读'), findsOneWidget);
-    expect(find.text('效果图确认'), findsNothing);
-    expect(find.text('项目理解确认'), findsNothing);
-    expect(find.text('合同确认'), findsNothing);
+      expect(find.text('资料确认 · 8项'), findsOneWidget);
+      expect(find.text('发布方资料'), findsNothing);
+      await _openMaterialTools(tester);
+      await _ensureVisible(tester, find.text('发布方资料'));
+      expect(find.text('发布方资料'), findsOneWidget);
+      expect(find.text('竞标资料'), findsOneWidget);
+      expect(find.text('成交确认'), findsNothing);
+      expect(find.text('需补充'), findsOneWidget);
+      expect(find.text('有待确认资料'), findsOneWidget);
+      expect(find.text('效果图确认'), findsNothing);
+      expect(find.text('项目理解确认'), findsNothing);
+      expect(find.text('合同确认'), findsNothing);
 
-    await _expandWorkbenchGroup(tester, '发布方资料');
-    expect(find.text('效果图确认'), findsOneWidget);
-    expect(find.text('尺寸图 / 施工图确认'), findsOneWidget);
-    expect(find.text('材质图 / 材料样板确认'), findsOneWidget);
-    expect(find.text('设备物料清单确认'), findsOneWidget);
-    expect(find.text('服务清单确认'), findsOneWidget);
-    expect(find.text('未提交'), findsOneWidget);
+      await _expandWorkbenchGroup(tester, '发布方资料');
+      expect(find.text('效果图确认'), findsOneWidget);
+      expect(find.text('尺寸图 / 施工图确认'), findsOneWidget);
+      expect(find.text('材质图 / 材料样板确认'), findsOneWidget);
+      expect(find.text('设备物料清单确认'), findsOneWidget);
+      expect(find.text('服务清单确认'), findsOneWidget);
+      expect(find.text('未提交'), findsOneWidget);
 
-    await _expandWorkbenchGroup(tester, '竞标资料');
-    expect(find.text('项目理解确认'), findsOneWidget);
-    expect(find.text('报价表确认'), findsOneWidget);
-    expect(find.text('进度安排确认'), findsOneWidget);
+      await _expandWorkbenchGroup(tester, '竞标资料');
+      expect(find.text('项目理解确认'), findsOneWidget);
+      expect(find.text('报价表确认'), findsOneWidget);
+      expect(find.text('进度安排确认'), findsOneWidget);
 
-    await _expandWorkbenchGroup(tester, '成交确认');
-    expect(find.text('合同确认'), findsOneWidget);
-    expect(find.text('最终成交金额确认'), findsOneWidget);
-    expect(find.text('报价确认'), findsNothing);
-    expect(find.text('排期确认'), findsNothing);
-    expect(find.text('工艺材质确认'), findsNothing);
-    expect(find.widgetWithText(TextButton, '确认'), findsNothing);
-    expect(find.text('发送确认卡'), findsNothing);
-  });
+      expect(find.text('成交确认'), findsNothing);
+      expect(find.text('合同确认'), findsNothing);
+      expect(find.text('最终成交金额确认'), findsNothing);
+      expect(find.text('报价确认'), findsNothing);
+      expect(find.text('排期确认'), findsNothing);
+      expect(find.text('工艺材质确认'), findsNothing);
+      expect(find.widgetWithText(TextButton, '确认'), findsNothing);
+      expect(find.text('发送确认卡'), findsNothing);
+    },
+  );
 
   testWidgets(
     'confirming publisher material turns entry green from server response',
     (WidgetTester tester) async {
       final handlers = _baseHandlers();
+      var effectState = 'pending_review';
+      handlers['GET /api/app/message/project-communication/workbench'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _workbenchPayload(effectState: effectState),
+          );
       handlers['POST /api/app/message/project-communication/workbench/material-review'] =
           (AppApiRequest request) async {
             final body = request.body! as Map<String, Object?>;
             expect(body['entryKey'], 'publisher_effect_image_review');
+            effectState = 'confirmed';
             return AppApiResponse(
               statusCode: 202,
               uri: request.uri,
@@ -584,11 +592,19 @@ void main() {
     WidgetTester tester,
   ) async {
     final handlers = _baseHandlers();
+    var quoteState = 'pending_review';
+    handlers['GET /api/app/message/project-communication/workbench'] =
+        (AppApiRequest request) async => AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: _workbenchPayload(quoteState: quoteState),
+        );
     handlers['POST /api/app/message/project-communication/workbench/material-review'] =
         (AppApiRequest request) async {
           final body = request.body! as Map<String, Object?>;
           expect(body['entryKey'], 'bid_quote_sheet_review');
           expect(body['reviewAction'], 'request_supplement');
+          quoteState = 'needs_supplement';
           return AppApiResponse(
             statusCode: 202,
             uri: request.uri,
@@ -628,7 +644,9 @@ void main() {
     await tester.pumpWidget(_buildPage(transport));
     await tester.pumpAndSettle();
     await _enterProjectCommunication(tester);
-    await _expandWorkbenchGroup(tester, '成交确认');
+    await _ensureVisible(tester, find.widgetWithText(OutlinedButton, '后续承接'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '后续承接'));
+    await tester.pumpAndSettle();
     await _ensureVisible(tester, find.text('最终成交金额确认'));
     await tester.tap(find.text('最终成交金额确认'));
     await tester.pumpAndSettle();

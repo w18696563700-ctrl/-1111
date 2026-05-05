@@ -40,9 +40,10 @@ const List<_ProjectAlbumCategoryOption> _projectAlbumCategories =
     ];
 
 class _ProjectAlbumSection extends StatefulWidget {
-  const _ProjectAlbumSection({required this.projectId});
+  const _ProjectAlbumSection({required this.projectId, this.threadId});
 
   final String projectId;
+  final String? threadId;
 
   @override
   State<_ProjectAlbumSection> createState() => _ProjectAlbumSectionState();
@@ -55,6 +56,9 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
   bool _uploading = false;
   String? _feedback;
   final Set<String> _deletingPhotoIds = <String>{};
+  final Set<String> _loadingPreviewPhotoIds = <String>{};
+  final Map<String, ProjectCommunicationFilePreviewAccessView> _previewCache =
+      <String, ProjectCommunicationFilePreviewAccessView>{};
 
   @override
   void initState() {
@@ -239,7 +243,48 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
     await _load(feedback: '已删除相册照片。');
   }
 
-  void _previewPhoto(ProjectAlbumPhotoView photo) {
+  Future<void> _previewPhoto(ProjectAlbumPhotoView photo) async {
+    final threadId = widget.threadId?.trim();
+    if (threadId == null || threadId.isEmpty) {
+      _showPhotoFallbackDialog(photo, '当前相册缺少项目沟通 threadId，请从项目沟通页进入后再预览真实图片。');
+      return;
+    }
+    var access = _previewCache[photo.fileAssetId];
+    if (access == null) {
+      setState(() => _loadingPreviewPhotoIds.add(photo.photoId));
+      final result = await CounterpartConversationConsumerLayer.instance
+          .loadProjectCommunicationFilePreviewAccess(
+            projectId: widget.projectId,
+            threadId: threadId,
+            fileAssetId: photo.fileAssetId,
+          );
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loadingPreviewPhotoIds.remove(photo.photoId));
+      access = result.data;
+      if (result.state != AppPageState.content || access == null) {
+        _showPhotoFallbackDialog(photo, result.message ?? '当前照片暂不可预览。');
+        return;
+      }
+      _previewCache[photo.fileAssetId] = access;
+    }
+    final accessUrl = access.accessUrl?.trim();
+    if (access.canPreview &&
+        access.previewType == 'image' &&
+        accessUrl != null &&
+        accessUrl.isNotEmpty) {
+      await _showProjectAttachmentNetworkImagePreviewDialog(
+        context,
+        fileName: access.fileName ?? photo.caption ?? photo.fileAssetId,
+        imageUrl: accessUrl,
+      );
+      return;
+    }
+    _showPhotoFallbackDialog(photo, access.fallbackReason ?? '当前照片暂不支持在线预览。');
+  }
+
+  void _showPhotoFallbackDialog(ProjectAlbumPhotoView photo, String message) {
     showDialog<void>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
@@ -257,7 +302,7 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
             if (photo.caption != null)
               _DetailLine(label: '说明', value: photo.caption!),
             const SizedBox(height: 8),
-            const Text('当前列表只返回 FileAsset 真值；签名图片地址可在后续 file/access 扩展中接入。'),
+            Text(message),
           ],
         ),
         actions: <Widget>[
@@ -353,7 +398,8 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
               child: _ProjectAlbumPhotoTile(
                 photo: photo,
                 deleting: _deletingPhotoIds.contains(photo.photoId),
-                onPreview: () => _previewPhoto(photo),
+                loadingPreview: _loadingPreviewPhotoIds.contains(photo.photoId),
+                onPreview: () => unawaited(_previewPhoto(photo)),
                 onDelete: () => _deletePhoto(photo),
               ),
             ),
@@ -367,12 +413,14 @@ class _ProjectAlbumPhotoTile extends StatelessWidget {
   const _ProjectAlbumPhotoTile({
     required this.photo,
     required this.deleting,
+    required this.loadingPreview,
     required this.onPreview,
     required this.onDelete,
   });
 
   final ProjectAlbumPhotoView photo;
   final bool deleting;
+  final bool loadingPreview;
   final VoidCallback onPreview;
   final VoidCallback onDelete;
 
@@ -409,9 +457,14 @@ class _ProjectAlbumPhotoTile extends StatelessWidget {
               runSpacing: 10,
               children: <Widget>[
                 OutlinedButton.icon(
-                  onPressed: onPreview,
-                  icon: const Icon(Icons.visibility_outlined),
-                  label: const Text('预览'),
+                  onPressed: loadingPreview ? null : onPreview,
+                  icon: loadingPreview
+                      ? const SizedBox.square(
+                          dimension: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.visibility_outlined),
+                  label: Text(loadingPreview ? '预览中' : '预览'),
                 ),
                 OutlinedButton.icon(
                   onPressed: deleting ? null : onDelete,

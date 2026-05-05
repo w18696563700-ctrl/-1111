@@ -47,14 +47,6 @@ class _ProjectCommunicationWorkbenchSectionState
             .where((entry) => entry.group == 'bid_materials')
             .toList(growable: false),
       ),
-      _WorkbenchGroupData(
-        key: 'deal_confirmation',
-        title: '成交确认',
-        summary: '合同与最终金额确认入口；入口不代表已确认',
-        entries: view.entries
-            .where((entry) => entry.group == 'deal_confirmation')
-            .toList(growable: false),
-      ),
     ];
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -250,7 +242,6 @@ class _WorkbenchGroup extends StatelessWidget {
     return switch (key) {
       'publisher_materials' => Icons.article_outlined,
       'bid_materials' => Icons.assignment_outlined,
-      'deal_confirmation' => Icons.workspace_premium_outlined,
       _ => Icons.assignment_turned_in_outlined,
     };
   }
@@ -294,8 +285,7 @@ class _WorkbenchGroupTiles extends StatelessWidget {
   }
 
   bool _wideEntry(ProjectCommunicationWorkbenchEntryView entry) {
-    return entry.entryKey == 'publisher_equipment_material_list_review' ||
-        entry.entryKey == 'final_confirmed_amount_confirmation';
+    return entry.entryKey == 'publisher_equipment_material_list_review';
   }
 }
 
@@ -372,8 +362,6 @@ class _WorkbenchEntryTile extends StatelessWidget {
       'bid_project_understanding_review' => Icons.psychology_outlined,
       'bid_quote_sheet_review' => Icons.receipt_long_outlined,
       'bid_schedule_plan_review' => Icons.event_note_outlined,
-      'contract_confirmation' => Icons.description_outlined,
-      'final_confirmed_amount_confirmation' => Icons.price_check_outlined,
       _ => Icons.assignment_outlined,
     };
   }
@@ -394,4 +382,12 @@ class _WorkbenchEntryTile extends StatelessWidget {
   ) {
     return _workbenchStatusStyle(theme, _workbenchEntryState(entry));
   }
+}
+
+bool _isMaterialWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
+  return entry.group == 'publisher_materials' || entry.group == 'bid_materials';
+}
+
+bool _isDealWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
+  return entry.group == 'deal_confirmation';
 }

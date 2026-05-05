@@ -541,8 +541,11 @@ class _CounterpartConversationPageState
 
   void _openFirstPendingWorkbenchEntry(Set<String> groups) {
     final entries = _workbenchResult?.data?.entries;
+    final wantsDealConfirmation = groups.contains('deal_confirmation');
     if (entries == null) {
-      _showSnack('资料确认单状态暂不可读，请稍后重试。');
+      _showSnack(
+        wantsDealConfirmation ? '后续承接状态暂不可读，请稍后重试。' : '资料确认单状态暂不可读，请稍后重试。',
+      );
       return;
     }
     ProjectCommunicationWorkbenchEntryView? entry;
@@ -558,7 +561,7 @@ class _CounterpartConversationPageState
       }
     }
     if (entry == null) {
-      _showSnack('当前没有可处理的资料确认项。');
+      _showSnack(wantsDealConfirmation ? '当前没有可处理的成交确认项。' : '当前没有可处理的资料确认项。');
       return;
     }
     _openWorkbenchEntry(entry);
@@ -1043,7 +1046,8 @@ class _CounterpartConversationPageState
                   loadingWorkbench: _loadingWorkbench,
                   workbenchResult: _workbenchResult,
                   onOpenNameAccess: _openBusinessCard,
-                  onOpenOrder: () => _openOrderDetail(selectedGroup),
+                  onOpenContinuation: () =>
+                      _openContinuationPanel(selectedGroup),
                   onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
                   onOpenWorkbenchEntry: _openWorkbenchEntry,
                 ),
@@ -1174,10 +1178,128 @@ class _CounterpartConversationPageState
     Navigator.of(context).pushNamed(orderTarget.routeLocation);
   }
 
+  void _openContinuationPanel(CounterpartConversationProjectGroupView group) {
+    final entries =
+        _workbenchResult?.data?.entries
+            .where(_isDealWorkbenchEntry)
+            .toList(growable: false) ??
+        const <ProjectCommunicationWorkbenchEntryView>[];
+    final amountEntry = entries
+        .where(
+          (entry) => entry.entryKey == 'final_confirmed_amount_confirmation',
+        )
+        .firstOrNull;
+    final contractEntry = entries
+        .where((entry) => entry.entryKey == 'contract_confirmation')
+        .firstOrNull;
+    final orderCard = _firstBusinessCard(group, 'project_order');
+    final orderTarget =
+        orderCard?.detailRouteTarget ?? _fallbackOrderTarget(group);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    '后续承接',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '订单种子、合同文件、最终成交金额分层承接；最终金额只以双方确认后的 Server finalConfirmedAmount 为准。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _ContinuationActionTile(
+                    icon: Icons.price_check_outlined,
+                    title: '最终成交金额确认',
+                    summary: amountEntry == null
+                        ? '当前暂无可处理的最终成交确认入口。'
+                        : '双方确认完成后才形成正式合同金额。',
+                    badgeCount:
+                        amountEntry?.badgeCount ??
+                        group.businessTodoSummary.dealConfirmationPendingCount,
+                    enabled: amountEntry != null,
+                    disabledReason: amountEntry?.disabledReason,
+                    onTap: amountEntry == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(_openDealConfirmationEntry(amountEntry));
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  _ContinuationActionTile(
+                    icon: Icons.description_outlined,
+                    title: '合同文件',
+                    summary: contractEntry == null
+                        ? '合同文件入口暂未开放，不能替代最终金额确认。'
+                        : '合同文件是成交确认依据之一。',
+                    badgeCount: contractEntry?.badgeCount ?? 0,
+                    enabled: contractEntry != null,
+                    disabledReason: contractEntry?.disabledReason,
+                    onTap: contractEntry == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(
+                              _openDealConfirmationEntry(contractEntry),
+                            );
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  _ContinuationActionTile(
+                    icon: Icons.receipt_long_outlined,
+                    title: '订单种子',
+                    summary: orderTarget == null
+                        ? '当前暂无订单种子，不能当作正式成交。'
+                        : '订单种子金额只是中标报价参考，不是最终合同金额。',
+                    enabled: orderTarget != null,
+                    onTap: orderTarget == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            Navigator.of(
+                              context,
+                            ).pushNamed(orderTarget.routeLocation);
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _openProjectAlbum(CounterpartConversationProjectGroupView group) {
-    Navigator.of(
-      context,
-    ).pushNamed(ExhibitionRoutes.projectAlbumWithProjectId(group.projectId));
+    final threadId = _threadResult?.data?.threadId.trim();
+    final base = Uri.parse(
+      ExhibitionRoutes.projectAlbumWithProjectId(group.projectId),
+    );
+    final location = base
+        .replace(
+          queryParameters: <String, String>{
+            ...base.queryParameters,
+            if (threadId != null && threadId.isNotEmpty) 'threadId': threadId,
+          },
+        )
+        .toString();
+    Navigator.of(context).pushNamed(location);
   }
 
   void _preloadImageAttachmentPreviews(
@@ -1514,6 +1636,14 @@ class _CounterpartConversationPageState
             ),
           );
     });
+    final currentDetail = _result?.data;
+    final currentThread = _threadResult?.data;
+    final selectedGroup = currentDetail == null
+        ? null
+        : _selectedProjectGroup(currentDetail);
+    if (currentThread != null && selectedGroup != null) {
+      unawaited(_loadProjectWorkbench(selectedGroup, currentThread));
+    }
     _showSnack(reviewAction == 'confirm' ? '已确认。' : '反馈已提交。');
     return true;
   }

@@ -944,7 +944,7 @@ class _SelectedProjectBusinessEntrypoints extends StatefulWidget {
     required this.loadingWorkbench,
     required this.workbenchResult,
     required this.onOpenNameAccess,
-    required this.onOpenOrder,
+    required this.onOpenContinuation,
     required this.onOpenProjectAlbum,
     required this.onOpenWorkbenchEntry,
   });
@@ -956,7 +956,7 @@ class _SelectedProjectBusinessEntrypoints extends StatefulWidget {
   final CounterpartConversationResult<ProjectCommunicationWorkbenchView>?
   workbenchResult;
   final ValueChanged<CounterpartConversationBusinessCardView> onOpenNameAccess;
-  final VoidCallback onOpenOrder;
+  final VoidCallback onOpenContinuation;
   final VoidCallback onOpenProjectAlbum;
   final ValueChanged<ProjectCommunicationWorkbenchEntryView>
   onOpenWorkbenchEntry;
@@ -979,6 +979,7 @@ class _SelectedProjectBusinessEntrypointsState
     final todoSummary =
         widget.workbenchResult?.data?.businessTodoSummary ??
         widget.group.businessTodoSummary;
+    final hasContinuation = widget.orderId != null || _dealEntries.isNotEmpty;
     final theme = Theme.of(context);
     return Material(
       color: theme.colorScheme.surface,
@@ -1023,6 +1024,7 @@ class _SelectedProjectBusinessEntrypointsState
                       badgeCount:
                           todoSummary.bidParticipationReviewPendingCount,
                       enabled: widget.participationCard != null,
+                      disabledReason: '当前没有待处理的参与审核。',
                       onPressed: widget.participationCard == null
                           ? null
                           : () => widget.onOpenNameAccess(
@@ -1035,10 +1037,12 @@ class _SelectedProjectBusinessEntrypointsState
                     child: _ProjectToolEntryButton(
                       icon: Icons.receipt_long_outlined,
                       label: '后续承接',
-                      enabled: widget.orderId != null,
-                      onPressed: widget.orderId == null
-                          ? null
-                          : widget.onOpenOrder,
+                      badgeCount: todoSummary.dealConfirmationPendingCount,
+                      enabled: hasContinuation,
+                      disabledReason: '当前项目暂无订单、合同或最终成交确认入口。',
+                      onPressed: hasContinuation
+                          ? widget.onOpenContinuation
+                          : null,
                     ),
                   ),
                   const SizedBox(width: 8),
@@ -1068,7 +1072,16 @@ class _SelectedProjectBusinessEntrypointsState
     if (result?.state != AppPageState.content || data == null) {
       return null;
     }
-    return data.entries.length;
+    return data.entries.where(_isMaterialWorkbenchEntry).length;
+  }
+
+  List<ProjectCommunicationWorkbenchEntryView> get _dealEntries {
+    final result = widget.workbenchResult;
+    final data = result?.data;
+    if (result?.state != AppPageState.content || data == null) {
+      return const <ProjectCommunicationWorkbenchEntryView>[];
+    }
+    return data.entries.where(_isDealWorkbenchEntry).toList(growable: false);
   }
 }
 
@@ -1080,6 +1093,7 @@ class _ProjectToolEntryButton extends StatelessWidget {
     required this.onPressed,
     this.selected = false,
     this.badgeCount = 0,
+    this.disabledReason,
   });
 
   final IconData icon;
@@ -1088,6 +1102,7 @@ class _ProjectToolEntryButton extends StatelessWidget {
   final VoidCallback? onPressed;
   final bool selected;
   final int badgeCount;
+  final String? disabledReason;
 
   @override
   Widget build(BuildContext context) {
@@ -1097,7 +1112,13 @@ class _ProjectToolEntryButton extends StatelessWidget {
       children: <Widget>[
         Positioned.fill(
           child: OutlinedButton(
-            onPressed: enabled ? onPressed : null,
+            onPressed: enabled
+                ? onPressed
+                : disabledReason == null
+                ? null
+                : () => ScaffoldMessenger.of(
+                    context,
+                  ).showSnackBar(SnackBar(content: Text(disabledReason!))),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
               side: BorderSide(
@@ -1137,6 +1158,104 @@ class _ProjectToolEntryButton extends StatelessWidget {
             child: _BusinessTodoBadge(count: badgeCount, compact: true),
           ),
       ],
+    );
+  }
+}
+
+class _ContinuationActionTile extends StatelessWidget {
+  const _ContinuationActionTile({
+    required this.icon,
+    required this.title,
+    required this.summary,
+    required this.enabled,
+    required this.onTap,
+    this.badgeCount = 0,
+    this.disabledReason,
+  });
+
+  final IconData icon;
+  final String title;
+  final String summary;
+  final bool enabled;
+  final VoidCallback? onTap;
+  final int badgeCount;
+  final String? disabledReason;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final foreground = enabled
+        ? theme.colorScheme.onSurface
+        : theme.colorScheme.onSurfaceVariant;
+    return Material(
+      color: enabled
+          ? theme.colorScheme.surfaceContainerLowest
+          : theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.55),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: BorderSide(color: theme.colorScheme.outlineVariant),
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: enabled
+            ? onTap
+            : disabledReason == null
+            ? null
+            : () => ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text(disabledReason!))),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            children: <Widget>[
+              Stack(
+                clipBehavior: Clip.none,
+                children: <Widget>[
+                  Icon(icon, color: foreground),
+                  if (badgeCount > 0)
+                    Positioned(
+                      right: -8,
+                      top: -8,
+                      child: _BusinessTodoBadge(
+                        count: badgeCount,
+                        compact: true,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      title,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        color: foreground,
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                    const SizedBox(height: 3),
+                    Text(
+                      summary,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: theme.colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
