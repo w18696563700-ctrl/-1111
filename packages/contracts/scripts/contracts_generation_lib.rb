@@ -511,6 +511,14 @@ module ContractsGeneration
     workbench_entry_keys = schemas.fetch('ProjectCommunicationWorkbenchEntryKey').fetch('enum')
     workbench_groups = schemas.fetch('ProjectCommunicationWorkbenchGroup').fetch('enum')
     material_review_states = schemas.fetch('ProjectCommunicationMaterialReviewState').fetch('enum')
+    chat_lock_reason_codes = schemas.fetch('ProjectCommunicationChatAvailability')
+      .fetch('properties')
+      .fetch('lockReasonCode')
+      .fetch('enum')
+    chat_required_next_actions = schemas.fetch('ProjectCommunicationChatAvailability')
+      .fetch('properties')
+      .fetch('requiredNextAction')
+      .fetch('enum')
     rating_entry_states = schemas.fetch('RatingEntryReadModel')
       .fetch('properties')
       .fetch('state')
@@ -735,6 +743,60 @@ module ContractsGeneration
       export type ProjectCommunicationMaterialReviewState =
         (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_STATES)[number];
 
+      export const PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES = #{json_array(chat_lock_reason_codes)} as const;
+      export type ProjectCommunicationChatLockReasonCode =
+        (typeof PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES)[number];
+
+      export const PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS = #{json_array(chat_required_next_actions)} as const;
+      export type ProjectCommunicationChatRequiredNextAction =
+        (typeof PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS)[number];
+
+      export interface ProjectCommunicationBusinessTodoSummary {
+        bidParticipationReviewPendingCount: number;
+        publisherMaterialReviewPendingCount: number;
+        bidMaterialReviewPendingCount: number;
+        dealConfirmationPendingCount: number;
+        totalPendingCount: number;
+      }
+
+      export interface ProjectCommunicationChatAvailability {
+        canSendMessage: boolean;
+        lockReasonCode: ProjectCommunicationChatLockReasonCode;
+        lockReasonText: string | null;
+        requiredNextAction: ProjectCommunicationChatRequiredNextAction;
+      }
+
+      export interface ProjectCommunicationThreadReadModel {
+        projectId: string;
+        threadId: string;
+        counterpartOrganizationId?: string | null;
+        chatAvailability: ProjectCommunicationChatAvailability;
+        generatedAt: string;
+      }
+
+      export interface CounterpartConversationProjectGroup {
+        projectId: string;
+        threadId: string;
+        projectDisplayTitle: string;
+        titleVisibility: string;
+        projectState: string;
+        latestActivityAt: string;
+        projectRelation?: string | null;
+        projectUnreadCount?: number;
+        hasProjectUnread?: boolean;
+        businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
+        cards: Array<Record<string, unknown>>;
+      }
+
+      export interface CounterpartConversationDetailResponse {
+        conversationId: string;
+        counterpart: Record<string, unknown>;
+        summary: Record<string, unknown>;
+        focusProjectId: string;
+        latestActivityAt: string;
+        projectGroups: CounterpartConversationProjectGroup[];
+      }
+
       export interface ProjectCommunicationWorkbenchRouteTarget {
         actionKey: string;
         canonicalPath: string;
@@ -767,6 +829,8 @@ module ContractsGeneration
         latestFeedbackText: string | null;
         latestFeedbackAt: string | null;
         reviewedAt: string | null;
+        badgeCount: number;
+        disabledReason: string | null;
         routeTarget: ProjectCommunicationWorkbenchRouteTarget | null;
         truthAnchor: ProjectCommunicationWorkbenchTruthAnchor;
       }
@@ -775,6 +839,8 @@ module ContractsGeneration
         projectId: string;
         threadId: string;
         viewerRole: 'publisher' | 'bidder' | 'unknown';
+        businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
+        chatAvailability: ProjectCommunicationChatAvailability;
         entries: ProjectCommunicationWorkbenchEntry[];
         generatedAt: string;
       }
