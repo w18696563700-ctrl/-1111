@@ -13,6 +13,7 @@ import { ProjectOrderEntity } from '../order/entities/project-order.entity';
 import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
 import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
 import { ProjectAuthenticitySincerityFreezeFeedbackEntity } from '../p0_pay/entities/project-authenticity-sincerity-freeze-feedback.entity';
+import { ForumPostEntity } from '../forum/entities/forum-post.entity';
 import { ProjectAttachmentFileAccessController } from './project-attachment-file-access.controller';
 import { ProjectAttachmentFileAccessService } from './project-attachment-file-access.service';
 import { ProjectAttachmentController } from './project-attachment.controller';
@@ -45,6 +46,7 @@ import { ProjectWriteService } from './project-write.service';
       ProjectPublicResourceEntity,
       ProjectExitCaseEntity,
       FileAssetEntity,
+      ForumPostEntity,
       BidEntity,
       ProjectOrderEntity,
       InquiryQuoteDepositEntity,

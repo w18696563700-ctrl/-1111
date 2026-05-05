@@ -12,6 +12,7 @@ import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ProjectAttachmentEntity } from './entities/project-attachment.entity';
 import { ProjectPublicResourceEntity } from './entities/project-public-resource.entity';
 import { ProjectEntity } from './entities/project.entity';
+import { ForumPostEntity } from '../forum/entities/forum-post.entity';
 import {
   fileAccessInvalid,
   fileAccessNotFound,
@@ -22,6 +23,7 @@ import {
 type FileAccessMode = 'preview' | 'download';
 type FileAccessScope = 'owner_private' | 'bid_material' | 'public_resource';
 
+const FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE = 'forum_draft_attachment';
 const OWNER_PRIVATE_VISIBILITY = 'owner_private';
 const APP_SHARED_VISIBILITY = 'app_shared';
 const PUBLIC_RESOURCE_SCOPE = 'public_resource';
@@ -65,6 +67,8 @@ export class ProjectAttachmentFileAccessService {
     private readonly projectRepository: Repository<ProjectEntity>,
     @InjectRepository(ProjectPublicResourceEntity)
     private readonly publicResourceRepository: Repository<ProjectPublicResourceEntity>,
+    @InjectRepository(ForumPostEntity)
+    private readonly forumPostRepository: Repository<ForumPostEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly publicUrlService: UploadPublicUrlService,
@@ -95,6 +99,14 @@ export class ProjectAttachmentFileAccessService {
     const attachment = await this.attachmentRepository.findOneBy({ fileAssetId: fileAsset.id });
     if (!attachment || this.normalizeText(attachment.visibility) !== OWNER_PRIVATE_VISIBILITY) {
       if (!hasExplicitAccessScope) {
+        const forumPostAccess = await this.tryGetForumPostAttachmentAccess(
+          fileAsset,
+          mode,
+          currentSession
+        );
+        if (forumPostAccess) {
+          return forumPostAccess;
+        }
         const publicResourceAccess = await this.tryGetPublicResourceAccess(
           fileAsset,
           mode,
@@ -182,6 +194,46 @@ export class ProjectAttachmentFileAccessService {
     };
   }
 
+  private async tryGetForumPostAttachmentAccess(
+    fileAsset: FileAssetEntity,
+    mode: FileAccessMode,
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>
+  ) {
+    if (this.normalizeText(fileAsset.businessType) !== FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE) {
+      return null;
+    }
+
+    const post = await this.forumPostRepository
+      .createQueryBuilder('post')
+      .where('post.state = :state', { state: 'published' })
+      .andWhere('post.attachment_file_asset_ids @> :fileAssetIds', {
+        fileAssetIds: JSON.stringify([fileAsset.id])
+      })
+      .orderBy('post.published_at', 'DESC')
+      .getOne();
+    if (!post) {
+      return null;
+    }
+
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    this.ensureForumAttachmentFileAsset(fileAsset, post);
+
+    const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
+    if (!accessUrl) {
+      throw fileAccessUnavailable('Current forum attachment access URL is unavailable.');
+    }
+
+    return {
+      fileAssetId: fileAsset.id,
+      mode,
+      accessUrl,
+      fileName: this.toFileName(fileAsset.objectKey),
+      mimeType: this.normalizeMimeType(fileAsset.mimeType),
+      expiresAt: this.buildExpiresAt(),
+      contentLengthBytes: fileAsset.size
+    };
+  }
+
   private isReadablePublicResource(
     resource: ProjectPublicResourceEntity,
     fileAsset: FileAssetEntity
@@ -205,6 +257,16 @@ export class ProjectAttachmentFileAccessService {
       this.normalizeText(fileAsset.organizationId) !== this.normalizeText(project.organizationId)
     ) {
       throw fileAccessUnavailable('Current FileAsset truth is not aligned with the project attachment.');
+    }
+  }
+
+  private ensureForumAttachmentFileAsset(fileAsset: FileAssetEntity, post: ForumPostEntity) {
+    if (
+      this.normalizeText(fileAsset.businessType) !== FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE ||
+      this.normalizeText(fileAsset.businessId) !== this.normalizeText(post.sourceDraftId) ||
+      this.normalizeText(fileAsset.organizationId) !== this.normalizeText(post.organizationId)
+    ) {
+      throw fileAccessUnavailable('Current FileAsset truth is not aligned with the forum post attachment.');
     }
   }
 
@@ -291,6 +353,12 @@ export class ProjectAttachmentFileAccessService {
       ? this.config.uploadSignedUrlExpiresSeconds
       : 0;
     return new Date(Date.now() + Math.max(expiresSeconds, 0) * 1000).toISOString();
+  }
+
+  private toFileName(objectKey: string) {
+    const segments = objectKey.split('/');
+    const fileName = segments[segments.length - 1]?.trim();
+    return fileName || objectKey;
   }
 
   private normalizeText(value: string | null | undefined) {

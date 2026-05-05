@@ -198,22 +198,62 @@ class _ForumDetailImageTile extends StatelessWidget {
       return Image.network(
         accessUrl,
         fit: BoxFit.cover,
+        frameBuilder:
+            (
+              BuildContext context,
+              Widget child,
+              int? frame,
+              bool wasSynchronouslyLoaded,
+            ) {
+              if (wasSynchronouslyLoaded || frame != null) {
+                return child;
+              }
+              return _loadingPlaceholder(theme);
+            },
+        loadingBuilder:
+            (
+              BuildContext context,
+              Widget child,
+              ImageChunkEvent? loadingProgress,
+            ) {
+              if (loadingProgress == null) {
+                return child;
+              }
+              return _loadingPlaceholder(theme);
+            },
         errorBuilder: (_, _, _) => _placeholder(theme, '点击重试', failed: true),
       );
     }
     if (loading) {
-      return DecoratedBox(
-        decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow),
-        child: const Center(
-          child: SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2.4),
-          ),
-        ),
-      );
+      return _loadingPlaceholder(theme);
     }
     return _placeholder(theme, failed ? '点击重试' : '点击加载');
+  }
+
+  Widget _loadingPlaceholder(ThemeData theme) {
+    return DecoratedBox(
+      decoration: BoxDecoration(color: theme.colorScheme.surfaceContainerLow),
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            const SizedBox(
+              width: 22,
+              height: 22,
+              child: CircularProgressIndicator(strokeWidth: 2.4),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '图片读取中',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _placeholder(ThemeData theme, String label, {bool failed = false}) {

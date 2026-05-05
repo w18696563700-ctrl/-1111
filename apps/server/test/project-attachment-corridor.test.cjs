@@ -92,6 +92,32 @@ function createAttachment(overrides = {}) {
   };
 }
 
+function createForumPost(overrides = {}) {
+  return {
+    id: 'forum-post-1',
+    postNo: 'FORUM-POST-1',
+    organizationId: 'buyer-org',
+    authorUserId: 'buyer-user',
+    authorActorId: 'buyer-user',
+    authorOrganizationId: 'buyer-org',
+    sourceDraftId: 'forum-draft-1',
+    topicId: 'expo-entry',
+    title: '论坛图片帖',
+    body: '论坛图片帖正文',
+    excerpt: '论坛图片帖正文',
+    attachmentFileAssetIds: ['forum-asset-1'],
+    state: 'published',
+    commentCount: 0,
+    lastModerationCaseId: null,
+    publishedAt: new Date('2026-05-05T10:00:00.000Z'),
+    hiddenAt: null,
+    archivedAt: null,
+    createdAt: new Date('2026-05-05T10:00:00.000Z'),
+    updatedAt: new Date('2026-05-05T10:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 function createPublicResource(overrides = {}) {
   return {
     resourceId: 'public-resource-1',
@@ -116,6 +142,7 @@ function createAttachmentHarness(overrides = {}) {
     projectMissing: overrides.projectMissing ?? false,
     fileAssets: structuredClone(overrides.fileAssets ?? [createFileAsset()]),
     attachments: structuredClone(overrides.attachments ?? []),
+    forumPosts: structuredClone(overrides.forumPosts ?? []),
     publicResources: structuredClone(overrides.publicResources ?? []),
     auditLogs: structuredClone(overrides.auditLogs ?? []),
   };
@@ -244,6 +271,39 @@ function createAttachmentHarness(overrides = {}) {
       };
     }
 
+    if (entity?.name === 'ForumPostEntity') {
+      return {
+        createQueryBuilder() {
+          const query = { state: null, fileAssetIds: [] };
+          return {
+            where(_expression, parameters = {}) {
+              query.state = parameters.state ?? null;
+              return this;
+            },
+            andWhere(_expression, parameters = {}) {
+              query.fileAssetIds = JSON.parse(parameters.fileAssetIds ?? '[]');
+              return this;
+            },
+            orderBy() {
+              return this;
+            },
+            async getOne() {
+              return (
+                draft.forumPosts.find((item) => {
+                  if (query.state && item.state !== query.state) {
+                    return false;
+                  }
+                  return query.fileAssetIds.every((fileAssetId) =>
+                    item.attachmentFileAssetIds.includes(fileAssetId),
+                  );
+                }) ?? null
+              );
+            },
+          };
+        },
+      };
+    }
+
     throw new Error(`unexpected repository ${entity?.name ?? 'unknown'}`);
   }
 
@@ -268,6 +328,7 @@ function createAttachmentHarness(overrides = {}) {
       attachmentRepository: getRepository({ name: 'ProjectAttachmentEntity' }, state),
       fileAssetRepository: getRepository({ name: 'FileAssetEntity' }, state),
       publicResourceRepository: getRepository({ name: 'ProjectPublicResourceEntity' }, state),
+      forumPostRepository: getRepository({ name: 'ForumPostEntity' }, state),
     },
     auditService: {
       async record(input, _context, manager) {
@@ -370,6 +431,7 @@ function createFileAccessService(harness, overrides = {}) {
     harness.repositories.attachmentRepository,
     harness.repositories.projectRepository,
     harness.repositories.publicResourceRepository,
+    harness.repositories.forumPostRepository,
     {
       async verifyCurrentSessionContext() {
         return {
@@ -771,6 +833,46 @@ test('file/access returns owner-private signed access without exposing objectKey
   assert.equal(result.contentLengthBytes, 2048);
   assert.deepEqual(publicUrlCalls, ['object-1']);
   assert.ok(Date.parse(result.expiresAt) > Date.now());
+  assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
+test('file/access returns signed access for published forum post attachment', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    fileAssets: [
+      createFileAsset({
+        id: 'forum-asset-1',
+        uploadSessionId: 'forum-upload-1',
+        businessType: 'forum_draft_attachment',
+        businessId: 'forum-draft-1',
+        fileKind: 'media',
+        objectKey: 'forum_draft_attachment/media/2026/05/forum-image.jpg',
+        mimeType: 'image/jpeg',
+      }),
+    ],
+    forumPosts: [createForumPost()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/forum-image';
+      },
+    },
+  });
+
+  const result = await service.getAccess(
+    { fileAssetId: 'forum-asset-1', mode: 'preview' },
+    createContext('file-access-forum-post-image'),
+  );
+
+  assert.equal(result.fileAssetId, 'forum-asset-1');
+  assert.equal(result.mode, 'preview');
+  assert.equal(result.accessUrl, 'https://signed.example.test/forum-image');
+  assert.equal(result.fileName, 'forum-image.jpg');
+  assert.equal(result.mimeType, 'image/jpeg');
+  assert.equal(result.contentLengthBytes, 2048);
+  assert.deepEqual(publicUrlCalls, ['forum_draft_attachment/media/2026/05/forum-image.jpg']);
   assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
 });
 
