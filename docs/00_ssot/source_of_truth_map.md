@@ -15,6 +15,10 @@ layer: L0 SSOT
 
 ## Current Round Registrations
 
+### 2026-05-05 Forum Route Matrix Alignment V1
+
+- [forum_route_matrix_alignment_v1_truth_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/forum_route_matrix_alignment_v1_truth_freeze_addendum.md) is the formal `L0` truth freeze for aligning the Forum app-facing route matrix across OpenAPI, generated contracts, BFF source routes, and Server source routes, freezing the `30` active `/api/app/forum/*` routes, confirming `author/follow` as the active V1 follow command, superseding historical `topic/follow` references unless separately reopened, materializing `draft/delete` across BFF and Server source, and blocking UI redesign, cloud deployment, database writes, and runtime-success claims in this round.
+
 ### 2026-05-05 Message Building Business Transit And Deal Confirmation V1
 
 - [message_building_business_transit_and_deal_confirmation_v1_truth_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/message_building_business_transit_and_deal_confirmation_v1_truth_freeze_addendum.md) is the formal `L0` truth freeze for using the messages building as a project-scoped business transit station from bid participation application through publisher review, publisher material confirmation, bid submit quote and three attachments, publisher quote/material confirmation, chat unlock, and final deal-confirmation entry handoff, freezing the split between ordinary unread and Server-owned business todo badges, requiring Server-owned chat availability for send lock/unlock, preserving `finalConfirmedAmount` under `/api/app/project/{projectId}/deal-confirmations` as the only final amount truth, and blocking Flutter/BFF-local red points, chat-text amount confirmation, payment, service-fee charge, deposit, settlement, invoice, wallet, fulfillment, acceptance, rating, and dispute expansion.

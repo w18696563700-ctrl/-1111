@@ -436,6 +436,9 @@ codes:
   - code: FORUM_DRAFT_UNAVAILABLE
     owner: Server
     meaning: Forum draft truth is absent or not accessible to the current actor.
+  - code: FORUM_DRAFT_INVALID
+    owner: Server
+    meaning: Forum draft save, detail, or owner-continuation request is missing required minimum fields or violates the current draft input boundary.
   - code: FORUM_PUBLISH_INVALID
     owner: Server
     meaning: Forum publish request is missing required minimum fields or references for the current publish handoff.
@@ -451,9 +454,15 @@ codes:
   - code: FORUM_INTERACTION_UNAVAILABLE
     owner: Server
     meaning: Forum interaction capability is intentionally not connected to a real Server-owned write chain in the current bounded stage.
+  - code: FORUM_INTERACTION_INBOX_INVALID
+    owner: Server
+    meaning: Forum interaction inbox request is missing required minimum query fields or uses an unsupported inbox tab.
   - code: FORUM_REPORT_INVALID
     owner: Server
     meaning: Forum report-submit request is missing required minimum fields, uses an unsupported target type, or uses a reason code outside the current bounded report contract.
+  - code: FORUM_REPORT_UNAVAILABLE
+    owner: Server
+    meaning: Forum report ticket truth is absent or not accessible to the current reporter.
   - code: FORUM_SEARCH_INVALID
     owner: Server
     meaning: Forum search request is missing the minimum required query fields or violates the current search input boundary.

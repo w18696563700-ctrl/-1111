@@ -2023,6 +2023,60 @@ paths:
             Controlled invalid-state response. If the current post or parent
             comment does not allow reply creation, the server must return
             `FORUM_COMMENT_INVALID_STATE`.
+  /api/app/forum/post/edit:
+    post:
+      tags: [Forum]
+      summary: Enter own forum post edit continuation via canonical path for Flutter App
+      operationId: enterAppForumPostEdit
+      requestBody:
+        required: true
+        description: >
+          Minimum owner-only post-edit continuation handoff. This path creates
+          or resumes a Server-owned edit draft and must not mutate public post
+          truth directly from Flutter App.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumPostOwnerActionRequest'
+      responses:
+        "202":
+          description: Minimum owner post-edit continuation accepted response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumPostEditContinuationResponse'
+        "404":
+          description: >
+            Controlled owner-post unavailable response. When the current actor
+            cannot continue editing the requested post, the server must return
+            `FORUM_DRAFT_UNAVAILABLE`.
+  /api/app/forum/post/delete:
+    post:
+      tags: [Forum]
+      summary: Delete own forum post via canonical path for Flutter App
+      operationId: deleteAppForumPost
+      requestBody:
+        required: true
+        description: >
+          Minimum owner-only post delete command. The Server owns the archived
+          state and audit boundary; Flutter App only receives continuation
+          feedback for the current owner asset surface.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumPostOwnerActionRequest'
+      responses:
+        "202":
+          description: Minimum owner post-delete accepted response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumPostDeleteContinuationResponse'
+        "404":
+          description: >
+            Controlled owner-post unavailable response. When the current actor
+            cannot delete the requested post, the server must return
+            `FORUM_DRAFT_UNAVAILABLE`.
   /api/app/forum/post/like:
     post:
       tags: [Forum]
@@ -2059,20 +2113,24 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForumToggleAcceptedResponse'
-  /api/app/forum/topic/follow:
+  /api/app/forum/author/follow:
     post:
       tags: [Forum]
-      summary: Toggle topic follow via canonical path for Flutter App
-      operationId: toggleAppForumTopicFollow
+      summary: Toggle public author follow via canonical path for Flutter App
+      operationId: toggleAppForumAuthorFollow
       requestBody:
         required: true
+        description: >
+          Current route-matrix alignment freezes source truth as public author
+          follow. Topic follow remains a future extension and is not an active
+          app-facing route in this matrix.
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/ForumTopicFollowToggleRequest'
+              $ref: '#/components/schemas/ForumAuthorFollowToggleRequest'
       responses:
         "202":
-          description: Minimum topic-follow toggle accepted response.
+          description: Minimum author-follow toggle accepted response.
           content:
             application/json:
               schema:
@@ -2163,6 +2221,32 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForumDraftListResponse'
+  /api/app/forum/draft/detail:
+    get:
+      tags: [Forum]
+      summary: Forum draft detail canonical path for Flutter App
+      operationId: getAppForumDraftDetail
+      parameters:
+        - in: query
+          name: draftId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Minimum forum draft-detail carrier for continuing an existing
+            Server-owned draft or owner post-edit draft. This path must not
+            expose autosave history, moderation internals, or attachment object
+            storage truth.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumDraftDetailResponse'
+        "404":
+          description: >
+            Controlled draft-unavailable response. When the current actor cannot
+            access the draft, the server must return `FORUM_DRAFT_UNAVAILABLE`.
   /api/app/forum/draft/delete:
     post:
       tags: [Forum]
@@ -2311,6 +2395,31 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForumMyBookmarksResponse'
+  /api/app/forum/me/likes:
+    get:
+      tags: [Forum]
+      summary: My forum likes canonical path for Flutter App
+      operationId: getAppForumMyLikes
+      parameters:
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: pageSize
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: Minimum my-likes projection for the profile forum assets surface.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumMyLikesResponse'
   /api/app/forum/me/follows:
     get:
       tags: [Forum]
@@ -2336,6 +2445,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ForumMyFollowsResponse'
+  /api/app/forum/reports/mine:
+    get:
+      tags: [Forum]
+      summary: My forum report tickets canonical path for Flutter App
+      operationId: getAppForumMyReports
+      parameters:
+        - in: query
+          name: cursor
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: pageSize
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 50
+      responses:
+        "200":
+          description: >
+            Minimum my-report-ticket projection for the profile forum assets
+            surface. This path is read-only for reporters and does not expose
+            moderation console actions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumMyReportsResponse'
+  /api/app/forum/reports/mine/{ticketId}:
+    get:
+      tags: [Forum]
+      summary: My forum report ticket detail canonical path for Flutter App
+      operationId: getAppForumMyReportDetail
+      parameters:
+        - in: path
+          name: ticketId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Minimum my-report-ticket detail projection. This path must not add
+            reporter-side adjudication, escalation, or operator governance
+            actions.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumMyReportTicket'
+        "404":
+          description: >
+            Controlled report-unavailable response. When the current actor
+            cannot read the report ticket, the server must return
+            `FORUM_REPORT_UNAVAILABLE`.
+  /api/app/forum/report/submit:
+    post:
+      tags: [Forum]
+      summary: Submit forum content report via canonical path for Flutter App
+      operationId: submitAppForumReport
+      requestBody:
+        required: true
+        description: >
+          Minimum forum report-submit request only. This path accepts reporter
+          input for post/comment targets and must not become an Admin moderation
+          console or reporter-side adjudication workflow.
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForumReportSubmitRequest'
+      responses:
+        "202":
+          description: Minimum forum report-submit accepted response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ForumReportSubmitResponse'
+        "400":
+          description: >
+            Controlled forum report request error. Invalid target or reason
+            input must return `FORUM_REPORT_INVALID`.
   /api/app/forum/interaction/inbox:
     get:
       tags: [Forum]
@@ -9023,6 +9212,7 @@ components:
       enum:
         - topic
         - reply
+        - topic_edit
       description: >
         Current minimum draft-kind set consumed by the Flutter App forum draft
         surfaces.
@@ -9180,6 +9370,44 @@ components:
         publishedAt:
           type: string
           format: date-time
+    ForumMyPostItem:
+      type: object
+      required:
+        - postId
+        - title
+        - topicId
+        - topicTitle
+        - excerpt
+        - state
+        - publishedAt
+        - updatedAt
+        - canEdit
+        - canDelete
+      description: >
+        Minimum owner post asset projection for `forum/me/posts` only.
+      properties:
+        postId:
+          type: string
+        title:
+          type: string
+        topicId:
+          type: string
+        topicTitle:
+          type: string
+        excerpt:
+          type: string
+        state:
+          $ref: '#/components/schemas/ForumPostState'
+        publishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        canEdit:
+          type: boolean
+        canDelete:
+          type: boolean
     ForumDraftCard:
       type: object
       required:
@@ -9266,6 +9494,7 @@ components:
         - content
         - attachmentRefs
         - publishedAt
+        - engagement
       description: >
         Minimum forum post detail read projection only. This model freezes one
         post body plus confirmed attachment references and must not become edit
@@ -9290,6 +9519,8 @@ components:
         publishedAt:
           type: string
           format: date-time
+        engagement:
+          $ref: '#/components/schemas/ForumEngagementSummary'
         viewerHasLiked:
           type:
             - boolean
@@ -9449,6 +9680,7 @@ components:
         - organizationName
         - publicPostCount
         - publicCommentCount
+        - viewerFollowsAuthor
       description: >
         Minimum public author profile projection. This is not profile editing
         truth, DM truth, follow truth, or organization governance truth.
@@ -9471,6 +9703,8 @@ components:
         publicCommentCount:
           type: integer
           minimum: 0
+        viewerFollowsAuthor:
+          type: boolean
     ForumAuthorPostCard:
       type: object
       required:
@@ -9551,13 +9785,13 @@ components:
           enum:
             - add
             - remove
-    ForumTopicFollowToggleRequest:
+    ForumAuthorFollowToggleRequest:
       type: object
       required:
-        - topicId
+        - authorId
         - action
       properties:
-        topicId:
+        authorId:
           type: string
         action:
           type: string
@@ -9573,6 +9807,77 @@ components:
         targetId:
           type: string
         state:
+          type: string
+        viewerHasLiked:
+          type:
+            - boolean
+            - 'null'
+        viewerHasBookmarked:
+          type:
+            - boolean
+            - 'null'
+        viewerFollowsAuthor:
+          type:
+            - boolean
+            - 'null'
+        likeCount:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+    ForumPostOwnerActionRequest:
+      type: object
+      required:
+        - postId
+      properties:
+        postId:
+          type: string
+    ForumPostEditContinuationResponse:
+      type: object
+      required:
+        - draftId
+        - targetPostId
+        - state
+        - status
+        - message
+      description: >
+        Minimum owner post-edit continuation response. It carries only the
+        Server-owned edit draft anchor and user-facing continuation status.
+      properties:
+        draftId:
+          type: string
+        targetPostId:
+          type: string
+        state:
+          $ref: '#/components/schemas/ForumDraftState'
+        status:
+          type: string
+          enum:
+            - accepted_edit_draft
+            - resumed_active_edit_draft
+        message:
+          type: string
+    ForumPostDeleteContinuationResponse:
+      type: object
+      required:
+        - postId
+        - state
+        - archivedAt
+        - message
+      description: >
+        Minimum owner post-delete continuation response. It must not expose a
+        separate moderation or audit workflow to Flutter App.
+      properties:
+        postId:
+          type: string
+        state:
+          type: string
+          enum:
+            - archived
+        archivedAt:
+          type: string
+          format: date-time
+        message:
           type: string
     ForumDraftSaveRequest:
       type: object
@@ -9631,6 +9936,47 @@ components:
           type: string
           enum:
             - deleted
+    ForumDraftDetailResponse:
+      type: object
+      required:
+        - draftId
+        - draftType
+        - targetPostId
+        - topicId
+        - title
+        - body
+        - attachmentFileAssetIds
+        - state
+        - updatedAt
+      description: >
+        Minimum forum draft detail response for continuing a Server-owned
+        draft or own-post edit draft.
+      properties:
+        draftId:
+          type: string
+        draftType:
+          type: string
+        targetPostId:
+          type:
+            - string
+            - 'null'
+        topicId:
+          type:
+            - string
+            - 'null'
+        title:
+          type: string
+        body:
+          type: string
+        attachmentFileAssetIds:
+          type: array
+          items:
+            type: string
+        state:
+          $ref: '#/components/schemas/ForumDraftState'
+        updatedAt:
+          type: string
+          format: date-time
     ForumFeedResponse:
       type: object
       required:
@@ -9808,7 +10154,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/ForumPostCard'
+            $ref: '#/components/schemas/ForumMyPostItem'
         page:
           $ref: '#/components/schemas/ForumCursorPageInfo'
     ForumMyCommentsResponse:
@@ -9835,6 +10181,57 @@ components:
             $ref: '#/components/schemas/ForumPostCard'
         page:
           $ref: '#/components/schemas/ForumCursorPageInfo'
+    ForumMyLikesResponse:
+      type: object
+      required:
+        - items
+        - page
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForumPostCard'
+        page:
+          $ref: '#/components/schemas/ForumCursorPageInfo'
+    ForumFollowedAuthorItem:
+      type: object
+      required:
+        - authorId
+        - displayName
+        - avatarUrl
+        - organizationName
+        - followedAt
+        - publicPostCount
+        - publicCommentCount
+        - viewerFollowsAuthor
+      description: >
+        Minimum followed-author asset projection for `forum/me/follows` only.
+        This is author follow truth, not topic follow truth or generic social
+        graph truth.
+      properties:
+        authorId:
+          type: string
+        displayName:
+          type: string
+        avatarUrl:
+          type:
+            - string
+            - 'null'
+        organizationName:
+          type:
+            - string
+            - 'null'
+        followedAt:
+          type: string
+          format: date-time
+        publicPostCount:
+          type: integer
+          minimum: 0
+        publicCommentCount:
+          type: integer
+          minimum: 0
+        viewerFollowsAuthor:
+          type: boolean
     ForumMyFollowsResponse:
       type: object
       required:
@@ -9844,9 +10241,157 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/ForumTopicCard'
+            $ref: '#/components/schemas/ForumFollowedAuthorItem'
         page:
           $ref: '#/components/schemas/ForumCursorPageInfo'
+    ForumReportTargetType:
+      type: string
+      enum:
+        - post
+        - comment
+    ForumReportReasonCode:
+      type: string
+      enum:
+        - ad_or_solicitation
+        - abuse_or_insult
+        - flamebait_or_conflict
+        - spam_or_flood
+        - plagiarism_or_repost
+        - other
+    ForumReportStatus:
+      type: string
+      enum:
+        - submitted
+        - pending_review
+        - resolved
+        - rejected
+        - closed
+    ForumReportSubmitRequest:
+      type: object
+      required:
+        - targetType
+        - targetId
+        - reasonCode
+      properties:
+        targetType:
+          $ref: '#/components/schemas/ForumReportTargetType'
+        targetId:
+          type: string
+        reasonCode:
+          $ref: '#/components/schemas/ForumReportReasonCode'
+        reasonDetail:
+          type:
+            - string
+            - 'null'
+    ForumReportSubmitResponse:
+      type: object
+      required:
+        - reportTicketId
+        - status
+        - target
+        - reason
+        - submittedAt
+      properties:
+        reportTicketId:
+          type: string
+        status:
+          $ref: '#/components/schemas/ForumReportStatus'
+        target:
+          type: object
+          required:
+            - targetType
+            - targetId
+          properties:
+            targetType:
+              $ref: '#/components/schemas/ForumReportTargetType'
+            targetId:
+              type: string
+        reason:
+          type: object
+          required:
+            - reasonCode
+            - reasonDetail
+          properties:
+            reasonCode:
+              $ref: '#/components/schemas/ForumReportReasonCode'
+            reasonDetail:
+              type:
+                - string
+                - 'null'
+        submittedAt:
+          type: string
+          format: date-time
+    ForumReportTargetSnapshot:
+      type: object
+      additionalProperties:
+        type:
+          - string
+          - 'null'
+    ForumMyReportTicket:
+      type: object
+      required:
+        - ticketId
+        - targetType
+        - targetTypeLabel
+        - targetId
+        - targetSummary
+        - reasonCode
+        - reasonLabel
+        - reasonDetail
+        - status
+        - statusLabel
+        - submittedAt
+        - updatedAt
+        - targetSnapshot
+      properties:
+        ticketId:
+          type: string
+        targetType:
+          $ref: '#/components/schemas/ForumReportTargetType'
+        targetTypeLabel:
+          type: string
+        targetId:
+          type: string
+        targetSummary:
+          type: string
+        reasonCode:
+          $ref: '#/components/schemas/ForumReportReasonCode'
+        reasonLabel:
+          type: string
+        reasonDetail:
+          type:
+            - string
+            - 'null'
+        status:
+          $ref: '#/components/schemas/ForumReportStatus'
+        statusLabel:
+          type: string
+        submittedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        targetSnapshot:
+          $ref: '#/components/schemas/ForumReportTargetSnapshot'
+    ForumMyReportsResponse:
+      type: object
+      required:
+        - items
+        - count
+        - traceId
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/ForumMyReportTicket'
+        count:
+          type: integer
+          minimum: 0
+        traceId:
+          type:
+            - string
+            - 'null'
     ForumInteractionInboxItem:
       type: object
       required:
