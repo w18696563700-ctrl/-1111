@@ -215,6 +215,93 @@ void main() {
     },
   );
 
+  testWidgets(
+    'forum drafts publish button completes the publish continuation',
+    (WidgetTester tester) async {
+      await tester.pumpWidget(
+        buildForumTestApp(initialRoute: ExhibitionRoutes.forumDrafts),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('本地进场夜班经验分享'), findsOneWidget);
+      expect(find.text('发布帖子'), findsOneWidget);
+
+      await tester.tap(find.text('发布帖子'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('帖子详情'), findsOneWidget);
+      expect(find.text('正式帖子正文'), findsOneWidget);
+      expect(find.text('发布帖子'), findsNothing);
+    },
+  );
+
+  testWidgets('forum my published post delete removes the card after confirm', (
+    WidgetTester tester,
+  ) async {
+    var deleted = false;
+
+    await tester.pumpWidget(
+      buildForumTestAppWithOverrides(
+        initialRoute: ExhibitionRoutes.forumMePosts,
+        forumHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/me/posts': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'items': <Object?>[
+                      <String, Object?>{
+                        'postId': 'post-delete-1',
+                        'title': '可删除已发布帖子',
+                        'topicId': 'expo-materials',
+                        'topicTitle': '布展进场',
+                        'excerpt': '这是一条可删的已发布帖子。',
+                        'state': 'published',
+                        'publishedAt': '2026-03-27T09:30:00Z',
+                        'updatedAt': '2026-03-30T09:30:00Z',
+                        'canEdit': true,
+                        'canDelete': true,
+                      },
+                    ],
+                    'page': <String, Object?>{
+                      'nextCursor': null,
+                      'hasMore': false,
+                    },
+                  },
+                );
+              },
+              'POST /api/app/forum/post/delete': (AppApiRequest request) async {
+                deleted = true;
+                return AppApiResponse(
+                  statusCode: 202,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'postId': 'post-delete-1',
+                    'state': 'archived',
+                    'archivedAt': '2026-03-30T09:57:48.523Z',
+                    'message': '帖子已删除',
+                  },
+                );
+              },
+            },
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('可删除已发布帖子'), findsOneWidget);
+    await tester.tap(find.text('删除帖子'));
+    await tester.pumpAndSettle();
+    expect(find.text('删除后，这篇帖子会从公开列表中移除，并按受控删除结果处理。是否继续？'), findsOneWidget);
+
+    await tester.tap(find.text('确认删除'));
+    await tester.pumpAndSettle();
+
+    expect(deleted, isTrue);
+    expect(find.text('可删除已发布帖子'), findsNothing);
+    expect(find.text('帖子已删除'), findsOneWidget);
+  });
+
   testWidgets('forum draft delete 404 stays Chinese and controlled', (
     WidgetTester tester,
   ) async {

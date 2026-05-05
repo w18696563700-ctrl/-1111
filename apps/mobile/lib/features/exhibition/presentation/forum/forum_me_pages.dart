@@ -422,8 +422,32 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
     setState(() => _deletingPostIds.remove(item.postId));
     _showOwnPostMessage(result.data?.message ?? result.message);
     if (result.isSuccess) {
-      _load();
+      _removeOwnedPostFromResult(item.postId);
     }
+  }
+
+  void _removeOwnedPostFromResult(String postId) {
+    final current = _postsResult;
+    if (current?.data == null) {
+      return;
+    }
+    final remaining = current!.data!.items
+        .where((ForumMyPostItemView item) => item.postId != postId)
+        .toList(growable: false);
+    setState(() {
+      _postsResult =
+          ForumReadResult<ForumPagedCollectionView<ForumMyPostItemView>>(
+            state: remaining.isEmpty
+                ? AppPageState.empty
+                : AppPageState.content,
+            method: current.method,
+            path: current.path,
+            data: ForumPagedCollectionView<ForumMyPostItemView>(
+              items: remaining,
+              page: current.data!.page,
+            ),
+          );
+    });
   }
 
   void _showOwnPostMessage(String? message) {
