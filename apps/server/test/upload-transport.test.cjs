@@ -497,6 +497,81 @@ test('upload init accepts project_album_photo images and rejects non-image truth
   );
 });
 
+test('upload init accepts forum draft media and keeps forum file truth', async () => {
+  const { service, state } = createUploadWriteHarness();
+
+  const response = await service.initUpload(
+    {
+      businessType: 'forum_draft_attachment',
+      businessId: 'draft-1',
+      fileKind: 'media',
+      mimeType: 'image/jpeg',
+      size: 128,
+      checksum: 'checksum-forum-image',
+    },
+    createRequestContext(),
+  );
+
+  assert.equal(response.businessType, 'forum_draft_attachment');
+  assert.equal(response.businessId, 'draft-1');
+  assert.equal(response.fileKind, 'media');
+  assert.equal(state.savedSessions.length, 1);
+  assert.equal(state.savedSessions[0].businessType, 'forum_draft_attachment');
+  assert.equal(state.savedSessions[0].fileKind, 'media');
+});
+
+test('upload init accepts forum draft document attachments and rejects unsafe media shape', async () => {
+  const { service, state } = createUploadWriteHarness();
+
+  const response = await service.initUpload(
+    {
+      businessType: 'forum_draft_attachment',
+      businessId: 'draft-1',
+      fileKind: '现场交付清单.pdf',
+      mimeType: 'application/pdf',
+      size: 1024,
+      checksum: 'checksum-forum-pdf',
+    },
+    createRequestContext(),
+  );
+
+  assert.equal(response.businessType, 'forum_draft_attachment');
+  assert.equal(response.fileKind, '现场交付清单.pdf');
+  assert.equal(state.savedSessions.length, 1);
+
+  await assert.rejects(
+    () =>
+      service.initUpload(
+        {
+          businessType: 'forum_draft_attachment',
+          businessId: 'draft-1',
+          fileKind: 'media',
+          mimeType: 'application/pdf',
+          size: 1024,
+          checksum: 'checksum-forum-media-pdf',
+        },
+        createRequestContext(),
+      ),
+    (error) => error?.response?.code === 'FILE_UPLOAD_INIT_INVALID',
+  );
+
+  await assert.rejects(
+    () =>
+      service.initUpload(
+        {
+          businessType: 'forum_draft_attachment',
+          businessId: 'draft-1',
+          fileKind: 'huge.pdf',
+          mimeType: 'application/pdf',
+          size: 21 * 1024 * 1024,
+          checksum: 'checksum-forum-huge-pdf',
+        },
+        createRequestContext(),
+      ),
+    (error) => error?.response?.code === 'FILE_UPLOAD_INIT_INVALID',
+  );
+});
+
 test('upload init stores verified current session truth for project uploads', async () => {
   const { service, state } = createUploadWriteHarness({
     currentSession: {
