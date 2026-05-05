@@ -9,6 +9,7 @@ import { BidParticipationRequestEntity } from '../bid_participation_request/enti
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectCommunicationMessageEntity } from '../project_communication/entities/project-communication-message.entity';
 import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
+import { ApnsPushProviderAdapter } from './apns-push-provider.adapter';
 import { AppNotificationEntity } from './entities/app-notification.entity';
 import { DevicePushTokenEntity } from './entities/device-push-token.entity';
 import { PushDeliveryAttemptEntity } from './entities/push-delivery-attempt.entity';
@@ -51,7 +52,8 @@ export class NotificationService {
     private readonly sessionVerifier: CurrentSessionVerificationService,
     private readonly presenter: NotificationPresenter,
     @InjectRepository(ProjectCommunicationThreadEntity)
-    private readonly threadRepository?: Repository<ProjectCommunicationThreadEntity>
+    private readonly threadRepository?: Repository<ProjectCommunicationThreadEntity>,
+    private readonly pushProvider: ApnsPushProviderAdapter = new ApnsPushProviderAdapter()
   ) {}
 
   async registerDeviceToken(payload: Record<string, unknown>, context: RequestContext) {
@@ -199,6 +201,7 @@ export class NotificationService {
       notificationState: 'active'
     });
     await notificationRepository.save(notification);
+    await this.recordDeliveryAttempts(notification, recipientOrganizationId, manager);
     return notification;
   }
 
@@ -284,20 +287,27 @@ export class NotificationService {
       );
       return;
     }
-    await attemptRepository.save(
-      tokens.map((token) =>
+    const attempts = [];
+    for (const token of tokens) {
+      const delivery = await this.pushProvider.deliver(token, notification);
+      if (delivery.attemptStatus === 'token_invalid') {
+        token.tokenState = 'inactive';
+        await tokenRepository.save(token);
+      }
+      attempts.push(
         attemptRepository.create({
           id: randomUUID(),
           notificationId: notification.id,
           deviceTokenId: token.id,
-          provider: token.provider,
-          attemptStatus: 'provider_unavailable',
-          errorCode: 'provider_credentials_unavailable',
-          errorMessage: 'APNs/FCM credentials are not configured for this degraded implementation path.',
+          provider: delivery.provider,
+          attemptStatus: delivery.attemptStatus,
+          errorCode: delivery.errorCode,
+          errorMessage: delivery.errorMessage,
           attemptedAt: new Date()
         })
-      )
-    );
+      );
+    }
+    await attemptRepository.save(attempts);
   }
 
   private async withRouteTargetAvailability(

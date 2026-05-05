@@ -133,6 +133,7 @@ test('bid participation request creates owner notification without project commu
   const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
   const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
   const savedNotifications = [];
+  const savedAttempts = [];
   const notificationRepository = {
     create(value) {
       return {
@@ -146,9 +147,25 @@ test('bid participation request creates owner notification without project commu
       return value;
     },
   };
+  const tokenRepository = {
+    async findBy() {
+      return [];
+    },
+  };
+  const attemptRepository = {
+    create(value) {
+      return value;
+    },
+    async save(value) {
+      savedAttempts.push(...(Array.isArray(value) ? value : [value]));
+      return value;
+    },
+  };
   const manager = {
     getRepository(entity) {
       if (String(entity?.name).includes('AppNotificationEntity')) return notificationRepository;
+      if (String(entity?.name).includes('DevicePushTokenEntity')) return tokenRepository;
+      if (String(entity?.name).includes('PushDeliveryAttemptEntity')) return attemptRepository;
       throw new Error('Unexpected repository ' + entity?.name);
     },
   };
@@ -183,6 +200,10 @@ test('bid participation request creates owner notification without project commu
     projectId: 'project-1',
     requestId: 'request-1',
   });
+  assert.equal(savedAttempts.length, 1);
+  assert.equal(savedAttempts[0].provider, 'noop');
+  assert.equal(savedAttempts[0].attemptStatus, 'skipped');
+  assert.equal(savedAttempts[0].errorCode, 'no_device_token');
 });
 
 test('notification mark read updates only actor-owned notifications and returns unread projection', async () => {
