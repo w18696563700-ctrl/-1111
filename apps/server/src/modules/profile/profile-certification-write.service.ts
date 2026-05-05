@@ -6,6 +6,7 @@ import { requireVerifiedCurrentSessionContext } from "../../shared/current-sessi
 import { RequestContext } from "../../shared/request-context";
 import { CurrentSessionVerificationService } from "../auth/current-session-verification.service";
 import { IdentityAuditLogEntity } from "../audit/identity-audit-log.entity";
+import { CreditConstraintsPostureInitializationService } from "../credit_constraints/credit-constraints-posture-initialization.service";
 import { FileAssetEntity } from "../upload/entities/file-asset.entity";
 import { CurrentActorEligibilityService } from "../organization/current-actor-eligibility.service";
 import { OrganizationCertificationEntity } from "../organization/entities/organization-certification.entity";
@@ -47,6 +48,7 @@ export class ProfileCertificationWriteService {
     private readonly certificationOcrService: ProfileCertificationOcrService,
     private readonly presenter: ProfilePresenter,
     private readonly enterpriseHubCertificationSyncService: EnterpriseHubCertificationSyncService,
+    private readonly creditConstraintsPostureInitializationService: CreditConstraintsPostureInitializationService,
   ) {}
 
   async submit(payload: Record<string, unknown>, context: RequestContext) {
@@ -172,6 +174,10 @@ export class ProfileCertificationWriteService {
       await manager
         .getRepository(OrganizationCertificationEntity)
         .save(certification);
+      if (certification.certificationStatus === "approved") {
+        await this.creditConstraintsPostureInitializationService
+          .ensureDefaultPosturesForApprovedOrganization(scope.organization.id, manager);
+      }
       await this.enterpriseHubCertificationSyncService.syncOrganizationListings(
         scope.organization.id,
         manager,
@@ -313,6 +319,10 @@ export class ProfileCertificationWriteService {
       await manager
         .getRepository(OrganizationCertificationEntity)
         .save(certification);
+      if (certification.certificationStatus === "approved") {
+        await this.creditConstraintsPostureInitializationService
+          .ensureDefaultPosturesForApprovedOrganization(scope.organization.id, manager);
+      }
       await this.enterpriseHubCertificationSyncService.syncOrganizationListings(
         scope.organization.id,
         manager,

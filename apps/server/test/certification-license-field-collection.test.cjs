@@ -51,6 +51,7 @@ test('certification submit persists the expanded formal truth fields from busine
   const savedOrganizations = [];
   const savedCertifications = [];
   const savedAudits = [];
+  const initializedPostures = [];
   const organization = {
     id: 'org-1',
     status: 'draft',
@@ -159,6 +160,20 @@ test('certification submit persists the expanded formal truth fields from busine
       },
     },
     new ProfilePresenter(),
+    {
+      async syncOrganizationListings() {},
+    },
+    {
+      async ensureDefaultPosturesForApprovedOrganization(organizationId) {
+        initializedPostures.push(organizationId);
+        return {
+          eligible: true,
+          organizationId,
+          createdFamilies: ['credit', 'deposit', 'transaction_guarantee'],
+          existingFamilies: [],
+        };
+      },
+    },
   );
 
   const result = await service.submit(
@@ -186,6 +201,7 @@ test('certification submit persists the expanded formal truth fields from busine
   assert.equal(savedCertifications[0].businessTerm, '长期');
   assert.equal(savedCertifications[0].businessScope, '展览服务');
   assert.equal(savedAudits.length, 1);
+  assert.deepEqual(initializedPostures, ['org-1']);
 });
 
 test('certification current returns the expanded formal truth fields', async () => {
@@ -222,6 +238,7 @@ test('certification current returns the expanded formal truth fields', async () 
     'legalPerson',
     'licenseFileId',
     'organizationId',
+    'personalCertification',
     'registeredCapital',
     'rejectReason',
     'submittedAt',
