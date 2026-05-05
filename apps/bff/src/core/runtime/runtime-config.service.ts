@@ -22,7 +22,7 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
 @Injectable()
 export class RuntimeConfigService {
   get appName(): string {
-    return process.env.APP_NAME ?? 'exhibition-bff';
+    return process.env.APP_NAME?.trim() || 'exhibition-bff';
   }
 
   get nodeEnv(): string {
@@ -42,7 +42,11 @@ export class RuntimeConfigService {
   }
 
   get serverBaseUrl(): string {
-    return process.env.SERVER_BASE_URL ?? 'http://127.0.0.1:3001';
+    return process.env.SERVER_BASE_URL?.trim() || 'http://127.0.0.1:3001';
+  }
+
+  get hasExplicitServerBaseUrl(): boolean {
+    return Boolean(process.env.SERVER_BASE_URL?.trim());
   }
 
   get serverGetTimeoutMs(): number {

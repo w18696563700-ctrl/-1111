@@ -248,6 +248,7 @@ export class MyProjectService {
 
   private toMyProjectListItemReadModel(result: Record<string, unknown>): MyProjectListItemReadModel {
     return {
+      projectCreatedAt: this.asNullableDateTimeString(result.projectCreatedAt),
       publicProject: this.toProjectShowcaseListItemReadModel(
         this.requireRecord(result.publicProject, 'My-project list item is missing publicProject.'),
       ),
@@ -410,6 +411,20 @@ export class MyProjectService {
       throw new Error('My-project publicProject contains an invalid date field.');
     }
     return normalized;
+  }
+
+  private asNullableDateTimeString(value: unknown) {
+    const normalized = this.asNullableString(value);
+    if (!normalized) {
+      return null;
+    }
+
+    const timestamp = Date.parse(normalized);
+    if (Number.isNaN(timestamp)) {
+      throw new Error('My-project list item contains an invalid projectCreatedAt field.');
+    }
+
+    return new Date(timestamp).toISOString();
   }
 
   private asBoolean(value: unknown, errorMessage: string) {

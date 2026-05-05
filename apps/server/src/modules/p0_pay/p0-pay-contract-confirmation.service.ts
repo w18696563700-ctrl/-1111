@@ -59,6 +59,61 @@ export class P0PayContractConfirmationService {
   ) {}
 
   async createConfirmation(taskId: string, payload: Record<string, unknown>, context: RequestContext) {
+    const result = await this.createConfirmationResult(taskId, payload, context, { chargeOnConfirmed: true });
+    return this.presenter.toContractConfirmationResponse(result);
+  }
+
+  async createProjectDealConfirmation(projectId: string, payload: Record<string, unknown>, context: RequestContext) {
+    const result = await this.createConfirmationResult(projectId, payload, context, { chargeOnConfirmed: false });
+    return this.presenter.toDealConfirmationAcceptedResponse({
+      ...result,
+      serviceFeeCalculation: this.buildDealServiceFeeCalculation(result.confirmation, result.authorization)
+    });
+  }
+
+  async getProjectDealConfirmation(projectId: string, dealConfirmationId: string, context: RequestContext) {
+    const confirmation = await this.confirmationRepository.findOneBy({
+      id: dealConfirmationId,
+      taskId: projectId
+    });
+    if (!confirmation) {
+      throw p0PayResourceUnavailable('Current deal confirmation is unavailable.');
+    }
+    const currentSession = await requireVerifiedCurrentSessionContext(context, this.currentSessionVerificationService);
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+    if (!scope) {
+      throw p0PayPermissionDenied('Current organization scope is required for deal confirmation.');
+    }
+    if (
+      scope.organization.id !== confirmation.publisherOrganizationId &&
+      scope.organization.id !== confirmation.factoryOrganizationId
+    ) {
+      throw p0PayPermissionDenied('Current organization cannot read this deal confirmation.');
+    }
+    const [authorization, charge] = await Promise.all([
+      confirmation.selectedBidId
+        ? this.authorizationRepository.findOne({
+            where: { taskId: projectId, bidId: confirmation.selectedBidId },
+            order: { updatedAt: 'DESC' }
+          })
+        : Promise.resolve(null),
+      this.chargeRepository.findOneBy({ contractConfirmationId: confirmation.id })
+    ]);
+    return this.presenter.toDealConfirmationReadModel({
+      confirmation,
+      authorization,
+      charge,
+      serviceFeeCalculation: this.buildDealServiceFeeCalculation(confirmation, authorization)
+    });
+  }
+
+  private async createConfirmationResult(
+    taskId: string,
+    payload: Record<string, unknown>,
+    context: RequestContext,
+    options: { chargeOnConfirmed: boolean }
+  ) {
     const command = this.commandParser.toContractConfirmationCommand(taskId, payload);
     this.assertFixedPriceCommand(command);
     const ownership = await this.requireContractOwnership(command, context);
@@ -73,11 +128,11 @@ export class P0PayContractConfirmationService {
     );
     if (existing) {
       const charge = await this.chargeRepository.findOneBy({ contractConfirmationId: existing.id });
-      return this.presenter.toContractConfirmationResponse({
+      return {
         confirmation: existing,
         authorization: ownership.authorization,
         charge
-      });
+      };
     }
 
     const result = await this.dataSource.transaction((manager) =>
@@ -85,10 +140,11 @@ export class P0PayContractConfirmationService {
         scopeKey,
         idempotencyKeyHash,
         requestHash,
-        context
+        context,
+        chargeOnConfirmed: options.chargeOnConfirmed
       })
     );
-    return this.presenter.toContractConfirmationResponse(result);
+    return result;
   }
 
   private async upsertConfirmation(
@@ -100,6 +156,7 @@ export class P0PayContractConfirmationService {
       idempotencyKeyHash: string;
       requestHash: string;
       context: RequestContext;
+      chargeOnConfirmed: boolean;
     }
   ) {
     const record = await this.idempotencyRecordService.findRecordInTransaction(
@@ -128,6 +185,9 @@ export class P0PayContractConfirmationService {
     });
     await this.recordConfirmationAudit(manager, confirmation, ownership, idempotency.context);
     if (confirmation.contractStatus !== 'confirmed_deal') {
+      return this.loadConfirmationResult(manager, confirmation, ownership.authorization);
+    }
+    if (!idempotency.chargeOnConfirmed) {
       return this.loadConfirmationResult(manager, confirmation, ownership.authorization);
     }
     const charge = await this.ensureCharge(manager, confirmation, ownership, idempotency.context);
@@ -475,6 +535,28 @@ export class P0PayContractConfirmationService {
       context,
       manager
     );
+  }
+
+  private buildDealServiceFeeCalculation(
+    confirmation: ContractConfirmationEntity,
+    authorization: PlatformServiceFeeAuthorizationEntity | null
+  ) {
+    const calculation = this.requireFeeRatePolicy().calculateDealServiceFee({
+      finalConfirmedAmount: confirmation.finalConfirmedAmount,
+      membershipTierSnapshot: authorization?.membershipTierSnapshot ?? 'none',
+      authorizationQuotaAmount: authorization?.authorizationQuotaAmount ?? '4000.00'
+    });
+    return {
+      ruleVersion: authorization?.feeRateRuleVersion || authorization?.ruleVersion || 'p0_pay_membership_service_fee_v1',
+      baseFeeAmount: Number(calculation.baseFeeAmount),
+      membershipTierApplied: authorization?.membershipTierSnapshot ?? null,
+      membershipDiscountRate: Number(calculation.membershipDiscountRate),
+      capAmount: Number(calculation.capAmount),
+      discountedFeeAmount: Number(calculation.finalFeeAmount),
+      finalFeeAmount: Number(calculation.finalFeeAmount),
+      pricingSnapshotHash: authorization?.feeRateSnapshotHash || authorization?.ruleSnapshotHash || '',
+      feeCalculatedAt: (authorization?.feeCalculatedAt ?? authorization?.agreedAt ?? confirmation.updatedAt).toISOString()
+    };
   }
 
   private requireFeeRatePolicy() {

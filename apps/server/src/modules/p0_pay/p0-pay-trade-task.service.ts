@@ -18,7 +18,6 @@ import { P0PayInternalTestNoFreezeService } from './p0-pay-internal-test-no-free
 import {
   PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
   PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
-  projectAuthenticitySincerityInternalTestNoFreezeEnabled,
 } from './p0-pay-internal-test-no-freeze.policy';
 import { P0PayServiceFeeRatePolicy } from './p0-pay-service-fee-rate.policy';
 import { P0PayStateActionService } from './p0-pay-state-action.service';
@@ -278,9 +277,13 @@ export class P0PayTradeTaskService {
       this.authorizationRepository.findOne({ where: { taskId: project.id }, order: { updatedAt: 'DESC' } }),
       this.depositRepository.findOne({ where: { taskId: project.id }, order: { updatedAt: 'DESC' } })
     ]);
+    const freezeFeedbackSummary =
+      await this.internalTestNoFreezeService.buildFeedbackSummary(project.id, context);
+    const hasGreenChannelFeedback =
+      freezeFeedbackSummary.myChoice === 'support_freeze' ||
+      freezeFeedbackSummary.myChoice === 'oppose_freeze';
     const internalTestNoFreezeAllowed =
-      projectAuthenticitySincerityInternalTestNoFreezeEnabled() &&
-      Boolean(deposit?.paymentOrderId) &&
+      hasGreenChannelFeedback &&
       deposit?.status !== 'paid';
     const sincerityStatus = internalTestNoFreezeAllowed
       ? PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS
@@ -290,8 +293,6 @@ export class P0PayTradeTaskService {
       : internalTestNoFreezeAllowed
         ? PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS
         : 'required';
-    const freezeFeedbackSummary =
-      await this.internalTestNoFreezeService.buildFeedbackSummary(project.id, context);
     return {
       projectId: project.id,
       pricingRuleVersion: authorization?.ruleVersion ?? deposit?.ruleVersion ?? null,
@@ -313,9 +314,7 @@ export class P0PayTradeTaskService {
           canonicalPath: `/api/app/project/${project.id}/pricing-summary`,
           params: { projectId: project.id }
         },
-        sincerityFreezePolicyNotice: projectAuthenticitySincerityInternalTestNoFreezeEnabled()
-          ? this.internalTestNoFreezeService.policyNotice
-          : null,
+        sincerityFreezePolicyNotice: this.internalTestNoFreezeService.policyNotice,
         freezeFeedbackSummary
       },
       bidServiceFeeAuthorization: authorization

@@ -6,6 +6,7 @@ import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { OrganizationCertificationEntity } from '../organization/entities/organization-certification.entity';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
+import { NotificationModule } from '../notifications/notification.module';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { BidParticipationRequestAccessService } from './bid-participation-request-access.service';
 import { BidParticipationRequestController } from './bid-participation-request.controller';
@@ -26,6 +27,7 @@ import { BidParticipationRequestEntity } from './entities/bid-participation-requ
     ]),
     AuthModule,
     OrganizationModule,
+    NotificationModule,
   ],
   controllers: [BidParticipationRequestController],
   providers: [

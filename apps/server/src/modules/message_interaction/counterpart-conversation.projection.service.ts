@@ -6,6 +6,10 @@ import {
   ProjectCommunicationUnreadQueryService,
   ProjectCommunicationUnreadStats,
 } from '../project_communication/project-communication-unread.query.service';
+import {
+  ProjectCommunicationBusinessStateService,
+  ProjectCommunicationBusinessTodoSummary,
+} from '../project_communication/project-communication-business-state.service';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
@@ -74,6 +78,8 @@ export class CounterpartConversationProjectionService {
     clarificationSource: CounterpartConversationClarificationSource,
     @Optional()
     private readonly unreadQueryService?: ProjectCommunicationUnreadQueryService,
+    @Optional()
+    private readonly businessStateService?: ProjectCommunicationBusinessStateService,
   ) {
     this.cardSources = [
       bidThreadSource,
@@ -166,8 +172,14 @@ export class CounterpartConversationProjectionService {
     });
     const conversationMap = this.groupSeedsByConversation(seeds);
 
-    return [...conversationMap.entries()]
-      .map(([conversationId, aggregate]): ConversationAggregate => {
+    const conversations = await Promise.all([...conversationMap.entries()]
+      .map(async ([conversationId, aggregate]): Promise<ConversationAggregate> => {
+        const businessTodoSummaryByProjectId =
+          await this.buildBusinessTodoSummaryMap({
+            aggregate,
+            projectMap,
+            viewerOrganizationId,
+          });
         const projectGroups = this.buildProjectGroups({
           aggregate,
           projectMap,
@@ -175,6 +187,7 @@ export class CounterpartConversationProjectionService {
           viewerOrganizationId,
           ratingEntryMap,
           unreadStatsByProjectId,
+          businessTodoSummaryByProjectId,
         });
         const focusProject = projectGroups[0];
         const latestCard = focusProject.cards[0];
@@ -199,10 +212,10 @@ export class CounterpartConversationProjectionService {
           myBidUnreadCount: unreadSummary.myBidUnreadCount,
           projectGroups,
         };
-      })
-      .sort((left, right) =>
-        right.latestActivityAt.localeCompare(left.latestActivityAt),
-      );
+      }));
+    return conversations.sort((left, right) =>
+      right.latestActivityAt.localeCompare(left.latestActivityAt),
+    );
   }
 
   private async loadCardSeeds(viewerOrganizationId: string) {
@@ -314,6 +327,7 @@ export class CounterpartConversationProjectionService {
     viewerOrganizationId: string;
     ratingEntryMap: Map<string, CounterpartConversationRatingEntryProjection>;
     unreadStatsByProjectId: Map<string, ProjectCommunicationUnreadStats>;
+    businessTodoSummaryByProjectId: Map<string, ProjectCommunicationBusinessTodoSummary>;
     nameAccessProjectionMap: Awaited<
       ReturnType<ProjectNameAccessProjectionService['buildPublicProjectionMap']>
     >;
@@ -345,6 +359,9 @@ export class CounterpartConversationProjectionService {
           projectUnreadCount: unreadStats.unreadCount,
           hasProjectUnread: unreadStats.hasUnread,
           latestUnreadMessageAt: unreadStats.latestUnreadMessageAt,
+          businessTodoSummary:
+            input.businessTodoSummaryByProjectId.get(projectId) ??
+            this.emptyBusinessTodoSummary(),
           ...(group.pricingSummary ? { pricingSummary: group.pricingSummary } : {}),
           ratingEntry:
             input.ratingEntryMap.get(
@@ -371,6 +388,35 @@ export class CounterpartConversationProjectionService {
       projectIds,
       viewerOrganizationId,
     );
+  }
+
+  private async buildBusinessTodoSummaryMap(input: {
+    aggregate: SeedConversationAggregate;
+    projectMap: Map<string, ProjectEntity>;
+    viewerOrganizationId: string;
+  }) {
+    if (!this.businessStateService) {
+      return new Map(
+        [...input.aggregate.projectGroups.keys()].map((projectId) => [
+          projectId,
+          this.emptyBusinessTodoSummary(),
+        ]),
+      );
+    }
+    const entries = await Promise.all([...input.aggregate.projectGroups.keys()].map(async (projectId) => {
+      const project = input.projectMap.get(projectId);
+      if (!project?.organizationId) {
+        return [projectId, this.emptyBusinessTodoSummary()] as const;
+      }
+      const state = await this.businessStateService.buildForPair({
+        projectId,
+        ownerOrganizationId: project.organizationId,
+        counterpartOrganizationId: input.aggregate.counterpart.organizationId,
+        viewerOrganizationId: input.viewerOrganizationId,
+      });
+      return [projectId, state.businessTodoSummary] as const;
+    }));
+    return new Map(entries);
   }
 
   private summarizeProjectGroupUnread(
@@ -416,6 +462,18 @@ export class CounterpartConversationProjectionService {
       hasUnread: false,
       latestUnreadMessageAt: null,
     };
+  }
+
+  private emptyBusinessTodoSummary(): ProjectCommunicationBusinessTodoSummary {
+    return (
+      this.businessStateService?.emptyBusinessTodoSummary() ?? {
+        bidParticipationReviewPendingCount: 0,
+        publisherMaterialReviewPendingCount: 0,
+        bidMaterialReviewPendingCount: 0,
+        dealConfirmationPendingCount: 0,
+        totalPendingCount: 0,
+      }
+    );
   }
 
   private buildCounterpartProjectDisplayTitle(input: {

@@ -108,8 +108,10 @@ test('non-archived historicalProjects bucket still follows formalCompletionStatu
 
   assert.equal(result.ongoingProjects.length, 1);
   assert.equal(result.ongoingProjects[0].publicProject.projectId, 'project-ongoing');
+  assert.equal(result.ongoingProjects[0].projectCreatedAt, '2026-04-10T07:00:00.000Z');
   assert.equal(result.historicalProjects.length, 1);
   assert.equal(result.historicalProjects[0].publicProject.projectId, 'project-history');
+  assert.equal(result.historicalProjects[0].projectCreatedAt, '2026-04-10T07:00:00.000Z');
 });
 
 test('default private progress fallback stays in ongoingProjects', async () => {

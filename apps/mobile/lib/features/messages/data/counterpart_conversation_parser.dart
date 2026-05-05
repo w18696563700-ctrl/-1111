@@ -2,6 +2,8 @@ import 'package:mobile/features/messages/data/counterpart_conversation_models.da
 import 'package:mobile/features/messages/data/messages_interaction_models.dart';
 import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
 
+const String _missingProjectContextMessage = '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
+
 CounterpartConversationDetailView parseCounterpartConversationDetail(
   Object? payload,
 ) {
@@ -48,12 +50,99 @@ ProjectCommunicationThreadView parseProjectCommunicationThread(
       map,
       'counterpartOrganizationId',
     ),
+    chatAvailability: _parseOptionalChatAvailability(map['chatAvailability']),
     threadState: _requiredString(map, 'threadState'),
     lastMessageId: _nullableString(map['lastMessageId']),
     lastMessageAt: _nullableString(map['lastMessageAt']),
     createdAt: _requiredString(map, 'createdAt'),
     updatedAt: _requiredString(map, 'updatedAt'),
   );
+}
+
+ProjectCommunicationBusinessTodoSummaryView _parseBusinessTodoSummary(
+  Object? payload,
+) {
+  final map = _requiredMap(payload, 'project communication business todo');
+  return ProjectCommunicationBusinessTodoSummaryView(
+    bidParticipationReviewPendingCount: _nonNegativeInt(
+      map['bidParticipationReviewPendingCount'],
+      'bidParticipationReviewPendingCount',
+    ),
+    publisherMaterialReviewPendingCount: _nonNegativeInt(
+      map['publisherMaterialReviewPendingCount'],
+      'publisherMaterialReviewPendingCount',
+    ),
+    bidMaterialReviewPendingCount: _nonNegativeInt(
+      map['bidMaterialReviewPendingCount'],
+      'bidMaterialReviewPendingCount',
+    ),
+    dealConfirmationPendingCount: _nonNegativeInt(
+      map['dealConfirmationPendingCount'],
+      'dealConfirmationPendingCount',
+    ),
+    totalPendingCount: _nonNegativeInt(
+      map['totalPendingCount'],
+      'totalPendingCount',
+    ),
+  );
+}
+
+ProjectCommunicationBusinessTodoSummaryView _parseOptionalBusinessTodoSummary(
+  Object? payload,
+) {
+  if (payload == null) {
+    return const ProjectCommunicationBusinessTodoSummaryView(
+      bidParticipationReviewPendingCount: 0,
+      publisherMaterialReviewPendingCount: 0,
+      bidMaterialReviewPendingCount: 0,
+      dealConfirmationPendingCount: 0,
+      totalPendingCount: 0,
+    );
+  }
+  return _parseBusinessTodoSummary(payload);
+}
+
+ProjectCommunicationChatAvailabilityView _parseChatAvailability(
+  Object? payload,
+) {
+  final map = _requiredMap(payload, 'project communication chat availability');
+  final rawLockReasonCode = _nullableString(map['lockReasonCode']);
+  return ProjectCommunicationChatAvailabilityView(
+    canSendMessage: _requiredBool(map, 'canSendMessage'),
+    lockReasonCode: rawLockReasonCode == null
+        ? null
+        : _enumValue(rawLockReasonCode, const <String>{
+            'bid_participation_review_pending',
+            'publisher_material_confirmation_pending',
+            'bid_submission_pending',
+            'bid_material_confirmation_pending',
+            'deal_confirmation_pending',
+          }, 'lockReasonCode'),
+    lockReasonText: _nullableString(map['lockReasonText']),
+    requiredNextAction:
+        _enumValue(_requiredString(map, 'requiredNextAction'), const <String>{
+          'review_bid_participation',
+          'confirm_publisher_materials',
+          'submit_bid_materials',
+          'confirm_bid_materials',
+          'open_deal_confirmation',
+          'none',
+        }, 'requiredNextAction'),
+  );
+}
+
+ProjectCommunicationChatAvailabilityView _parseOptionalChatAvailability(
+  Object? payload,
+) {
+  if (payload == null) {
+    return const ProjectCommunicationChatAvailabilityView(
+      canSendMessage: false,
+      lockReasonCode: null,
+      lockReasonText: '当前项目沟通状态正在同步，请稍后重试。',
+      requiredNextAction: 'none',
+    );
+  }
+  return _parseChatAvailability(payload);
 }
 
 ProjectCommunicationMessageListView parseProjectCommunicationMessages(
@@ -189,6 +278,10 @@ ProjectCommunicationWorkbenchView parseProjectCommunicationWorkbench(
       'bidder',
       'unknown',
     }, 'viewerRole'),
+    businessTodoSummary: _parseOptionalBusinessTodoSummary(
+      map['businessTodoSummary'],
+    ),
+    chatAvailability: _parseOptionalChatAvailability(map['chatAvailability']),
     entries: _requiredList(map, 'entries')
         .map<ProjectCommunicationWorkbenchEntryView>(
           parseProjectCommunicationWorkbenchEntry,
@@ -223,8 +316,9 @@ parseProjectCommunicationMaterialReviewResponse(Object? payload) {
   );
 }
 
-ProjectCommunicationWorkbenchEntryView
-parseProjectCommunicationWorkbenchEntry(Object? payload) {
+ProjectCommunicationWorkbenchEntryView parseProjectCommunicationWorkbenchEntry(
+  Object? payload,
+) {
   final map = _requiredMap(payload, 'project communication workbench entry');
   final group = _enumValue(_requiredString(map, 'group'), const {
     'publisher_materials',
@@ -283,6 +377,8 @@ parseProjectCommunicationWorkbenchEntry(Object? payload) {
       'blocked',
     }, 'actionState'),
     attachmentCount: _requiredInt(map, 'attachmentCount'),
+    badgeCount: _optionalNonNegativeInt(map['badgeCount'], 'badgeCount'),
+    disabledReason: _nullableString(map['disabledReason']),
     sourceFiles: _parseWorkbenchSourceFiles(map['sourceFiles']),
     latestFeedbackText: _nullableString(map['latestFeedbackText']),
     latestFeedbackAt: _nullableString(map['latestFeedbackAt']),
@@ -300,7 +396,10 @@ List<ProjectCommunicationWorkbenchSourceFileView> _parseWorkbenchSourceFiles(
   }
   return _requiredList(<String, Object?>{'sourceFiles': payload}, 'sourceFiles')
       .map<ProjectCommunicationWorkbenchSourceFileView>((item) {
-        final map = _requiredMap(item, 'project communication workbench source file');
+        final map = _requiredMap(
+          item,
+          'project communication workbench source file',
+        );
         return ProjectCommunicationWorkbenchSourceFileView(
           fileAssetId: _requiredString(map, 'fileAssetId'),
           fileName: _requiredString(map, 'fileName'),
@@ -479,6 +578,9 @@ CounterpartConversationProjectGroupView _parseProjectGroup(Object? payload) {
     ),
     hasProjectUnread:
         _optionalBool(map['hasProjectUnread'], 'hasProjectUnread') ?? false,
+    businessTodoSummary: _parseOptionalBusinessTodoSummary(
+      map['businessTodoSummary'],
+    ),
     orderSummary: _parseOrderSummary(
       map['orderSummary'] ??
           map['order'] ??
@@ -794,6 +896,13 @@ int _optionalNonNegativeInt(Object? value, String field) {
   throw FormatException('field "$field" must be a non-negative int');
 }
 
+int _nonNegativeInt(Object? value, String field) {
+  if (value is int && value >= 0) {
+    return value;
+  }
+  throw FormatException('field "$field" must be a non-negative int');
+}
+
 String _enumValue(String value, Set<String> allowed, String context) {
   if (!allowed.contains(value)) {
     throw FormatException('$context returned unsupported value "$value"');
@@ -803,16 +912,14 @@ String _enumValue(String value, Set<String> allowed, String context) {
 
 Map<String, String> _stringMap(Object? payload) {
   if (payload is! Map) {
-    throw const FormatException('route params must be an object');
+    throw const FormatException(_missingProjectContextMessage);
   }
   final result = <String, String>{};
   for (final MapEntry<Object?, Object?> entry in payload.entries) {
     final key = '${entry.key}'.trim();
     final value = entry.value;
     if (key.isEmpty || value is! String || value.trim().isEmpty) {
-      throw const FormatException(
-        'route params must contain non-empty strings',
-      );
+      throw const FormatException(_missingProjectContextMessage);
     }
     result[key] = value.trim();
   }

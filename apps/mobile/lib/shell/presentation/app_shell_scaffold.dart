@@ -65,17 +65,24 @@ class AppShellScaffold extends StatelessWidget {
           ),
         ),
     ];
-    final hideRootExhibitionAppBar =
-        currentBuilding == AppBuilding.exhibition &&
+    final suppressMessagesRootBack =
+        currentBuilding == AppBuilding.messages &&
         titleOverride == null &&
-        !canPop;
+        titleContent == null;
+    final allowBack = canPop && !suppressMessagesRootBack;
+    final hideRootAppBar =
+        (currentBuilding == AppBuilding.exhibition ||
+            currentBuilding == AppBuilding.messages) &&
+        titleOverride == null &&
+        titleContent == null &&
+        !allowBack;
 
     return Scaffold(
-      appBar: hideRootExhibitionAppBar
+      appBar: hideRootAppBar
           ? null
           : AppBar(
               automaticallyImplyLeading: false,
-              leading: canPop
+              leading: allowBack
                   ? IconButton(
                       icon: const Icon(Icons.arrow_back_ios_new_rounded),
                       onPressed: () {
@@ -98,7 +105,7 @@ class AppShellScaffold extends StatelessWidget {
               ],
             ),
           ),
-          if (canPop)
+          if (allowBack)
             Positioned(
               left: 0,
               top: 0,
@@ -327,8 +334,7 @@ class _ShellNavigationIcon extends StatelessWidget {
         Positioned(
           right: -10,
           top: -6,
-          child: Semantics(
-            label: '消息未处理摘要 $label',
+          child: ExcludeSemantics(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: theme.colorScheme.error,

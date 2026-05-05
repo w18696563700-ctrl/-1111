@@ -6,7 +6,7 @@ extension _MyBidWorkspaceSupport on _MyProjectListPageState {
       return;
     }
 
-    setState(() => _myBidLoading = true);
+    _setMyBidLoading(true);
     final result = await ExhibitionConsumerLayer.instance.loadMyBidList(
       forceRefresh: forceRefresh,
     );
@@ -14,10 +14,7 @@ extension _MyBidWorkspaceSupport on _MyProjectListPageState {
       return;
     }
 
-    setState(() {
-      _myBidResult = result;
-      _myBidLoading = false;
-    });
+    _finishMyBidLoad(result);
   }
 
   Widget _buildMyBidWorkspaceSection(BuildContext context) {
@@ -78,7 +75,7 @@ extension _MyBidWorkspaceSupport on _MyProjectListPageState {
                     highlight: true,
                   ),
                   _DetailLine(
-                    label: '报价金额',
+                    label: '竞标报价',
                     value: _currencyText(item['quoteAmount']),
                     highlight: true,
                   ),

@@ -226,15 +226,20 @@ String? _counterpartConversationRouteLocation(Map<String, String> routeParams) {
   }
   final conversationId = routeParams['conversationId'];
   final projectId = routeParams['projectId'];
+  final threadId = routeParams['threadId'];
   if (conversationId == null ||
       conversationId.trim().isEmpty ||
       projectId == null ||
       projectId.trim().isEmpty) {
     return 'routeTarget.routeParams conversationId and projectId must be non-empty';
   }
+  if (threadId != null && threadId.trim().isEmpty) {
+    return 'routeTarget.routeParams threadId must be non-empty when provided';
+  }
   return ExhibitionRoutes.counterpartConversationWithIds(
     conversationId: conversationId,
     projectId: projectId,
+    threadId: threadId,
   );
 }
 

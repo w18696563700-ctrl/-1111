@@ -1,7 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:mobile/shared/ui/app_visual_tokens.dart';
 
-enum AppStatusTone { neutral, brand, warning, success, danger }
+enum AppStatusTone {
+  neutral,
+  brand,
+  warning,
+  success,
+  danger,
+  info,
+  pending,
+  disabled,
+  unknown,
+}
 
 class AppPageHeader extends StatelessWidget {
   const AppPageHeader({
@@ -403,6 +413,26 @@ class AppBottomSafePadding extends StatelessWidget {
       background: AppVisualTokens.dangerSoft,
       border: const Color(0xFFEBC2BD),
       foreground: const Color(0xFFA13B34),
+    ),
+    AppStatusTone.info => (
+      background: const Color(0xFFEAF3FF),
+      border: const Color(0xFFBBD4F2),
+      foreground: const Color(0xFF245C97),
+    ),
+    AppStatusTone.pending => (
+      background: const Color(0xFFFFF7E8),
+      border: const Color(0xFFF0D09B),
+      foreground: const Color(0xFF8A5A10),
+    ),
+    AppStatusTone.disabled => (
+      background: const Color(0xFFF0F0EF),
+      border: const Color(0xFFD6D3CE),
+      foreground: AppVisualTokens.textTertiary,
+    ),
+    AppStatusTone.unknown => (
+      background: const Color(0xFFF7F4F0),
+      border: AppVisualTokens.borderSoft,
+      foreground: AppVisualTokens.textTertiary,
     ),
     AppStatusTone.neutral => (
       background: const Color(0xFFF8F7F5),

@@ -2117,10 +2117,8 @@ void main() {
 
       expect(find.text('项目沟通'), findsOneWidget);
 
-      await _scrollAndTap(
-        tester,
-        find.widgetWithText(FilledButton, '进入项目沟通').first,
-      );
+      await tester.tap(find.text('杭州搭建公司').first);
+      await tester.pumpAndSettle();
       expect(find.text('展览项目 1'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(selectedBottomDestinationIndex(tester), 1);
@@ -2129,7 +2127,7 @@ void main() {
         tester,
         find.widgetWithText(FilledButton, '进入沟通').first,
       );
-      expect(find.text('返回项目列表'), findsOneWidget);
+      expect(find.byTooltip('返回项目列表'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
 
       await tester.tap(
@@ -2138,7 +2136,7 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(find.text('返回项目列表'), findsNothing);
+      expect(find.byTooltip('返回项目列表'), findsNothing);
       expect(find.text('展览项目 1'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
     },
@@ -2242,7 +2240,7 @@ void main() {
   );
 
   testWidgets(
-    'messages page reloads shell unread badge after project communication refresh',
+    'messages page does not reload shell unread badge after project communication refresh',
     (WidgetTester tester) async {
       var shellContextLoads = 0;
       final shellContextConsumer = AppShellContextConsumer(
@@ -2339,12 +2337,80 @@ void main() {
 
       await tapBottomDestination(tester, '消息');
 
-      expect(shellContextLoads, greaterThanOrEqualTo(2));
+      expect(shellContextLoads, 1);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsNothing,
+      );
+      expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'messages page does not let project communication refresh clear notification badge',
+    (WidgetTester tester) async {
+      var shellContextLoads = 0;
+      final shellContextConsumer = AppShellContextConsumer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/shell/context': (AppApiRequest request) async {
+                    shellContextLoads += 1;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _shellContextPayload(
+                        unreadSummary: const <String, Object?>{'messages': 2},
+                      ),
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'lane': 'project_communication',
+                      'items': <Object?>[],
+                    },
+                  ),
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          shellContextConsumer: shellContextConsumer,
+          messagesTransport: messagesTransport,
+          sessionStore: buildAuthenticatedSessionStore(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navigationBar = find.byType(NavigationBar);
       expect(
         find.descendant(of: navigationBar, matching: find.text('2')),
         findsOneWidget,
       );
-      expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
+
+      await tapBottomDestination(tester, '消息');
+
+      expect(shellContextLoads, 1);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(find.text('当前没有新的项目沟通'), findsOneWidget);
     },
   );
 
@@ -2679,6 +2745,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tapBottomDestination(tester, '消息');
+      await tester.tap(find.text('论坛互动'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('回复我的').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('回复了你在《材料交接节点》里的问题'));
@@ -2694,7 +2762,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('帖子详情'), findsNothing);
-      expect(find.text('互动中心'), findsOneWidget);
+      expect(find.text('论坛互动'), findsOneWidget);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
     },
   );
@@ -4515,6 +4583,40 @@ void main() {
     expect(find.text('当前上下文暂不可用'), findsOneWidget);
     expect(find.text('当前离线'), findsNothing);
     expect(find.widgetWithText(FilledButton, '重试承接'), findsOneWidget);
+  });
+
+  testWidgets('messages offline root does not show a dead back button', (
+    WidgetTester tester,
+  ) async {
+    final shellContextConsumer = AppShellContextConsumer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/shell/context': (AppApiRequest request) async {
+                  throw const SocketException('offline');
+                },
+              },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: AppBuilding.messages.routePath,
+        shellContextConsumer: shellContextConsumer,
+        sessionStore: buildAuthenticatedSessionStore(deviceId: 'device-shell'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前离线'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '重试承接'), findsOneWidget);
+    expect(
+      find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded),
+      findsNothing,
+    );
   });
 
   testWidgets(

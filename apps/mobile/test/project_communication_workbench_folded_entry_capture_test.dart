@@ -35,6 +35,7 @@ void main() {
     final foldedKey = GlobalKey();
     await _pumpCapturePage(tester, foldedKey);
     await _enterProjectCommunication(tester);
+    await _openMaterialWorkbench(tester);
     await _ensureVisible(tester, find.text('发布方资料'));
     await _capture(
       foldedKey,
@@ -55,6 +56,7 @@ void main() {
     final narrowKey = GlobalKey();
     await _pumpCapturePage(tester, narrowKey);
     await _enterProjectCommunication(tester);
+    await _openMaterialWorkbench(tester);
     await _ensureVisible(tester, find.text('发布方资料'));
     await _capture(
       narrowKey,
@@ -121,6 +123,13 @@ Future<void> _ensureVisible(WidgetTester tester, Finder finder) async {
 
 Future<void> _enterProjectCommunication(WidgetTester tester) async {
   final entry = find.widgetWithText(FilledButton, '进入沟通').first;
+  await _ensureVisible(tester, entry);
+  await tester.tap(entry);
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openMaterialWorkbench(WidgetTester tester) async {
+  final entry = find.textContaining('资料确认').last;
   await _ensureVisible(tester, entry);
   await tester.tap(entry);
   await tester.pumpAndSettle();
@@ -193,7 +202,7 @@ Map<String, Object?> _detailPayload() {
     'conversationUnreadCount': 0,
     'myPublishedUnreadCount': 0,
     'myBidUnreadCount': 0,
-    'projectGroups': const <Object?>[
+    'projectGroups': <Object?>[
       <String, Object?>{
         'projectId': 'project-1',
         'projectDisplayTitle': 'POPAY会员赛事受控测试-day10a-flagship',
@@ -205,6 +214,7 @@ Map<String, Object?> _detailPayload() {
         'latestActivityAt': '2026-05-04T10:00:00Z',
         'projectUnreadCount': 0,
         'hasProjectUnread': false,
+        'businessTodoSummary': _businessTodoSummary(),
         'cards': <Object?>[],
       },
     ],
@@ -212,16 +222,36 @@ Map<String, Object?> _detailPayload() {
 }
 
 Map<String, Object?> _threadPayload() {
-  return const <String, Object?>{
+  return <String, Object?>{
     'threadId': 'thread-1',
     'projectId': 'project-1',
     'ownerOrganizationId': 'org-owner',
     'counterpartOrganizationId': 'org-counterpart',
+    'chatAvailability': _chatAvailability(),
     'threadState': 'active',
     'lastMessageId': 'msg-3',
     'lastMessageAt': '2026-05-04T10:02:00Z',
     'createdAt': '2026-05-04T10:00:00Z',
     'updatedAt': '2026-05-04T10:02:00Z',
+  };
+}
+
+Map<String, Object?> _businessTodoSummary() {
+  return const <String, Object?>{
+    'bidParticipationReviewPendingCount': 0,
+    'publisherMaterialReviewPendingCount': 0,
+    'bidMaterialReviewPendingCount': 0,
+    'dealConfirmationPendingCount': 0,
+    'totalPendingCount': 0,
+  };
+}
+
+Map<String, Object?> _chatAvailability() {
+  return const <String, Object?>{
+    'canSendMessage': true,
+    'lockReasonCode': null,
+    'lockReasonText': null,
+    'requiredNextAction': 'none',
   };
 }
 
@@ -250,6 +280,8 @@ Map<String, Object?> _workbenchPayload() {
     'projectId': 'project-1',
     'threadId': 'thread-1',
     'viewerRole': 'bidder',
+    'businessTodoSummary': _businessTodoSummary(),
+    'chatAvailability': _chatAvailability(),
     'entries': <Object?>[
       _workbenchEntry(
         entryKey: 'publisher_effect_image_review',
@@ -325,6 +357,8 @@ Map<String, Object?> _workbenchEntry({
     'reviewState': null,
     'actionState': 'blocked',
     'attachmentCount': 0,
+    'badgeCount': 0,
+    'disabledReason': '当前资料尚未提交。',
     'latestFeedbackText': null,
     'latestFeedbackAt': null,
     'reviewedAt': null,

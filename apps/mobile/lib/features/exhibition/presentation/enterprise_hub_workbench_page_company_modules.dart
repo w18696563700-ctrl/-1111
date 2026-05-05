@@ -130,15 +130,73 @@ extension _EnterpriseWorkbenchCompanyModules
       showUpstreamTruthSection: showUpstreamTruthSection,
       showCertificationSummarySection: showCertificationSummarySection,
     );
+    final basicModules = modules
+        .where(
+          (entry) =>
+              entry.module == _CompanyWorkbenchModule.display ||
+              entry.module == _CompanyWorkbenchModule.basic ||
+              entry.module == _CompanyWorkbenchModule.location ||
+              entry.module == _CompanyWorkbenchModule.album,
+        )
+        .toList(growable: false);
+    final detailModules = modules
+        .where(
+          (entry) =>
+              entry.module == _CompanyWorkbenchModule.cases ||
+              entry.module == _CompanyWorkbenchModule.contact ||
+              entry.module == _CompanyWorkbenchModule.truthStatus,
+        )
+        .toList(growable: false);
     return EnterpriseSectionCard(
       key: const ValueKey<String>('company-workbench-module-entries'),
-      title: '核心信息概览',
-      subtitle: '详细编辑内容已折叠为模块入口，首页只保留摘要和当前处理项。',
+      title: '展示资料管理',
+      subtitle: '首页只保留分组入口；完整字段继续进入模块维护。',
       child: Column(
-        children: modules
-            .map((entry) => _buildCompanyModuleEntry(entry))
-            .toList(growable: false),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          _buildCompanyModuleGroup(
+            title: '基础信息',
+            description: '决定公开详情的品牌识别、简介、地址和画册。',
+            entries: basicModules,
+          ),
+          const SizedBox(height: 14),
+          _buildCompanyModuleGroup(
+            title: '详细信息',
+            description: '管理案例、联系人、认证与发布状态。',
+            entries: detailModules,
+          ),
+        ],
       ),
+    );
+  }
+
+  Widget _buildCompanyModuleGroup({
+    required String title,
+    required String description,
+    required List<_CompanyModuleEntryData> entries,
+  }) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          title,
+          style: theme.textTheme.titleSmall?.copyWith(
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          description,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: colorScheme.onSurfaceVariant,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: 10),
+        ...entries.map(_buildCompanyModuleEntry),
+      ],
     );
   }
 

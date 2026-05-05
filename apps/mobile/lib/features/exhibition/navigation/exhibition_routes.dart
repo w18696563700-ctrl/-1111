@@ -113,9 +113,15 @@ final class ExhibitionRoutes {
     return _withQuery(projectEdit, <String, String>{'projectId': projectId});
   }
 
-  static String myProjectDetailWithProjectId(String projectId) {
+  static String myProjectDetailWithProjectId(
+    String projectId, {
+    String? stage,
+  }) {
+    final normalizedStage = stage?.trim();
     return _withQuery(myProjectDetail, <String, String>{
       'projectId': projectId,
+      if (normalizedStage != null && normalizedStage.isNotEmpty)
+        'stage': normalizedStage,
     });
   }
 
@@ -156,11 +162,17 @@ final class ExhibitionRoutes {
   static String counterpartConversationWithIds({
     required String conversationId,
     required String projectId,
+    String? threadId,
   }) {
-    return _withQuery(counterpartConversation, <String, String>{
+    final queryParameters = <String, String>{
       'conversationId': conversationId,
       'projectId': projectId,
-    });
+    };
+    final normalizedThreadId = threadId?.trim();
+    if (normalizedThreadId != null && normalizedThreadId.isNotEmpty) {
+      queryParameters['threadId'] = normalizedThreadId;
+    }
+    return _withQuery(counterpartConversation, queryParameters);
   }
 
   static String bidThreadWithIds({
@@ -181,8 +193,13 @@ final class ExhibitionRoutes {
     return _withQuery(forumSquare, <String, String>{'topicId': topicId});
   }
 
-  static String forumPostWithPostId(String postId) {
-    return '$forumPosts/${Uri.encodeComponent(postId)}';
+  static String forumPostWithPostId(String postId, {String? title}) {
+    final path = '$forumPosts/${Uri.encodeComponent(postId)}';
+    final normalizedTitle = title?.trim();
+    if (normalizedTitle == null || normalizedTitle.isEmpty) {
+      return path;
+    }
+    return _withQuery(path, <String, String>{'title': normalizedTitle});
   }
 
   static String forumAuthorWithAuthorId(String authorId) {

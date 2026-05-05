@@ -30,6 +30,10 @@ type PublishDraftCommand = {
   draftId: string;
 };
 
+type DeleteDraftCommand = {
+  draftId: string;
+};
+
 type OwnPostCommand = {
   postId: string;
 };
@@ -168,6 +172,41 @@ export class ForumWriteService {
     });
 
     return this.presenter.toPublishResponse({ draft, post, topic });
+  }
+
+  async deleteDraft(payload: Record<string, unknown>, context: RequestContext) {
+    const command = this.toDeleteDraftCommand(payload);
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+    if (!scope) {
+      throw forumDraftUnavailable('organizationId is unavailable for forum draft delete.');
+    }
+
+    const draft = await this.draftRepository.findOne({
+      where: {
+        id: command.draftId,
+        creatorUserId: currentSession.userId,
+        organizationId: scope.organization.id,
+        state: In(['draft', 'ready_to_publish'])
+      }
+    });
+    if (!draft) {
+      throw forumDraftUnavailable('Forum draft is unavailable for delete.');
+    }
+
+    const discardedAt = new Date();
+    draft.state = 'deleted';
+    draft.discardedAt = discardedAt;
+    await this.draftRepository.save(draft);
+
+    return {
+      draftId: draft.id,
+      state: 'deleted'
+    };
   }
 
   async enterPostEdit(payload: Record<string, unknown>, context: RequestContext) {
@@ -327,6 +366,13 @@ export class ForumWriteService {
     return {
       draftId: this.readRequiredString(source.draftId, 'draftId')
     } satisfies PublishDraftCommand;
+  }
+
+  private toDeleteDraftCommand(payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    return {
+      draftId: this.readRequiredString(source.draftId, 'draftId')
+    } satisfies DeleteDraftCommand;
   }
 
   private toOwnPostCommand(payload: Record<string, unknown>) {

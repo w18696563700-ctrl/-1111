@@ -357,6 +357,11 @@ test('Server P0-1 ProjectWriteService consumes a single publish-eligibility conc
         };
       },
     },
+    {
+      async requireProjectPublishGate() {
+        throw new Error('publish gate should not be checked while creating project');
+      },
+    },
   );
 
   const result = await service.createProject(
@@ -442,6 +447,11 @@ test('Server P0-1 ProjectWriteService persists dual-field naming truth while kee
             roleKeys: ['buyer_admin'],
           },
         };
+      },
+    },
+    {
+      async requireProjectPublishGate() {
+        throw new Error('publish gate should not be checked while creating project');
       },
     },
   );

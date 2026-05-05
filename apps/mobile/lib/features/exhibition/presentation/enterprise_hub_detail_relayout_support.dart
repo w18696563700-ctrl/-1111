@@ -183,6 +183,38 @@ class EnterpriseDetailImageFrame extends StatelessWidget {
   }
 }
 
+class EnterpriseDetailHeroImageCountBadge extends StatelessWidget {
+  const EnterpriseDetailHeroImageCountBadge({
+    super.key,
+    required this.current,
+    required this.total,
+  });
+
+  final int current;
+  final int total;
+
+  @override
+  Widget build(BuildContext context) {
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.black.withValues(alpha: 0.48),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.22)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        child: Text(
+          '$current/$total',
+          style: Theme.of(context).textTheme.labelSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 List<EnterpriseDetailMetricItem> enterpriseDetailBuildSummaryItems(
   EnterpriseHubDetailData data,
 ) {

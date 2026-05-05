@@ -25,7 +25,7 @@ export class ForumDraftDeleteService {
         throw new HttpException(
           {
             statusCode: 400,
-            code: 'FORUM_DRAFT_DELETE_INVALID',
+            code: 'FORUM_DRAFT_INVALID',
             message: 'draftId is required for forum draft delete.',
             source: 'bff',
           },
@@ -58,12 +58,12 @@ export class ForumDraftDeleteService {
   private normalizeDeleteError(error: unknown): HttpException {
     const normalized = this.errors.toHttpException(
       error,
-      'FORUM_DRAFT_DELETE_FAILED',
+      'FORUM_DRAFT_UNAVAILABLE',
       '当前草稿暂时无法删除，请稍后再试。',
     );
     const statusCode = normalized.getStatus();
     const payload = this.asRecord(normalized.getResponse());
-    const code = this.asOptionalString(payload.code) ?? 'FORUM_DRAFT_DELETE_FAILED';
+    const code = this.asOptionalString(payload.code) ?? 'FORUM_DRAFT_UNAVAILABLE';
     const originalMessage = this.asOptionalString(payload.message) ?? '';
     const translatedMessage = this.translateMessage(statusCode, code, originalMessage);
     const details = this.asRecord(payload.details);

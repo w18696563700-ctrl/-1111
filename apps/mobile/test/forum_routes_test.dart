@@ -367,9 +367,12 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('草稿'), findsOneWidget);
+    expect(find.text('发帖草稿编辑页'), findsOneWidget);
     expect(find.text('发帖主链'), findsNothing);
     expect(find.text('先保存草稿，再进入发布'), findsNothing);
-    expect(find.text('请先保存草稿；保存后可直接继续发布，离开后也可从草稿箱继续。'), findsOneWidget);
+    expect(find.text('请先保存草稿；保存后会进入草稿箱，由草稿箱承接发布。'), findsOneWidget);
+    expect(find.text('保存草稿并跳转至草稿箱发布帖子'), findsOneWidget);
+    expect(find.text('发布'), findsNothing);
     expect(find.text('写一个标题'), findsOneWidget);
   });
 
@@ -385,7 +388,7 @@ void main() {
 
     expect(find.text('本地进场夜班经验分享'), findsOneWidget);
     expect(find.text('这是一条已保存的论坛草稿内容。'), findsOneWidget);
-    expect(find.text('当前草稿已保存，可直接继续发布。'), findsOneWidget);
+    expect(find.text('当前草稿已保存，可到草稿箱发布。'), findsOneWidget);
   });
 
   testWidgets(
@@ -790,6 +793,11 @@ void main() {
                             },
                           ],
                           'publishedAt': '2026-03-27T09:30:00Z',
+                          'engagement': <String, Object?>{
+                            'replyCount': 0,
+                            'likeCount': 0,
+                            'viewCount': 0,
+                          },
                           'viewerHasLiked': false,
                           'viewerHasBookmarked': false,
                           'viewerFollowsTopic': true,
@@ -813,26 +821,18 @@ void main() {
       expect(find.text('现场照片.jpg'), findsOneWidget);
       await tester.pumpAndSettle();
 
-      expect(find.text('上传确认完成，请保存草稿'), findsOneWidget);
+      expect(find.text('上传确认完成，等待保存草稿'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('保存草稿'));
+      await tester.tap(find.text('保存草稿并跳转至草稿箱发布帖子'));
       await tester.pumpAndSettle();
 
       expect(draftSaveBodies.last['attachmentFileAssetIds'], const <String>[
         'asset-uploaded-1',
       ]);
-      expect(find.text('已保存到草稿，附件已承接'), findsOneWidget);
-      expect(find.text('已承接到当前草稿'), findsWidgets);
-
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('发布'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('附件'), findsOneWidget);
-      expect(find.text('现场照片.jpg'), findsOneWidget);
+      expect(find.text('草稿'), findsOneWidget);
+      expect(find.text('本地进场夜班经验分享'), findsOneWidget);
     },
   );
 

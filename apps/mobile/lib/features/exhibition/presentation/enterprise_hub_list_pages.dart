@@ -542,6 +542,9 @@ class _EnterpriseBoardListPageState extends State<EnterpriseBoardListPage> {
               padding: const EdgeInsets.only(bottom: 12),
               child: EnterpriseCard(
                 item: item,
+                clean:
+                    widget.boardType == EnterpriseBoardType.factory ||
+                    widget.boardType == EnterpriseBoardType.supplier,
                 onPressed: () {
                   Navigator.of(
                     context,

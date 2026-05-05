@@ -5,6 +5,7 @@ import { ForumAuthorProfileService } from './forum-author-profile.service';
 import { ForumCommandContextService } from './forum-command-context.service';
 import { ForumCommandErrorService } from './forum-command-error.service';
 import { ForumDraftCommandErrorMessageService } from './forum-draft-command-error-message.service';
+import { ForumDraftDeleteService } from './forum-draft-delete.service';
 import { ForumDraftOpenService } from './forum-draft-open.service';
 import { ForumController } from './forum.controller';
 import { ForumInteractionService } from './forum-interaction.service';
@@ -26,6 +27,7 @@ import { ForumService } from './forum.service';
     ForumAuthorProfileService,
     ForumCommandErrorService,
     ForumDraftCommandErrorMessageService,
+    ForumDraftDeleteService,
     ForumDraftOpenService,
     ForumInteractionInboxService,
     ForumInteractionService,

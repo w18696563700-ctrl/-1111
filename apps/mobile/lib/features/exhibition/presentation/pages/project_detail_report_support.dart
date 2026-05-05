@@ -18,13 +18,13 @@ extension _ProjectDetailReportSupport on _ProjectDetailPageState {
     if (_submittingReport) {
       return;
     }
-    setState(() => _submittingReport = true);
+    _setProjectReportSubmitting(true);
     final result = await ExhibitionConsumerLayer.instance
         .submitExhibitionReport(projectId: projectId);
     if (!mounted) {
       return;
     }
-    setState(() => _submittingReport = false);
+    _setProjectReportSubmitting(false);
     final message = result.isSuccess
         ? _projectReportSuccessMessage(result.payload)
         : (result.message ?? '当前举报提交未完成，请稍后再试。');

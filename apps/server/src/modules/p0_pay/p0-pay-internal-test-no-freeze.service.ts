@@ -11,7 +11,11 @@ import {
   ProjectAuthenticitySincerityFreezeFeedbackChoice,
   ProjectAuthenticitySincerityFreezeFeedbackEntity,
 } from './entities/project-authenticity-sincerity-freeze-feedback.entity';
-import { p0PayInvalid, p0PayPermissionDenied, p0PayResourceUnavailable } from './p0-pay.errors';
+import {
+  p0PayPermissionDenied,
+  p0PayResourceUnavailable,
+  projectAuthenticitySincerityFreezeFeedbackInvalid,
+} from './p0-pay.errors';
 import { PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NOTICE } from './p0-pay-internal-test-no-freeze.policy';
 
 const FREEZE_FEEDBACK_CHOICES = new Set<ProjectAuthenticitySincerityFreezeFeedbackChoice>([
@@ -101,7 +105,7 @@ export class P0PayInternalTestNoFreezeService {
 
   private readChoice(value: unknown): ProjectAuthenticitySincerityFreezeFeedbackChoice {
     if (typeof value !== 'string' || !FREEZE_FEEDBACK_CHOICES.has(value as ProjectAuthenticitySincerityFreezeFeedbackChoice)) {
-      throw p0PayInvalid('Project authenticity sincerity freeze feedback choice is invalid.');
+      throw projectAuthenticitySincerityFreezeFeedbackInvalid();
     }
     return value as ProjectAuthenticitySincerityFreezeFeedbackChoice;
   }

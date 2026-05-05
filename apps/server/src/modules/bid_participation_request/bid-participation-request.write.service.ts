@@ -6,6 +6,7 @@ import { requireVerifiedCurrentSessionContext } from '../../shared/current-sessi
 import { RequestContext } from '../../shared/request-context';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { NotificationService } from '../notifications/notification.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ProjectEntity } from '../project/entities/project.entity';
 import {
@@ -29,6 +30,7 @@ export class BidParticipationRequestWriteService {
     private readonly sessionVerifier: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly presenter: BidParticipationRequestPresenter,
+    private readonly notificationService: NotificationService,
   ) {}
 
   async createRequest(payload: Record<string, unknown>, context: RequestContext) {
@@ -77,6 +79,11 @@ export class BidParticipationRequestWriteService {
 
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(BidParticipationRequestEntity).save(request);
+      await this.notificationService.createBidParticipationRequestCreatedNotification(
+        request,
+        project,
+        manager,
+      );
       await this.recordAudit(manager.getRepository(IdentityAuditLogEntity), {
         objectType: 'bid_participation_request',
         objectId: request.id,

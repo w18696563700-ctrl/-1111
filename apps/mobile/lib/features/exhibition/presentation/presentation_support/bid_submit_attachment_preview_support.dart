@@ -25,7 +25,7 @@ extension _BidSubmitAttachmentPreviewActions on _BidSubmitPageState {
       return;
     }
 
-    setState(() => slot.previewOpening = true);
+    _setBidAttachmentPreviewOpening(slot, true);
     if (_bidSubmitAttachmentIsImageMimeType(draft.mimeType)) {
       await _showProjectAttachmentLocalImagePreviewDialog(
         context,
@@ -33,7 +33,7 @@ extension _BidSubmitAttachmentPreviewActions on _BidSubmitPageState {
         bytes: draft.bytes,
       );
       if (mounted) {
-        setState(() => slot.previewOpening = false);
+        _setBidAttachmentPreviewOpening(slot, false);
       }
       return;
     }
@@ -46,7 +46,7 @@ extension _BidSubmitAttachmentPreviewActions on _BidSubmitPageState {
     if (!mounted) {
       return;
     }
-    setState(() => slot.previewOpening = false);
+    _setBidAttachmentPreviewOpening(slot, false);
     _showBidSubmitAttachmentMessage(
       opened ? '已打开附件预览。' : '附件已生成本地预览文件，但当前设备未能直接打开。',
     );

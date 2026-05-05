@@ -37,6 +37,17 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
   final GlobalKey _highlightedProjectKey = GlobalKey();
   bool _highlightScrollScheduled = false;
 
+  void _setMyBidLoading(bool value) {
+    setState(() => _myBidLoading = value);
+  }
+
+  void _finishMyBidLoad(ExhibitionLoadResult result) {
+    setState(() {
+      _myBidResult = result;
+      _myBidLoading = false;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -312,9 +323,15 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
             };
             final routeName = stage.value == _MyProjectStageBucket.draft
                 ? ExhibitionRoutes.projectEditWithProjectId(projectId)
-                : ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
+                : ExhibitionRoutes.myProjectDetailWithProjectId(
+                    projectId,
+                    stage: _myProjectDetailRouteStageHint(stage.value),
+                  );
             final detailRouteName =
-                ExhibitionRoutes.myProjectDetailWithProjectId(projectId);
+                ExhibitionRoutes.myProjectDetailWithProjectId(
+                  projectId,
+                  stage: _myProjectDetailRouteStageHint(stage.value),
+                );
             final highlighted = projectId == _highlightProjectId;
 
             Widget card = _MyProjectCompactCard(
@@ -340,6 +357,9 @@ class _MyProjectListPageState extends State<MyProjectListPage> {
                   ? () => _openRoute(detailRouteName)
                   : null,
               highlighted: highlighted,
+              highlightLabel: highlighted
+                  ? _myProjectDraftHighlightLabel(item)
+                  : null,
             );
             if (highlighted) {
               card = KeyedSubtree(key: _highlightedProjectKey, child: card);
@@ -359,4 +379,12 @@ _MyProjectWorkspaceBucket _myProjectWorkspaceFromRoute(String? workspace) {
   return workspace?.trim() == 'bids'
       ? _MyProjectWorkspaceBucket.bids
       : _MyProjectWorkspaceBucket.published;
+}
+
+String? _myProjectDetailRouteStageHint(_MyProjectStageBucket stage) {
+  return switch (stage) {
+    _MyProjectStageBucket.submitted => 'submitted',
+    _MyProjectStageBucket.published => 'published',
+    _ => null,
+  };
 }

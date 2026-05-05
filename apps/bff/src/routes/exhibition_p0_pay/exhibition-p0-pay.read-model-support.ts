@@ -1,5 +1,9 @@
 export type Payload = Record<string, unknown>;
 
+const DISPLAY_ONLY_AUTHENTICITY_SINCERITY_AMOUNT = '200.00';
+const DISPLAY_ONLY_BID_SERVICE_FEE_AUTHORIZATION_QUOTA = '4000.00';
+const DISPLAY_ONLY_PRICING_CURRENCY = 'CNY';
+
 export function readPublisherPricing(record: Payload) {
   const publisher = optionalRecord(record.publisherPricing);
   if (publisher) {
@@ -12,10 +16,10 @@ export function readPublisherPricing(record: Payload) {
   const status = readOptionalString(readFirst(sincerity.status, sincerity.depositStatus, sincerity.orderStatus));
   return {
     authenticitySincerityRequired: true,
-    authenticitySincerityAmount: readFirst(sincerity.amount, '200.00'),
+    authenticitySincerityAmount: readFirst(sincerity.amount, DISPLAY_ONLY_AUTHENTICITY_SINCERITY_AMOUNT),
     authenticitySincerityStatus: status && status !== 'not_required' ? status : null,
     authenticitySincerityOrderId: readFirst(sincerity.orderId, sincerity.depositOrderId, null),
-    authenticitySincerityCurrency: readFirst(sincerity.currency, 'CNY'),
+    authenticitySincerityCurrency: readFirst(sincerity.currency, DISPLAY_ONLY_PRICING_CURRENCY),
     authenticitySincerityChannelCandidates: readArray(sincerity.channelCandidates),
     authenticitySincerityExpiresAt: readFirst(sincerity.expiresAt, null),
     publishGateStatus: status === 'paid' ? 'satisfied' : 'required',
@@ -44,7 +48,7 @@ export function readBidderPricing(record: Payload) {
     authorizationQuotaAmount: readFirst(
       authorization.authorizationQuotaAmount,
       authorization.quotaAmount,
-      '4000.00',
+      DISPLAY_ONLY_BID_SERVICE_FEE_AUTHORIZATION_QUOTA,
     ),
     authorizationStatus: status && status !== 'not_required' ? status : null,
     bidSubmissionEligible: status === 'frozen',

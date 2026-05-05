@@ -112,6 +112,12 @@ test("message interactions route is materialized and no longer router 404 locall
         projectId,
         ownerOrganizationId: "owner-org",
         counterpartOrganizationId,
+        chatAvailability: {
+          canSendMessage: true,
+          lockReasonCode: null,
+          lockReasonText: null,
+          requiredNextAction: "none",
+        },
         threadState: "open",
         lastMessageId: null,
         lastMessageAt: null,
@@ -250,7 +256,9 @@ test("message interactions route is materialized and no longer router 404 locall
       `${url}/api/app/message/project-communication/thread?projectId=project-1&counterpartOrganizationId=org-1`,
     );
     assert.equal(threadResponse.status, 200);
-    assert.equal((await threadResponse.json()).threadId, "thread-1");
+    const threadBody = await threadResponse.json();
+    assert.equal(threadBody.threadId, "thread-1");
+    assert.equal(threadBody.chatAvailability.canSendMessage, true);
 
     const messagesResponse = await fetch(
       `${url}/api/app/message/project-communication/messages?threadId=thread-1&projectId=project-1`,
@@ -611,6 +619,13 @@ test("counterpart conversation detail service forwards frozen server path and hi
               projectUnreadCount: 2,
               hasProjectUnread: true,
               latestUnreadMessageAt: "2026-04-29T10:04:00.000Z",
+              businessTodoSummary: {
+                bidParticipationReviewPendingCount: 1,
+                publisherMaterialReviewPendingCount: 0,
+                bidMaterialReviewPendingCount: 0,
+                dealConfirmationPendingCount: 0,
+                totalPendingCount: 1,
+              },
               orderSummary: {
                 orderId: "order-1",
                 projectId: "project-1",
@@ -746,6 +761,11 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.equal(result.projectGroups[0].projectUnreadCount, 2);
   assert.equal(result.projectGroups[0].hasProjectUnread, true);
   assert.equal(result.projectGroups[0].latestUnreadMessageAt, "2026-04-29T10:04:00.000Z");
+  assert.equal(result.projectGroups[0].businessTodoSummary.totalPendingCount, 1);
+  assert.equal(
+    result.projectGroups[0].businessTodoSummary.bidParticipationReviewPendingCount,
+    1,
+  );
   assert.deepEqual(result.projectGroups[0].orderSummary, {
     orderId: "order-1",
     projectId: "project-1",
@@ -831,6 +851,12 @@ test("project communication routes forward thread, message list, send, and read 
             projectId: options.params.projectId,
             ownerOrganizationId: "owner-org",
             counterpartOrganizationId: options.params.counterpartOrganizationId,
+            chatAvailability: {
+              canSendMessage: true,
+              lockReasonCode: null,
+              lockReasonText: null,
+              requiredNextAction: "none",
+            },
             threadState: "open",
             lastMessageId: null,
             lastMessageAt: null,

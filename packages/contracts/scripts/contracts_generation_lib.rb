@@ -494,15 +494,6 @@ module ContractsGeneration
   end
 
   def build_message_contract_types(schemas)
-    workbench_entry_keys = schemas.fetch('ProjectCommunicationWorkbenchEntryKey').fetch('enum')
-    material_review_entry_keys = schemas.fetch('ProjectCommunicationMaterialReviewEntryKey').fetch('enum')
-    workbench_groups = schemas.fetch('ProjectCommunicationWorkbenchEntryGroup').fetch('enum')
-    viewer_roles = schemas.fetch('ProjectCommunicationWorkbenchViewerRole').fetch('enum')
-    subject_owner_roles = schemas.fetch('ProjectCommunicationWorkbenchSubjectOwnerRole').fetch('enum')
-    availability_states = schemas.fetch('ProjectCommunicationWorkbenchAvailabilityState').fetch('enum')
-    review_states = schemas.fetch('ProjectCommunicationWorkbenchReviewState').fetch('enum')
-    action_states = schemas.fetch('ProjectCommunicationWorkbenchActionState').fetch('enum')
-    material_review_actions = schemas.fetch('ProjectCommunicationMaterialReviewAction').fetch('enum')
     message_kinds = schemas.fetch('ProjectCommunicationMessageKind').fetch('enum')
     delivery_states = schemas.fetch('ProjectCommunicationMessageDeliveryState').fetch('enum')
     read_states = schemas.fetch('ProjectCommunicationMessageReadState').fetch('enum')
@@ -567,120 +558,6 @@ module ContractsGeneration
         organizationId: string;
         lastReadMessageId: string | null;
         lastReadAt: string;
-        updatedAt: string;
-      }
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_ENTRY_KEYS = #{json_array(workbench_entry_keys)} as const;
-      export type ProjectCommunicationWorkbenchEntryKey =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_ENTRY_KEYS)[number];
-
-      export const PROJECT_COMMUNICATION_MATERIAL_REVIEW_ENTRY_KEYS = #{json_array(material_review_entry_keys)} as const;
-      export type ProjectCommunicationMaterialReviewEntryKey =
-        (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_ENTRY_KEYS)[number];
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_ENTRY_GROUPS = #{json_array(workbench_groups)} as const;
-      export type ProjectCommunicationWorkbenchEntryGroup =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_ENTRY_GROUPS)[number];
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_VIEWER_ROLES = #{json_array(viewer_roles)} as const;
-      export type ProjectCommunicationWorkbenchViewerRole =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_VIEWER_ROLES)[number];
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_SUBJECT_OWNER_ROLES = #{json_array(subject_owner_roles)} as const;
-      export type ProjectCommunicationWorkbenchSubjectOwnerRole =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_SUBJECT_OWNER_ROLES)[number];
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_AVAILABILITY_STATES = #{json_array(availability_states)} as const;
-      export type ProjectCommunicationWorkbenchAvailabilityState =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_AVAILABILITY_STATES)[number];
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_REVIEW_STATES = #{json_array(review_states)} as const;
-      export type ProjectCommunicationWorkbenchReviewState =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_REVIEW_STATES)[number];
-
-      export const PROJECT_COMMUNICATION_WORKBENCH_ACTION_STATES = #{json_array(action_states)} as const;
-      export type ProjectCommunicationWorkbenchActionState =
-        (typeof PROJECT_COMMUNICATION_WORKBENCH_ACTION_STATES)[number];
-
-      export const PROJECT_COMMUNICATION_MATERIAL_REVIEW_ACTIONS = #{json_array(material_review_actions)} as const;
-      export type ProjectCommunicationMaterialReviewAction =
-        (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_ACTIONS)[number];
-
-      export interface ProjectCommunicationWorkbenchSourceFile {
-        fileAssetId: string;
-        fileName: string;
-        mimeType: string;
-        sortOrder: number;
-      }
-
-      export interface ProjectCommunicationWorkbenchRouteTarget {
-        actionKey: string;
-        canonicalPath: string;
-        params: Record<string, string>;
-      }
-
-      export interface ProjectCommunicationWorkbenchTruthAnchor {
-        truthOwner: 'server';
-        subjectType: 'publisher_quote_basis_material' | 'bid_submission_material' | 'deal_confirmation';
-        projectId: string;
-        threadId: string;
-        bidId: string | null;
-        subjectOwnerOrganizationId: string | null;
-        reviewerOrganizationId: string | null;
-        materialKind: string | null;
-        bidMaterialSlot: string | null;
-        dealConfirmationId: string | null;
-        sourceVersionToken: string | null;
-      }
-
-      export interface ProjectCommunicationWorkbenchEntry {
-        entryKey: ProjectCommunicationWorkbenchEntryKey;
-        group: ProjectCommunicationWorkbenchEntryGroup;
-        label: string;
-        summary: string | null;
-        projectId: string;
-        threadId: string;
-        bidId: string | null;
-        viewerRole: ProjectCommunicationWorkbenchViewerRole;
-        subjectOwnerRole: ProjectCommunicationWorkbenchSubjectOwnerRole;
-        availabilityState: ProjectCommunicationWorkbenchAvailabilityState;
-        reviewState: ProjectCommunicationWorkbenchReviewState | null;
-        actionState: ProjectCommunicationWorkbenchActionState;
-        attachmentCount: number;
-        sourceFiles: ProjectCommunicationWorkbenchSourceFile[];
-        latestFeedbackText: string | null;
-        latestFeedbackAt: string | null;
-        reviewedAt: string | null;
-        routeTarget: ProjectCommunicationWorkbenchRouteTarget | null;
-        truthAnchor: ProjectCommunicationWorkbenchTruthAnchor;
-      }
-
-      export interface ProjectCommunicationWorkbenchResponse {
-        projectId: string;
-        threadId: string;
-        viewerRole: ProjectCommunicationWorkbenchViewerRole;
-        entries: ProjectCommunicationWorkbenchEntry[];
-        generatedAt: string;
-      }
-
-      export interface ProjectCommunicationMaterialReviewRequest {
-        projectId: string;
-        threadId: string;
-        bidId?: string | null;
-        entryKey: ProjectCommunicationMaterialReviewEntryKey;
-        reviewAction: ProjectCommunicationMaterialReviewAction;
-        feedbackReasonCodes?: string[];
-        feedbackText?: string | null;
-        sourceVersionToken?: string | null;
-        idempotencyKey: string;
-      }
-
-      export interface ProjectCommunicationMaterialReviewResponse {
-        entry: ProjectCommunicationWorkbenchEntry;
-        entries?: ProjectCommunicationWorkbenchEntry[];
-        projectId: string;
-        threadId: string;
-        viewerRole: ProjectCommunicationWorkbenchViewerRole;
         updatedAt: string;
       }
     TS
@@ -833,6 +710,7 @@ module ContractsGeneration
       }
 
       export interface MyProjectListItemReadModel {
+        projectCreatedAt: string | null;
         publicProject: ProjectShowcaseListItemReadModel;
         privateSummary: MyProjectPrivateProgressSummaryReadModel;
       }
@@ -881,6 +759,7 @@ module ContractsGeneration
       .fetch('properties')
       .fetch('state')
       .fetch('enum')
+    bid_participation_request_statuses = schemas.fetch('BidParticipationRequestStatus').fetch('enum')
     bid_result_states = schemas.fetch('BidResultReadModel')
       .fetch('properties')
       .fetch('state')
@@ -888,6 +767,25 @@ module ContractsGeneration
     bid_result_outcomes = schemas.fetch('BidResultReadModel')
       .fetch('properties')
       .fetch('result')
+      .fetch('enum')
+    deal_confirmation_statuses = schemas.fetch('DealConfirmationStatus').fetch('enum')
+    pricing_currency_codes = schemas.fetch('PricingCurrencyCode').fetch('enum')
+    project_bid_material_kinds = schemas.fetch('ProjectBidMaterialKind').fetch('enum')
+    project_album_photo_categories = schemas.fetch('ProjectAlbumPhotoCategory').fetch('enum')
+    project_album_photo_states = schemas.fetch('ProjectAlbumPhotoReadModel')
+      .fetch('properties')
+      .fetch('photoState')
+      .fetch('enum')
+    workbench_entry_keys = schemas.fetch('ProjectCommunicationWorkbenchEntryKey').fetch('enum')
+    workbench_groups = schemas.fetch('ProjectCommunicationWorkbenchGroup').fetch('enum')
+    material_review_states = schemas.fetch('ProjectCommunicationMaterialReviewState').fetch('enum')
+    chat_lock_reason_codes = schemas.fetch('ProjectCommunicationChatAvailability')
+      .fetch('properties')
+      .fetch('lockReasonCode')
+      .fetch('enum')
+    chat_required_next_actions = schemas.fetch('ProjectCommunicationChatAvailability')
+      .fetch('properties')
+      .fetch('requiredNextAction')
       .fetch('enum')
     rating_entry_states = schemas.fetch('RatingEntryReadModel')
       .fetch('properties')
@@ -973,6 +871,299 @@ module ContractsGeneration
         orderId: string | null;
         contractId: string | null;
         state: BidAwardState;
+      }
+
+      export const BID_PARTICIPATION_REQUEST_STATUSES = #{json_array(bid_participation_request_statuses)} as const;
+      export type BidParticipationRequestStatus =
+        (typeof BID_PARTICIPATION_REQUEST_STATUSES)[number];
+
+      export interface BidParticipationRequestCreateRequest {
+        projectId: string;
+      }
+
+      export interface BidParticipationRequestAcceptedResponse {
+        requestId: string;
+        projectId: string;
+        status: BidParticipationRequestStatus;
+        threadId: string;
+      }
+
+      export interface BidParticipationRequesterReadModel {
+        organizationId: string;
+        displayName: string;
+        avatarUrl: string | null;
+      }
+
+      export interface BidParticipationPrimaryReviewAction {
+        actionKey: 'bid_participation.review';
+        enabled: boolean;
+        availableDecisions: Array<'approve' | 'reject'>;
+      }
+
+      export interface BidParticipationThreadDetailReadModel {
+        threadId: string;
+        threadType: 'bid_participation_review';
+        projectId: string;
+        requestId: string;
+        requestStatus: BidParticipationRequestStatus;
+        displayTitle: string;
+        requesterOrganization: BidParticipationRequesterReadModel;
+        items: Array<Record<string, unknown>>;
+        primaryReviewAction: BidParticipationPrimaryReviewAction;
+      }
+
+      export interface BidParticipationPendingListResponse {
+        projectId: string;
+        requests: BidParticipationThreadDetailReadModel[];
+      }
+
+      export interface BidParticipationReviewAcceptedResponse {
+        requestId: string;
+        projectId: string;
+        status: 'approved' | 'rejected';
+      }
+
+      export interface BidSubmitRequest {
+        projectId: string;
+        quoteAmount: number;
+        proposalSummary: string;
+        projectUnderstandingFileAssetId: string;
+        quoteSheetFileAssetId: string;
+        schedulePlanFileAssetId: string;
+      }
+
+      export interface BidSubmitAcceptedResponse {
+        bidId: string;
+      }
+
+      export const PROJECT_BID_MATERIAL_KINDS = #{json_array(project_bid_material_kinds)} as const;
+      export type ProjectBidMaterialKind = (typeof PROJECT_BID_MATERIAL_KINDS)[number];
+
+      export interface ProjectBidMaterialReadModel {
+        attachmentId: string;
+        projectId: string;
+        fileAssetId: string;
+        fileName: string;
+        attachmentKind: ProjectBidMaterialKind;
+        mimeType: string;
+        sortOrder: number;
+        createdAt: string;
+      }
+
+      export interface ProjectBidMaterialListResponse {
+        projectId: string;
+        attachments: ProjectBidMaterialReadModel[];
+      }
+
+      export const PROJECT_ALBUM_PHOTO_CATEGORIES = #{json_array(project_album_photo_categories)} as const;
+      export type ProjectAlbumPhotoCategory = (typeof PROJECT_ALBUM_PHOTO_CATEGORIES)[number];
+
+      export const PROJECT_ALBUM_PHOTO_STATES = #{json_array(project_album_photo_states)} as const;
+      export type ProjectAlbumPhotoState = (typeof PROJECT_ALBUM_PHOTO_STATES)[number];
+
+      export interface ProjectAlbumPhotoBindRequest {
+        fileAssetId: string;
+        category: ProjectAlbumPhotoCategory;
+        caption?: string | null;
+        sortOrder?: number | null;
+      }
+
+      export interface ProjectAlbumPhotoReadModel {
+        photoId: string;
+        projectId: string;
+        fileAssetId: string;
+        category: ProjectAlbumPhotoCategory;
+        caption: string | null;
+        mimeType: string;
+        sortOrder: number;
+        photoState: ProjectAlbumPhotoState;
+        uploadedByUserId: string;
+        uploadedByActorId?: string | null;
+        uploadedByOrganizationId: string;
+        createdAt: string;
+        removedAt?: string | null;
+      }
+
+      export interface ProjectAlbumPhotoListReadModel {
+        projectId: string;
+        limit: number;
+        photoCount: number;
+        items: ProjectAlbumPhotoReadModel[];
+      }
+
+      export const DEAL_CONFIRMATION_STATUSES = #{json_array(deal_confirmation_statuses)} as const;
+      export type DealConfirmationStatus = (typeof DEAL_CONFIRMATION_STATUSES)[number];
+
+      export const PRICING_CURRENCY_CODES = #{json_array(pricing_currency_codes)} as const;
+      export type PricingCurrencyCode = (typeof PRICING_CURRENCY_CODES)[number];
+
+      export interface PricingServiceFeeCalculation {
+        ruleVersion: string;
+        baseFeeAmount: number;
+        membershipTierApplied: string | null;
+        membershipDiscountRate: number | null;
+        capAmount: number;
+        discountedFeeAmount: number;
+        finalFeeAmount: number;
+        pricingSnapshotHash: string;
+        feeCalculatedAt: string;
+      }
+
+      export interface DealConfirmationCreateRequest {
+        selectedBidId: string;
+        finalConfirmedAmount: number;
+        currency: PricingCurrencyCode;
+        contractFileAssetIds: string[];
+        confirmationRole: 'publisher' | 'factory';
+        platformServiceFeeRecalculationAwarenessConfirmed: boolean;
+        idempotencyKey: string;
+      }
+
+      export interface DealConfirmationAcceptedResponse {
+        dealConfirmationId: string;
+        dealStatus: DealConfirmationStatus;
+        selectedBidId: string;
+        finalConfirmedAmount: number;
+        platformServiceFeeCalculation: PricingServiceFeeCalculation;
+        serviceFeeChargeStatus: string;
+        updatedAt: string;
+      }
+
+      export interface DealConfirmationReadModel extends DealConfirmationAcceptedResponse {
+        publisherConfirmedAt: string | null;
+        factoryConfirmedAt: string | null;
+        publisherAuthenticitySincerityStatus: string | null;
+      }
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_ENTRY_KEYS = #{json_array(workbench_entry_keys)} as const;
+      export type ProjectCommunicationWorkbenchEntryKey =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_ENTRY_KEYS)[number];
+
+      export const PROJECT_COMMUNICATION_WORKBENCH_GROUPS = #{json_array(workbench_groups)} as const;
+      export type ProjectCommunicationWorkbenchGroup =
+        (typeof PROJECT_COMMUNICATION_WORKBENCH_GROUPS)[number];
+
+      export const PROJECT_COMMUNICATION_MATERIAL_REVIEW_STATES = #{json_array(material_review_states)} as const;
+      export type ProjectCommunicationMaterialReviewState =
+        (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_STATES)[number];
+
+      export const PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES = #{json_array(chat_lock_reason_codes)} as const;
+      export type ProjectCommunicationChatLockReasonCode =
+        (typeof PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES)[number];
+
+      export const PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS = #{json_array(chat_required_next_actions)} as const;
+      export type ProjectCommunicationChatRequiredNextAction =
+        (typeof PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS)[number];
+
+      export interface ProjectCommunicationBusinessTodoSummary {
+        bidParticipationReviewPendingCount: number;
+        publisherMaterialReviewPendingCount: number;
+        bidMaterialReviewPendingCount: number;
+        dealConfirmationPendingCount: number;
+        totalPendingCount: number;
+      }
+
+      export interface ProjectCommunicationChatAvailability {
+        canSendMessage: boolean;
+        lockReasonCode: ProjectCommunicationChatLockReasonCode;
+        lockReasonText: string | null;
+        requiredNextAction: ProjectCommunicationChatRequiredNextAction;
+      }
+
+      export interface ProjectCommunicationThreadReadModel {
+        projectId: string;
+        threadId: string;
+        counterpartOrganizationId?: string | null;
+        chatAvailability: ProjectCommunicationChatAvailability;
+        generatedAt: string;
+      }
+
+      export interface CounterpartConversationProjectGroup {
+        projectId: string;
+        threadId: string;
+        projectDisplayTitle: string;
+        titleVisibility: string;
+        projectState: string;
+        latestActivityAt: string;
+        projectRelation?: string | null;
+        projectUnreadCount?: number;
+        hasProjectUnread?: boolean;
+        businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
+        cards: Array<Record<string, unknown>>;
+      }
+
+      export interface CounterpartConversationDetailResponse {
+        conversationId: string;
+        counterpart: Record<string, unknown>;
+        summary: Record<string, unknown>;
+        focusProjectId: string;
+        latestActivityAt: string;
+        projectGroups: CounterpartConversationProjectGroup[];
+      }
+
+      export interface ProjectCommunicationWorkbenchRouteTarget {
+        actionKey: string;
+        canonicalPath: string;
+        params: Record<string, string>;
+      }
+
+      export interface ProjectCommunicationWorkbenchTruthAnchor {
+        truthOwner: 'server';
+        subjectType: 'publisher_quote_basis_material' | 'bid_submission_material' | 'deal_confirmation';
+        projectId: string;
+        threadId: string;
+        bidId: string | null;
+        dealConfirmationId: string | null;
+      }
+
+      export interface ProjectCommunicationWorkbenchEntry {
+        entryKey: ProjectCommunicationWorkbenchEntryKey;
+        group: ProjectCommunicationWorkbenchGroup;
+        label: string;
+        summary: string | null;
+        projectId: string;
+        threadId: string;
+        bidId: string | null;
+        viewerRole: 'publisher' | 'bidder' | 'unknown';
+        subjectOwnerRole: 'publisher' | 'bidder' | 'platform';
+        availabilityState: 'unsubmitted' | 'readable' | 'unavailable';
+        reviewState: ProjectCommunicationMaterialReviewState | null;
+        actionState: 'enabled' | 'readonly' | 'blocked';
+        attachmentCount: number;
+        latestFeedbackText: string | null;
+        latestFeedbackAt: string | null;
+        reviewedAt: string | null;
+        badgeCount: number;
+        disabledReason: string | null;
+        routeTarget: ProjectCommunicationWorkbenchRouteTarget | null;
+        truthAnchor: ProjectCommunicationWorkbenchTruthAnchor;
+      }
+
+      export interface ProjectCommunicationWorkbenchReadModel {
+        projectId: string;
+        threadId: string;
+        viewerRole: 'publisher' | 'bidder' | 'unknown';
+        businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
+        chatAvailability: ProjectCommunicationChatAvailability;
+        entries: ProjectCommunicationWorkbenchEntry[];
+        generatedAt: string;
+      }
+
+      export interface ProjectCommunicationMaterialReviewRequest {
+        projectId: string;
+        threadId: string;
+        bidId?: string | null;
+        entryKey: ProjectCommunicationWorkbenchEntryKey;
+        reviewAction: 'confirm' | 'request_supplement';
+        feedbackReasonCodes?: string[];
+        feedbackText?: string | null;
+        sourceVersionToken?: string | null;
+        idempotencyKey: string;
+      }
+
+      export interface ProjectCommunicationMaterialReviewAcceptedResponse {
+        entry: ProjectCommunicationWorkbenchEntry;
+        entries?: ProjectCommunicationWorkbenchEntry[];
       }
 
       export const BID_RESULT_STATES = #{json_array(bid_result_states)} as const;

@@ -20,6 +20,11 @@ AppApiClient _client(FakeAppApiTransport transport) {
   );
 }
 
+Future<void> _openNotificationPanel(WidgetTester tester) async {
+  await tester.tap(find.byTooltip('消息中心'));
+  await tester.pumpAndSettle();
+}
+
 void main() {
   testWidgets('messages building renders bounded notification center', (
     WidgetTester tester,
@@ -60,6 +65,8 @@ void main() {
               'unread': <String, Object?>{
                 'total': 1,
                 'projectCommunication': 1,
+                'businessTodo': 0,
+                'bidParticipationRequest': 0,
                 'forumInteraction': 0,
                 'system': 0,
               },
@@ -78,6 +85,8 @@ void main() {
               'unread': <String, Object?>{
                 'total': 0,
                 'projectCommunication': 0,
+                'businessTodo': 0,
+                'bidParticipationRequest': 0,
                 'forumInteraction': 0,
                 'system': 0,
               },
@@ -97,16 +106,16 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('消息中心'), findsOneWidget);
-    expect(find.text('重要通知、项目沟通等消息'), findsOneWidget);
+    expect(find.text('消息中心'), findsNothing);
+    expect(find.text('重要通知、项目沟通等消息'), findsNothing);
     expect(find.textContaining('有新的项目沟通消息'), findsNothing);
 
-    await tester.tap(find.text('消息中心'));
-    await tester.pumpAndSettle();
+    await _openNotificationPanel(tester);
 
+    expect(find.text('消息中心'), findsOneWidget);
     expect(find.text('项目沟通'), findsWidgets);
     expect(find.textContaining('有新的项目沟通消息'), findsOneWidget);
-    expect(find.text('报价确认已发送。'), findsOneWidget);
+    expect(find.text('当前通知暂时无法定位，请稍后重试或从对应入口进入。'), findsOneWidget);
 
     await tester.tap(find.textContaining('有新的项目沟通消息'));
     await tester.pumpAndSettle();
@@ -118,7 +127,7 @@ void main() {
           .length,
       0,
     );
-    expect(find.text('当前通知暂时无法定位，请稍后重试或从对应入口进入。'), findsOneWidget);
+    expect(find.text('当前通知暂时无法定位，请稍后重试或从对应入口进入。'), findsWidgets);
   });
 
   testWidgets('notification center scrolls long lists without overflow', (
@@ -164,6 +173,8 @@ void main() {
               'unread': const <String, Object?>{
                 'total': 20,
                 'projectCommunication': 20,
+                'businessTodo': 0,
+                'bidParticipationRequest': 0,
                 'forumInteraction': 0,
                 'system': 0,
               },
@@ -183,8 +194,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('消息中心'));
-    await tester.pumpAndSettle();
+    await _openNotificationPanel(tester);
 
     expect(tester.takeException(), isNull);
     expect(find.textContaining('项目沟通 · 通知 1'), findsOneWidget);
@@ -193,8 +203,78 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('project communication refresh does not reload shell context', (
+    WidgetTester tester,
+  ) async {
+    var messageRequestCount = 0;
+    final refreshSignal = ValueNotifier<int>(0);
+    addTearDown(refreshSignal.dispose);
+    final transport = FakeAppApiTransport(
+      handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+        'GET /api/app/message/interactions': (request) async {
+          messageRequestCount += 1;
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: const <String, Object?>{
+              'lane': 'project_communication',
+              'items': <Object?>[],
+            },
+          );
+        },
+        'GET /api/app/notifications/list': (request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: const <String, Object?>{
+              'items': <Object?>[],
+              'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+              'unread': <String, Object?>{
+                'total': 3,
+                'projectCommunication': 2,
+                'businessTodo': 1,
+                'bidParticipationRequest': 1,
+                'forumInteraction': 0,
+                'system': 0,
+              },
+            },
+          );
+        },
+      },
+    );
+    final shellConsumer = _FakeShellContextConsumer(messagesUnread: 99);
+    final controller = AppBootstrapController(
+      shellContextConsumer: shellConsumer,
+    );
+    final client = _client(transport);
+    MessagesConsumerLayer.install(MessagesConsumerLayer(client: client));
+    ForumConsumerLayer.install(ForumConsumerLayer(client: client));
+    addTearDown(controller.dispose);
+    addTearDown(MessagesConsumerLayer.reset);
+    addTearDown(ForumConsumerLayer.reset);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: AppShellScope(
+          controller: controller,
+          child: Scaffold(body: MessagesPage(refreshSignal: refreshSignal)),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    final shellReloadsBeforeRefresh = shellConsumer.loadResultCount;
+    refreshSignal.value += 1;
+    await tester.pump();
+    await tester.pumpAndSettle();
+
+    expect(messageRequestCount, greaterThanOrEqualTo(2));
+    expect(shellConsumer.loadResultCount, shellReloadsBeforeRefresh);
+    expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '3');
+  });
+
   testWidgets(
-    'marking a notification read refreshes shell unread badge source',
+    'project communication notification opens target without direct read mutation',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(
         handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
@@ -223,6 +303,7 @@ void main() {
                     'projectId': 'project-1',
                     'threadId': 'thread-1',
                     'routeTarget': <String, Object?>{
+                      'state': 'enabled',
                       'routeParams': <String, Object?>{
                         'threadId': 'thread-1',
                         'projectId': 'project-1',
@@ -231,6 +312,17 @@ void main() {
                       'canonicalPath':
                           '/api/app/message/counterpart-conversation/detail',
                       'localEntryKey': 'counterpart_conversation.open',
+                      'requiredParams': <Object?>[
+                        'conversationId',
+                        'projectId',
+                      ],
+                    },
+                    'routeTargetAvailability': <String, Object?>{
+                      'state': 'available',
+                      'reasonCode': 'ROUTE_TARGET_AVAILABLE',
+                      'reasonText': '当前通知入口可用。',
+                      'fallbackAction': 'none',
+                      'fallbackRouteTarget': null,
                     },
                     'createdAt': '2026-05-01T08:00:00Z',
                     'readAt': null,
@@ -241,6 +333,8 @@ void main() {
                 'unread': <String, Object?>{
                   'total': 1,
                   'projectCommunication': 1,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
                   'forumInteraction': 0,
                   'system': 0,
                 },
@@ -256,6 +350,8 @@ void main() {
                 'unread': <String, Object?>{
                   'total': 0,
                   'projectCommunication': 0,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
                   'forumInteraction': 0,
                   'system': 0,
                 },
@@ -291,8 +387,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('消息中心'));
-      await tester.pumpAndSettle();
+      await _openNotificationPanel(tester);
 
       await tester.tap(find.textContaining('有新的项目沟通消息'));
       await tester.pumpAndSettle();
@@ -305,9 +400,460 @@ void main() {
                   request.canonicalPath == '/api/app/notifications/read',
             )
             .length,
+        0,
+      );
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '1');
+    },
+  );
+
+  testWidgets(
+    'stale project notification opens subject fallback without marking read',
+    (WidgetTester tester) async {
+      var dismissed = false;
+      var readRequests = 0;
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            if (dismissed) {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'items': <Object?>[],
+                  'page': <String, Object?>{
+                    'nextCursor': null,
+                    'hasMore': false,
+                  },
+                  'unread': <String, Object?>{
+                    'total': 0,
+                    'projectCommunication': 0,
+                    'businessTodo': 0,
+                    'bidParticipationRequest': 0,
+                    'forumInteraction': 0,
+                    'system': 0,
+                  },
+                },
+              );
+            }
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'notificationId': 'notice-stale-1',
+                    'type': 'project_communication_message',
+                    'source': 'project_communication',
+                    'title': '有新的项目沟通消息',
+                    'body': '旧入口已经不可用。',
+                    'projectId': 'project-1',
+                    'threadId': 'thread-stale',
+                    'routeTarget': <String, Object?>{
+                      'state': 'enabled',
+                      'routeParams': <String, Object?>{
+                        'threadId': 'thread-stale',
+                        'projectId': 'project-1',
+                        'conversationId': 'org-1',
+                      },
+                      'canonicalPath':
+                          '/api/app/message/counterpart-conversation/detail',
+                      'localEntryKey': 'counterpart_conversation.open',
+                      'requiredParams': <Object?>[
+                        'conversationId',
+                        'projectId',
+                      ],
+                    },
+                    'routeTargetAvailability': <String, Object?>{
+                      'state': 'expired',
+                      'reasonCode': 'PROJECT_COMMUNICATION_THREAD_NOT_FOUND',
+                      'reasonText': '入口已失效，可从主体项目列表重新进入。',
+                      'fallbackAction': 'open_subject_list',
+                      'fallbackRouteTarget': <String, Object?>{
+                        'state': 'enabled',
+                        'routeParams': <String, Object?>{
+                          'projectId': 'project-1',
+                          'conversationId': 'org-1',
+                        },
+                        'canonicalPath':
+                            '/api/app/message/counterpart-conversation/detail',
+                        'localEntryKey': 'counterpart_conversation.open',
+                        'requiredParams': <Object?>[
+                          'conversationId',
+                          'projectId',
+                        ],
+                      },
+                    },
+                    'createdAt': '2026-05-01T08:00:00Z',
+                    'readAt': null,
+                    'unread': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 1,
+                  'projectCommunication': 1,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+          'POST /api/app/notifications/read': (request) async {
+            readRequests += 1;
+            dismissed = true;
+            expect(request.body, <String, Object?>{
+              'notificationIds': <String>['notice-stale-1'],
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'readNotificationIds': <Object?>['notice-stale-1'],
+                'unread': <String, Object?>{
+                  'total': 0,
+                  'projectCommunication': 0,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final client = _client(transport);
+      MessagesConsumerLayer.install(MessagesConsumerLayer(client: client));
+      ForumConsumerLayer.install(ForumConsumerLayer(client: client));
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(home: const Scaffold(body: MessagesPage())),
+      );
+      await tester.pumpAndSettle();
+
+      await _openNotificationPanel(tester);
+
+      expect(find.text('入口已失效'), findsOneWidget);
+      expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
+      expect(find.text('从主体列表进入'), findsOneWidget);
+      expect(find.text('忽略此提醒'), findsOneWidget);
+      expect(find.text('清理失效提醒 1'), findsOneWidget);
+
+      await tester.tap(find.textContaining('有新的项目沟通消息'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('当前没有新的项目沟通'), findsOneWidget);
+      expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
+      expect(
+        transport.requests
+            .where(
+              (request) =>
+                  request.canonicalPath == '/api/app/notifications/read',
+            )
+            .length,
+        0,
+      );
+      expect(readRequests, 0);
+
+      await _openNotificationPanel(tester);
+      await tester.tap(find.text('清理失效提醒 1'));
+      await tester.pumpAndSettle();
+
+      expect(readRequests, 1);
+      expect(find.text('未读 0'), findsOneWidget);
+      expect(find.text('全部当前为空'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'messages page keeps shell badge from shell context when project communication is empty',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 1,
+                  'projectCommunication': 0,
+                  'businessTodo': 1,
+                  'bidParticipationRequest': 1,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final controller = AppBootstrapController(
+        shellContextConsumer: _FakeShellContextConsumer(messagesUnread: 1),
+      );
+      MessagesConsumerLayer.install(
+        MessagesConsumerLayer(client: _client(transport)),
+      );
+      ForumConsumerLayer.install(
+        ForumConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShellScope(
+            controller: controller,
+            child: const Scaffold(body: MessagesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '1');
+    },
+  );
+
+  testWidgets(
+    'messages page syncs shell badge from notification unread total only',
+    (WidgetTester tester) async {
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'notificationId': 'notice-1',
+                    'type': 'project_communication_message',
+                    'source': 'project_communication',
+                    'title': '有新的项目沟通消息',
+                    'body': '这条 item 是未读，但 total 为 0。',
+                    'projectId': 'project-1',
+                    'threadId': 'thread-1',
+                    'routeTarget': null,
+                    'createdAt': '2026-05-01T08:00:00Z',
+                    'readAt': null,
+                    'unread': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 0,
+                  'projectCommunication': 0,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final controller = AppBootstrapController(
+        shellContextConsumer: _FakeShellContextConsumer(messagesUnread: 9),
+      );
+      MessagesConsumerLayer.install(
+        MessagesConsumerLayer(client: _client(transport)),
+      );
+      ForumConsumerLayer.install(
+        ForumConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          home: AppShellScope(
+            controller: controller,
+            child: const Scaffold(body: MessagesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
+    },
+  );
+
+  testWidgets(
+    'bid participation notification marks read and opens existing review thread',
+    (WidgetTester tester) async {
+      String? openedRoute;
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'notificationId': 'notice-bpr-1',
+                    'type': 'bid_participation_request',
+                    'source': 'bid_participation_request',
+                    'title': '有新的参与竞标申请',
+                    'body': '有供应商提交了参与竞标申请，请进入审核线程处理。',
+                    'projectId': 'project-1',
+                    'threadId': 'request-1',
+                    'routeTarget': <String, Object?>{
+                      'canonicalPath':
+                          '/api/app/project/bid-participation/thread/detail',
+                      'localEntryKey': 'bid_participation_request.open',
+                      'requiredParams': <Object?>[
+                        'threadId',
+                        'projectId',
+                        'requestId',
+                      ],
+                      'routeParams': <String, Object?>{
+                        'threadId': 'request-1',
+                        'projectId': 'project-1',
+                        'requestId': 'request-1',
+                      },
+                      'state': 'enabled',
+                    },
+                    'createdAt': '2026-05-04T07:30:00Z',
+                    'readAt': null,
+                    'unread': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 1,
+                  'projectCommunication': 0,
+                  'businessTodo': 1,
+                  'bidParticipationRequest': 1,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+          'POST /api/app/notifications/read': (request) async {
+            expect(request.body, <String, Object?>{
+              'notificationIds': <String>['notice-bpr-1'],
+            });
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'readNotificationIds': <Object?>['notice-bpr-1'],
+                'unread': <String, Object?>{
+                  'total': 0,
+                  'projectCommunication': 0,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+        },
+      );
+      final controller = AppBootstrapController(
+        shellContextConsumer: _FakeShellContextConsumer(),
+      );
+      MessagesConsumerLayer.install(
+        MessagesConsumerLayer(client: _client(transport)),
+      );
+      ForumConsumerLayer.install(
+        ForumConsumerLayer(client: _client(transport)),
+      );
+      addTearDown(controller.dispose);
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          onGenerateRoute: (settings) {
+            openedRoute = settings.name;
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const Scaffold(body: Text('处理参与竞标申请')),
+            );
+          },
+          home: AppShellScope(
+            controller: controller,
+            child: const Scaffold(body: MessagesPage()),
+          ),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _openNotificationPanel(tester);
+
+      expect(find.text('业务待办'), findsWidgets);
+      expect(find.textContaining('有新的参与竞标申请'), findsOneWidget);
+
+      await tester.tap(find.textContaining('有新的参与竞标申请'));
+      await tester.pumpAndSettle();
+
+      expect(
+        transport.requests
+            .where(
+              (request) =>
+                  request.canonicalPath == '/api/app/notifications/read',
+            )
+            .length,
         1,
       );
-      expect(shellConsumer.loadResultCount, 2);
+      expect(
+        openedRoute,
+        contains('/exhibition/projects/bid-participation-thread'),
+      );
+      expect(find.text('处理参与竞标申请'), findsOneWidget);
       expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
     },
   );
@@ -399,7 +945,7 @@ void main() {
   );
 
   test(
-    'notification routeTarget ignores carried threadId when opening project communication',
+    'notification routeTarget carries threadId when opening project communication',
     () {
       final item = parseAppNotificationItem(const <String, Object?>{
         'notificationId': 'notice-1',
@@ -427,7 +973,41 @@ void main() {
 
       expect(
         item.routeTarget?.routeLocation,
-        '/exhibition/messages/counterpart-conversation?conversationId=org-1&projectId=project-1',
+        '/exhibition/messages/counterpart-conversation?conversationId=org-1&projectId=project-1&threadId=thread-1',
+      );
+    },
+  );
+
+  test(
+    'bid participation notification routeTarget opens existing review thread',
+    () {
+      final item = parseAppNotificationItem(const <String, Object?>{
+        'notificationId': 'notice-bpr-1',
+        'type': 'bid_participation_request',
+        'source': 'bid_participation_request',
+        'title': '有新的参与竞标申请',
+        'body': '有供应商提交了参与竞标申请，请进入审核线程处理。',
+        'projectId': 'project-1',
+        'threadId': 'request-1',
+        'routeTarget': <String, Object?>{
+          'state': 'enabled',
+          'routeParams': <String, Object?>{
+            'threadId': 'request-1',
+            'projectId': 'project-1',
+            'requestId': 'request-1',
+          },
+          'canonicalPath': '/api/app/project/bid-participation/thread/detail',
+          'localEntryKey': 'bid_participation_request.open',
+          'requiredParams': <Object?>['threadId', 'projectId', 'requestId'],
+        },
+        'createdAt': '2026-05-04T07:30:00Z',
+        'readAt': null,
+        'unread': true,
+      });
+
+      expect(
+        item.routeTarget?.routeLocation,
+        '/exhibition/projects/bid-participation-thread?threadId=request-1&projectId=project-1&requestId=request-1',
       );
     },
   );
@@ -447,6 +1027,9 @@ final class _NoopRealtimeClient implements ProjectCommunicationRealtimeClient {
 }
 
 final class _FakeShellContextConsumer implements AppShellContextConsumer {
+  _FakeShellContextConsumer({this.messagesUnread = 0});
+
+  final int messagesUnread;
   int loadResultCount = 0;
 
   @override
@@ -461,7 +1044,7 @@ final class _FakeShellContextConsumer implements AppShellContextConsumer {
       path: AppShellContextCanonicalPaths.shellContext,
       data: AppShellContextData(
         organizationId: 'org-1',
-        unreadSummary: const <String, Object?>{'messages': 0},
+        unreadSummary: <String, Object?>{'messages': messagesUnread},
       ),
     );
   }

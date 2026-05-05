@@ -961,7 +961,7 @@ void main() {
   );
 
   testWidgets(
-    'exhibition home factory channel keeps featured recommendation detail CTA visible',
+    'exhibition home factory channel uses clean card with whole-card detail entry',
     (WidgetTester tester) async {
       final homeClient = FakeExhibitionHomeAggregationClient(
         onLoad: (_) => contentHomeResult(),
@@ -981,7 +981,10 @@ void main() {
       await tester.tap(find.text('优选').last);
       await tester.pumpAndSettle();
       await _scrollTo(tester, find.text('工厂优选样本'));
-      expect(find.text('查看工厂详情'), findsOneWidget);
+      expect(find.text('查看工厂详情'), findsNothing);
+      await tester.tap(find.text('工厂优选样本'));
+      await tester.pumpAndSettle();
+      expect(find.text('工厂优选样本'), findsWidgets);
     },
   );
 

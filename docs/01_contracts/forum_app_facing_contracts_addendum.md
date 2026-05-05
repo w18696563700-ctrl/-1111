@@ -37,13 +37,18 @@ layer: L2 Contracts
   - `GET /api/app/forum/topic/list`
   - `GET /api/app/forum/topic/detail`
   - `GET /api/app/forum/post/detail`
+  - `GET /api/app/forum/author/profile`
+  - `GET /api/app/forum/author/posts`
   - `GET /api/app/forum/post/comments`
   - `POST /api/app/forum/post/comment`
+  - `POST /api/app/forum/post/edit`
+  - `POST /api/app/forum/post/delete`
   - `POST /api/app/forum/post/like`
   - `POST /api/app/forum/post/bookmark`
-  - `POST /api/app/forum/topic/follow`
+  - `POST /api/app/forum/author/follow`
   - `POST /api/app/forum/draft/save`
   - `GET /api/app/forum/draft/list`
+  - `GET /api/app/forum/draft/detail`
   - `POST /api/app/forum/draft/delete`
   - `POST /api/app/forum/publish`
   - `GET /api/app/forum/search`
@@ -51,12 +56,18 @@ layer: L2 Contracts
   - `GET /api/app/forum/me/posts`
   - `GET /api/app/forum/me/comments`
   - `GET /api/app/forum/me/bookmarks`
+  - `GET /api/app/forum/me/likes`
   - `GET /api/app/forum/me/follows`
+  - `GET /api/app/forum/reports/mine`
+  - `GET /api/app/forum/reports/mine/{ticketId}`
+  - `POST /api/app/forum/report/submit`
   - `GET /api/app/forum/interaction/inbox`
 - Current path-matrix meaning:
   - one forum family only
   - one app-facing object tree only
   - no second forum family under `messages` or `profile`
+  - author follow is the current active follow route; topic follow remains a
+    future extension and is not part of this active route matrix
 
 ## Minimum Contract Object Families
 - Current forum app-facing contracts must cover at minimum:
@@ -66,20 +77,27 @@ layer: L2 Contracts
   - topic metadata for classify, select, and filter
   - forum post detail
   - forum post comments
+  - public author profile and public author posts
   - forum interaction actions:
     - like
     - comment
     - bookmark
-    - follow
+    - author follow
+  - own post continuation:
+    - edit continuation
+    - delete continuation
   - forum publish
   - forum draft save
   - forum draft list
+  - forum draft detail
   - forum draft delete
   - forum me assets:
     - my posts
     - my comments
     - my bookmarks
+    - my likes
     - my follows
+    - my reports
   - forum interaction inbox:
     - replies
     - likes
@@ -104,7 +122,9 @@ layer: L2 Contracts
   - my posts
   - my comments
   - my bookmarks
+  - my likes
   - my follows
+  - my report records
   - draft assets
 - `profile` must not take over:
   - forum main browsing contracts

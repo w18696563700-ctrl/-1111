@@ -60,9 +60,20 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
           onChanged: (_) => _markComposerDirty(),
         ),
-        if (_mediaItems.isNotEmpty) ...<Widget>[
+        if (_inlineImageItems.isNotEmpty) ...<Widget>[
           const SizedBox(height: 14),
-          _inlineAttachmentList(context),
+          _ForumComposerInlineImageGrid(
+            items: _inlineImageItems,
+            onPreview: (item) => _showImagePreviewDialog(context, item),
+            onRemove: (item) => _removeMedia(item.localId),
+            onUpload: (item) => _startMediaUpload(item.localId),
+            saving: _saving,
+            publishing: _publishing,
+          ),
+        ],
+        if (_inlineFileItems.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 14),
+          _inlineAttachmentList(context, _inlineFileItems),
         ],
         const SizedBox(height: 18),
         _mediaSection(context),
@@ -82,7 +93,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
                 _bodyController.text.trim().isEmpty)) ...<Widget>[
           const SizedBox(height: 10),
           Text(
-            '标题和正文写完后，请先保存草稿；保存后可直接继续发布，离开后也可从草稿箱继续。',
+            '标题和正文写完后，请保存草稿；保存后会自动进入草稿箱，由草稿箱承接发布。',
             style: theme.textTheme.bodySmall?.copyWith(
               color: theme.colorScheme.onSurfaceVariant,
             ),
@@ -150,13 +161,19 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Row(
               children: <Widget>[
-                Text(
-                  '分类：$currentLabel',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                ForumCategoryBadge(label: currentLabel, compact: true),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '分类：$currentLabel',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppVisualTokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -247,7 +264,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
         ),
         const SizedBox(height: 8),
         Text(
-          '当前稳定路径是先保存草稿，再继续发布。可添加图片、视频或 PDF/文档；若当前还没保存草稿，会先提示补齐内容并在保存后继续上传。',
+          '当前入口只负责编辑草稿。图片、视频或 PDF/文档会在内容补齐后自动上传；保存草稿后进入草稿箱发布帖子。',
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -258,7 +275,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           _mediaSectionNotice(
             context,
             icon: Icons.info_outline_rounded,
-            message: '附件已选中，请先填写分类、标题和正文，再点击“保存草稿”，系统会继续上传。',
+            message: '附件已选中，请先填写分类、标题和正文；内容补齐后系统会自动上传。',
           ),
         ],
         if (_hasFailedMedia) ...<Widget>[
@@ -266,7 +283,8 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           _mediaSectionNotice(
             context,
             icon: Icons.error_outline_rounded,
-            message: '仍有附件未完成上传，可以点“重新上传”，也可以先移除后再继续。',
+            message:
+                _firstFailedMediaMessage() ?? '仍有附件未完成上传，可以点“重新上传”，也可以先移除后再继续。',
             tone: theme.colorScheme.errorContainer,
             iconColor: theme.colorScheme.error,
           ),
@@ -275,7 +293,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           _mediaSectionNotice(
             context,
             icon: Icons.verified_rounded,
-            message: '附件上传确认已完成，请先保存草稿，避免发布时因为附件未承接被拦住。',
+            message: '附件上传确认已完成，保存草稿后会承接附件并进入草稿箱。',
           ),
         ],
         const SizedBox(height: 12),
@@ -347,20 +365,54 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
     );
   }
 
-  Widget _inlineAttachmentList(BuildContext context) {
+  String? _firstFailedMediaMessage() {
+    for (final item in _mediaItems) {
+      if (item.stage != _ForumComposerMediaStage.uploadFailed) {
+        continue;
+      }
+      final message = item.statusMessage?.trim();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+    }
+    return null;
+  }
+
+  List<_ForumComposerMediaItem> get _inlineImageItems {
+    return _mediaItems
+        .where(
+          (_ForumComposerMediaItem item) =>
+              _forumIsImageMimeType(item.mimeType) && item.bytes.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
+
+  List<_ForumComposerMediaItem> get _inlineFileItems {
+    return _mediaItems
+        .where(
+          (_ForumComposerMediaItem item) =>
+              !_forumIsImageMimeType(item.mimeType) || item.bytes.isEmpty,
+        )
+        .toList(growable: false);
+  }
+
+  Widget _inlineAttachmentList(
+    BuildContext context,
+    List<_ForumComposerMediaItem> items,
+  ) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '正文下的附件',
+          '附件',
           style: theme.textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: theme.colorScheme.onSurfaceVariant,
           ),
         ),
         const SizedBox(height: 10),
-        ..._mediaItems.map(
+        ...items.map(
           (_ForumComposerMediaItem item) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _mediaItemCard(context, item),
@@ -373,12 +425,17 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
   Widget _mediaItemCard(BuildContext context, _ForumComposerMediaItem item) {
     final theme = Theme.of(context);
     final canRemove = !item.isTransferActive;
-    final canUpload = item.canStartUpload && !_saving && !_publishing;
+    final canUpload =
+        item.stage == _ForumComposerMediaStage.uploadFailed &&
+        item.canStartUpload &&
+        !_saving &&
+        !_publishing;
     final uploadLabel = item.stage == _ForumComposerMediaStage.uploadFailed
         ? '重新上传'
         : '开始上传';
     final statusText = item.statusMessage ?? _forumMediaStageLabel(item);
-    final previewLabel = item.mimeType.startsWith('image/') && item.bytes.isNotEmpty
+    final previewLabel =
+        item.mimeType.startsWith('image/') && item.bytes.isNotEmpty
         ? '点名称预览'
         : null;
     final subtitle = previewLabel == null
@@ -472,9 +529,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
 
   Widget _compactMediaTitleRow(
     BuildContext context,
-    _ForumComposerMediaItem item,
-    {required String subtitle}
-  ) {
+    _ForumComposerMediaItem item, {
+    required String subtitle,
+  }) {
     if (item.mimeType.startsWith('image/') && item.bytes.isNotEmpty) {
       return _imagePreviewTriggerCard(context, item, subtitle: subtitle);
     }
@@ -631,7 +688,8 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showGenericPreviewDialog(context, item, subtitle: subtitle),
+        onTap: () =>
+            _showGenericPreviewDialog(context, item, subtitle: subtitle),
         child: Ink(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
@@ -644,7 +702,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
               children: <Widget>[
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+                    color: theme.colorScheme.primaryContainer.withValues(
+                      alpha: 0.7,
+                    ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Padding(
@@ -754,12 +814,16 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: SingleChildScrollView(
                       child: SelectableText(
                         previewText,
-                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.5,
+                        ),
                       ),
                     ),
                   )
@@ -770,7 +834,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -833,9 +899,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
       final opened = await _openLocalPreviewFile(file.path);
       _showActionFeedback(
         opened
-            ? (item.mimeType.startsWith('video/')
-                  ? '已在系统中打开视频预览'
-                  : '已在系统中打开文件')
+            ? (item.mimeType.startsWith('video/') ? '已在系统中打开视频预览' : '已在系统中打开文件')
             : '当前设备暂时不能直接打开这个附件，可先上传后继续按帖子附件链查看',
         error: !opened,
       );
@@ -870,7 +934,12 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
         return result.exitCode == 0;
       }
       if (Platform.isWindows) {
-        final result = await Process.run('cmd', <String>['/c', 'start', '', path]);
+        final result = await Process.run('cmd', <String>[
+          '/c',
+          'start',
+          '',
+          path,
+        ]);
         return result.exitCode == 0;
       }
     } on ProcessException {
@@ -932,7 +1001,6 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
   Widget _composerBottomBar(
     BuildContext context, {
     required bool canSaveDraft,
-    required bool canPublish,
     required String? helperText,
   }) {
     final theme = Theme.of(context);
@@ -964,16 +1032,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
               Row(
                 children: <Widget>[
                   Expanded(
-                    child: OutlinedButton(
-                      onPressed: canSaveDraft ? _saveDraft : null,
-                      child: Text(_saving ? '保存中' : '保存草稿'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
                     child: FilledButton(
-                      onPressed: canPublish ? _publish : null,
-                      child: Text(_publishing ? '发布中' : '发布'),
+                      onPressed: canSaveDraft ? _saveDraft : null,
+                      child: Text(_saving ? '保存中' : '保存草稿并跳转至草稿箱发布帖子'),
                     ),
                   ),
                 ],

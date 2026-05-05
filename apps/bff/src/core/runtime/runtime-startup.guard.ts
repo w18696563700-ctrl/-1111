@@ -3,11 +3,6 @@ import { RuntimeConfigService } from './runtime-config.service';
 
 type HostKind = 'loopback' | 'private' | 'public' | 'invalid';
 
-function readExplicitEnv(name: string): string | null {
-  const value = process.env[name]?.trim();
-  return value ? value : null;
-}
-
 function classifyHost(hostname: string): HostKind {
   const host = hostname.trim().toLowerCase();
   if (!host) {
@@ -47,8 +42,7 @@ export function assertBffRuntimeBoundary(
   config: RuntimeConfigService,
   logger = new Logger('BffBootstrap'),
 ) {
-  const explicitServerBaseUrl = readExplicitEnv('SERVER_BASE_URL');
-  const upstreamSource = explicitServerBaseUrl ? 'env' : 'implicit_default';
+  const upstreamSource = config.hasExplicitServerBaseUrl ? 'env' : 'implicit_default';
   const upstreamHostKind = classifyUrlHost(config.serverBaseUrl);
   const bootSurface = isCompiledRuntime() ? 'compiled' : 'dev';
 
@@ -58,7 +52,7 @@ export function assertBffRuntimeBoundary(
     );
   }
 
-  if ((bootSurface === 'compiled' || config.isProduction) && !explicitServerBaseUrl) {
+  if ((bootSurface === 'compiled' || config.isProduction) && !config.hasExplicitServerBaseUrl) {
     throw new Error(
       'Refusing to start compiled/production BFF with implicit SERVER_BASE_URL fallback. ' +
         'Set SERVER_BASE_URL explicitly, including http://127.0.0.1:3001 if cloud-host loopback is intentional.',

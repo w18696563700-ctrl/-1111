@@ -91,10 +91,12 @@ class EnterpriseCard extends StatelessWidget {
     super.key,
     required this.item,
     required this.onPressed,
+    this.clean = false,
   });
 
   final EnterpriseHubListItem item;
   final VoidCallback onPressed;
+  final bool clean;
 
   @override
   Widget build(BuildContext context) {
@@ -165,7 +167,7 @@ class EnterpriseCard extends StatelessWidget {
                         ),
                       ),
                     ],
-                    if (chips.isNotEmpty) ...<Widget>[
+                    if (!clean && chips.isNotEmpty) ...<Widget>[
                       const SizedBox(height: 10),
                       Wrap(
                         spacing: 6,

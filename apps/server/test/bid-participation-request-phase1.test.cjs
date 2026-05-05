@@ -108,13 +108,35 @@ function createAuditRepository() {
   };
 }
 
+function createNotificationRepository() {
+  const rows = [];
+  return {
+    rows,
+    create(input) {
+      return {
+        ...input,
+        createdAt: input.createdAt ?? new Date('2026-04-28T09:30:00.000Z'),
+        updatedAt: input.updatedAt ?? new Date('2026-04-28T09:30:00.000Z'),
+      };
+    },
+    async save(value) {
+      rows.push(value);
+      return value;
+    },
+  };
+}
+
 function createServiceHarness({ requests = [], project = createProject() } = {}) {
   const { BidParticipationRequestEntity } = require('../dist/modules/bid_participation_request/entities/bid-participation-request.entity.js');
   const { IdentityAuditLogEntity } = require('../dist/modules/audit/identity-audit-log.entity.js');
+  const { AppNotificationEntity } = require('../dist/modules/notifications/entities/app-notification.entity.js');
   const { BidParticipationRequestPresenter } = require('../dist/modules/bid_participation_request/bid-participation-request.presenter.js');
   const { BidParticipationRequestWriteService } = require('../dist/modules/bid_participation_request/bid-participation-request.write.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
   const requestRepository = createRequestRepository(requests);
   const auditRepository = createAuditRepository();
+  const notificationRepository = createNotificationRepository();
   const projectRepository = {
     async findOneBy(where) {
       return where.id === project.id ? project : null;
@@ -129,6 +151,9 @@ function createServiceHarness({ requests = [], project = createProject() } = {})
           }
           if (entity === IdentityAuditLogEntity) {
             return auditRepository;
+          }
+          if (entity === AppNotificationEntity) {
+            return notificationRepository;
           }
           throw new Error('unexpected repository');
         },
@@ -184,12 +209,20 @@ function createServiceHarness({ requests = [], project = createProject() } = {})
       sessionVerifier,
       eligibilityService,
       new BidParticipationRequestPresenter(),
+      new NotificationService(
+        notificationRepository,
+        {},
+        {},
+        sessionVerifier,
+        new NotificationPresenter(),
+      ),
     ),
+    notificationRepository,
   };
 }
 
-test('bid participation create writes pending truth and append-only audit', async () => {
-  const { service, requestRepository, auditRepository } = createServiceHarness();
+test('bid participation create writes pending truth, notification, and append-only audit', async () => {
+  const { service, requestRepository, auditRepository, notificationRepository } = createServiceHarness();
   const result = await service.createRequest(
     { projectId: 'project-1' },
     createContext('bid-participation-create'),
@@ -202,6 +235,20 @@ test('bid participation create writes pending truth and append-only audit', asyn
   assert.equal(auditRepository.rows.length, 1);
   assert.equal(auditRepository.rows[0].objectType, 'bid_participation_request');
   assert.equal(auditRepository.rows[0].action, 'BidParticipationRequested');
+  assert.equal(notificationRepository.rows.length, 1);
+  assert.equal(notificationRepository.rows[0].type, 'bid_participation_request');
+  assert.equal(notificationRepository.rows[0].source, 'bid_participation_request');
+  assert.equal(notificationRepository.rows[0].organizationId, 'publisher-org');
+  assert.equal(notificationRepository.rows[0].projectId, 'project-1');
+  assert.equal(notificationRepository.rows[0].threadId, requestRepository.rows[0].id);
+  assert.equal(
+    notificationRepository.rows[0].routeTarget.canonicalPath,
+    '/api/app/project/bid-participation/thread/detail',
+  );
+  assert.equal(
+    notificationRepository.rows[0].routeTarget.routeParams.requestId,
+    requestRepository.rows[0].id,
+  );
   assert.deepEqual(result, {
     requestId: requestRepository.rows[0].id,
     projectId: 'project-1',

@@ -29,14 +29,24 @@ export class NotificationRouteService {
     }
   }
 
-  async listNotifications(pageSize: string | undefined, cursor: string | undefined, headers: IncomingHttpHeaders) {
+  async listNotifications(
+    query: {
+      pageSize?: string;
+      cursor?: string;
+      source?: string;
+      lane?: string;
+    },
+    headers: IncomingHttpHeaders
+  ) {
     const path = '/server/notifications/list';
     try {
       const result = await this.serverClient.get<unknown>(path, {
         headers: this.buildScopedHeaders(headers),
         params: {
-          pageSize: this.readOptionalQuery(pageSize),
-          cursor: this.readOptionalQuery(cursor)
+          pageSize: this.readOptionalQuery(query.pageSize),
+          cursor: this.readOptionalQuery(query.cursor),
+          source: this.readOptionalQuery(query.source),
+          lane: this.readOptionalQuery(query.lane)
         }
       });
       return readAppNotificationListReadModel(result);

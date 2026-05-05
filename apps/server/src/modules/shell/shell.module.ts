@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { MembershipModule } from '../membership/membership.module';
+import { MessageInteractionModule } from '../message_interaction/message-interaction.module';
+import { NotificationModule } from '../notifications/notification.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { PrivateOperatingSystemReorganizationModule } from '../private_operating_system_reorganization/private-operating-system-reorganization.module';
 import { ProjectCommunicationModule } from '../project_communication/project-communication.module';
@@ -14,6 +16,8 @@ import { ShellQueryService } from './shell-query.service';
     AuthModule,
     OrganizationModule,
     MembershipModule,
+    MessageInteractionModule,
+    NotificationModule,
     PrivateOperatingSystemReorganizationModule,
     ProjectCommunicationModule,
     UploadModule

@@ -88,6 +88,13 @@ export type CounterpartConversationProjectGroupProjection = {
   projectUnreadCount: number;
   hasProjectUnread: boolean;
   latestUnreadMessageAt: string | null;
+  businessTodoSummary: {
+    bidParticipationReviewPendingCount: number;
+    publisherMaterialReviewPendingCount: number;
+    bidMaterialReviewPendingCount: number;
+    dealConfirmationPendingCount: number;
+    totalPendingCount: number;
+  };
   pricingSummary?: Record<string, unknown>;
   ratingEntry: CounterpartConversationRatingEntryProjection | null;
   cards: CounterpartConversationBusinessCardProjection[];

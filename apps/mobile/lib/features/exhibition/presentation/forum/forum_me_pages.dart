@@ -213,9 +213,12 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
           actions: <Widget>[
             AppPrimaryButton(
               label: '查看帖子',
-              onPressed: () => Navigator.of(
-                context,
-              ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
+              onPressed: () => Navigator.of(context).pushNamed(
+                ExhibitionRoutes.forumPostWithPostId(
+                  item.postId,
+                  title: item.title,
+                ),
+              ),
             ),
             AppSecondaryButton(
               icon: _editingPostIds.contains(item.postId)
@@ -276,9 +279,12 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
             actions: <Widget>[
               AppPrimaryButton(
                 label: '查看原帖',
-                onPressed: () => Navigator.of(
-                  context,
-                ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
+                onPressed: () => Navigator.of(context).pushNamed(
+                  ExhibitionRoutes.forumPostWithPostId(
+                    item.postId,
+                    title: item.postTitle,
+                  ),
+                ),
               ),
               AppSecondaryButton(
                 label: '回评论区',
@@ -416,8 +422,32 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
     setState(() => _deletingPostIds.remove(item.postId));
     _showOwnPostMessage(result.data?.message ?? result.message);
     if (result.isSuccess) {
-      _load();
+      _removeOwnedPostFromResult(item.postId);
     }
+  }
+
+  void _removeOwnedPostFromResult(String postId) {
+    final current = _postsResult;
+    if (current?.data == null) {
+      return;
+    }
+    final remaining = current!.data!.items
+        .where((ForumMyPostItemView item) => item.postId != postId)
+        .toList(growable: false);
+    setState(() {
+      _postsResult =
+          ForumReadResult<ForumPagedCollectionView<ForumMyPostItemView>>(
+            state: remaining.isEmpty
+                ? AppPageState.empty
+                : AppPageState.content,
+            method: current.method,
+            path: current.path,
+            data: ForumPagedCollectionView<ForumMyPostItemView>(
+              items: remaining,
+              page: current.data!.page,
+            ),
+          );
+    });
   }
 
   void _showOwnPostMessage(String? message) {

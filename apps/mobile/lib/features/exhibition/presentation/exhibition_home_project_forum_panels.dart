@@ -297,171 +297,45 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
           ? '${widget.provinceName ?? '本省'}当前还没有公开项目'
           : '当前还没有公开项目';
       return <Widget>[
-        _HomeStateNotice(
+        AppPageStateView(
+          state: AppPageState.empty,
           title: title,
           message: '可以先进入项目列表继续查看，或直接发布项目。',
-          actions: <Widget>[
-            OutlinedButton(
-              onPressed: widget.onOpenProjectList,
-              child: const Text('进入项目列表'),
-            ),
-            FilledButton(
-              onPressed: widget.onOpenProjectCreate,
-              child: const Text('去发布项目'),
-            ),
-          ],
+          retryLabel: '进入项目列表',
+          onRetry: widget.onOpenProjectList,
+          content: const SizedBox.shrink(),
+          scope: AppPageStateViewScope.card,
+        ),
+        const SizedBox(height: 8),
+        FilledButton(
+          onPressed: widget.onOpenProjectCreate,
+          child: const Text('去发布项目'),
         ),
       ];
     }
 
+    final message = _selectedFilter == _HomeProjectFilter.province
+        ? '当前不会把综合项目伪装成本省结果。你可以先刷新，或进入项目列表查看。'
+        : '当前不会用本地演示项目替代云端推荐。你可以先刷新，或进入项目列表查看。';
     return <Widget>[
-      _HomeStateNotice(
+      AppPageStateView(
+        state: activeState == AppPageState.content
+            ? AppPageState.errorRetryable
+            : activeState ?? AppPageState.errorRetryable,
         title: _selectedFilter == _HomeProjectFilter.province
             ? '${widget.provinceName ?? '本省'}项目推荐暂时没有刷新成功'
             : '当前项目推荐暂时没有刷新成功',
-        message: _selectedFilter == _HomeProjectFilter.province
-            ? '当前不会把综合项目伪装成本省结果。你可以先刷新，或进入项目列表查看。'
-            : '当前不会用本地演示项目替代云端推荐。你可以先刷新，或进入项目列表查看。',
-        actions: <Widget>[
-          OutlinedButton(
-            onPressed: _refreshActiveFilter,
-            child: const Text('刷新当前频道'),
-          ),
-          OutlinedButton(
-            onPressed: widget.onOpenProjectList,
-            child: const Text('进入项目列表'),
-          ),
-        ],
+        message: message,
+        retryLabel: '刷新当前频道',
+        onRetry: _refreshActiveFilter,
+        content: const SizedBox.shrink(),
+        scope: AppPageStateViewScope.card,
+      ),
+      const SizedBox(height: 8),
+      OutlinedButton(
+        onPressed: widget.onOpenProjectList,
+        child: const Text('进入项目列表'),
       ),
     ];
-  }
-}
-
-class _HomeForumModulePanel extends StatefulWidget {
-  const _HomeForumModulePanel({
-    required this.onOpenForum,
-    required this.onOpenForumPublish,
-    required this.onOpenForumPost,
-  });
-
-  final VoidCallback onOpenForum;
-  final VoidCallback onOpenForumPublish;
-  final ValueChanged<String> onOpenForumPost;
-
-  @override
-  State<_HomeForumModulePanel> createState() => _HomeForumModulePanelState();
-}
-
-class _HomeForumModulePanelState extends State<_HomeForumModulePanel> {
-  ForumReadResult<ForumFeedView>? _result;
-  bool _loading = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadFeed();
-  }
-
-  Future<void> _loadFeed() async {
-    if (_loading) {
-      return;
-    }
-    setState(() {
-      _loading = true;
-    });
-    final result = await ForumConsumerLayer.instance.loadFeed(scope: 'square');
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _loading = false;
-      _result = result;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final feedItems = _result?.data?.items ?? const <ForumFeedItemView>[];
-    final state = _result?.state;
-
-    return _HomeModulePanelShell(
-      children: <Widget>[
-        _HomeChannelActionRail(
-          actions: <_HomeChannelAction>[
-            _HomeChannelAction(
-              label: '打开论坛',
-              onPressed: widget.onOpenForum,
-              primary: true,
-            ),
-            _HomeChannelAction(
-              label: '去写帖子',
-              onPressed: widget.onOpenForumPublish,
-            ),
-            _HomeChannelAction(label: '刷新', onPressed: _loadFeed),
-          ],
-        ),
-        const SizedBox(height: 12),
-        _HomeChannelFilterRail<_HomeForumFilter>(
-          options: const <_HomeChannelFilterOption<_HomeForumFilter>>[
-            _HomeChannelFilterOption(
-              value: _HomeForumFilter.comprehensive,
-              label: '综合',
-            ),
-          ],
-          selectedValue: _HomeForumFilter.comprehensive,
-          onSelected: (_) {},
-        ),
-        const SizedBox(height: 12),
-        if (_loading && _result == null)
-          const _HomeLoadingNotice(message: '正在读取论坛帖子')
-        else if (state == AppPageState.content && feedItems.isNotEmpty)
-          ...feedItems
-              .take(3)
-              .map(
-                (ForumFeedItemView item) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: _HomeForumFeedCard(
-                    topicLabel: forumDisplayTopicLabel(
-                      rawLabel: item.topicLabel,
-                      topicId: item.topicId,
-                    ),
-                    title: item.title,
-                    excerpt: item.excerpt,
-                    metaLabel:
-                        '${forumDisplayActorName(item.author.displayName)} · ${forumDisplayTimeLabel(item.publishedAt)}',
-                    statLabel: '${item.engagement.replyCount} 回复',
-                    onPressed: () => widget.onOpenForumPost(item.postId),
-                  ),
-                ),
-              )
-        else if (state == AppPageState.empty)
-          _HomeStateNotice(
-            title: '当前论坛还没有公开帖子',
-            message: '可以先打开论坛查看全部内容，或直接去写帖子。',
-            actions: <Widget>[
-              OutlinedButton(
-                onPressed: widget.onOpenForum,
-                child: const Text('打开论坛'),
-              ),
-              FilledButton(
-                onPressed: widget.onOpenForumPublish,
-                child: const Text('去写帖子'),
-              ),
-            ],
-          )
-        else
-          _HomeStateNotice(
-            title: '当前论坛列表暂时没有刷新成功',
-            message: '这一版只展示真实论坛 feed，不会把说明文字伪装成内容。',
-            actions: <Widget>[
-              OutlinedButton(onPressed: _loadFeed, child: const Text('刷新当前频道')),
-              OutlinedButton(
-                onPressed: widget.onOpenForum,
-                child: const Text('打开论坛'),
-              ),
-            ],
-          ),
-      ],
-    );
   }
 }

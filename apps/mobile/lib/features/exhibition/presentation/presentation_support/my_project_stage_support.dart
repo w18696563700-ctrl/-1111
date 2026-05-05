@@ -159,8 +159,8 @@ const _MyProjectStageOption _myProjectArchivedStageOption =
 const _MyProjectLifecycleActionOption _publishLifecycleAction =
     _MyProjectLifecycleActionOption(
       kind: _MyProjectLifecycleActionKind.publish,
-      buttonLabel: '检查无误，确定发布',
-      confirmTitle: '检查无误，确定发布',
+      buttonLabel: '确认并发布',
+      confirmTitle: '确认发布项目',
       confirmMessage:
           '确认后，项目将从预发布列表进入公域项目详情，工厂可以查看公开信息并参与竞标。发布后不能直接删除；如需退出公域，后续请走下架关闭。',
       confirmLabel: '确认发布',

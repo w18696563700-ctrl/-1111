@@ -284,8 +284,8 @@ class EnterpriseTargetEnterpriseInfoEntryCard extends StatelessWidget {
                   const SizedBox(height: 4),
                   Text(
                     accessible
-                        ? '点击后读取对方企业 OCR 识别后的正式认证文字信息。'
-                        : '当前仅展示锁定态，正式数据仍由云端权限返回决定。',
+                        ? '点击后查看当前权限允许访问的企业认证信息。'
+                        : '当前仅展示锁定态，可见信息仍由云端权限返回决定。',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                       height: 1.4,

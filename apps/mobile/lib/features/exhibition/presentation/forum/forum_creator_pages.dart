@@ -26,7 +26,7 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
   int _nextMediaLocalId = 0;
   bool _loading = true;
   bool _saving = false;
-  bool _publishing = false;
+  final bool _publishing = false;
 
   @override
   void initState() {
@@ -100,9 +100,13 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
   Future<void> _saveDraft() async {
     final result = await _submitDraftSave(
       showFeedback: true,
-      resumePendingUploadsOnSuccess: true,
+      resumePendingUploadsOnSuccess: false,
     );
     if (result.isSuccess) {
+      if (!mounted) {
+        return;
+      }
+      Navigator.of(context).pushReplacementNamed(ExhibitionRoutes.forumDrafts);
       return;
     }
   }
@@ -168,8 +172,8 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
             ? pendingUploadIds.isNotEmpty
                   ? '已保存到草稿，正在继续上传附件'
                   : _confirmedAttachmentIds.isEmpty
-                  ? '已保存到草稿'
-                  : '已保存到草稿，附件已承接'
+                  ? '已保存到草稿，正在进入草稿箱'
+                  : '已保存到草稿，附件已承接，正在进入草稿箱'
             : result.message ?? '草稿暂未保存，请稍后重试',
         error: !result.isSuccess,
       );
@@ -180,52 +184,6 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
     }
 
     return result;
-  }
-
-  Future<void> _publish() async {
-    final draftId = _selectedDraftId;
-    if (draftId == null) {
-      return;
-    }
-
-    setState(() {
-      _publishing = true;
-    });
-
-    final result = await ForumConsumerLayer.instance.publishDraft(
-      draftId: draftId,
-    );
-    if (!mounted) {
-      return;
-    }
-
-    final publishResult = result.data;
-    if (result.isSuccess && publishResult != null && publishResult.isClear) {
-      final continuation = await _resolveForumPublishContinuation(
-        publishResult,
-      );
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _publishing = false;
-      });
-      _showActionFeedback(continuation.message);
-      Navigator.of(context).pushReplacementNamed(continuation.routeName);
-      return;
-    }
-
-    setState(() {
-      _publishing = false;
-    });
-
-    if (result.isSuccess && publishResult != null && publishResult.isBlocked) {
-      _showActionFeedback(publishResult.message, error: true);
-      return;
-    }
-
-    _showActionFeedback(result.message ?? '当前暂时还不能发布', error: true);
   }
 
   @override
@@ -245,7 +203,6 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
         _composerBottomBar(
           context,
           canSaveDraft: _canSaveDraft,
-          canPublish: _canPublish,
           helperText: helperText,
         ),
       ],
@@ -310,10 +267,12 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
 
   void _markComposerDirty() {
     setState(() {});
+    _startPendingMediaUploadsWhenReady();
   }
 
   void _selectComposerTopic(String topicId) {
     setState(() => _selectedTopicId = topicId);
+    _startPendingMediaUploadsWhenReady();
   }
 
   Future<void> _pickMedia(ForumPublishMediaType type) async {
@@ -372,7 +331,7 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
     });
 
     if (!canAutoStartSelection) {
-      _showActionFeedback('已选中附件，请先填写分类、标题和正文，再保存草稿后继续上传');
+      _showActionFeedback('已选中附件，请先填写分类、标题和正文，补齐后会自动上传');
       return;
     }
 
@@ -396,8 +355,10 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
     if (_activeDraftId == null) {
       _updateMediaItem(
         localId,
-        (_ForumComposerMediaItem current) =>
-            current.copyWith(statusMessage: '正在准备草稿'),
+        (_ForumComposerMediaItem current) => current.copyWith(
+          stage: _ForumComposerMediaStage.initStarting,
+          statusMessage: '正在准备草稿',
+        ),
       );
       final ready = await _ensureDraftExistsForMedia();
       if (!mounted) {
@@ -406,8 +367,10 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
       if (!ready) {
         _updateMediaItem(
           localId,
-          (_ForumComposerMediaItem current) =>
-              current.copyWith(statusMessage: '请先完善内容并保存草稿后再上传'),
+          (_ForumComposerMediaItem current) => current.copyWith(
+            stage: _ForumComposerMediaStage.selectedPending,
+            statusMessage: '请先完善内容后再上传',
+          ),
         );
         return;
       }
@@ -523,10 +486,37 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
       (_ForumComposerMediaItem current) => current.copyWith(
         stage: _ForumComposerMediaStage.confirmedReady,
         fileAssetId: fileAssetId,
-        statusMessage: '上传确认完成，请保存草稿',
+        statusMessage: '上传确认完成，等待保存草稿',
       ),
     );
-    _showActionFeedback('附件已上传完成，请点击“保存草稿”承接到当前草稿');
+    _showActionFeedback('附件已上传完成，保存草稿后会进入草稿箱');
+  }
+
+  void _startPendingMediaUploadsWhenReady() {
+    if (!_canAutoStartPendingMedia ||
+        _saving ||
+        _publishing ||
+        _hasActiveMediaTransfer) {
+      return;
+    }
+
+    final pendingIds = _mediaItems
+        .where(
+          (_ForumComposerMediaItem item) =>
+              item.stage == _ForumComposerMediaStage.selectedPending,
+        )
+        .map((_ForumComposerMediaItem item) => item.localId)
+        .toList(growable: false);
+    if (pendingIds.isEmpty) {
+      return;
+    }
+
+    _showActionFeedback(
+      pendingIds.length == 1 ? '内容已补齐，正在上传附件' : '内容已补齐，正在依次上传附件',
+    );
+    for (final localId in pendingIds) {
+      unawaited(_startMediaUpload(localId));
+    }
   }
 
   void _removeMedia(String localId) {
@@ -573,17 +563,11 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
       _activeDraftId != null || _hasRequiredContent;
 
   bool get _canSaveDraft =>
-      !_saving && !_hasActiveMediaTransfer && _hasRequiredContent;
-
-  bool get _canPublish =>
-      _selectedDraftId != null &&
       !_saving &&
-      !_publishing &&
       !_hasActiveMediaTransfer &&
       !_hasPendingMediaSelection &&
       !_hasFailedMedia &&
-      !_hasConfirmedUnboundMedia &&
-      !_hasUnsavedContent;
+      _hasRequiredContent;
 
   bool get _hasUnsavedContent {
     final draftId = _selectedDraftId;
@@ -614,7 +598,7 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
 
   String? get _composerHelperText {
     if (_loading) {
-      return _selectedDraftId == null ? '正在准备发帖页' : '正在恢复草稿内容';
+      return _selectedDraftId == null ? '正在准备草稿编辑页' : '正在恢复草稿内容';
     }
     if (_selectedDraftId != null &&
         _draftDetailResult != null &&
@@ -631,18 +615,18 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
       return _canAutoStartPendingMedia ? '附件已选中，正在准备上传' : '附件已选中，请先填写分类、标题和正文';
     }
     if (_hasFailedMedia) {
-      return '有附件上传失败，可以重试或移除后继续';
+      return '有附件上传失败，请重试或移除后再保存草稿';
     }
     if (_hasConfirmedUnboundMedia) {
-      return '附件已确认，请先保存草稿，再继续发布';
+      return '附件已确认，保存草稿后会进入草稿箱';
     }
     if (_selectedDraftId == null) {
-      return '请先保存草稿；保存后可直接继续发布，离开后也可从草稿箱继续。';
+      return '请先保存草稿；保存后会进入草稿箱，由草稿箱承接发布。';
     }
     if (_hasUnsavedContent) {
-      return '当前内容有更新，请先保存草稿，再继续发布';
+      return '当前内容有更新，请先保存草稿，再到草稿箱发布';
     }
-    return '当前草稿已保存，可直接继续发布。';
+    return '当前草稿已保存，可到草稿箱发布。';
   }
 
   void _restoreDraftDetail(ForumDraftDetailView detail) {
@@ -767,7 +751,7 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
           }
           return item.copyWith(
             stage: _ForumComposerMediaStage.confirmedReady,
-            statusMessage: '上传确认完成，请保存草稿',
+            statusMessage: '上传确认完成，等待保存草稿',
           );
         })
         .toList(growable: false);
@@ -827,7 +811,8 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
     if (message != null &&
         message.isNotEmpty &&
         RegExp(r'[\u4e00-\u9fff]').hasMatch(message) &&
-        !_looksTechnicalUploadMessage(message)) {
+        !_looksTechnicalUploadMessage(message) &&
+        !_looksGenericUploadFailureMessage(message)) {
       return message;
     }
     return switch (result.errorCode) {
@@ -845,8 +830,14 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
         lower.contains('cannot ') ||
         lower.contains('econnrefused') ||
         lower.contains('direct upload') ||
+        value.contains('直传') ||
         lower.contains('upstream') ||
         lower.contains('transport');
+  }
+
+  bool _looksGenericUploadFailureMessage(String value) {
+    final trimmed = value.trim();
+    return trimmed == '上传失败' || trimmed == '请求失败' || trimmed == '网络错误';
   }
 }
 

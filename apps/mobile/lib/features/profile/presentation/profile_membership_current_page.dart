@@ -38,33 +38,39 @@ class _ProfileMembershipCurrentPageState
   @override
   Widget build(BuildContext context) {
     if (!AppSessionStore.instance.hasAnySession) {
-      return _ProfileScreenStatePanel(
+      return AppPageStateView(
+        state: AppPageState.unauthorized,
         title: '当前会话暂不可用',
         message: '当前没有可验证的会话，我的会员页不展示伪造会员状态。',
-        actionLabel: '进入登录入口',
-        onAction: () =>
+        retryLabel: '进入登录入口',
+        onRetry: () =>
             Navigator.of(context).pushNamed(ProfileIdentityRoutes.login),
+        content: const SizedBox.shrink(),
       );
     }
 
     final result = _result;
     final data = result?.data;
     if (_loading || result == null) {
-      return const _ProfileScreenStatePanel(
+      return const AppPageStateView(
+        state: AppPageState.loading,
         title: '正在读取会员状态',
         message: '正在同步当前会员档位、权益摘要与配额摘要。',
+        content: SizedBox.shrink(),
       );
     }
     if (result.state != AppPageState.content || data == null) {
-      return _ProfileScreenStatePanel(
+      return AppPageStateView(
+        state: result.state,
         title: '我的会员当前暂不可用',
         message: profileVisibleReadMessage(
           state: result.state,
           rawMessage: result.message,
           surfaceLabel: '我的会员',
         ),
-        actionLabel: result.state == AppPageState.errorRetryable ? '重试' : null,
-        onAction: result.state == AppPageState.errorRetryable ? _load : null,
+        retryLabel: '重试',
+        onRetry: result.state == AppPageState.errorRetryable ? _load : null,
+        content: const SizedBox.shrink(),
       );
     }
 

@@ -155,20 +155,6 @@ AppShellContextConsumer _buildShellContextConsumer({
 
 Finder _projectCreateField(String key) => find.byKey(ValueKey<String>(key));
 
-Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
-  await tester.scrollUntilVisible(
-    finder,
-    200,
-    scrollable: find.byType(Scrollable).first,
-  );
-  await tester.pumpAndSettle();
-  await tester.ensureVisible(finder);
-  await tester.pumpAndSettle();
-  await tester.tap(finder, warnIfMissed: false);
-  await tester.pump();
-  await tester.pumpAndSettle();
-}
-
 void main() {
   test(
     'project list consumer forwards frozen filter params and keeps no-city fallback',
@@ -745,15 +731,21 @@ void main() {
       expect(
         find.descendant(
           of: find.byType(AppBar),
-          matching: find.text('草稿 -> 预发布列表'),
+          matching: find.text('草稿 -> 预发布信息补充页'),
         ),
         findsOneWidget,
       );
       expect(find.text('当前状态：草稿'), findsNothing);
-      expect(find.text('当前生命周期'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '保存到预发布列表'), findsOneWidget);
+      expect(find.text('当前任务'), findsNothing);
+      expect(find.text('当前生命周期'), findsNothing);
+      expect(
+        find.widgetWithText(FilledButton, '确认保存并进入预发布信息补充页'),
+        findsOneWidget,
+      );
       expect(find.widgetWithText(OutlinedButton, '仅保存草稿'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, '查看我的项目详情'), findsOneWidget);
       expect(find.widgetWithText(OutlinedButton, '收起当前内容核对'), findsOneWidget);
+      expect(find.text('当前内容只读核对'), findsNothing);
       expect(find.text('基础信息'), findsWidgets);
       expect(find.text('项目地点与范围'), findsOneWidget);
       await tester.scrollUntilVisible(
@@ -774,14 +766,19 @@ void main() {
       await tester.pumpAndSettle();
       expect(_projectCreateField('project-create-description'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, '确认保存到预发布列表'),
+        find.text('当前处于草稿阶段，需先确认保存到预发布信息补充页；进入后可继续补充报价依据资料。'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('当前状态：当前项目尚未进入预发布附件补充阶段。'), findsOneWidget);
-      expect(find.text('当前提示：请仔细核对上面信息，确认进入预发布列表。'), findsOneWidget);
-      expect(find.widgetWithText(FilledButton, '确认保存到预发布列表'), findsOneWidget);
+      expect(
+        find.text('当前处于草稿阶段，需先确认保存到预发布信息补充页；进入后可继续补充报价依据资料。'),
+        findsOneWidget,
+      );
+      expect(
+        find.widgetWithText(FilledButton, '确认保存并进入预发布信息补充页'),
+        findsOneWidget,
+      );
       expect(find.text('保存到草稿或预发布列表后，五类报价依据资料会在这里开放补充。'), findsNothing);
     },
   );
@@ -842,10 +839,59 @@ void main() {
                         ),
                         'privateProgress': const <String, Object?>{
                           'hasAcceptedOrder': false,
+                          'orderStatus': null,
+                          'contractStatus': null,
+                          'fulfillmentStatus': null,
+                          'acceptanceStatus': null,
+                          'afterSalesOrDisputeStatus': null,
                           'formalCompletionStatus': 'not_formally_completed',
                           'evaluationStatus': 'not_eligible',
                         },
                       },
+                    );
+                  },
+              'GET /api/app/my/projects/project-edit-2/attachments':
+                  (AppApiRequest request) async {
+                    requests.add(request);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'projectId': 'project-edit-2',
+                        'attachments': <Object?>[],
+                      },
+                    );
+                  },
+              'GET /api/app/project/project-edit-2/pricing-summary':
+                  (AppApiRequest request) async {
+                    requests.add(request);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'projectId': 'project-edit-2',
+                        'publisherPricing': <String, Object?>{
+                          'authenticitySincerityRequired': true,
+                          'authenticitySincerityAmount': '200.00',
+                          'authenticitySincerityStatus': null,
+                          'publishGateStatus': 'required',
+                          'freezeFeedbackSummary': <String, Object?>{
+                            'supportFreezeCount': 0,
+                            'opposeFreezeCount': 0,
+                          },
+                        },
+                        'readOnly': true,
+                        'updatedAt': '2026-04-26T09:00:00Z',
+                      },
+                    );
+                  },
+              'GET /api/app/project/public-resources':
+                  (AppApiRequest request) async {
+                    requests.add(request);
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{'resources': <Object?>[]},
                     );
                   },
               'POST /api/app/project/save': (AppApiRequest request) async {
@@ -903,7 +949,8 @@ void main() {
         findsOneWidget,
       );
       expect(find.text('当前状态：草稿'), findsNothing);
-      await _scrollAndTap(tester, find.widgetWithText(OutlinedButton, '仅保存草稿'));
+      await tester.tap(find.widgetWithText(OutlinedButton, '仅保存草稿'));
+      await tester.pumpAndSettle();
       await tester.pumpAndSettle();
       expect(
         requests.any(
@@ -913,78 +960,34 @@ void main() {
         isTrue,
       );
 
-      await tester.scrollUntilVisible(
-        find.byKey(
-          const ValueKey<String>(
-            'project-edit-draft-submit-to-prepublish-bottom',
-          ),
-        ),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
+      await tester.tap(find.widgetWithText(FilledButton, '确认保存并进入预发布信息补充页'));
       await tester.pumpAndSettle();
-      await _scrollAndTap(
-        tester,
-        find.byKey(
-          const ValueKey<String>(
-            'project-edit-draft-submit-to-prepublish-bottom',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
-      expect(
-        _projectCreateField('project-edit-app-bar-status'),
-        findsOneWidget,
-      );
+      expect(_projectCreateField('project-edit-app-bar-status'), findsNothing);
       expect(
         find.descendant(of: find.byType(AppBar), matching: find.text('预发布列表')),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.text('当前状态：预发布列表'), findsNothing);
+      expect(find.text('编辑项目 预发布列表'), findsNothing);
       expect(find.widgetWithText(FilledButton, '发布项目'), findsNothing);
-      expect(find.widgetWithText(FilledButton, '返回预发布列表详情'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '继续核对当前内容'), findsOneWidget);
-      expect(find.widgetWithText(OutlinedButton, '展开当前内容核对'), findsOneWidget);
-      expect(find.text('基础信息'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '返回预发布列表详情'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '继续核对当前内容'), findsNothing);
+      expect(find.widgetWithText(OutlinedButton, '展开当前内容核对'), findsNothing);
+      expect(_projectCreateField('项目名称'), findsNothing);
       expect(find.text('项目地点与范围'), findsNothing);
       expect(find.text('计划时间'), findsNothing);
       expect(find.text('补充说明'), findsNothing);
-      expect(find.textContaining('西部糖酒会 / 古井贡'), findsOneWidget);
-      expect(find.textContaining('四川 / 成都'), findsOneWidget);
-      expect(find.textContaining('2026年4月10日 至 2026年4月18日'), findsOneWidget);
+      expect(find.textContaining('我的项目详情', findRichText: true), findsWidgets);
       expect(
-        find.textContaining('最终发布确认回到“我的项目 -> 预发布列表 -> 单项目详情”完成'),
-        findsOneWidget,
+        find.textContaining('预发布补资料并发布页', findRichText: true),
+        findsWidgets,
       );
+      expect(find.text('当前阶段：预发布列表'), findsOneWidget);
+      expect(find.text('报价依据资料'), findsWidgets);
+      expect(find.text('编辑项目'), findsNothing);
+      expect(find.text('正在进入预发布补资料并发布页'), findsNothing);
+      expect(_projectCreateField('project-create-title'), findsNothing);
+      expect(_projectCreateField('project-create-brand-name'), findsNothing);
 
-      await _scrollAndTap(
-        tester,
-        find.widgetWithText(OutlinedButton, '继续核对当前内容'),
-      );
-      await tester.pumpAndSettle();
-      expect(find.widgetWithText(OutlinedButton, '收起当前内容核对'), findsOneWidget);
-      expect(find.text('基础信息'), findsWidgets);
-      expect(find.text('项目地点与范围'), findsOneWidget);
-      expect(_projectCreateField('project-create-title'), findsOneWidget);
-      expect(_projectCreateField('project-create-brand-name'), findsOneWidget);
-
-      await tester.scrollUntilVisible(
-        find.text('报价依据资料'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('报价依据资料'), findsOneWidget);
-
-      await _scrollAndTap(
-        tester,
-        find.byKey(
-          const ValueKey<String>(
-            'project-edit-review-return-to-prepublish-bottom',
-          ),
-        ),
-      );
-      await tester.pumpAndSettle();
       expect(
         requests.any(
           (AppApiRequest request) =>

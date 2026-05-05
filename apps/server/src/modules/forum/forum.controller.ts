@@ -139,6 +139,12 @@ export class ForumController {
     return this.writeService.saveDraft(body, resolveRequestContext(headers));
   }
 
+  @Post('draft/delete')
+  @HttpCode(202)
+  deleteDraft(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {
+    return this.writeService.deleteDraft(body, resolveRequestContext(headers));
+  }
+
   @Post('publish')
   @HttpCode(202)
   publishDraft(@Body() body: Record<string, unknown>, @Headers() headers: HeaderBag) {

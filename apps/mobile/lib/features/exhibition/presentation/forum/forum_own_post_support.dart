@@ -71,12 +71,9 @@ Widget _buildForumCommentPreview({
         ...comments.map(
           (ForumCommentItemView item) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
-            child: _ForumThreadCommentCard(
-              author: item.author,
-              target: item.parentCommentId == null ? '回复主帖' : '回复评论',
-              content: item.body,
-              meta:
-                  '${_compactPublishedAt(item.publishedAt)} · ${item.replyCount} 条后续回复',
+            child: ForumCommentCard.fromItem(
+              item: item,
+              targetLabel: item.parentCommentId == null ? '回复主帖' : '回复评论',
               onOpenAuthor: () =>
                   _openForumAuthorProfile(context, item.author.authorId),
               onReport: () => _showForumReportSheet(
@@ -89,6 +86,13 @@ Widget _buildForumCommentPreview({
               ),
             ),
           ),
+        ),
+      if (!showCommentState && comments.isEmpty)
+        const ForumSlimStatePanel(
+          loading: false,
+          state: AppPageState.empty,
+          emptyMessage: '当前帖子还没有评论',
+          onRetry: _noop,
         ),
       if (hasMore) ...<Widget>[
         const SizedBox(height: 12),

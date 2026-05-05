@@ -44,3 +44,22 @@
 - Flutter App work may start only after Codex 总控 issues a stage gate checklist and marks the stage as allowed.
 - Frontend consumes contracts read-only and must stop on any contract gap.
 - Unknown state names, unknown error codes, and unknown critical fields must enter controlled failure or explicit reporting paths; fallback must not hide contract drift.
+
+## Public Capability Reuse
+- First registered baseline: commit `6535092 feat: add shared Flutter public capability foundation`.
+- Existing pages are not required to migrate all at once. When adding new features, fixing bugs, doing local optimization, or touching related pages, first reuse the registered public capabilities below.
+- File opening must prefer `FileOpenCoordinator`. Do not duplicate direct `open_filex` wrappers inside pages.
+- Attachment display must prefer `AttachmentTile / FileTile`. Pages may pass actions and display data, but must not make the tile own business attachment truth.
+- Money display must prefer `MoneyFormatter`. Do not hand-roll amount formatting in pages.
+- Loading / empty / error / retry display must prefer `AppPageStateView` when the page needs a shared state shell.
+- Form double-submit protection must prefer `SubmitGuard`. It is frontend click protection only and does not replace backend idempotency.
+- Status badge display must prefer `StatusBadgePolicy`. Do not create page-local status badge wording tables unless the state wording is page-private and explicitly not reusable.
+- Public capability work must not be used as a reason to modify `BFF`, `Server`, `OpenAPI`, or generated types.
+
+### Public Capability Boundaries
+- `FileOpenCoordinator` only coordinates file and external URI opening. It does not own `file/access`, authorization, `objectKey`, or `accessUrl` truth.
+- `AttachmentTile / FileTile` only render attachment rows and action entry points. They do not own `FileAsset`, `Evidence`, visibility, deletion, or business binding truth.
+- `MoneyFormatter` only formats display amounts. It must not calculate 200 yuan earnest money truth, 4000 yuan bid service fee preauthorization, final platform service fee, membership discount, or payment state.
+- `StatusBadgePolicy` only owns display tone and unknown fallback. It must not define a business state machine or introduce new business states.
+- `SubmitGuard` only prevents repeated frontend taps while a submit action is running. It must not replace backend idempotency, validation, authorization, or audit.
+- `AppPageStateView` only renders loading / empty / error / retry states. It must not swallow real error codes, unknown states, or contract drift.

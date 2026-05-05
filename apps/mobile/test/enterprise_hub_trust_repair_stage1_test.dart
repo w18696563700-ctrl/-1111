@@ -582,23 +582,25 @@ void main() {
 
   test('ensure shell posts shell route with board type only', () async {
     AppApiRequest? seenRequest;
+    final path = EnterpriseHubBoardCanonicalFamily.forBoard(
+      EnterpriseBoardType.company,
+    ).ensureShell;
     final layer = EnterpriseHubConsumerLayer(
       client: AppApiClient(
         transport: FakeAppApiTransport(
           handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-            'POST /api/app/exhibition/enterprise-hub/enterprises/ensure-shell':
-                (AppApiRequest request) async {
-                  seenRequest = request;
-                  return AppApiResponse(
-                    statusCode: 200,
-                    uri: request.uri,
-                    body: const <String, Object?>{
-                      'enterpriseId': 'ent-shell-1',
-                      'boardType': 'company',
-                      'shellStatus': 'created',
-                    },
-                  );
+            'POST $path': (AppApiRequest request) async {
+              seenRequest = request;
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'enterpriseId': 'ent-shell-1',
+                  'boardType': 'company',
+                  'shellStatus': 'created',
                 },
+              );
+            },
           },
         ),
       ),
@@ -609,11 +611,8 @@ void main() {
     );
 
     expect(result.isSuccess, isTrue);
-    expect(
-      seenRequest?.canonicalPath,
-      '/api/app/exhibition/enterprise-hub/enterprises/ensure-shell',
-    );
-    expect(seenRequest?.body, <String, Object?>{'boardType': 'company'});
+    expect(seenRequest?.canonicalPath, path);
+    expect(seenRequest?.body, <String, Object?>{});
     expect(result.data?.enterpriseId, 'ent-shell-1');
     expect(result.data?.shellStatus, 'created');
   });
@@ -622,23 +621,25 @@ void main() {
     'create application keeps applicant fields on applications route',
     () async {
       AppApiRequest? seenRequest;
+      final path = EnterpriseHubBoardCanonicalFamily.forBoard(
+        EnterpriseBoardType.company,
+      ).applications;
       final layer = EnterpriseHubConsumerLayer(
         client: AppApiClient(
           transport: FakeAppApiTransport(
             handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
-              'POST /api/app/exhibition/enterprise-hub/applications':
-                  (AppApiRequest request) async {
-                    seenRequest = request;
-                    return AppApiResponse(
-                      statusCode: 200,
-                      uri: request.uri,
-                      body: const <String, Object?>{
-                        'applicationId': 'app-1',
-                        'enterpriseId': 'ent-shell-1',
-                        'applicationStatus': 'draft',
-                      },
-                    );
+              'POST $path': (AppApiRequest request) async {
+                seenRequest = request;
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'applicationId': 'app-1',
+                    'enterpriseId': 'ent-shell-1',
+                    'applicationStatus': 'draft',
                   },
+                );
+              },
             },
           ),
         ),
@@ -651,12 +652,8 @@ void main() {
       );
 
       expect(result.isSuccess, isTrue);
-      expect(
-        seenRequest?.canonicalPath,
-        '/api/app/exhibition/enterprise-hub/applications',
-      );
+      expect(seenRequest?.canonicalPath, path);
       expect(seenRequest?.body, <String, Object?>{
-        'applyBoardType': 'company',
         'applicantName': '王伟伟',
         'applicantMobile': '13800000000',
       });

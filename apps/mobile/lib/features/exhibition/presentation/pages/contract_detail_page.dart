@@ -148,8 +148,8 @@ class _ContractDetailPageState extends State<ContractDetailPage> {
     final contractState = _stateFromPayload(result?.payload);
 
     return _LoadPageFrame(
-      title: '合同详情',
-      summary: '查看当前合同状态，并继续处理确认或改单。',
+      title: '合同承接状态',
+      summary: '查看 Contract seed 承接状态；合同金额确认只以最终金额确认入口为准。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -231,7 +231,7 @@ class _ContractDetailPageState extends State<ContractDetailPage> {
         FilledButton(
           key: const ValueKey<String>('contract_confirm_button'),
           onPressed: _confirming || _amending ? null : _confirmContract,
-          child: const Text('确认当前合同'),
+          child: const Text('确认合同承接状态'),
         ),
       ],
       if (contractState == 'active') ...<Widget>[
@@ -249,8 +249,8 @@ class _ContractDetailPageState extends State<ContractDetailPage> {
 
   String _contractStateHint(String? contractState) {
     return switch (contractState) {
-      'pending_confirm' => '请确认合同内容无误后再继续。',
-      'active' => '合同已生效。如需调整，可发起最小改单。',
+      'pending_confirm' => '这里仅确认合同承接状态，不写入最终合同金额。',
+      'active' => '合同承接状态已确认；最终合同金额仍以最终金额确认入口为准。',
       'amended' => '合同已改单，当前以最新合同状态为准。',
       _ => '当前合同仅可查看。',
     };

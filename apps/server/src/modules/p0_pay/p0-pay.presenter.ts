@@ -5,11 +5,24 @@ import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PlatformServiceFeeChargeEntity } from './entities/platform-service-fee-charge.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
 import { P0_PAY_ACCOUNT_BINDING_POLICY } from './p0-pay.state';
+import { normalizeDealConfirmationStatus } from './p0-pay.types';
 
 type ChannelAction = {
   channelActionType: 'sdk_payload' | 'web_redirect' | 'qr_code' | 'unavailable';
   channelPayload: Record<string, unknown> | null;
   callbackAwaiting: boolean;
+};
+
+type DealServiceFeeCalculationSnapshot = {
+  ruleVersion: string;
+  baseFeeAmount: number;
+  membershipTierApplied: string | null;
+  membershipDiscountRate: number;
+  capAmount: number;
+  discountedFeeAmount: number;
+  finalFeeAmount: number;
+  pricingSnapshotHash: string;
+  feeCalculatedAt: string;
 };
 
 @Injectable()
@@ -196,6 +209,37 @@ export class P0PayPresenter {
           ? 'enter_fulfillment'
           : 'wait_counterparty_confirmation',
       updatedAt: input.confirmation.updatedAt
+    };
+  }
+
+  toDealConfirmationAcceptedResponse(input: {
+    confirmation: ContractConfirmationEntity;
+    authorization: PlatformServiceFeeAuthorizationEntity | null;
+    charge: PlatformServiceFeeChargeEntity | null;
+    serviceFeeCalculation: DealServiceFeeCalculationSnapshot;
+  }) {
+    return {
+      dealConfirmationId: input.confirmation.id,
+      dealStatus: normalizeDealConfirmationStatus(input.confirmation.contractStatus),
+      selectedBidId: input.confirmation.selectedBidId,
+      finalConfirmedAmount: Number(input.confirmation.finalConfirmedAmount),
+      platformServiceFeeCalculation: input.serviceFeeCalculation,
+      serviceFeeChargeStatus: input.charge?.chargeStatus ?? 'not_open',
+      updatedAt: input.confirmation.updatedAt
+    };
+  }
+
+  toDealConfirmationReadModel(input: {
+    confirmation: ContractConfirmationEntity;
+    authorization: PlatformServiceFeeAuthorizationEntity | null;
+    charge: PlatformServiceFeeChargeEntity | null;
+    serviceFeeCalculation: DealServiceFeeCalculationSnapshot;
+  }) {
+    return {
+      ...this.toDealConfirmationAcceptedResponse(input),
+      publisherConfirmedAt: input.confirmation.publisherConfirmedAt,
+      factoryConfirmedAt: input.confirmation.factoryConfirmedAt,
+      publisherAuthenticitySincerityStatus: null
     };
   }
 

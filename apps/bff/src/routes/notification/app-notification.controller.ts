@@ -16,9 +16,11 @@ export class AppNotificationController {
   listNotifications(
     @Query('pageSize') pageSize: string | undefined,
     @Query('cursor') cursor: string | undefined,
+    @Query('source') source: string | undefined,
+    @Query('lane') lane: string | undefined,
     @Headers() headers: IncomingHttpHeaders
   ) {
-    return this.service.listNotifications(pageSize, cursor, headers);
+    return this.service.listNotifications({ pageSize, cursor, source, lane }, headers);
   }
 
   @Post('read')

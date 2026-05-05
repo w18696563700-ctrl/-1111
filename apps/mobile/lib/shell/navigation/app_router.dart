@@ -144,7 +144,10 @@ class AppRouter {
         ticketId: reportTicketId,
       ),
       _ when topicId != null => ForumTopicDetailPage(topicId: topicId),
-      _ when postId != null => ForumPostDetailPage(postId: postId),
+      _ when postId != null => ForumPostDetailPage(
+        postId: postId,
+        initialTitle: routeUri.queryParameters['title'],
+      ),
       _ => null,
     };
 
@@ -159,7 +162,7 @@ class AppRouter {
       ExhibitionRoutes.forumFollowing => '关注',
       ExhibitionRoutes.forumTopics => '话题分类',
       ExhibitionRoutes.forumComments => '评论互动区',
-      ExhibitionRoutes.forumPublish => '发帖',
+      ExhibitionRoutes.forumPublish => '发帖草稿编辑页',
       ExhibitionRoutes.forumDrafts => '草稿',
       ExhibitionRoutes.forumSearch => '搜索',
       _ when authorId != null => '作者主页',
@@ -186,6 +189,13 @@ class AppRouter {
         authorId != null ||
         topicId != null ||
         postId != null;
+    final showForumPublishFab = <String>{
+      ExhibitionRoutes.forum,
+      ExhibitionRoutes.forumSquare,
+      ExhibitionRoutes.forumLocal,
+      ExhibitionRoutes.forumFollowing,
+      ExhibitionRoutes.forumTopics,
+    }.contains(routePath);
 
     return MaterialPageRoute<void>(
       settings: settings,
@@ -216,8 +226,7 @@ class AppRouter {
             ],
           _ => const <Widget>[],
         },
-        floatingActionButton:
-            showForumToolActions && routePath != ExhibitionRoutes.forumPublish
+        floatingActionButton: showForumPublishFab
             ? FloatingActionButton.small(
                 tooltip: '发布帖子',
                 onPressed: () {
@@ -487,8 +496,8 @@ class AppRouter {
       ExhibitionRoutes.bidThread => '沟通与投标',
       ExhibitionRoutes.bidSubmit =>
         routeUri.queryParameters['mode'] == 'result' ? '竞标结果' : '竞标提交',
-      ExhibitionRoutes.orderDetail => '订单详情',
-      ExhibitionRoutes.contractDetail => '合同详情',
+      ExhibitionRoutes.orderDetail => '后续承接状态',
+      ExhibitionRoutes.contractDetail => '合同承接状态',
       ExhibitionRoutes.milestoneList => '里程碑列表',
       ExhibitionRoutes.milestoneSubmit => '里程碑提交',
       ExhibitionRoutes.inspectionDetail => '验收详情',
@@ -521,6 +530,7 @@ class AppRouter {
     final titleContent = switch (routePath) {
       ExhibitionRoutes.myProjectDetail => MyProjectDetailHeaderTitle(
         projectId: routeUri.queryParameters['projectId'],
+        stageHint: routeUri.queryParameters['stage'],
       ),
       ExhibitionRoutes.projectEdit => ProjectEditHeaderTitle(
         projectId: routeUri.queryParameters['projectId'],
@@ -535,6 +545,7 @@ class AppRouter {
         builder: (_) => _CounterpartConversationRouteScaffold(
           conversationId: routeUri.queryParameters['conversationId'],
           projectId: routeUri.queryParameters['projectId'],
+          threadId: routeUri.queryParameters['threadId'],
           title: title,
           titleContent: titleContent,
           appBarActions: appBarActions,
@@ -542,16 +553,27 @@ class AppRouter {
       );
     }
 
+    final currentBuilding = _exhibitionTradeRouteBuilding(routePath);
+
     return MaterialPageRoute<void>(
       settings: settings,
       builder: (_) => AppShellScaffold(
-        currentBuilding: AppBuilding.exhibition,
+        currentBuilding: currentBuilding,
         titleOverride: title,
         titleContent: titleContent,
         appBarActions: appBarActions,
         child: child,
       ),
     );
+  }
+
+  AppBuilding _exhibitionTradeRouteBuilding(String routePath) {
+    return switch (routePath) {
+      ExhibitionRoutes.myProjectList ||
+      ExhibitionRoutes.myProjectDetail ||
+      ExhibitionRoutes.projectEdit => AppBuilding.profile,
+      _ => AppBuilding.exhibition,
+    };
   }
 
   Route<dynamic>? _matchProfileRoute(RouteSettings settings) {
@@ -761,6 +783,7 @@ class _CounterpartConversationRouteScaffold extends StatefulWidget {
   const _CounterpartConversationRouteScaffold({
     required this.conversationId,
     required this.projectId,
+    required this.threadId,
     required this.title,
     required this.titleContent,
     required this.appBarActions,
@@ -768,6 +791,7 @@ class _CounterpartConversationRouteScaffold extends StatefulWidget {
 
   final String? conversationId;
   final String? projectId;
+  final String? threadId;
   final String title;
   final Widget? titleContent;
   final List<Widget> appBarActions;
@@ -779,7 +803,16 @@ class _CounterpartConversationRouteScaffold extends StatefulWidget {
 
 class _CounterpartConversationRouteScaffoldState
     extends State<_CounterpartConversationRouteScaffold> {
+  final ValueNotifier<int> _projectListSearchToggleSignal = ValueNotifier<int>(
+    0,
+  );
   bool _chatWindowActive = false;
+
+  @override
+  void dispose() {
+    _projectListSearchToggleSignal.dispose();
+    super.dispose();
+  }
 
   void _handleChatWindowActiveChanged(bool active) {
     if (_chatWindowActive == active || !mounted) {
@@ -792,13 +825,25 @@ class _CounterpartConversationRouteScaffoldState
   Widget build(BuildContext context) {
     return AppShellScaffold(
       currentBuilding: AppBuilding.messages,
-      titleOverride: widget.title,
-      titleContent: widget.titleContent,
-      appBarActions: widget.appBarActions,
+      titleOverride: null,
+      titleContent: widget.titleContent ?? const SizedBox.shrink(),
+      appBarActions: <Widget>[
+        ...widget.appBarActions,
+        if (!_chatWindowActive)
+          IconButton(
+            tooltip: '搜索项目',
+            onPressed: () {
+              _projectListSearchToggleSignal.value += 1;
+            },
+            icon: const Icon(Icons.search_rounded),
+          ),
+      ],
       showBottomNavigationBar: !_chatWindowActive,
       child: CounterpartConversationPage(
         conversationId: widget.conversationId,
         projectId: widget.projectId,
+        threadId: widget.threadId,
+        projectListSearchToggleSignal: _projectListSearchToggleSignal,
         onChatWindowActiveChanged: _handleChatWindowActiveChanged,
       ),
     );

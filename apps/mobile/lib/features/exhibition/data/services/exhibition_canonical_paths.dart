@@ -75,6 +75,17 @@ final class ExhibitionCanonicalPaths {
     return '/api/app/project/${Uri.encodeComponent(projectId)}/pricing-summary';
   }
 
+  static String projectDealConfirmations(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/deal-confirmations';
+  }
+
+  static String projectDealConfirmationDetail(
+    String projectId,
+    String dealConfirmationId,
+  ) {
+    return '${projectDealConfirmations(projectId)}/${Uri.encodeComponent(dealConfirmationId)}';
+  }
+
   static String projectAuthenticitySincerityOrders(String projectId) {
     return '/api/app/project/${Uri.encodeComponent(projectId)}/authenticity-sincerity/orders';
   }

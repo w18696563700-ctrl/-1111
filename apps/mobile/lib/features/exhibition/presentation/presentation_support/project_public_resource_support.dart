@@ -315,14 +315,11 @@ Future<bool> _openDownloadedProjectPublicResourceFile(
   if (override != null) {
     return override(file);
   }
-  try {
-    final result = await OpenFilex.open(file.path, type: file.mimeType);
-    return result.type == ResultType.done;
-  } on PlatformException {
-    return false;
-  } on IOException {
-    return false;
-  }
+  final result = await FileOpenCoordinator.instance.openPath(
+    path: file.path,
+    mimeType: file.mimeType,
+  );
+  return result.opened;
 }
 
 Future<bool> _shareDownloadedProjectPublicResourceFile(
