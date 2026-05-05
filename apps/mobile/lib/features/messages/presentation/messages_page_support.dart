@@ -335,6 +335,10 @@ class _MessagesNotificationCenterSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final items = result?.data?.items ?? const <AppNotificationItemView>[];
+    final listHeight = _notificationPanelListHeight(
+      itemCount: items.length,
+      maxHeight: MediaQuery.sizeOf(context).height * 0.46,
+    );
     return Material(
       color: theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -426,17 +430,21 @@ class _MessagesNotificationCenterSection extends StatelessWidget {
                   body: '项目沟通、论坛互动和系统提醒会汇总在这里。',
                 )
               else
-                ...items
-                    .take(5)
-                    .map(
-                      (AppNotificationItemView item) => Padding(
-                        padding: const EdgeInsets.only(bottom: 10),
-                        child: _MessagesNotificationCard(
-                          item: item,
-                          onOpen: () => onOpen(item),
-                        ),
-                      ),
-                    ),
+                SizedBox(
+                  height: listHeight,
+                  child: ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: items.length,
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) {
+                      final item = items[index];
+                      return _MessagesNotificationCard(
+                        item: item,
+                        onOpen: () => onOpen(item),
+                      );
+                    },
+                  ),
+                ),
             ],
           ],
         ),
@@ -454,6 +462,15 @@ class _MessagesNotificationCenterSection extends StatelessWidget {
   }
 }
 
+double _notificationPanelListHeight({
+  required int itemCount,
+  required double maxHeight,
+}) {
+  final contentHeight =
+      itemCount * 66.0 + (itemCount - 1).clamp(0, itemCount) * 6.0;
+  return contentHeight.clamp(96.0, maxHeight).toDouble();
+}
+
 class _MessagesNotificationCard extends StatelessWidget {
   const _MessagesNotificationCard({required this.item, required this.onOpen});
 
@@ -463,61 +480,99 @@ class _MessagesNotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final routeLocation = item.routeTarget?.routeLocation;
+    final canLocate = routeLocation != null && routeLocation.trim().isNotEmpty;
+    final timeLabel = _relativeCreatedAt(item.createdAt);
+    final sourceLabel = _notificationSource(item.source);
+    final body = item.body?.trim();
     return Material(
-      color: item.unread
-          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.14)
-          : theme.colorScheme.surface,
+      color: item.unread ? const Color(0xFFFFFBF6) : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(10, 8, 9, 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.42,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(9),
-                  child: Icon(
-                    _notificationIcon(item.source),
-                    size: 22,
-                    color: theme.colorScheme.primary,
-                  ),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.38,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Icon(
+                          _notificationIcon(item.source),
+                          size: 19,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    if (item.unread)
+                      Positioned(
+                        top: -1,
+                        right: -1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.error,
+                            border: Border.all(
+                              color: theme.colorScheme.surface,
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const SizedBox(width: 9, height: 9),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    _MessagesMetaPill(label: _notificationSource(item.source)),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        Flexible(
+                          child: Text(
+                            '$sourceLabel · ${item.title}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                        if (!canLocate) ...<Widget>[
+                          const SizedBox(width: 6),
+                          const _MessagesMetaPill(label: '暂不可定位'),
+                        ],
+                      ],
                     ),
-                    if (item.body != null) ...<Widget>[
-                      const SizedBox(height: 4),
+                    if (body != null && body.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 3),
                       Text(
-                        item.body!,
+                        body,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.18,
                         ),
                       ),
                     ],
@@ -525,24 +580,33 @@ class _MessagesNotificationCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  if (_relativeCreatedAt(item.createdAt) != null) ...<Widget>[
-                    const SizedBox(height: 16),
-                    Text(
-                      _relativeCreatedAt(item.createdAt)!,
-                      style: theme.textTheme.bodySmall?.copyWith(
+              SizedBox(
+                width: 54,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (timeLabel != null)
+                      Text(
+                        timeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    if (canLocate) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ],
           ),
@@ -554,6 +618,7 @@ class _MessagesNotificationCard extends StatelessWidget {
   IconData _notificationIcon(String source) {
     return switch (source) {
       'project_communication' => Icons.forum_outlined,
+      'bid_participation_request' => Icons.assignment_turned_in_outlined,
       'forum_interaction' => Icons.dynamic_feed_outlined,
       _ => Icons.notifications_none_rounded,
     };
@@ -562,6 +627,7 @@ class _MessagesNotificationCard extends StatelessWidget {
   String _notificationSource(String source) {
     return switch (source) {
       'project_communication' => '项目沟通',
+      'bid_participation_request' => '业务待办',
       'forum_interaction' => '论坛互动',
       _ => '系统提醒',
     };

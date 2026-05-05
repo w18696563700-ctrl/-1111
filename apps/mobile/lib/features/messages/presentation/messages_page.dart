@@ -305,24 +305,37 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   Future<void> _openNotification(AppNotificationItemView item) async {
+    final routeLocation = item.routeTarget?.routeLocation;
+    if (routeLocation == null || routeLocation.trim().isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
+      );
+      return;
+    }
+    try {
+      unawaited(Navigator.of(context).pushNamed(routeLocation));
+    } catch (_) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
+      );
+      return;
+    }
     if (item.unread) {
-      await MessagesConsumerLayer.instance.markNotificationsRead(<String>[
-        item.notificationId,
-      ]);
+      final result = await MessagesConsumerLayer.instance.markNotificationsRead(
+        <String>[item.notificationId],
+      );
+      if (result.state != AppPageState.content) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(result.message ?? '当前通知已读操作暂不可用，请稍后再试。')),
+        );
+        return;
+      }
       await _loadNotifications(showLoading: false);
       await _reloadShellContext();
     }
-    if (!mounted) {
-      return;
-    }
-    final routeLocation = item.routeTarget?.routeLocation;
-    if (routeLocation == null || routeLocation.isEmpty) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(const SnackBar(content: Text('当前通知暂时没有可打开的页面。')));
-      return;
-    }
-    Navigator.of(context).pushNamed(routeLocation);
   }
 
   Future<void> _reloadShellContext() async {
