@@ -4,6 +4,7 @@ import { IdentityAuditModule } from '../audit/identity-audit.module';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { AuthModule } from '../auth/auth.module';
 import { ContentSafetyModule } from '../content_safety/content-safety.module';
+import { CreditConstraintsModule } from '../credit_constraints/credit-constraints.module';
 import { GovernanceAppealCaseEntity } from '../governance/entities/governance-appeal-case.entity';
 import { GovernancePenaltyEntity } from '../governance/entities/governance-penalty.entity';
 import { DeviceEntity } from '../identity/entities/device.entity';
@@ -52,6 +53,7 @@ import { OrganizationCertificationRevalidationAttemptEntity } from './entities/o
   imports: [
     AuthModule,
     ContentSafetyModule,
+    CreditConstraintsModule,
     EnterpriseHubModule,
     OrganizationCreditScoringModule,
     OrganizationModule,
