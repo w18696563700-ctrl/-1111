@@ -465,7 +465,8 @@ void main() {
 
     expect(uploadInitCount, 0);
     expect(find.text('现场照片.jpg'), findsWidgets);
-    expect(find.textContaining('点名称预览'), findsOneWidget);
+    expect(find.text('正文图片'), findsOneWidget);
+    expect(find.text('图片预览'), findsOneWidget);
     expect(find.text('附件已选中，请先填写分类、标题和正文'), findsOneWidget);
 
     await tester.drag(find.byType(ListView).first, const Offset(0, 320));

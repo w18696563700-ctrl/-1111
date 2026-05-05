@@ -827,7 +827,8 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
     if (message != null &&
         message.isNotEmpty &&
         RegExp(r'[\u4e00-\u9fff]').hasMatch(message) &&
-        !_looksTechnicalUploadMessage(message)) {
+        !_looksTechnicalUploadMessage(message) &&
+        !_looksGenericUploadFailureMessage(message)) {
       return message;
     }
     return switch (result.errorCode) {
@@ -845,8 +846,14 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
         lower.contains('cannot ') ||
         lower.contains('econnrefused') ||
         lower.contains('direct upload') ||
+        value.contains('直传') ||
         lower.contains('upstream') ||
         lower.contains('transport');
+  }
+
+  bool _looksGenericUploadFailureMessage(String value) {
+    final trimmed = value.trim();
+    return trimmed == '上传失败' || trimmed == '请求失败' || trimmed == '网络错误';
   }
 }
 

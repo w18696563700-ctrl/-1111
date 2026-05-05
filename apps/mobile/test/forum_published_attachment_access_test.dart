@@ -1,3 +1,4 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
@@ -28,6 +29,11 @@ Map<String, Object?> _postDetailWithAttachment({
         'mimeType': mimeType,
       },
     ],
+    'engagement': <String, Object?>{
+      'replyCount': 0,
+      'likeCount': 0,
+      'viewCount': 0,
+    },
     'publishedAt': '2026-03-31T12:00:00Z',
     'viewerHasLiked': false,
     'viewerHasBookmarked': false,
@@ -47,6 +53,23 @@ Future<void> _pumpPostDetail(
     ),
   );
   await tester.pumpAndSettle();
+}
+
+Future<void> _scrollToAttachment(WidgetTester tester, String fileName) async {
+  final target = find.text(fileName);
+  final viewportHeight =
+      tester.view.physicalSize.height / tester.view.devicePixelRatio;
+  for (var i = 0; i < 7; i += 1) {
+    if (tester.any(target)) {
+      final center = tester.getCenter(target);
+      if (center.dy > 20 && center.dy < viewportHeight - 20) {
+        break;
+      }
+    }
+    await tester.drag(find.byType(ListView).first, const Offset(0, -260));
+    await tester.pumpAndSettle();
+  }
+  expect(target, findsOneWidget);
 }
 
 void main() {
@@ -104,6 +127,7 @@ void main() {
           },
     );
 
+    await _scrollToAttachment(tester, '现场照片.jpg');
     await tester.tap(find.text('现场照片.jpg'));
     await tester.pumpAndSettle();
 
@@ -160,12 +184,19 @@ void main() {
           },
     );
 
+    await _scrollToAttachment(tester, '进场演示.mp4');
     await tester.tap(find.text('进场演示.mp4'));
     await tester.pumpAndSettle();
 
+    expect(find.text('视频预览'), findsOneWidget);
+    expect(find.text('调用设备播放器'), findsOneWidget);
+    expect(openedUri, isNull);
+
+    await tester.tap(find.text('调用设备播放器'));
+    await tester.pumpAndSettle();
+
     expect(openedUri?.toString(), 'https://files.example.com/video.mp4?sig=2');
-    expect(find.text('已打开视频预览'), findsOneWidget);
-    expect(find.text('视频预览链接'), findsNothing);
+    expect(find.text('已调用设备播放器'), findsOneWidget);
   });
 
   testWidgets('published file attachment opens external download url', (
@@ -217,62 +248,72 @@ void main() {
           },
     );
 
+    await _scrollToAttachment(tester, '交付清单.pdf');
     await tester.tap(find.text('交付清单.pdf'));
     await tester.pumpAndSettle();
 
-    expect(openedUri?.toString(), 'https://files.example.com/brief.pdf?sig=3');
-    expect(find.text('已交给系统处理下载'), findsOneWidget);
-    expect(find.text('文件下载链接'), findsNothing);
-  });
+    expect(find.text('文件预览'), findsOneWidget);
+    expect(find.text('调用设备打开'), findsOneWidget);
+    expect(openedUri, isNull);
 
-  testWidgets('published file attachment shows fallback sheet when external open fails', (
-    WidgetTester tester,
-  ) async {
-    ForumDetailAttachmentDebugOverrides.installExternalUrlOpener((
-      Uri uri,
-    ) async {
-      return false;
-    });
-
-    await _pumpPostDetail(
-      tester,
-      forumHandlerOverrides:
-          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-            'GET /api/app/forum/post/detail': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: _postDetailWithAttachment(
-                  fileAssetId: 'asset-file-2',
-                  fileName: '报价单.pdf',
-                  mimeType: 'application/pdf',
-                ),
-              );
-            },
-            'GET /api/app/file/access': (AppApiRequest request) async {
-              return AppApiResponse(
-                statusCode: 200,
-                uri: request.uri,
-                body: const <String, Object?>{
-                  'fileAssetId': 'asset-file-2',
-                  'mode': 'download',
-                  'accessUrl': 'https://files.example.com/quote.pdf?sig=4',
-                  'fileName': '报价单.pdf',
-                  'mimeType': 'application/pdf',
-                  'expiresAt': '2026-03-31T13:00:00Z',
-                  'contentLengthBytes': 4096,
-                },
-              );
-            },
-          },
-    );
-
-    await tester.tap(find.text('报价单.pdf'));
+    await tester.tap(find.text('调用设备打开'));
     await tester.pumpAndSettle();
 
-    expect(find.text('文件下载链接'), findsOneWidget);
-    expect(find.text('复制链接'), findsOneWidget);
+    expect(openedUri?.toString(), 'https://files.example.com/brief.pdf?sig=3');
+    expect(find.text('已调用设备打开附件'), findsOneWidget);
   });
+
+  testWidgets(
+    'published file attachment shows fallback sheet when external open fails',
+    (WidgetTester tester) async {
+      ForumDetailAttachmentDebugOverrides.installExternalUrlOpener((
+        Uri uri,
+      ) async {
+        return false;
+      });
+
+      await _pumpPostDetail(
+        tester,
+        forumHandlerOverrides:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/post/detail': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _postDetailWithAttachment(
+                    fileAssetId: 'asset-file-2',
+                    fileName: '报价单.pdf',
+                    mimeType: 'application/pdf',
+                  ),
+                );
+              },
+              'GET /api/app/file/access': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'fileAssetId': 'asset-file-2',
+                    'mode': 'download',
+                    'accessUrl': 'https://files.example.com/quote.pdf?sig=4',
+                    'fileName': '报价单.pdf',
+                    'mimeType': 'application/pdf',
+                    'expiresAt': '2026-03-31T13:00:00Z',
+                    'contentLengthBytes': 4096,
+                  },
+                );
+              },
+            },
+      );
+
+      await _scrollToAttachment(tester, '报价单.pdf');
+      await tester.tap(find.text('报价单.pdf'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('文件预览'), findsOneWidget);
+      expect(find.text('调用设备打开'), findsOneWidget);
+      expect(find.text('复制链接'), findsOneWidget);
+    },
+  );
 
   testWidgets('file access 409 is shown in controlled Chinese message', (
     WidgetTester tester,
@@ -305,6 +346,7 @@ void main() {
           },
     );
 
+    await _scrollToAttachment(tester, '已解绑文件.pdf');
     await tester.tap(find.text('已解绑文件.pdf'));
     await tester.pump();
 

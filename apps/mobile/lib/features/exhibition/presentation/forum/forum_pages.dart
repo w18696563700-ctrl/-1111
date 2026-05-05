@@ -18,6 +18,7 @@ import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
 import 'package:mobile/shared/ui/app_visual_components.dart';
 import 'package:mobile/shared/ui/app_visual_tokens.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 part 'forum_feed_pages.dart';
 part 'forum_feed_support.dart';
@@ -25,6 +26,9 @@ part 'forum_feed_filter_support.dart';
 part 'forum_topics_page.dart';
 part 'forum_detail_pages.dart';
 part 'forum_detail_surface_widgets.dart';
+part 'forum_composer_media_widgets.dart';
+part 'forum_detail_media_widgets.dart';
+part 'forum_media_presentation_widgets.dart';
 part 'forum_comment_pages.dart';
 part 'forum_creator_pages.dart';
 part 'forum_creator_page_sections.dart';

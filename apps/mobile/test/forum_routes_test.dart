@@ -836,7 +836,7 @@ void main() {
       await tester.tap(find.text('发布'));
       await tester.pumpAndSettle();
 
-      expect(find.text('附件'), findsOneWidget);
+      expect(find.text('正文图片'), findsOneWidget);
       expect(find.text('现场照片.jpg'), findsOneWidget);
     },
   );

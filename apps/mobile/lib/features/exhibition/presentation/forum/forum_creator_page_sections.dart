@@ -60,9 +60,20 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           style: theme.textTheme.bodyLarge?.copyWith(height: 1.55),
           onChanged: (_) => _markComposerDirty(),
         ),
-        if (_mediaItems.isNotEmpty) ...<Widget>[
+        if (_inlineImageItems.isNotEmpty) ...<Widget>[
           const SizedBox(height: 14),
-          _inlineAttachmentList(context),
+          _ForumComposerInlineImageGrid(
+            items: _inlineImageItems,
+            onPreview: (item) => _showImagePreviewDialog(context, item),
+            onRemove: (item) => _removeMedia(item.localId),
+            onUpload: (item) => _startMediaUpload(item.localId),
+            saving: _saving,
+            publishing: _publishing,
+          ),
+        ],
+        if (_inlineFileItems.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 14),
+          _inlineAttachmentList(context, _inlineFileItems),
         ],
         const SizedBox(height: 18),
         _mediaSection(context),
@@ -367,7 +378,28 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
     return null;
   }
 
-  Widget _inlineAttachmentList(BuildContext context) {
+  List<_ForumComposerMediaItem> get _inlineImageItems {
+    return _mediaItems
+        .where(
+          (_ForumComposerMediaItem item) =>
+              _forumIsImageMimeType(item.mimeType) && item.bytes.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
+
+  List<_ForumComposerMediaItem> get _inlineFileItems {
+    return _mediaItems
+        .where(
+          (_ForumComposerMediaItem item) =>
+              !_forumIsImageMimeType(item.mimeType) || item.bytes.isEmpty,
+        )
+        .toList(growable: false);
+  }
+
+  Widget _inlineAttachmentList(
+    BuildContext context,
+    List<_ForumComposerMediaItem> items,
+  ) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -380,7 +412,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           ),
         ),
         const SizedBox(height: 10),
-        ..._mediaItems.map(
+        ...items.map(
           (_ForumComposerMediaItem item) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: _mediaItemCard(context, item),
