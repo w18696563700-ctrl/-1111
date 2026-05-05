@@ -1070,6 +1070,96 @@
         }
       }
     },
+    "/api/app/profile/credit-and-constraints/status": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Profile credit-and-constraints status canonical path for Flutter App",
+        "operationId": "getAppProfileCreditConstraintsStatus",
+        "responses": {
+          "200": {
+            "description": "Minimum current-organization credit, deposit, and transaction-guarantee posture status projection. This path is read-only and must not be interpreted as credit scoring, payment execution, deposit freeze, refund, settlement, or transaction-guarantee activation.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCreditConstraintsStatusResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Controlled invalid or expired app session response."
+          },
+          "403": {
+            "description": "Controlled forbidden response for the current actor or organization scope."
+          },
+          "404": {
+            "description": "Controlled unavailable response when current credit, deposit, or transaction-guarantee posture cannot be read for the current organization scope.\n"
+          }
+        }
+      }
+    },
+    "/api/app/profile/credit-and-constraints/explanation": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Profile credit-and-constraints explanation canonical path for Flutter App",
+        "operationId": "getAppProfileCreditConstraintsExplanation",
+        "responses": {
+          "200": {
+            "description": "Minimum read-only explanation projection for the current credit, deposit, transaction-guarantee, and dependency posture. This path must not expose scoring rules, algorithm weights, payment execution, settlement, refund, or Admin governance operations.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCreditConstraintsExplanationResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Controlled invalid or expired app session response."
+          },
+          "403": {
+            "description": "Controlled forbidden response for the current actor or organization scope."
+          },
+          "404": {
+            "description": "Controlled unavailable response when explanation posture cannot be read."
+          }
+        }
+      }
+    },
+    "/api/app/profile/credit-and-constraints/handoff": {
+      "get": {
+        "tags": [
+          "Profile"
+        ],
+        "summary": "Profile credit-and-constraints handoff canonical path for Flutter App",
+        "operationId": "getAppProfileCreditConstraintsHandoff",
+        "responses": {
+          "200": {
+            "description": "Minimum read-only handoff projection for current credit, deposit, transaction-guarantee, and V2.2 payment/billing dependency posture. This path carries direction only and must not execute payment, deposit freeze, refund, settlement, or transaction-guarantee opening.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProfileCreditConstraintsHandoffResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Controlled invalid or expired app session response."
+          },
+          "403": {
+            "description": "Controlled forbidden response for the current actor or organization scope."
+          },
+          "404": {
+            "description": "Controlled unavailable response when handoff posture cannot be read."
+          }
+        }
+      }
+    },
     "/api/app/profile/governance/status": {
       "get": {
         "tags": [
@@ -8916,6 +9006,371 @@
               "string",
               "null"
             ]
+          }
+        }
+      },
+      "ProfileCreditConstraintsStatusResponse": {
+        "type": "object",
+        "required": [
+          "privateSummary",
+          "creditConstraint",
+          "deposit",
+          "transactionGuarantee",
+          "dependencyReference"
+        ],
+        "description": "Current read-only `我的信用与约束` status posture response. This schema covers existing runtime fields only and does not introduce organization credit scoring, payment execution, deposit freeze, refund, settlement, or transaction-guarantee activation.\n",
+        "properties": {
+          "privateSummary": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsPrivateSummary"
+          },
+          "creditConstraint": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintPosture"
+          },
+          "deposit": {
+            "$ref": "#/components/schemas/ProfileDepositPosture"
+          },
+          "transactionGuarantee": {
+            "$ref": "#/components/schemas/ProfileTransactionGuaranteePosture"
+          },
+          "dependencyReference": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProfileCreditConstraintsDependencyReference"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProfileCreditConstraintsPrivateSummary": {
+        "type": "object",
+        "required": [
+          "entryKey",
+          "summaryStatus",
+          "creditConstraintStatus",
+          "depositPostureStatus",
+          "transactionGuaranteeEligibilityStatus",
+          "updatedAt"
+        ],
+        "properties": {
+          "entryKey": {
+            "type": "string"
+          },
+          "summaryStatus": {
+            "type": "string",
+            "description": "Current bounded summary posture status."
+          },
+          "creditConstraintStatus": {
+            "type": "string",
+            "description": "Current credit-constraint posture status."
+          },
+          "depositPostureStatus": {
+            "type": "string",
+            "description": "Current deposit posture status."
+          },
+          "transactionGuaranteeEligibilityStatus": {
+            "type": "string",
+            "description": "Current transaction-guarantee eligibility posture status."
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProfileCreditConstraintPosture": {
+        "type": "object",
+        "required": [
+          "creditConstraintStatus",
+          "performanceConstraintStatus",
+          "executionAvailabilityStatus",
+          "restrictionReasonCode",
+          "advisoryReasonCode",
+          "updatedAt"
+        ],
+        "properties": {
+          "creditConstraintStatus": {
+            "type": "string"
+          },
+          "performanceConstraintStatus": {
+            "type": "string"
+          },
+          "executionAvailabilityStatus": {
+            "type": "string"
+          },
+          "restrictionReasonCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "advisoryReasonCode": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProfileDepositPosture": {
+        "type": "object",
+        "required": [
+          "depositRequirementStatus",
+          "depositEligibilityStatus",
+          "depositRestrictionStatus",
+          "depositPostureStatus",
+          "depositHandoffKey",
+          "depositDependencyKey",
+          "updatedAt"
+        ],
+        "description": "Current deposit requirement, eligibility, restriction, status, and handoff posture only. This is not a deposit amount, payment, freeze, refund, settlement, or billing execution schema.\n",
+        "properties": {
+          "depositRequirementStatus": {
+            "type": "string"
+          },
+          "depositEligibilityStatus": {
+            "type": "string"
+          },
+          "depositRestrictionStatus": {
+            "type": "string"
+          },
+          "depositPostureStatus": {
+            "type": "string"
+          },
+          "depositHandoffKey": {
+            "type": "string"
+          },
+          "depositDependencyKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProfileTransactionGuaranteePosture": {
+        "type": "object",
+        "required": [
+          "transactionGuaranteeEligibilityStatus",
+          "transactionGuaranteeRestrictionStatus",
+          "transactionGuaranteeExplanationKey",
+          "transactionGuaranteeHandoffKey",
+          "transactionGuaranteeDependencyKey",
+          "updatedAt"
+        ],
+        "description": "Current transaction-guarantee eligibility, restriction, explanation, handoff, and dependency posture only. This is not transaction-guarantee activation, dispute, adjudication, or funds execution.\n",
+        "properties": {
+          "transactionGuaranteeEligibilityStatus": {
+            "type": "string"
+          },
+          "transactionGuaranteeRestrictionStatus": {
+            "type": "string"
+          },
+          "transactionGuaranteeExplanationKey": {
+            "type": "string"
+          },
+          "transactionGuaranteeHandoffKey": {
+            "type": "string"
+          },
+          "transactionGuaranteeDependencyKey": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProfileCreditConstraintsDependencyReference": {
+        "type": "object",
+        "required": [
+          "dependencyFamilyKey",
+          "dependencyRequired",
+          "dependencyExplanationKey",
+          "dependencyHandoffKey"
+        ],
+        "description": "Current dependency reference only. `v22_payment_billing` is a future capability dependency and not payment, billing, settlement, refund, or freeze execution.\n",
+        "properties": {
+          "dependencyFamilyKey": {
+            "type": "string"
+          },
+          "dependencyRequired": {
+            "type": "boolean"
+          },
+          "dependencyExplanationKey": {
+            "type": "string"
+          },
+          "dependencyHandoffKey": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileCreditConstraintsExplanationResponse": {
+        "type": "object",
+        "required": [
+          "creditExplanation",
+          "depositExplanation",
+          "transactionGuaranteeExplanation",
+          "dependencyExplanation",
+          "disclaimer"
+        ],
+        "properties": {
+          "creditExplanation": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsExplanationBlock"
+          },
+          "depositExplanation": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsExplanationBlock"
+          },
+          "transactionGuaranteeExplanation": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsExplanationBlock"
+          },
+          "dependencyExplanation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProfileCreditConstraintsDependencyExplanation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "disclaimer": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileCreditConstraintsExplanationBlock": {
+        "type": "object",
+        "required": [
+          "explanationKey",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "explanationKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileCreditConstraintsDependencyExplanation": {
+        "type": "object",
+        "required": [
+          "dependencyFamilyKey",
+          "dependencyRequired",
+          "dependencyExplanationKey",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "dependencyFamilyKey": {
+            "type": "string"
+          },
+          "dependencyRequired": {
+            "type": "boolean"
+          },
+          "dependencyExplanationKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileCreditConstraintsHandoffResponse": {
+        "type": "object",
+        "required": [
+          "creditHandoff",
+          "depositHandoff",
+          "transactionGuaranteeHandoff",
+          "dependencyHandoff"
+        ],
+        "properties": {
+          "creditHandoff": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsHandoffBlock"
+          },
+          "depositHandoff": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsHandoffBlock"
+          },
+          "transactionGuaranteeHandoff": {
+            "$ref": "#/components/schemas/ProfileCreditConstraintsHandoffBlock"
+          },
+          "dependencyHandoff": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProfileCreditConstraintsDependencyHandoff"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProfileCreditConstraintsHandoffBlock": {
+        "type": "object",
+        "required": [
+          "handoffKey",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "handoffKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          }
+        }
+      },
+      "ProfileCreditConstraintsDependencyHandoff": {
+        "type": "object",
+        "required": [
+          "dependencyFamilyKey",
+          "dependencyRequired",
+          "dependencyHandoffKey",
+          "title",
+          "body"
+        ],
+        "properties": {
+          "dependencyFamilyKey": {
+            "type": "string"
+          },
+          "dependencyRequired": {
+            "type": "boolean"
+          },
+          "dependencyHandoffKey": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
           }
         }
       },
