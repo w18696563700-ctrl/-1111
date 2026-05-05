@@ -1,0 +1,66 @@
+name: Organization Credit Scoring Reserve Payload Parity
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Cloud ingress base URL for BFF and Server health plus App-facing APIs.
+        required: true
+        default: http://47.108.180.198
+      timeout_ms:
+        description: Per-request timeout in milliseconds.
+        required: true
+        default: '15000'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: organization-credit-scoring-reserve-payload-parity
+  cancel-in-progress: false
+
+jobs:
+  payload-parity:
+    name: Read-only reserve payload parity
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_BASE_URL: ${{ inputs.base_url }}
+      ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_ACCOUNTS_JSON: ${{ secrets.ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_ACCOUNTS_JSON }}
+      ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_TIMEOUT_MS: ${{ inputs.timeout_ms }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enable pnpm
+        run: corepack enable
+
+      - name: Validate CI inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ -z "${ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_ACCOUNTS_JSON:-}" ]; then
+            echo "::error::ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_ACCOUNTS_JSON secret is not configured."
+            exit 1
+          fi
+
+          if [ -z "${ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_BASE_URL:-}" ]; then
+            echo "::error::ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_BASE_URL is empty."
+            exit 1
+          fi
+
+          case "${ORGANIZATION_CREDIT_SCORING_RESERVE_PARITY_BASE_URL}" in
+            http://127.0.0.1:*|https://127.0.0.1:*|http://localhost:*|https://localhost:*)
+              echo "::error::CI payload parity must use formal cloud ingress, not localhost."
+              exit 1
+              ;;
+          esac
+
+      - name: Run organization credit scoring reserve payload parity
+        run: pnpm runtime:organization-credit-scoring-reserve:payload-parity
