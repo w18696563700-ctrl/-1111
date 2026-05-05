@@ -265,13 +265,16 @@ class _HomeEnterpriseModulePanelState
                 summary:
                     enterpriseBoardCardSummaryText(item) ??
                     _homeEnterpriseCardSummary(item),
-                badgeLabel: item.boardType == EnterpriseBoardType.company
+                badgeLabel:
+                    _homeEnterpriseUsesCleanCard(item.boardType) ||
+                        item.boardType == EnterpriseBoardType.company
                     ? null
                     : _homeEnterpriseCardBadgeLabel(item),
                 actionLabel: _homeEnterpriseDetailActionLabel(item.boardType),
                 imageUrl: item.logoUrl,
                 locationLabel: _homeEnterpriseCardLocationLabel(item),
                 chips: enterpriseBoardCardSummaryChips(item),
+                clean: _homeEnterpriseUsesCleanCard(item.boardType),
                 onPressed: () => widget.onOpenEnterpriseItem(item),
               ),
             ),

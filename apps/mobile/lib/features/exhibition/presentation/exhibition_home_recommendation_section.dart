@@ -10,6 +10,7 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
     this.imageUrl,
     this.locationLabel,
     this.chips = const <String>[],
+    this.clean = false,
   });
 
   final String title;
@@ -20,11 +21,13 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
   final String? imageUrl;
   final String? locationLabel;
   final List<String> chips;
+  final bool clean;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final hasVisibleBadge = badgeLabel != null && badgeLabel!.trim().isNotEmpty;
+    final hasVisibleBadge =
+        !clean && badgeLabel != null && badgeLabel!.trim().isNotEmpty;
     return Semantics(
       button: true,
       label: actionLabel,
@@ -103,7 +106,7 @@ class _HomeEnterpriseRecommendationCard extends StatelessWidget {
                             height: 1.4,
                           ),
                         ),
-                        if (chips.isNotEmpty) ...<Widget>[
+                        if (!clean && chips.isNotEmpty) ...<Widget>[
                           const SizedBox(height: 10),
                           Wrap(
                             spacing: 6,

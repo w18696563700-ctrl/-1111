@@ -1236,11 +1236,11 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('优秀供应商'), findsOneWidget);
+    expect(find.text('优秀供应商'), findsNothing);
     expect(find.text('城市'), findsOneWidget);
     expect(find.text('供应品类'), findsOneWidget);
     expect(find.text('全部'), findsOneWidget);
-    expect(find.text('桁架舞台搭建厂'), findsWidgets);
+    expect(find.text('桁架舞台搭建厂'), findsOneWidget);
     expect(find.text('默认排序'), findsNothing);
     await tester.scrollUntilVisible(
       find.text('华南物料租赁服务商'),
@@ -1248,8 +1248,10 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
-    expect(find.text('桁架舞台搭建厂'), findsWidgets);
-    expect(find.textContaining('响应'), findsWidgets);
+    expect(find.text('桁架舞台搭建厂'), findsOneWidget);
+    expect(find.textContaining('响应'), findsOneWidget);
+    expect(find.text('已认证'), findsNothing);
+    expect(find.text('5 个案例'), findsNothing);
     expect(find.text('按天租赁'), findsNothing);
   });
 
@@ -1323,7 +1325,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('优秀工厂'), findsOneWidget);
+      expect(find.text('优秀工厂'), findsNothing);
       expect(find.text('厂房位置'), findsOneWidget);
       expect(find.text('厂房面积'), findsOneWidget);
       expect(find.text('工艺类型'), findsNothing);
@@ -1335,7 +1337,9 @@ void main() {
       );
       await tester.pumpAndSettle();
       expect(find.text('华南数字制作工厂'), findsOneWidget);
-      expect(find.text('木作'), findsWidgets);
+      expect(find.text('工艺：木作'), findsOneWidget);
+      expect(find.text('已认证'), findsNothing);
+      expect(find.text('8 个案例'), findsNothing);
     },
   );
 

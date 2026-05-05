@@ -101,6 +101,11 @@ String? _homeEnterpriseCardLocationLabel(EnterpriseHubListItem item) {
   return parts.isEmpty ? null : parts.join(' / ');
 }
 
+bool _homeEnterpriseUsesCleanCard(EnterpriseBoardType boardType) {
+  return boardType == EnterpriseBoardType.factory ||
+      boardType == EnterpriseBoardType.supplier;
+}
+
 String _homeEnterpriseDetailActionLabel(EnterpriseBoardType boardType) {
   return switch (boardType) {
     EnterpriseBoardType.company => '查看公司详情',
