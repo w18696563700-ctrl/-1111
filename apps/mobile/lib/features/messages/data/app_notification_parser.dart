@@ -42,6 +42,9 @@ AppNotificationUnreadView parseAppNotificationUnread(Object? payload) {
   return AppNotificationUnreadView(
     total: _optionalNonNegativeInt(map?['total']),
     projectCommunication: _optionalNonNegativeInt(map?['projectCommunication']),
+    businessTodo: _optionalNonNegativeInt(
+      map?['businessTodo'] ?? map?['bidParticipationRequest'],
+    ),
     bidParticipationRequest: _optionalNonNegativeInt(
       map?['bidParticipationRequest'],
     ),

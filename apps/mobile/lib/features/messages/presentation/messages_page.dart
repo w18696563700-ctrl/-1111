@@ -15,6 +15,14 @@ enum _MessagesInteractionTab { replies, likes, follows }
 
 enum _MessagesPrimaryTab { projectCommunication, forumInteraction }
 
+enum _MessagesNotificationFilter {
+  all,
+  projectCommunication,
+  forumInteraction,
+  businessTodo,
+  system,
+}
+
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key, this.refreshSignal, this.entrySignal});
 
@@ -51,6 +59,8 @@ class _MessagesPageState extends State<MessagesPage> {
   bool _projectCommunicationLoading = false;
   bool _notificationLoading = false;
   bool _notificationCenterExpanded = false;
+  _MessagesNotificationFilter _selectedNotificationFilter =
+      _MessagesNotificationFilter.all;
 
   @override
   void initState() {
@@ -185,11 +195,6 @@ class _MessagesPageState extends State<MessagesPage> {
         _projectCommunicationLoading = false;
       }
     });
-    if (loadToken == _latestReminderLoadToken &&
-        (result.state == AppPageState.content ||
-            result.state == AppPageState.empty)) {
-      await _reloadShellContextPreservingNotificationUnread();
-    }
   }
 
   Future<void> _loadNotifications({bool showLoading = true}) async {
@@ -197,7 +202,9 @@ class _MessagesPageState extends State<MessagesPage> {
     if (shouldShowLoading) {
       setState(() => _notificationLoading = true);
     }
-    final result = await MessagesConsumerLayer.instance.loadNotifications();
+    final result = await MessagesConsumerLayer.instance.loadNotifications(
+      source: _notificationFilterQuery(_selectedNotificationFilter),
+    );
     if (!mounted) {
       return;
     }
@@ -248,8 +255,11 @@ class _MessagesPageState extends State<MessagesPage> {
             child: _MessagesNotificationPanel(
               loading: _notificationLoading,
               result: _notificationResult,
+              selectedFilter: _selectedNotificationFilter,
+              onSelectFilter: _selectNotificationFilter,
               onOpen: _openNotification,
               onRetry: () => _loadNotifications(),
+              onLoadMore: _loadMoreNotifications,
             ),
           ),
         Expanded(
@@ -391,6 +401,53 @@ class _MessagesPageState extends State<MessagesPage> {
     _load(tab: tab);
   }
 
+  void _selectNotificationFilter(_MessagesNotificationFilter filter) {
+    if (filter == _selectedNotificationFilter) {
+      return;
+    }
+    setState(() {
+      _selectedNotificationFilter = filter;
+    });
+    _loadNotifications(showLoading: false);
+  }
+
+  Future<void> _loadMoreNotifications() async {
+    final current = _notificationResult?.data;
+    if (current == null || current.nextCursor == null || _notificationLoading) {
+      return;
+    }
+    setState(() => _notificationLoading = true);
+    final result = await MessagesConsumerLayer.instance.loadNotifications(
+      cursor: current.nextCursor,
+      source: _notificationFilterQuery(_selectedNotificationFilter),
+    );
+    if (!mounted) {
+      return;
+    }
+    final next = result.data;
+    setState(() {
+      _notificationLoading = false;
+      if (result.state == AppPageState.content && next != null) {
+        _notificationResult = AppNotificationListResult(
+          state: result.state,
+          method: result.method,
+          path: result.path,
+          data: AppNotificationListView(
+            items: <AppNotificationItemView>[...current.items, ...next.items],
+            nextCursor: next.nextCursor,
+            hasMore: next.hasMore,
+            unread: next.unread,
+          ),
+          message: result.message,
+          errorCode: result.errorCode,
+        );
+      } else {
+        _notificationResult = result;
+      }
+    });
+    _syncShellMessagesUnreadBadge(result);
+  }
+
   List<MessageInteractionItemView> _projectCommunicationItems(
     MessageInteractionListResult? result,
   ) {
@@ -439,6 +496,21 @@ class _MessagesPageState extends State<MessagesPage> {
   bool _nonEmpty(String? value) => value != null && value.trim().isNotEmpty;
 
   Future<void> _openNotification(AppNotificationItemView item) async {
+    final routeLocation = item.routeTarget?.routeLocation;
+    if (routeLocation == null || routeLocation.isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
+      );
+      return;
+    }
+    try {
+      unawaited(Navigator.of(context).pushNamed(routeLocation));
+    } catch (_) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
+      );
+      return;
+    }
     if (item.unread) {
       final result = await MessagesConsumerLayer.instance.markNotificationsRead(
         <String>[item.notificationId],
@@ -459,17 +531,6 @@ class _MessagesPageState extends State<MessagesPage> {
         _syncShellMessagesUnreadCount(unread.total);
       }
     }
-    if (!mounted) {
-      return;
-    }
-    final routeLocation = item.routeTarget?.routeLocation;
-    if (routeLocation == null || routeLocation.isEmpty) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(const SnackBar(content: Text('当前通知暂时没有可打开的页面。')));
-      return;
-    }
-    Navigator.of(context).pushNamed(routeLocation);
   }
 
   Future<void> _reloadShellContext() async {

@@ -2240,7 +2240,7 @@ void main() {
   );
 
   testWidgets(
-    'messages page reloads shell unread badge after project communication refresh',
+    'messages page does not reload shell unread badge after project communication refresh',
     (WidgetTester tester) async {
       var shellContextLoads = 0;
       final shellContextConsumer = AppShellContextConsumer(
@@ -2337,10 +2337,10 @@ void main() {
 
       await tapBottomDestination(tester, '消息');
 
-      expect(shellContextLoads, greaterThanOrEqualTo(2));
+      expect(shellContextLoads, 1);
       expect(
         find.descendant(of: navigationBar, matching: find.text('2')),
-        findsOneWidget,
+        findsNothing,
       );
       expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
     },
@@ -2405,7 +2405,7 @@ void main() {
 
       await tapBottomDestination(tester, '消息');
 
-      expect(shellContextLoads, greaterThanOrEqualTo(2));
+      expect(shellContextLoads, 1);
       expect(
         find.descendant(of: navigationBar, matching: find.text('2')),
         findsOneWidget,

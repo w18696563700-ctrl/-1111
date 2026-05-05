@@ -163,75 +163,206 @@ class _MessagesNotificationPanel extends StatelessWidget {
   const _MessagesNotificationPanel({
     required this.loading,
     required this.result,
+    required this.selectedFilter,
+    required this.onSelectFilter,
     required this.onOpen,
     required this.onRetry,
+    required this.onLoadMore,
   });
 
   final bool loading;
   final AppNotificationListResult? result;
+  final _MessagesNotificationFilter selectedFilter;
+  final ValueChanged<_MessagesNotificationFilter> onSelectFilter;
   final ValueChanged<AppNotificationItemView> onOpen;
   final VoidCallback onRetry;
+  final VoidCallback onLoadMore;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final items = result?.data?.items ?? const <AppNotificationItemView>[];
-    final unreadCount = result?.data?.unread.total ?? 0;
+    final maxPanelHeight = MediaQuery.sizeOf(context).height * 0.64;
+    final data = result?.data;
+    final items = _notificationItemsForFilter(
+      data?.items ?? const <AppNotificationItemView>[],
+      selectedFilter,
+    );
+    final unread = data?.unread;
+    final unreadCount = unread?.total ?? 0;
     final failed = _notificationFailed(result);
-    return Material(
-      elevation: 8,
-      shadowColor: Colors.black.withValues(alpha: 0.10),
-      color: theme.colorScheme.surface,
-      shape: RoundedRectangleBorder(
-        side: const BorderSide(color: Color(0xFFECD8B9)),
-        borderRadius: BorderRadius.circular(18),
+    final hasMore = data?.hasMore == true;
+    final maxListHeight = (maxPanelHeight - 108).clamp(132.0, maxPanelHeight);
+    final listHeight = _notificationPanelListHeight(
+      itemCount: items.length,
+      hasMore: hasMore,
+      maxHeight: maxListHeight.toDouble(),
+    );
+    return ConstrainedBox(
+      constraints: BoxConstraints(
+        maxHeight: maxPanelHeight,
+        minWidth: double.infinity,
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Row(
-              children: <Widget>[
-                Expanded(
-                  child: Text(
-                    '消息中心',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w900,
+      child: Material(
+        elevation: 8,
+        shadowColor: Colors.black.withValues(alpha: 0.10),
+        color: theme.colorScheme.surface,
+        shape: RoundedRectangleBorder(
+          side: const BorderSide(color: Color(0xFFECD8B9)),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 12, 12, 10),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '消息中心',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
                     ),
                   ),
+                  _MessagesMetaPill(label: '未读 $unreadCount'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              if (unread != null) ...<Widget>[
+                SizedBox(
+                  height: 34,
+                  child: ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    itemCount: _MessagesNotificationFilter.values.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 8),
+                    itemBuilder: (context, index) {
+                      final filter = _MessagesNotificationFilter.values[index];
+                      return _MessagesNotificationFilterChip(
+                        label: _notificationFilterLabel(filter),
+                        count: _notificationFilterUnreadCount(unread, filter),
+                        selected: selectedFilter == filter,
+                        onTap: () => onSelectFilter(filter),
+                      );
+                    },
+                  ),
                 ),
-                _MessagesMetaPill(label: '未读 $unreadCount'),
+                const SizedBox(height: 9),
               ],
-            ),
-            const SizedBox(height: 10),
-            if (loading)
-              const LinearProgressIndicator(minHeight: 5)
-            else if (failed)
-              _MessagesInlinePanel(
-                title: '消息中心暂不可用',
-                body: result?.message ?? '请稍后再试。',
-                trailing: FilledButton.tonal(
-                  onPressed: onRetry,
-                  child: const Text('重试'),
-                ),
-              )
-            else if (items.isEmpty)
-              const _MessagesInlinePanel(
-                title: '暂无新的消息',
-                body: '通知中心当前没有可展示的真实提醒。',
-              )
-            else ...<Widget>[
-              for (final item in items.take(5))
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: _MessagesNotificationCard(
-                    item: item,
-                    onOpen: () => onOpen(item),
+              if (loading)
+                const LinearProgressIndicator(minHeight: 5)
+              else if (failed)
+                _MessagesInlinePanel(
+                  title: '消息中心暂不可用',
+                  body: result?.message ?? '请稍后再试。',
+                  trailing: FilledButton.tonal(
+                    onPressed: onRetry,
+                    child: const Text('重试'),
+                  ),
+                )
+              else if (items.isEmpty)
+                _MessagesInlinePanel(
+                  title: '${_notificationFilterLabel(selectedFilter)}当前为空',
+                  body: '当前分组没有可展示的真实提醒。',
+                )
+              else
+                SizedBox(
+                  height: listHeight,
+                  child: ListView.separated(
+                    padding: EdgeInsets.zero,
+                    itemCount: items.length + (hasMore ? 1 : 0),
+                    separatorBuilder: (_, _) => const SizedBox(height: 6),
+                    itemBuilder: (context, index) {
+                      if (index >= items.length) {
+                        return Align(
+                          alignment: Alignment.center,
+                          child: TextButton.icon(
+                            onPressed: onLoadMore,
+                            icon: const Icon(Icons.expand_more_rounded),
+                            label: const Text('查看更多'),
+                          ),
+                        );
+                      }
+                      final item = items[index];
+                      return _MessagesNotificationCard(
+                        item: item,
+                        onOpen: () => onOpen(item),
+                      );
+                    },
                   ),
                 ),
             ],
-          ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+double _notificationPanelListHeight({
+  required int itemCount,
+  required bool hasMore,
+  required double maxHeight,
+}) {
+  final contentHeight =
+      itemCount * 66.0 + (itemCount - 1).clamp(0, itemCount) * 6.0;
+  final loadMoreHeight = hasMore ? 42.0 : 0.0;
+  return (contentHeight + loadMoreHeight).clamp(96.0, maxHeight).toDouble();
+}
+
+class _MessagesNotificationFilterChip extends StatelessWidget {
+  const _MessagesNotificationFilterChip({
+    required this.label,
+    required this.count,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final int count;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return InkWell(
+      borderRadius: BorderRadius.circular(999),
+      onTap: onTap,
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          color: selected
+              ? theme.colorScheme.primaryContainer
+              : theme.colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? theme.colorScheme.primary.withValues(alpha: 0.34)
+                : theme.colorScheme.outlineVariant,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 11, vertical: 7),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Text(
+                label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: selected
+                      ? theme.colorScheme.onPrimaryContainer
+                      : theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              if (count > 0) ...<Widget>[
+                const SizedBox(width: 6),
+                _MessagesUnreadBadge(label: _unreadCountLabel(count)),
+              ],
+            ],
+          ),
         ),
       ),
     );
@@ -566,61 +697,99 @@ class _MessagesNotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final routeLocation = item.routeTarget?.routeLocation;
+    final canLocate = routeLocation != null && routeLocation.trim().isNotEmpty;
+    final timeLabel = _relativeCreatedAt(item.createdAt);
+    final sourceLabel = _notificationSource(item.source);
+    final body = item.body?.trim();
     return Material(
-      color: item.unread
-          ? theme.colorScheme.primaryContainer.withValues(alpha: 0.14)
-          : theme.colorScheme.surface,
+      color: item.unread ? const Color(0xFFFFFBF6) : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
         side: BorderSide(color: theme.colorScheme.outlineVariant),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
       ),
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         onTap: onOpen,
         child: Padding(
-          padding: const EdgeInsets.all(14),
+          padding: const EdgeInsets.fromLTRB(10, 8, 9, 8),
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: theme.colorScheme.primaryContainer.withValues(
-                    alpha: 0.42,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Padding(
-                  padding: const EdgeInsets.all(9),
-                  child: Icon(
-                    _notificationIcon(item.source),
-                    size: 22,
-                    color: theme.colorScheme.primary,
-                  ),
+              SizedBox(
+                width: 36,
+                height: 36,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: <Widget>[
+                    Positioned.fill(
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          color: theme.colorScheme.primaryContainer.withValues(
+                            alpha: 0.38,
+                          ),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Icon(
+                          _notificationIcon(item.source),
+                          size: 19,
+                          color: theme.colorScheme.primary,
+                        ),
+                      ),
+                    ),
+                    if (item.unread)
+                      Positioned(
+                        top: -1,
+                        right: -1,
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            color: theme.colorScheme.error,
+                            border: Border.all(
+                              color: theme.colorScheme.surface,
+                              width: 1.5,
+                            ),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: const SizedBox(width: 9, height: 9),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    _MessagesMetaPill(label: _notificationSource(item.source)),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: theme.textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w900,
-                      ),
+                    Row(
+                      children: <Widget>[
+                        Flexible(
+                          child: Text(
+                            '$sourceLabel · ${item.title}',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: theme.textTheme.titleSmall?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              height: 1.15,
+                            ),
+                          ),
+                        ),
+                        if (!canLocate) ...<Widget>[
+                          const SizedBox(width: 6),
+                          const _MessagesMetaPill(label: '暂不可定位'),
+                        ],
+                      ],
                     ),
-                    if (item.body != null) ...<Widget>[
-                      const SizedBox(height: 4),
+                    if (body != null && body.isNotEmpty) ...<Widget>[
+                      const SizedBox(height: 3),
                       Text(
-                        item.body!,
+                        body,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: theme.colorScheme.onSurfaceVariant,
+                          height: 1.18,
                         ),
                       ),
                     ],
@@ -628,24 +797,33 @@ class _MessagesNotificationCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                  if (_relativeCreatedAt(item.createdAt) != null) ...<Widget>[
-                    const SizedBox(height: 16),
-                    Text(
-                      _relativeCreatedAt(item.createdAt)!,
-                      style: theme.textTheme.bodySmall?.copyWith(
+              SizedBox(
+                width: 54,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    if (timeLabel != null)
+                      Text(
+                        timeLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.right,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    if (canLocate) ...<Widget>[
+                      const SizedBox(height: 4),
+                      Icon(
+                        Icons.chevron_right_rounded,
+                        size: 20,
                         color: theme.colorScheme.onSurfaceVariant,
                       ),
-                    ),
+                    ],
                   ],
-                ],
+                ),
               ),
             ],
           ),
@@ -657,6 +835,7 @@ class _MessagesNotificationCard extends StatelessWidget {
   IconData _notificationIcon(String source) {
     return switch (source) {
       'project_communication' => Icons.forum_outlined,
+      'business_todo' => Icons.assignment_turned_in_outlined,
       'bid_participation_request' => Icons.assignment_turned_in_outlined,
       'forum_interaction' => Icons.dynamic_feed_outlined,
       _ => Icons.notifications_none_rounded,
@@ -666,7 +845,8 @@ class _MessagesNotificationCard extends StatelessWidget {
   String _notificationSource(String source) {
     return switch (source) {
       'project_communication' => '项目沟通',
-      'bid_participation_request' => '参与竞标申请',
+      'business_todo' => '业务待办',
+      'bid_participation_request' => '业务待办',
       'forum_interaction' => '论坛互动',
       _ => '系统提醒',
     };
@@ -1036,6 +1216,68 @@ String _primaryTabLabel(_MessagesPrimaryTab tab) {
   return switch (tab) {
     _MessagesPrimaryTab.projectCommunication => '项目沟通',
     _MessagesPrimaryTab.forumInteraction => '论坛互动',
+  };
+}
+
+String? _notificationFilterQuery(_MessagesNotificationFilter filter) {
+  return switch (filter) {
+    _MessagesNotificationFilter.all => null,
+    _MessagesNotificationFilter.projectCommunication => 'project_communication',
+    _MessagesNotificationFilter.forumInteraction => 'forum_interaction',
+    _MessagesNotificationFilter.businessTodo => 'business_todo',
+    _MessagesNotificationFilter.system => 'system',
+  };
+}
+
+String _notificationFilterLabel(_MessagesNotificationFilter filter) {
+  return switch (filter) {
+    _MessagesNotificationFilter.all => '全部',
+    _MessagesNotificationFilter.projectCommunication => '项目沟通',
+    _MessagesNotificationFilter.forumInteraction => '论坛互动',
+    _MessagesNotificationFilter.businessTodo => '业务待办',
+    _MessagesNotificationFilter.system => '系统',
+  };
+}
+
+int _notificationFilterUnreadCount(
+  AppNotificationUnreadView unread,
+  _MessagesNotificationFilter filter,
+) {
+  return switch (filter) {
+    _MessagesNotificationFilter.all => unread.total,
+    _MessagesNotificationFilter.projectCommunication =>
+      unread.projectCommunication,
+    _MessagesNotificationFilter.forumInteraction => unread.forumInteraction,
+    _MessagesNotificationFilter.businessTodo => unread.businessTodo,
+    _MessagesNotificationFilter.system => unread.system,
+  };
+}
+
+List<AppNotificationItemView> _notificationItemsForFilter(
+  List<AppNotificationItemView> items,
+  _MessagesNotificationFilter filter,
+) {
+  if (filter == _MessagesNotificationFilter.all) {
+    return items;
+  }
+  return items
+      .where((item) => _notificationMatchesFilter(item.source, filter))
+      .toList(growable: false);
+}
+
+bool _notificationMatchesFilter(
+  String source,
+  _MessagesNotificationFilter filter,
+) {
+  return switch (filter) {
+    _MessagesNotificationFilter.all => true,
+    _MessagesNotificationFilter.projectCommunication =>
+      source == 'project_communication',
+    _MessagesNotificationFilter.forumInteraction =>
+      source == 'forum_interaction',
+    _MessagesNotificationFilter.businessTodo =>
+      source == 'business_todo' || source == 'bid_participation_request',
+    _MessagesNotificationFilter.system => source == 'system',
   };
 }
 

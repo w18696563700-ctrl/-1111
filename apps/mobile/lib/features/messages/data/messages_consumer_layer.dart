@@ -89,11 +89,16 @@ class MessagesConsumerLayer {
   Future<AppNotificationListResult> loadNotifications({
     int pageSize = 30,
     String? cursor,
+    String? source,
   }) async {
     final query = <String, String>{'pageSize': '$pageSize'};
     final normalizedCursor = cursor?.trim();
     if (normalizedCursor != null && normalizedCursor.isNotEmpty) {
       query['cursor'] = normalizedCursor;
+    }
+    final normalizedSource = source?.trim();
+    if (normalizedSource != null && normalizedSource.isNotEmpty) {
+      query['source'] = normalizedSource;
     }
     try {
       final response = await runProtectedAppRequest(
