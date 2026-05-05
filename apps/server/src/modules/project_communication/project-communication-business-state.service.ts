@@ -9,6 +9,7 @@ import { ProjectAttachmentEntity } from '../project/entities/project-attachment.
 import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import {
+  PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
   ProjectBidMaterialSlot,
   ProjectCommunicationWorkbenchEntryDefinition,
   ProjectQuoteBasisMaterialKind,
@@ -202,8 +203,19 @@ export class ProjectCommunicationBusinessStateService {
     }
     const publisherSources = await this.publisherMaterialSources(input.projectId);
     const reviews = bid
-      ? await this.loadReviews(input.projectId, bid.id, input.viewerOrganizationId)
-      : [];
+      ? [
+          ...(await this.loadReviews(input.projectId, bid.id, input.viewerOrganizationId)),
+          ...(await this.loadReviews(
+            input.projectId,
+            PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
+            input.viewerOrganizationId
+          ))
+        ]
+      : await this.loadReviews(
+          input.projectId,
+          PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
+          input.viewerOrganizationId
+        );
     return projectCommunicationWorkbenchEntryDefinitions
       .filter((definition) => definition.group === 'publisher_materials')
       .filter((definition) =>
@@ -298,8 +310,12 @@ export class ProjectCommunicationBusinessStateService {
     if (!source?.sourceVersionToken || source.attachmentCount === 0) {
       return false;
     }
-    const review = reviews.find((item) => item.entryKey === definition.entryKey);
-    return review?.sourceVersionToken !== source.sourceVersionToken || review.reviewState !== 'confirmed';
+    return !reviews.some(
+      (item) =>
+        item.entryKey === definition.entryKey &&
+        item.sourceVersionToken === source.sourceVersionToken &&
+        item.reviewState === 'confirmed'
+    );
   }
 
   private bidMaterialSource(bid: BidEntity, slot: ProjectBidMaterialSlot | null) {

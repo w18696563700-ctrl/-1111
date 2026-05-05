@@ -29,6 +29,7 @@ import {
   ProjectCommunicationWorkbenchSourceFileProjection
 } from './project-communication-workbench.presenter';
 import {
+  PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
   ProjectBidMaterialSlot,
   ProjectCommunicationWorkbenchEntryDefinition,
   ProjectCommunicationWorkbenchViewerRole,
@@ -190,8 +191,17 @@ export class ProjectCommunicationWorkbenchService {
   ) {
     const publisherSources = await this.publisherMaterialSources(scope.projectId, attachmentRepository);
     const reviews = scope.bid
-      ? await reviewRepository.findBy({ projectId: scope.projectId, bidId: scope.bid.id })
-      : [];
+      ? [
+          ...(await reviewRepository.findBy({ projectId: scope.projectId, bidId: scope.bid.id })),
+          ...(await reviewRepository.findBy({
+            projectId: scope.projectId,
+            bidId: PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID
+          }))
+        ]
+      : await reviewRepository.findBy({
+          projectId: scope.projectId,
+          bidId: PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID
+        });
     return projectCommunicationWorkbenchEntryDefinitions.map((definition) =>
       this.toEntryProjection(definition, scope, publisherSources, reviews)
     );
@@ -247,9 +257,7 @@ export class ProjectCommunicationWorkbenchService {
     const reviewerOrganizationId = definition.subjectOwnerRole === 'publisher'
       ? scope.bid ? this.bidderOrganizationId(scope.bid) : scope.thread.counterpartOrganizationId
       : scope.thread.ownerOrganizationId;
-    const review = scope.bid
-      ? reviews.find((item) => item.entryKey === definition.entryKey && item.reviewerOrganizationId === reviewerOrganizationId) ?? null
-      : null;
+    const review = this.selectMaterialReview(definition, reviews, reviewerOrganizationId, scope.bid?.id ?? null);
     const currentReview = review?.sourceVersionToken === source.sourceVersionToken ? review : null;
     const reviewState = source.attachmentCount === 0
       ? 'unsubmitted'
@@ -301,6 +309,28 @@ export class ProjectCommunicationWorkbenchService {
     };
   }
 
+  private selectMaterialReview(
+    definition: ProjectCommunicationWorkbenchEntryDefinition,
+    reviews: ProjectCommunicationMaterialReviewEntity[],
+    reviewerOrganizationId: string | null,
+    bidId: string | null
+  ) {
+    const candidates = reviews.filter(
+      (item) => item.entryKey === definition.entryKey && item.reviewerOrganizationId === reviewerOrganizationId
+    );
+    if (definition.group === 'publisher_materials') {
+      return (
+        candidates.find((item) => bidId && item.bidId === bidId) ??
+        candidates.find((item) => item.bidId === PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID) ??
+        null
+      );
+    }
+    if (definition.group === 'bid_materials' && bidId) {
+      return candidates.find((item) => item.bidId === bidId) ?? null;
+    }
+    return null;
+  }
+
   private resolveMaterialSource(
     definition: ProjectCommunicationWorkbenchEntryDefinition,
     scope: WorkbenchScope,
@@ -337,6 +367,9 @@ export class ProjectCommunicationWorkbenchService {
     command: ProjectCommunicationMaterialReviewCommand,
     scope: WorkbenchScope
   ) {
+    if (entry.definition.group === 'bid_materials' && !scope.bid) {
+      throw projectCommunicationInvalid('Field `bidId` is required for bid material review.');
+    }
     if (entry.availabilityState !== 'readable' || !entry.sourceVersionToken) {
       throw projectCommunicationWorkbenchInvalid(
         'PROJECT_COMMUNICATION_MATERIAL_UNSUBMITTED',
@@ -355,9 +388,6 @@ export class ProjectCommunicationWorkbenchService {
         'Current material source has changed.'
       );
     }
-    if (!scope.bid) {
-      throw projectCommunicationInvalid('Field `bidId` is required for material review.');
-    }
     if (command.reviewAction === 'request_supplement' && command.feedbackReasonCodes.length === 0 && !command.feedbackText) {
       throw projectCommunicationWorkbenchInvalid(
         'PROJECT_COMMUNICATION_MATERIAL_FEEDBACK_REQUIRED',
@@ -374,14 +404,14 @@ export class ProjectCommunicationWorkbenchService {
   ) {
     const existing = await repository.findOneBy({
       projectId: entry.projectId,
-      bidId: entry.bidId ?? '',
+      bidId: entry.bidId ?? PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
       reviewerOrganizationId: entry.reviewerOrganizationId ?? '',
       entryKey: command.entryKey
     });
     const review = existing ?? repository.create({ id: randomUUID() });
     review.projectId = entry.projectId;
     review.threadId = entry.threadId;
-    review.bidId = entry.bidId ?? '';
+    review.bidId = entry.bidId ?? PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID;
     review.entryKey = command.entryKey;
     review.subjectType = entry.definition.subjectType as ProjectCommunicationMaterialReviewEntity['subjectType'];
     review.materialKind = entry.definition.materialKind;

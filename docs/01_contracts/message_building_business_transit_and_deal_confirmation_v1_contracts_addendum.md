@@ -29,7 +29,7 @@ inputs_canonical:
 | 主体项目列表 | `GET` | `/api/app/message/counterpart-conversation/detail` | `projectGroups[].businessTodoSummary` 是第二层项目业务待办红点来源。 |
 | 项目聊天线程 | `GET` | `/api/app/message/project-communication/thread` | `chatAvailability` 是第三层聊天输入框锁定 / 解锁来源。 |
 | 项目工作台 | `GET` | `/api/app/message/project-communication/workbench` | 返回 `businessTodoSummary`、`chatAvailability`、`entries[].badgeCount`、`entries[].disabledReason`。 |
-| 资料确认命令 | `POST` | `/api/app/message/project-communication/workbench/material-review` | 仍只处理 8 个资料条目，不处理最终合同金额。 |
+| 资料确认命令 | `POST` | `/api/app/message/project-communication/workbench/material-review` | 仍只处理 8 个资料条目，不处理最终合同金额；`publisher_materials` 可无 `bidId`，`bid_materials` 必须有真实 `bidId`。 |
 | 最终金额确认 | `POST/GET` | `/api/app/project/{projectId}/deal-confirmations*` | 唯一最终金额确认路径族。 |
 | 合同 continuation | `POST` | `/api/app/contract/confirm` | 不得携带或写入最终合同金额。 |
 
@@ -100,6 +100,16 @@ V1 下一步动作最小枚举：
 - `badgeCount` 不得由 Flutter 用 `attachmentCount`、`reviewState` 或普通 unread 推断。
 - `disabledReason` 不得用英文异常或 raw route error 替代。
 - `contract_confirmation` 和 `final_confirmed_amount_confirmation` 的 route target 只能指向 `deal-confirmations` 路径族，不得指向 `/api/app/contract/confirm`。
+
+## 5.1 Material Review `bidId` Conditional Freeze
+
+`ProjectCommunicationMaterialReviewRequest.bidId` 继续是 optional / nullable 字段，但含义不是全局可空：
+
+- `publisher_materials` entries 允许 `bidId = null`，用于竞标方在 bid submit 前确认发布方 5 项报价依据资料。
+- `bid_materials` entries 必须携带真实 `bidId`，用于发布方确认竞标方报价表和三附件。
+- `contract_confirmation`、`final_confirmed_amount_confirmation` 不走 material-review，不得用 `bidId` 或聊天内容承接最终金额。
+- BFF schema 不得把 `bidId` 改成全局 required，也不得为 no-bid publisher review 临时拼一个假 bidId。
+- Server 可以使用稳定 no-bid key 持久化 publisher material review，但该 key 不能被暴露为真实 Bid。
 
 ## 6. Deal Confirmation Boundary Review
 

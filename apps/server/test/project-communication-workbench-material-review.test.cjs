@@ -1,5 +1,10 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
+
+function hashSource(parts) {
+  return createHash('sha256').update(parts.join('|'), 'utf8').digest('hex');
+}
 
 function createContext(organizationId) {
   return {
@@ -42,7 +47,7 @@ function createHarness(options = {}) {
     createdAt: new Date('2026-05-02T01:00:00.000Z'),
     updatedAt: new Date('2026-05-02T01:00:00.000Z'),
   };
-  const bid = {
+  const defaultBid = {
     id: 'bid-1',
     projectId: 'project-1',
     bidderOrganizationId: 'org-bidder',
@@ -52,6 +57,7 @@ function createHarness(options = {}) {
     schedulePlanFileAssetId: 'file-schedule',
     updatedAt: new Date('2026-05-02T01:05:00.000Z'),
   };
+  const bid = Object.prototype.hasOwnProperty.call(options, 'bid') ? options.bid : defaultBid;
   const attachments = options.attachments ?? [
     {
       id: 'att-effect',
@@ -88,6 +94,7 @@ function createHarness(options = {}) {
   };
   const bidRepo = {
     async findOneBy(where) {
+      if (!bid) return null;
       if (where.id && where.id !== bid.id) return null;
       if (where.projectId !== bid.projectId) return null;
       if (where.bidderOrganizationId && where.bidderOrganizationId !== bid.bidderOrganizationId) return null;
@@ -273,6 +280,45 @@ test('business state locks bidder chat on pending publisher material confirmatio
   assert.equal(result.chatAvailability.requiredNextAction, 'confirm_publisher_materials');
 });
 
+test('business state reads no-bid publisher material review before bid submit', async () => {
+  const attachmentCreatedAt = new Date('2026-05-02T01:10:00.000Z');
+  const service = createBusinessStateHarness({
+    attachments: [
+      {
+        id: 'att-effect',
+        projectId: 'project-1',
+        fileAssetId: 'file-effect',
+        attachmentKind: 'effect_image',
+        visibility: 'owner_private',
+        sortOrder: 0,
+        createdAt: attachmentCreatedAt,
+      },
+    ],
+    reviews: [
+      {
+        projectId: 'project-1',
+        bidId: '',
+        reviewerOrganizationId: 'org-bidder',
+        entryKey: 'publisher_effect_image_review',
+        sourceVersionToken: hashSource([`att-effect:file-effect:${attachmentCreatedAt.toISOString()}`]),
+        reviewState: 'confirmed',
+      },
+    ],
+  });
+  const result = await service.buildForPair({
+    projectId: 'project-1',
+    ownerOrganizationId: 'org-publisher',
+    counterpartOrganizationId: 'org-bidder',
+    viewerOrganizationId: 'org-bidder',
+  });
+
+  assert.equal(result.businessTodoSummary.publisherMaterialReviewPendingCount, 0);
+  assert.equal(result.businessTodoSummary.totalPendingCount, 0);
+  assert.equal(result.chatAvailability.canSendMessage, false);
+  assert.equal(result.chatAvailability.lockReasonCode, 'bid_submission_pending');
+  assert.equal(result.chatAvailability.requiredNextAction, 'submit_bid_materials');
+});
+
 test('business state leaves final amount pending as a communication prompt, not a chat lock', async () => {
   const service = createBusinessStateHarness({
     bid: {
@@ -352,6 +398,91 @@ test('bidder confirms publisher material and persisted state returns green truth
   assert.equal(reviews[0].reviewState, 'confirmed');
   assert.equal(result.entry.reviewState, 'confirmed');
   assert.equal(result.entry.reviewedAt, reviews[0].confirmedAt.toISOString());
+});
+
+test('bidder confirms publisher material without bidId before bid submit', async () => {
+  const { service, reviews } = createHarness({ bid: null });
+  const before = await service.getWorkbench(
+    { projectId: 'project-1', threadId: 'thread-1' },
+    createContext('org-bidder'),
+  );
+  const sourceVersionToken = before.entries[0].truthAnchor.sourceVersionToken;
+  const result = await service.reviewMaterial(
+    {
+      projectId: 'project-1',
+      threadId: 'thread-1',
+      entryKey: 'publisher_effect_image_review',
+      reviewAction: 'confirm',
+      sourceVersionToken,
+      idempotencyKey: 'confirm-effect-no-bid',
+    },
+    createContext('org-bidder'),
+  );
+
+  assert.equal(reviews.length, 1);
+  assert.equal(reviews[0].bidId, '');
+  assert.equal(reviews[0].reviewState, 'confirmed');
+  assert.equal(result.entry.bidId, null);
+  assert.equal(result.entry.reviewState, 'confirmed');
+  assert.equal(result.entry.reviewedAt, reviews[0].confirmedAt.toISOString());
+});
+
+test('workbench keeps no-bid publisher material review visible after bid exists', async () => {
+  const attachmentCreatedAt = new Date('2026-05-02T01:10:00.000Z');
+  const { service } = createHarness({
+    attachments: [
+      {
+        id: 'att-effect',
+        projectId: 'project-1',
+        fileAssetId: 'file-effect',
+        fileName: '效果图.png',
+        attachmentKind: 'effect_image',
+        visibility: 'owner_private',
+        sortOrder: 0,
+        createdAt: attachmentCreatedAt,
+      },
+    ],
+    reviews: [
+      {
+        projectId: 'project-1',
+        bidId: '',
+        reviewerOrganizationId: 'org-bidder',
+        entryKey: 'publisher_effect_image_review',
+        sourceVersionToken: hashSource([`att-effect:file-effect:${attachmentCreatedAt.toISOString()}`]),
+        reviewState: 'confirmed',
+        confirmedAt: new Date('2026-05-02T01:20:00.000Z'),
+      },
+    ],
+  });
+  const result = await service.getWorkbench(
+    { projectId: 'project-1', threadId: 'thread-1', bidId: 'bid-1' },
+    createContext('org-bidder'),
+  );
+
+  assert.equal(result.entries[0].bidId, 'bid-1');
+  assert.equal(result.entries[0].reviewState, 'confirmed');
+  assert.equal(result.entries[0].badgeCount, 0);
+});
+
+test('bid material review still requires bidId', async () => {
+  const { service, reviews } = createHarness({ bid: null });
+  await assert.rejects(
+    () =>
+      service.reviewMaterial(
+        {
+          projectId: 'project-1',
+          threadId: 'thread-1',
+          entryKey: 'bid_quote_sheet_review',
+          reviewAction: 'confirm',
+          idempotencyKey: 'bid-material-no-bid',
+        },
+        createContext('org-publisher'),
+      ),
+    (error) =>
+      error.getResponse?.().code === 'PROJECT_COMMUNICATION_INVALID' &&
+      error.getResponse?.().message === 'Field `bidId` is required for bid material review.',
+  );
+  assert.equal(reviews.length, 0);
 });
 
 test('publisher cannot confirm its own publisher material', async () => {

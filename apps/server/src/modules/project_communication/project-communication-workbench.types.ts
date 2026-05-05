@@ -75,6 +75,8 @@ export type ProjectCommunicationWorkbenchEntryDefinition = {
   bidMaterialSlot: ProjectBidMaterialSlot | null;
 };
 
+export const PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID = '';
+
 export const projectCommunicationWorkbenchEntryDefinitions: readonly ProjectCommunicationWorkbenchEntryDefinition[] = [
   {
     entryKey: 'publisher_effect_image_review',

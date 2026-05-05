@@ -12283,7 +12283,9 @@ components:
       description: >
         Material review command for the eight material entries only. It must
         not accept `contract_confirmation` or
-        `final_confirmed_amount_confirmation`.
+        `final_confirmed_amount_confirmation`. `publisher_materials` review
+        may omit `bidId` before bid submit; `bid_materials` review must carry a
+        concrete `bidId`.
       properties:
         projectId:
           type: string
@@ -12293,6 +12295,12 @@ components:
           type:
             - string
             - 'null'
+          description: >
+            Conditional material-review anchor. It is optional only for
+            `publisher_materials` entries because publisher quote-basis
+            confirmation happens before bid submit can create a bid. It is
+            required for `bid_materials` entries and must not be used for
+            contract or final-amount confirmation.
         entryKey:
           $ref: '#/components/schemas/ProjectCommunicationWorkbenchEntryKey'
         reviewAction:
