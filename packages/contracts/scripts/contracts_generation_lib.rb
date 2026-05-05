@@ -214,6 +214,7 @@ module ContractsGeneration
     local_entry_keys = registry_entries.map { |entry| entry.fetch('localEntryKey') }
 
     registry_literal = JSON.pretty_generate(registry_entries)
+    profile_credit_constraints_type_block = build_profile_credit_constraints_contract_types(schemas)
     project_type_block = build_project_contract_types(schemas)
     trading_type_block = build_trading_contract_types(schemas)
 
@@ -294,9 +295,125 @@ module ContractsGeneration
       export const REGISTERED_INSTANCE_ENTRY_REGISTRY =
       #{indent_block(registry_literal, 2)} as const satisfies readonly RegisteredInstanceEntryItem[];
 
+      #{profile_credit_constraints_type_block}
+
       #{project_type_block}
 
       #{trading_type_block}
+    TS
+  end
+
+  def build_profile_credit_constraints_contract_types(schemas)
+    [
+      'ProfileCreditConstraintsStatusResponse',
+      'ProfileCreditConstraintsPrivateSummary',
+      'ProfileCreditConstraintPosture',
+      'ProfileDepositPosture',
+      'ProfileTransactionGuaranteePosture',
+      'ProfileCreditConstraintsDependencyReference',
+      'ProfileCreditConstraintsExplanationResponse',
+      'ProfileCreditConstraintsExplanationBlock',
+      'ProfileCreditConstraintsDependencyExplanation',
+      'ProfileCreditConstraintsHandoffResponse',
+      'ProfileCreditConstraintsHandoffBlock',
+      'ProfileCreditConstraintsDependencyHandoff'
+    ].each { |schema_name| schemas.fetch(schema_name) }
+
+    <<~TS
+      export interface ProfileCreditConstraintsPrivateSummary {
+        entryKey: string;
+        summaryStatus: string;
+        creditConstraintStatus: string;
+        depositPostureStatus: string;
+        transactionGuaranteeEligibilityStatus: string;
+        updatedAt: string;
+      }
+
+      export interface ProfileCreditConstraintPosture {
+        creditConstraintStatus: string;
+        performanceConstraintStatus: string;
+        executionAvailabilityStatus: string;
+        restrictionReasonCode: string | null;
+        advisoryReasonCode: string | null;
+        updatedAt: string;
+      }
+
+      export interface ProfileDepositPosture {
+        depositRequirementStatus: string;
+        depositEligibilityStatus: string;
+        depositRestrictionStatus: string;
+        depositPostureStatus: string;
+        depositHandoffKey: string;
+        depositDependencyKey: string | null;
+        updatedAt: string;
+      }
+
+      export interface ProfileTransactionGuaranteePosture {
+        transactionGuaranteeEligibilityStatus: string;
+        transactionGuaranteeRestrictionStatus: string;
+        transactionGuaranteeExplanationKey: string;
+        transactionGuaranteeHandoffKey: string;
+        transactionGuaranteeDependencyKey: string | null;
+        updatedAt: string;
+      }
+
+      export interface ProfileCreditConstraintsDependencyReference {
+        dependencyFamilyKey: string;
+        dependencyRequired: boolean;
+        dependencyExplanationKey: string;
+        dependencyHandoffKey: string;
+      }
+
+      export interface ProfileCreditConstraintsStatusResponse {
+        privateSummary: ProfileCreditConstraintsPrivateSummary;
+        creditConstraint: ProfileCreditConstraintPosture;
+        deposit: ProfileDepositPosture;
+        transactionGuarantee: ProfileTransactionGuaranteePosture;
+        dependencyReference: ProfileCreditConstraintsDependencyReference | null;
+      }
+
+      export interface ProfileCreditConstraintsExplanationBlock {
+        explanationKey: string;
+        title: string;
+        body: string;
+      }
+
+      export interface ProfileCreditConstraintsDependencyExplanation {
+        dependencyFamilyKey: string;
+        dependencyRequired: boolean;
+        dependencyExplanationKey: string;
+        title: string;
+        body: string;
+      }
+
+      export interface ProfileCreditConstraintsExplanationResponse {
+        creditExplanation: ProfileCreditConstraintsExplanationBlock;
+        depositExplanation: ProfileCreditConstraintsExplanationBlock;
+        transactionGuaranteeExplanation: ProfileCreditConstraintsExplanationBlock;
+        dependencyExplanation: ProfileCreditConstraintsDependencyExplanation | null;
+        disclaimer: string;
+      }
+
+      export interface ProfileCreditConstraintsHandoffBlock {
+        handoffKey: string;
+        title: string;
+        body: string;
+      }
+
+      export interface ProfileCreditConstraintsDependencyHandoff {
+        dependencyFamilyKey: string;
+        dependencyRequired: boolean;
+        dependencyHandoffKey: string;
+        title: string;
+        body: string;
+      }
+
+      export interface ProfileCreditConstraintsHandoffResponse {
+        creditHandoff: ProfileCreditConstraintsHandoffBlock;
+        depositHandoff: ProfileCreditConstraintsHandoffBlock;
+        transactionGuaranteeHandoff: ProfileCreditConstraintsHandoffBlock;
+        dependencyHandoff: ProfileCreditConstraintsDependencyHandoff | null;
+      }
     TS
   end
 
