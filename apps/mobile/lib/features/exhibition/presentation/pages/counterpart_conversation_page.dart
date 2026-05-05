@@ -444,13 +444,13 @@ class _CounterpartConversationPageState
       return;
     }
     _lastMarkedReadMessageId = lastReadMessageId;
-    _reloadShellContextAfterRead();
+    await _reloadShellContextAfterRead();
     await _refreshConversationDetailAfterRead();
   }
 
-  void _reloadShellContextAfterRead() {
+  Future<void> _reloadShellContextAfterRead() async {
     try {
-      unawaited(AppShellScope.read(context).reloadShellContext());
+      await AppShellScope.read(context).reloadShellContext();
     } catch (_) {
       // Tests may mount this page without the full shell scope.
     }
