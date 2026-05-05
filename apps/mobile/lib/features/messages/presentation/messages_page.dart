@@ -497,6 +497,15 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _openNotification(AppNotificationItemView item) async {
     final routeLocation = item.routeTarget?.routeLocation;
+    if (_isProjectCommunicationNotification(item) &&
+        !_hasCompleteProjectCommunicationRoute(item)) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(_projectCommunicationMissingContextMessage),
+        ),
+      );
+      return;
+    }
     if (routeLocation == null || routeLocation.isEmpty) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
@@ -504,14 +513,15 @@ class _MessagesPageState extends State<MessagesPage> {
       return;
     }
     try {
-      unawaited(Navigator.of(context).pushNamed(routeLocation));
+      final routeFuture = Navigator.of(context).pushNamed(routeLocation);
+      unawaited(routeFuture);
     } catch (_) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
       );
       return;
     }
-    if (item.unread) {
+    if (item.unread && !_isProjectCommunicationNotification(item)) {
       final result = await MessagesConsumerLayer.instance.markNotificationsRead(
         <String>[item.notificationId],
       );
@@ -531,6 +541,24 @@ class _MessagesPageState extends State<MessagesPage> {
         _syncShellMessagesUnreadCount(unread.total);
       }
     }
+  }
+
+  bool _isProjectCommunicationNotification(AppNotificationItemView item) {
+    return item.source == 'project_communication' ||
+        item.type == 'project_communication_message' ||
+        item.routeTarget?.canonicalPath ==
+            '/api/app/message/counterpart-conversation/detail';
+  }
+
+  bool _hasCompleteProjectCommunicationRoute(AppNotificationItemView item) {
+    final routeTarget = item.routeTarget;
+    if (routeTarget == null || !_nonEmpty(routeTarget.routeLocation)) {
+      return false;
+    }
+    final params = routeTarget.params;
+    return _nonEmpty(params['conversationId']) &&
+        _nonEmpty(params['projectId']) &&
+        _nonEmpty(params['threadId']);
   }
 
   Future<void> _reloadShellContext() async {

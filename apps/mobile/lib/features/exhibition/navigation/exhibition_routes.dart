@@ -162,11 +162,17 @@ final class ExhibitionRoutes {
   static String counterpartConversationWithIds({
     required String conversationId,
     required String projectId,
+    String? threadId,
   }) {
-    return _withQuery(counterpartConversation, <String, String>{
+    final queryParameters = <String, String>{
       'conversationId': conversationId,
       'projectId': projectId,
-    });
+    };
+    final normalizedThreadId = threadId?.trim();
+    if (normalizedThreadId != null && normalizedThreadId.isNotEmpty) {
+      queryParameters['threadId'] = normalizedThreadId;
+    }
+    return _withQuery(counterpartConversation, queryParameters);
   }
 
   static String bidThreadWithIds({

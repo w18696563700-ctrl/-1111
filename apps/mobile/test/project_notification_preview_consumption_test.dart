@@ -127,7 +127,7 @@ void main() {
           .length,
       0,
     );
-    expect(find.text('当前通知暂时无法定位，请稍后重试或从对应入口进入。'), findsOneWidget);
+    expect(find.text('无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。'), findsOneWidget);
   });
 
   testWidgets('notification center scrolls long lists without overflow', (
@@ -274,7 +274,7 @@ void main() {
   });
 
   testWidgets(
-    'marking a notification read refreshes shell unread badge source',
+    'project communication notification opens target without direct read mutation',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(
         handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
@@ -382,12 +382,20 @@ void main() {
 
       await _openNotificationPanel(tester);
 
-      final reloadCountBeforeRead = shellConsumer.loadResultCount;
       await tester.tap(find.textContaining('有新的项目沟通消息'));
       await tester.pumpAndSettle();
 
-      expect(shellConsumer.loadResultCount, reloadCountBeforeRead + 1);
-      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
+      expect(find.text('项目沟通详情'), findsOneWidget);
+      expect(
+        transport.requests
+            .where(
+              (request) =>
+                  request.canonicalPath == '/api/app/notifications/read',
+            )
+            .length,
+        0,
+      );
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '1');
     },
   );
 
@@ -757,7 +765,7 @@ void main() {
   );
 
   test(
-    'notification routeTarget ignores carried threadId when opening project communication',
+    'notification routeTarget carries threadId when opening project communication',
     () {
       final item = parseAppNotificationItem(const <String, Object?>{
         'notificationId': 'notice-1',
@@ -785,7 +793,7 @@ void main() {
 
       expect(
         item.routeTarget?.routeLocation,
-        '/exhibition/messages/counterpart-conversation?conversationId=org-1&projectId=project-1',
+        '/exhibition/messages/counterpart-conversation?conversationId=org-1&projectId=project-1&threadId=thread-1',
       );
     },
   );

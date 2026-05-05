@@ -1417,7 +1417,7 @@ void main() {
       expect(find.byIcon(Icons.lock_outline_rounded), findsOneWidget);
       final maskedTitle = tester.widget<Text>(find.text('项目名称需申请查看').first);
       expect(maskedTitle.style?.color, const Color(0xFF1F7A3A));
-      expect(find.text('最近消息：暂无最新消息'), findsOneWidget);
+      expect(find.text('最近消息：有 1 条未读项目沟通消息'), findsOneWidget);
       expect(find.text('进入后才加载此项目聊天、后续承接入口和项目相册入口。'), findsNothing);
       expect(find.text('想跟TA说点什么...'), findsNothing);
     },
@@ -1573,7 +1573,8 @@ void main() {
       expect(find.text('我竞标'), findsWidgets);
       expect(find.text('西洽会 - 泸州'), findsOneWidget);
       expect(find.text('西洽会 - 成都'), findsOneWidget);
-      expect(find.text('最近消息：暂无最新消息'), findsNWidgets(2));
+      expect(find.text('最近消息：有 2 条未读项目沟通消息'), findsOneWidget);
+      expect(find.text('最近消息：暂无最新消息'), findsOneWidget);
       expect(find.textContaining('更新时间：2026-05-04'), findsOneWidget);
       expect(find.textContaining('更新时间：2026-05-03'), findsOneWidget);
       expect(find.text('未读 2'), findsOneWidget);

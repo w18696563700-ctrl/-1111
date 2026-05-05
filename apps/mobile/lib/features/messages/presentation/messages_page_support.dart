@@ -1257,10 +1257,11 @@ List<AppNotificationItemView> _notificationItemsForFilter(
   List<AppNotificationItemView> items,
   _MessagesNotificationFilter filter,
 ) {
+  final unreadItems = items.where((item) => item.unread);
   if (filter == _MessagesNotificationFilter.all) {
-    return items;
+    return unreadItems.toList(growable: false);
   }
-  return items
+  return unreadItems
       .where((item) => _notificationMatchesFilter(item.source, filter))
       .toList(growable: false);
 }

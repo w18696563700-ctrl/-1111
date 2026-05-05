@@ -545,6 +545,7 @@ class AppRouter {
         builder: (_) => _CounterpartConversationRouteScaffold(
           conversationId: routeUri.queryParameters['conversationId'],
           projectId: routeUri.queryParameters['projectId'],
+          threadId: routeUri.queryParameters['threadId'],
           title: title,
           titleContent: titleContent,
           appBarActions: appBarActions,
@@ -782,6 +783,7 @@ class _CounterpartConversationRouteScaffold extends StatefulWidget {
   const _CounterpartConversationRouteScaffold({
     required this.conversationId,
     required this.projectId,
+    required this.threadId,
     required this.title,
     required this.titleContent,
     required this.appBarActions,
@@ -789,6 +791,7 @@ class _CounterpartConversationRouteScaffold extends StatefulWidget {
 
   final String? conversationId;
   final String? projectId;
+  final String? threadId;
   final String title;
   final Widget? titleContent;
   final List<Widget> appBarActions;
@@ -839,6 +842,7 @@ class _CounterpartConversationRouteScaffoldState
       child: CounterpartConversationPage(
         conversationId: widget.conversationId,
         projectId: widget.projectId,
+        threadId: widget.threadId,
         projectListSearchToggleSignal: _projectListSearchToggleSignal,
         onChatWindowActiveChanged: _handleChatWindowActiveChanged,
       ),

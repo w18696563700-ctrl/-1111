@@ -5,12 +5,14 @@ class CounterpartConversationPage extends StatefulWidget {
     super.key,
     this.conversationId,
     this.projectId,
+    this.threadId,
     this.projectListSearchToggleSignal,
     this.onChatWindowActiveChanged,
   });
 
   final String? conversationId;
   final String? projectId;
+  final String? threadId;
   final ValueListenable<int>? projectListSearchToggleSignal;
   final ValueChanged<bool>? onChatWindowActiveChanged;
 
@@ -66,6 +68,14 @@ class _CounterpartConversationPageState
   @override
   void initState() {
     super.initState();
+    final initialProjectId = widget.projectId?.trim();
+    final initialThreadId = widget.threadId?.trim();
+    if (initialProjectId != null &&
+        initialProjectId.isNotEmpty &&
+        initialThreadId != null &&
+        initialThreadId.isNotEmpty) {
+      _selectedProjectId = initialProjectId;
+    }
     WidgetsBinding.instance.addObserver(this);
     _load();
   }
@@ -129,6 +139,7 @@ class _CounterpartConversationPageState
     if (result.state == AppPageState.content &&
         result.data != null &&
         selectedProjectId != null) {
+      _notifyChatWindowActive(true);
       final selectedGroup = _selectedProjectGroup(result.data!);
       if (selectedGroup != null) {
         setState(() {

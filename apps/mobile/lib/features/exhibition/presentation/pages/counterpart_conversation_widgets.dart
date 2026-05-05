@@ -753,6 +753,9 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
     final hasUnread = group.hasProjectUnread && group.projectUnreadCount > 0;
     final businessTodoCount = group.businessTodoSummary.totalPendingCount;
     final hasBusinessTodo = businessTodoCount > 0;
+    final latestMessageLabel = hasUnread
+        ? '最近消息：有 ${group.projectUnreadCount} 条未读项目沟通消息'
+        : '最近消息：暂无最新消息';
     const maskedTitleColor = Color(0xFF1F7A3A);
     return LayoutBuilder(
       builder: (context, constraints) {
@@ -825,7 +828,7 @@ class _CounterpartProjectEntryTile extends StatelessWidget {
               ),
             const SizedBox(height: 6),
             Text(
-              '最近消息：暂无最新消息',
+              latestMessageLabel,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: theme.textTheme.bodySmall?.copyWith(
