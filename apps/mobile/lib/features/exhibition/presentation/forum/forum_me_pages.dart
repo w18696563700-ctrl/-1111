@@ -213,9 +213,12 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
           actions: <Widget>[
             AppPrimaryButton(
               label: '查看帖子',
-              onPressed: () => Navigator.of(
-                context,
-              ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
+              onPressed: () => Navigator.of(context).pushNamed(
+                ExhibitionRoutes.forumPostWithPostId(
+                  item.postId,
+                  title: item.title,
+                ),
+              ),
             ),
             AppSecondaryButton(
               icon: _editingPostIds.contains(item.postId)
@@ -276,9 +279,12 @@ class _ForumMeCollectionPageState extends State<ForumMeCollectionPage> {
             actions: <Widget>[
               AppPrimaryButton(
                 label: '查看原帖',
-                onPressed: () => Navigator.of(
-                  context,
-                ).pushNamed(ExhibitionRoutes.forumPostWithPostId(item.postId)),
+                onPressed: () => Navigator.of(context).pushNamed(
+                  ExhibitionRoutes.forumPostWithPostId(
+                    item.postId,
+                    title: item.postTitle,
+                  ),
+                ),
               ),
               AppSecondaryButton(
                 label: '回评论区',

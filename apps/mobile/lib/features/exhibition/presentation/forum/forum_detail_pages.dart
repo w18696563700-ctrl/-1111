@@ -136,9 +136,14 @@ class _ForumTopicDetailPageState extends State<ForumTopicDetailPage> {
 }
 
 class ForumPostDetailPage extends StatefulWidget {
-  const ForumPostDetailPage({super.key, required this.postId});
+  const ForumPostDetailPage({
+    super.key,
+    required this.postId,
+    this.initialTitle,
+  });
 
   final String? postId;
+  final String? initialTitle;
 
   @override
   State<ForumPostDetailPage> createState() => _ForumPostDetailPageState();
@@ -289,6 +294,7 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
         else if (detail != null) ...<Widget>[
           _ForumDetailHero(
             topicLabel: topicTitle,
+            title: _displayTitle(widget.initialTitle, fallback: topicTitle),
             author: detail.author,
             publishedAt: _compactPublishedAt(detail.publishedAt),
             viewerFollowsTopic: detail.viewerFollowsTopic == true,
@@ -323,19 +329,14 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
               summary: '点击图片或视频可预览，文档文件可下载。',
             ),
             const SizedBox(height: 12),
-            ...detail.attachmentRefs.map(
-              (ForumAttachmentRefView item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ForumDetailAttachmentRow(
-                  item: item,
-                  actionLabel: _attachmentActionLabel(item.mimeType),
-                  loading: _openingAttachmentAssetIds.contains(
-                    item.fileAssetId,
-                  ),
-                  onTap: () => _openAttachment(item),
-                ),
-              ),
+            ForumAttachmentPreview(
+              attachments: detail.attachmentRefs,
+              onOpenAttachment: _openAttachment,
             ),
+            if (_openingAttachmentAssetIds.isNotEmpty) ...<Widget>[
+              const SizedBox(height: 8),
+              const LinearProgressIndicator(minHeight: 3),
+            ],
           ],
           const SizedBox(height: 24),
           _ForumDetailActionBar(
@@ -363,33 +364,18 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
           ),
           if (_inlineCommentVisible) ...<Widget>[
             const SizedBox(height: 14),
-            ForumSectionCard(
-              eyebrow: '评论输入',
-              title: '写评论',
-              summary: '输入后直接发送，不再跳转新页面。',
-              children: <Widget>[
-                TextField(
-                  controller: _inlineCommentController,
-                  focusNode: _inlineCommentFocusNode,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: '说说你的看法（支持中文）',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: _inlineCommentSubmitting
-                        ? null
-                        : () => _submitInlineComment(detail.postId),
-                    icon: const Icon(Icons.send_rounded),
-                    label: Text(_inlineCommentSubmitting ? '发送中' : '发送'),
-                  ),
-                ),
-              ],
+            Text(
+              '写评论',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            ForumCommentInputBar(
+              controller: _inlineCommentController,
+              focusNode: _inlineCommentFocusNode,
+              submitting: _inlineCommentSubmitting,
+              onSubmit: () => _submitInlineComment(detail.postId),
             ),
           ],
           const SizedBox(height: 24),
@@ -778,16 +764,6 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     return _isImageAttachment(mimeType) || _isVideoAttachment(mimeType)
         ? 'preview'
         : 'download';
-  }
-
-  String _attachmentActionLabel(String mimeType) {
-    if (_isImageAttachment(mimeType)) {
-      return '预览';
-    }
-    if (_isVideoAttachment(mimeType)) {
-      return '预览';
-    }
-    return '下载';
   }
 
   bool _isImageAttachment(String mimeType) => mimeType.startsWith('image/');

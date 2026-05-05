@@ -12,8 +12,8 @@ import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.da
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_location_context_store.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
-import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/forum/forum_shared_components.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
 import 'package:mobile/shared/widgets/app_page_state_view.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
@@ -25,6 +25,7 @@ part 'exhibition_home_module_deck.dart';
 part 'exhibition_home_module_panels.dart';
 part 'exhibition_home_channel_rails.dart';
 part 'exhibition_home_channel_support.dart';
+part 'exhibition_home_forum_panel.dart';
 part 'exhibition_home_project_forum_panels.dart';
 part 'exhibition_home_enterprise_panels.dart';
 part 'exhibition_home_location_options.dart';

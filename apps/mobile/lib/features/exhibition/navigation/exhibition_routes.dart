@@ -187,8 +187,13 @@ final class ExhibitionRoutes {
     return _withQuery(forumSquare, <String, String>{'topicId': topicId});
   }
 
-  static String forumPostWithPostId(String postId) {
-    return '$forumPosts/${Uri.encodeComponent(postId)}';
+  static String forumPostWithPostId(String postId, {String? title}) {
+    final path = '$forumPosts/${Uri.encodeComponent(postId)}';
+    final normalizedTitle = title?.trim();
+    if (normalizedTitle == null || normalizedTitle.isEmpty) {
+      return path;
+    }
+    return _withQuery(path, <String, String>{'title': normalizedTitle});
   }
 
   static String forumAuthorWithAuthorId(String authorId) {

@@ -150,13 +150,19 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
             padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
             child: Row(
               children: <Widget>[
-                Text(
-                  '分类：$currentLabel',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w700,
+                ForumCategoryBadge(label: currentLabel, compact: true),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    '分类：$currentLabel',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: AppVisualTokens.textSecondary,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
-                const Spacer(),
                 Icon(
                   Icons.keyboard_arrow_down_rounded,
                   color: theme.colorScheme.onSurfaceVariant,
@@ -266,7 +272,8 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
           _mediaSectionNotice(
             context,
             icon: Icons.error_outline_rounded,
-            message: '仍有附件未完成上传，可以点“重新上传”，也可以先移除后再继续。',
+            message:
+                _firstFailedMediaMessage() ?? '仍有附件未完成上传，可以点“重新上传”，也可以先移除后再继续。',
             tone: theme.colorScheme.errorContainer,
             iconColor: theme.colorScheme.error,
           ),
@@ -347,13 +354,26 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
     );
   }
 
+  String? _firstFailedMediaMessage() {
+    for (final item in _mediaItems) {
+      if (item.stage != _ForumComposerMediaStage.uploadFailed) {
+        continue;
+      }
+      final message = item.statusMessage?.trim();
+      if (message != null && message.isNotEmpty) {
+        return message;
+      }
+    }
+    return null;
+  }
+
   Widget _inlineAttachmentList(BuildContext context) {
     final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
-          '正文下的附件',
+          '附件',
           style: theme.textTheme.labelLarge?.copyWith(
             fontWeight: FontWeight.w800,
             color: theme.colorScheme.onSurfaceVariant,
@@ -378,7 +398,8 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
         ? '重新上传'
         : '开始上传';
     final statusText = item.statusMessage ?? _forumMediaStageLabel(item);
-    final previewLabel = item.mimeType.startsWith('image/') && item.bytes.isNotEmpty
+    final previewLabel =
+        item.mimeType.startsWith('image/') && item.bytes.isNotEmpty
         ? '点名称预览'
         : null;
     final subtitle = previewLabel == null
@@ -472,9 +493,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
 
   Widget _compactMediaTitleRow(
     BuildContext context,
-    _ForumComposerMediaItem item,
-    {required String subtitle}
-  ) {
+    _ForumComposerMediaItem item, {
+    required String subtitle,
+  }) {
     if (item.mimeType.startsWith('image/') && item.bytes.isNotEmpty) {
       return _imagePreviewTriggerCard(context, item, subtitle: subtitle);
     }
@@ -631,7 +652,8 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
-        onTap: () => _showGenericPreviewDialog(context, item, subtitle: subtitle),
+        onTap: () =>
+            _showGenericPreviewDialog(context, item, subtitle: subtitle),
         child: Ink(
           decoration: BoxDecoration(
             color: theme.colorScheme.surface,
@@ -644,7 +666,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
               children: <Widget>[
                 DecoratedBox(
                   decoration: BoxDecoration(
-                    color: theme.colorScheme.primaryContainer.withValues(alpha: 0.7),
+                    color: theme.colorScheme.primaryContainer.withValues(
+                      alpha: 0.7,
+                    ),
                     borderRadius: BorderRadius.circular(14),
                   ),
                   child: Padding(
@@ -754,12 +778,16 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: SingleChildScrollView(
                       child: SelectableText(
                         previewText,
-                        style: theme.textTheme.bodyMedium?.copyWith(height: 1.5),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          height: 1.5,
+                        ),
                       ),
                     ),
                   )
@@ -770,7 +798,9 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
                     decoration: BoxDecoration(
                       color: theme.colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: theme.colorScheme.outlineVariant),
+                      border: Border.all(
+                        color: theme.colorScheme.outlineVariant,
+                      ),
                     ),
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -833,9 +863,7 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
       final opened = await _openLocalPreviewFile(file.path);
       _showActionFeedback(
         opened
-            ? (item.mimeType.startsWith('video/')
-                  ? '已在系统中打开视频预览'
-                  : '已在系统中打开文件')
+            ? (item.mimeType.startsWith('video/') ? '已在系统中打开视频预览' : '已在系统中打开文件')
             : '当前设备暂时不能直接打开这个附件，可先上传后继续按帖子附件链查看',
         error: !opened,
       );
@@ -870,7 +898,12 @@ extension _ForumPublishPageSections on _ForumPublishPageState {
         return result.exitCode == 0;
       }
       if (Platform.isWindows) {
-        final result = await Process.run('cmd', <String>['/c', 'start', '', path]);
+        final result = await Process.run('cmd', <String>[
+          '/c',
+          'start',
+          '',
+          path,
+        ]);
         return result.exitCode == 0;
       }
     } on ProcessException {

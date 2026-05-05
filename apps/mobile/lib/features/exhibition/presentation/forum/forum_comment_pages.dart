@@ -13,6 +13,7 @@ class ForumCommentInteractionPage extends StatefulWidget {
 class _ForumCommentInteractionPageState
     extends State<ForumCommentInteractionPage> {
   final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
   ForumReadResult<ForumPostDetailView>? _detailResult;
   ForumReadResult<ForumPagedCollectionView<ForumCommentItemView>>?
   _commentResult;
@@ -28,6 +29,7 @@ class _ForumCommentInteractionPageState
   @override
   void dispose() {
     _controller.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -95,9 +97,6 @@ class _ForumCommentInteractionPageState
             rawLabel: detail.topicTitle,
             topicId: detail.topicId,
           );
-    final authorName = detail == null
-        ? '论坛用户'
-        : forumDisplayActorName(detail.author.displayName);
     final showStateCard =
         _loading ||
         (_detailResult?.state != null &&
@@ -116,42 +115,20 @@ class _ForumCommentInteractionPageState
             errorCode: _detailResult?.errorCode,
           )
         else if (detail != null) ...<Widget>[
-          ForumSectionCard(
-            eyebrow: '当前帖子',
-            title: topicTitle!,
-            summary: '评论互动区会继续围绕当前帖子展开。',
-            children: <Widget>[
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
-                children: <Widget>[
-                  ForumInfoPill(label: '# $topicTitle', highlighted: true),
-                ],
-              ),
-              ForumPostPreviewCard(
-                title: '帖子上下文',
-                summary: detail.content,
-                meta:
-                    '$authorName · ${_compactPublishedAt(detail.publishedAt)}',
-              ),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: <Widget>[
-                  FilledButton.tonal(
-                    onPressed: () =>
-                        _returnToPostDetail(context, detail.postId),
-                    child: const Text('回帖子详情'),
-                  ),
-                  FilledButton.tonal(
-                    onPressed: () => Navigator.of(
-                      context,
-                    ).pushNamed(_routeForScope(ForumFeedScope.square)),
-                    child: const Text('回论坛列表'),
-                  ),
-                ],
-              ),
-            ],
+          ForumPostCard(
+            topicLabel: topicTitle!,
+            title: topicTitle,
+            excerpt: detail.content,
+            author: detail.author,
+            publishedAt: detail.publishedAt,
+            stateLabel: forumDisplayContentState(detail.state),
+            replyCount: detail.engagement.replyCount,
+            likeCount: detail.engagement.likeCount,
+            viewCount: detail.engagement.viewCount,
+            attachmentRefs: detail.attachmentRefs,
+            onTap: () => _returnToPostDetail(context, detail.postId),
+            onOpenAuthor: () =>
+                _openForumAuthorProfile(context, detail.author.authorId),
           ),
           const SizedBox(height: 16),
           ForumSectionCard(
@@ -159,29 +136,12 @@ class _ForumCommentInteractionPageState
             title: '继续发言',
             summary: '输入内容后可以继续回复当前讨论。',
             children: <Widget>[
-              TextField(
+              ForumCommentInputBar(
                 controller: _controller,
-                minLines: 3,
-                maxLines: 5,
-                decoration: const InputDecoration(
-                  hintText: '继续补充你的排班经验、材料协同建议或进场提醒',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-              Wrap(
-                spacing: 12,
-                runSpacing: 12,
-                children: <Widget>[
-                  FilledButton.icon(
-                    onPressed: _submitting ? null : _submitComment,
-                    icon: const Icon(Icons.send_rounded),
-                    label: Text(_submitting ? '发送中' : '发送回复'),
-                  ),
-                  OutlinedButton(
-                    onPressed: _submitting ? null : _controller.clear,
-                    child: const Text('清空输入'),
-                  ),
-                ],
+                focusNode: _focusNode,
+                submitting: _submitting,
+                onSubmit: _submitComment,
+                submitLabel: '发送回复',
               ),
             ],
           ),
@@ -210,12 +170,9 @@ class _ForumCommentInteractionPageState
                 )
               else
                 ...comments.map(
-                  (ForumCommentItemView item) => _ForumThreadCommentCard(
-                    author: item.author,
-                    target: item.parentCommentId == null ? '回复主帖' : '回复评论',
-                    content: item.body,
-                    meta:
-                        '${_compactPublishedAt(item.publishedAt)} · ${item.replyCount} 条后续回复',
+                  (ForumCommentItemView item) => ForumCommentCard.fromItem(
+                    item: item,
+                    targetLabel: item.parentCommentId == null ? '回复主帖' : '回复评论',
                     onOpenAuthor: () =>
                         _openForumAuthorProfile(context, item.author.authorId),
                     onReport: () => _showForumReportSheet(

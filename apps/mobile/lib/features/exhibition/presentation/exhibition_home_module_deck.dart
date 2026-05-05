@@ -58,7 +58,7 @@ class _HomeModuleDeck extends StatefulWidget {
   final ValueChanged<String> onOpenProjectDetail;
   final VoidCallback onOpenForum;
   final VoidCallback onOpenForumPublish;
-  final ValueChanged<String> onOpenForumPost;
+  final void Function(String postId, {String? title}) onOpenForumPost;
   final VoidCallback onOpenCompanyBoard;
   final VoidCallback onOpenFactoryBoard;
   final VoidCallback onOpenSupplierBoard;

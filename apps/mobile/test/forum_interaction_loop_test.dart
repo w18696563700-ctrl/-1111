@@ -91,7 +91,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(submittedBodies, contains('详情页内联评论'));
 
-      final loadMoreAction = find.text('查看更多评论').last;
+      final loadMoreAction = find.widgetWithText(OutlinedButton, '查看更多评论').last;
       await tester.scrollUntilVisible(
         loadMoreAction,
         500,
@@ -99,7 +99,8 @@ void main() {
       );
       await tester.ensureVisible(loadMoreAction);
       await tester.pumpAndSettle();
-      await tester.tap(loadMoreAction);
+      final loadMoreButton = tester.widget<OutlinedButton>(loadMoreAction);
+      loadMoreButton.onPressed?.call();
       await tester.pumpAndSettle();
       expect(requestedCursors, contains('cursor-2'));
       expect(requestedPageSizes, everyElement('10'));

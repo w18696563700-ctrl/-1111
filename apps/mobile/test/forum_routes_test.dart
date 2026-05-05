@@ -790,6 +790,11 @@ void main() {
                             },
                           ],
                           'publishedAt': '2026-03-27T09:30:00Z',
+                          'engagement': <String, Object?>{
+                            'replyCount': 0,
+                            'likeCount': 0,
+                            'viewCount': 0,
+                          },
                           'viewerHasLiked': false,
                           'viewerHasBookmarked': false,
                           'viewerFollowsTopic': true,

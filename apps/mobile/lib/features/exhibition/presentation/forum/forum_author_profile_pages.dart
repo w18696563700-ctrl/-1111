@@ -158,13 +158,24 @@ class _ForumAuthorProfilePageState extends State<ForumAuthorProfilePage> {
             emptyMessage: '当前作者还没有公开帖子',
             onRetry: _load,
           )
-        else
+        else ...<Widget>[
+          const _ForumDetailSectionHeading(title: '作者公开帖子'),
+          const SizedBox(height: 12),
           ...posts.map(
             (ForumAuthorPostCardView item) => Padding(
               padding: const EdgeInsets.only(bottom: 8),
-              child: _ForumPublicPostCard.fromAuthorPostCard(item: item),
+              child: ForumPostCard.fromAuthorPost(
+                item: item,
+                onTap: () => Navigator.of(context).pushNamed(
+                  ExhibitionRoutes.forumPostWithPostId(
+                    item.postId,
+                    title: item.title,
+                  ),
+                ),
+              ),
             ),
           ),
+        ],
       ],
     );
   }

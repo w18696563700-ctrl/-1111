@@ -125,6 +125,7 @@ class _ForumSearchPageState extends State<ForumSearchPage> {
                                   )
                                 : ExhibitionRoutes.forumPostWithPostId(
                                     item.postId!,
+                                    title: item.title,
                                   ),
                           ),
                           child: Text(item.postId == null ? '查看话题' : '查看帖子'),

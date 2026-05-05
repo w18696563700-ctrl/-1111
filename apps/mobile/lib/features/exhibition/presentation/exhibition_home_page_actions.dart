@@ -197,10 +197,10 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
     Navigator.of(context).pushNamed(ExhibitionRoutes.forumPublish);
   }
 
-  void _openForumPost(String postId) {
+  void _openForumPost(String postId, {String? title}) {
     Navigator.of(
       context,
-    ).pushNamed(ExhibitionRoutes.forumPostWithPostId(postId));
+    ).pushNamed(ExhibitionRoutes.forumPostWithPostId(postId, title: title));
   }
 
   void _openEnterpriseListItem(EnterpriseHubListItem item) {

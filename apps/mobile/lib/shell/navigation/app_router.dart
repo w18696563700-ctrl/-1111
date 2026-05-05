@@ -144,7 +144,10 @@ class AppRouter {
         ticketId: reportTicketId,
       ),
       _ when topicId != null => ForumTopicDetailPage(topicId: topicId),
-      _ when postId != null => ForumPostDetailPage(postId: postId),
+      _ when postId != null => ForumPostDetailPage(
+        postId: postId,
+        initialTitle: routeUri.queryParameters['title'],
+      ),
       _ => null,
     };
 
@@ -186,6 +189,13 @@ class AppRouter {
         authorId != null ||
         topicId != null ||
         postId != null;
+    final showForumPublishFab = <String>{
+      ExhibitionRoutes.forum,
+      ExhibitionRoutes.forumSquare,
+      ExhibitionRoutes.forumLocal,
+      ExhibitionRoutes.forumFollowing,
+      ExhibitionRoutes.forumTopics,
+    }.contains(routePath);
 
     return MaterialPageRoute<void>(
       settings: settings,
@@ -216,8 +226,7 @@ class AppRouter {
             ],
           _ => const <Widget>[],
         },
-        floatingActionButton:
-            showForumToolActions && routePath != ExhibitionRoutes.forumPublish
+        floatingActionButton: showForumPublishFab
             ? FloatingActionButton.small(
                 tooltip: '发布帖子',
                 onPressed: () {

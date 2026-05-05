@@ -204,106 +204,13 @@ class _ForumFeedCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return _ForumPublicPostCard.fromFeed(item: item);
-  }
-}
-
-class _ForumThreadCommentCard extends StatelessWidget {
-  const _ForumThreadCommentCard({
-    required this.author,
-    required this.target,
-    required this.content,
-    required this.meta,
-    required this.onOpenAuthor,
-    this.onReport,
-  });
-
-  final ForumAuthorSummaryView author;
-  final String target;
-  final String content;
-  final String meta;
-  final VoidCallback onOpenAuthor;
-  final VoidCallback? onReport;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final visibleName = forumDisplayActorName(author.displayName);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
+    return ForumPostCard.fromFeed(
+      item: item,
+      onTap: () => Navigator.of(context).pushNamed(
+        ExhibitionRoutes.forumPostWithPostId(item.postId, title: item.title),
       ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(18),
-                onTap: onOpenAuthor,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 2,
-                    vertical: 2,
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      _ForumAuthorAvatar(
-                        label: visibleName,
-                        avatarUrl: author.avatarUrl,
-                        radius: 16,
-                      ),
-                      const SizedBox(width: 10),
-                      Expanded(
-                        child: Text(
-                          '$visibleName · $target',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.labelLarge?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right_rounded,
-                        size: 18,
-                        color: theme.colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              content,
-              style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
-            ),
-            const SizedBox(height: 10),
-            Text(
-              meta,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: theme.colorScheme.onSurfaceVariant,
-              ),
-            ),
-            if (onReport != null) ...<Widget>[
-              const SizedBox(height: 8),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton.icon(
-                  onPressed: onReport,
-                  icon: const Icon(Icons.flag_outlined, size: 18),
-                  label: const Text('举报'),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+      onOpenAuthor: () =>
+          _openForumAuthorProfile(context, item.author.authorId),
     );
   }
 }
@@ -341,6 +248,14 @@ ForumFeedScope _scopeForCategoryKey(String categoryKey) {
 
 String _topicLabel(String categoryKey) {
   return forumDisplayTopicLabel(categoryKey: categoryKey);
+}
+
+String _displayTitle(String? title, {required String fallback}) {
+  final normalized = title?.trim();
+  if (normalized == null || normalized.isEmpty) {
+    return fallback;
+  }
+  return normalized;
 }
 
 String _compactPublishedAt(String value) {
