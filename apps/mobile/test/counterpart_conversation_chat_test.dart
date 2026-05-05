@@ -2005,7 +2005,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('项目相册'), findsOneWidget);
-      expect(find.text('当前数量：0 / 50'), findsOneWidget);
+      expect(find.text('共 0 / 50 张'), findsOneWidget);
       expect(find.text('上传图片'), findsOneWidget);
 
       await tester.tap(find.text('上传图片'));
@@ -2013,28 +2013,32 @@ void main() {
 
       expect(bindCount, 1);
       expect(transport.uploads, hasLength(1));
-      expect(find.textContaining('progress.png 已进入项目相册'), findsOneWidget);
-      expect(find.textContaining('file-album-1'), findsOneWidget);
+      expect(find.textContaining('照片已进入项目相册'), findsOneWidget);
+      expect(find.text('共 1 / 50 张'), findsOneWidget);
+      expect(find.text('相册照片'), findsOneWidget);
+      expect(find.textContaining('progress.png'), findsNothing);
+      expect(find.textContaining('file-album-1'), findsNothing);
+      expect(find.byTooltip('保存到本地'), findsOneWidget);
 
       await tester.scrollUntilVisible(
-        find.text('预览'),
+        find.byTooltip('预览'),
         160,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('预览'));
+      await tester.tap(find.byTooltip('预览'));
       await tester.pumpAndSettle();
       expect(find.text('照片预览'), findsOneWidget);
       await tester.tap(find.text('关闭'));
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.text('删除'),
+        find.byTooltip('删除'),
         120,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      await tester.tap(find.text('删除'));
+      await tester.tap(find.byTooltip('删除'));
       await tester.pumpAndSettle();
 
       expect(deleteCount, 1);

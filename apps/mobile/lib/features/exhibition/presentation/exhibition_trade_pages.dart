@@ -55,6 +55,8 @@ part 'pages/counterpart_conversation_workbench_detail_widgets.dart';
 part 'pages/counterpart_conversation_material_confirmation_widgets.dart';
 part 'pages/counterpart_conversation_chat_widgets.dart';
 part 'pages/project_album_section.dart';
+part 'pages/project_album_support.dart';
+part 'pages/project_album_save_support.dart';
 part 'pages/project_album_page.dart';
 part 'pages/counterpart_conversation_subject_sheet.dart';
 part 'pages/minimal_visual_spec_page.dart';

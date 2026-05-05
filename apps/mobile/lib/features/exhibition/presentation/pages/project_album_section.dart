@@ -49,7 +49,8 @@ class _ProjectAlbumSection extends StatefulWidget {
   State<_ProjectAlbumSection> createState() => _ProjectAlbumSectionState();
 }
 
-class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
+class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
+    with _ProjectAlbumUploadActions {
   String _selectedCategory = 'progress';
   CounterpartConversationResult<ProjectAlbumPhotoListView>? _result;
   bool _loading = false;
@@ -57,6 +58,7 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
   String? _feedback;
   final Set<String> _deletingPhotoIds = <String>{};
   final Set<String> _loadingPreviewPhotoIds = <String>{};
+  final Set<String> _savingPhotoIds = <String>{};
   final Map<String, ProjectCommunicationFilePreviewAccessView> _previewCache =
       <String, ProjectCommunicationFilePreviewAccessView>{};
 
@@ -73,6 +75,9 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
       _result = null;
       _feedback = null;
       _deletingPhotoIds.clear();
+      _savingPhotoIds.clear();
+      _loadingPreviewPhotoIds.clear();
+      _previewCache.clear();
       _load();
     }
   }
@@ -105,123 +110,6 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
     });
   }
 
-  Future<void> _selectAndUpload() async {
-    if (_uploading) {
-      return;
-    }
-    if (_photos.length >= _projectAlbumLimit) {
-      setState(() => _feedback = '当前项目相册最多 50 张，已达到上限。');
-      return;
-    }
-    setState(() {
-      _uploading = true;
-      _feedback = '正在选择项目相册图片。';
-    });
-    final draft = await _pickProjectAttachmentDraft(imageOnly: true);
-    if (!mounted) {
-      return;
-    }
-    if (draft == null) {
-      setState(() {
-        _uploading = false;
-        _feedback = '未选择图片。';
-      });
-      return;
-    }
-    final resolved = _resolveProjectAttachmentDraft(draft);
-    if (resolved == null || !resolved.mimeType.startsWith('image/')) {
-      setState(() {
-        _uploading = false;
-        _feedback = '项目相册只支持 PNG、JPEG、WEBP 图片。';
-      });
-      return;
-    }
-    await _uploadResolvedPhoto(resolved);
-  }
-
-  Future<void> _uploadResolvedPhoto(
-    _ResolvedProjectAttachmentDraft draft,
-  ) async {
-    setState(() => _feedback = '正在申请相册图片上传。');
-    final init = await ExhibitionConsumerLayer.instance.uploadInit(
-      UploadInitCommand(
-        businessType: _projectAttachmentBusinessType,
-        businessId: widget.projectId,
-        fileKind: _projectAlbumFileKind,
-        mimeType: draft.mimeType,
-        size: draft.sizeInBytes,
-        checksum: draft.checksum,
-      ),
-    );
-    if (!mounted) {
-      return;
-    }
-    final directive = init.directive;
-    if (init.state != AppUploadState.signedReady || directive == null) {
-      setState(() {
-        _uploading = false;
-        _feedback = init.message ?? '相册图片上传初始化失败。';
-      });
-      return;
-    }
-
-    setState(() => _feedback = '正在直传相册图片。');
-    final direct = await ExhibitionConsumerLayer.instance.directUpload(
-      directive: directive,
-      bodyBytes: draft.bytes,
-    );
-    if (!mounted) {
-      return;
-    }
-    if (direct.state != AppUploadState.uploadConfirming) {
-      setState(() {
-        _uploading = false;
-        _feedback = direct.message ?? '相册图片直传失败。';
-      });
-      return;
-    }
-
-    setState(() => _feedback = '正在确认相册图片上传。');
-    final confirm = await ExhibitionConsumerLayer.instance.uploadConfirm(
-      directive: directive,
-    );
-    if (!mounted) {
-      return;
-    }
-    final fileAssetId = confirm.fileAssetId?.trim();
-    if (confirm.state != AppUploadState.uploadBound ||
-        fileAssetId == null ||
-        fileAssetId.isEmpty) {
-      setState(() {
-        _uploading = false;
-        _feedback = confirm.message ?? '相册图片确认失败。';
-      });
-      return;
-    }
-
-    setState(() => _feedback = '正在绑定项目相册照片。');
-    final bind = await CounterpartConversationConsumerLayer.instance
-        .bindProjectAlbumPhoto(
-          projectId: widget.projectId,
-          fileAssetId: fileAssetId,
-          category: _selectedCategory,
-          caption: draft.fileName,
-          sortOrder: _photos.length,
-        );
-    if (!mounted) {
-      return;
-    }
-    if (bind.state != AppPageState.content) {
-      setState(() {
-        _uploading = false;
-        _feedback = bind.message ?? '项目相册绑定失败。';
-      });
-      return;
-    }
-    setState(() => _uploading = false);
-    await _load(feedback: '${draft.fileName} 已进入项目相册。');
-  }
-
   Future<void> _deletePhoto(ProjectAlbumPhotoView photo) async {
     if (_deletingPhotoIds.contains(photo.photoId)) {
       return;
@@ -243,15 +131,19 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
     await _load(feedback: '已删除相册照片。');
   }
 
-  Future<void> _previewPhoto(ProjectAlbumPhotoView photo) async {
+  Future<ProjectCommunicationFilePreviewAccessView?> _loadPhotoAccess(
+    ProjectAlbumPhotoView photo, {
+    required ValueChanged<bool> onBusyChanged,
+    required ValueChanged<String> onFailure,
+  }) async {
     final threadId = widget.threadId?.trim();
     if (threadId == null || threadId.isEmpty) {
-      _showPhotoFallbackDialog(photo, '当前相册缺少项目沟通 threadId，请从项目沟通页进入后再预览真实图片。');
-      return;
+      onFailure('当前相册缺少项目沟通 threadId，请从项目沟通页进入后再操作真实图片。');
+      return null;
     }
     var access = _previewCache[photo.fileAssetId];
     if (access == null) {
-      setState(() => _loadingPreviewPhotoIds.add(photo.photoId));
+      onBusyChanged(true);
       final result = await CounterpartConversationConsumerLayer.instance
           .loadProjectCommunicationFilePreviewAccess(
             projectId: widget.projectId,
@@ -259,15 +151,38 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
             fileAssetId: photo.fileAssetId,
           );
       if (!mounted) {
-        return;
+        return null;
       }
-      setState(() => _loadingPreviewPhotoIds.remove(photo.photoId));
+      onBusyChanged(false);
       access = result.data;
       if (result.state != AppPageState.content || access == null) {
-        _showPhotoFallbackDialog(photo, result.message ?? '当前照片暂不可预览。');
-        return;
+        onFailure(result.message ?? '当前照片暂不可操作。');
+        return null;
       }
       _previewCache[photo.fileAssetId] = access;
+    }
+    return access;
+  }
+
+  Future<void> _previewPhoto(ProjectAlbumPhotoView photo) async {
+    final access = await _loadPhotoAccess(
+      photo,
+      onBusyChanged: (bool busy) {
+        if (!mounted) {
+          return;
+        }
+        setState(() {
+          if (busy) {
+            _loadingPreviewPhotoIds.add(photo.photoId);
+          } else {
+            _loadingPreviewPhotoIds.remove(photo.photoId);
+          }
+        });
+      },
+      onFailure: (String message) => _showPhotoFallbackDialog(message),
+    );
+    if (!mounted || access == null) {
+      return;
     }
     final accessUrl = access.accessUrl?.trim();
     if (access.canPreview &&
@@ -276,35 +191,69 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
         accessUrl.isNotEmpty) {
       await _showProjectAttachmentNetworkImagePreviewDialog(
         context,
-        fileName: access.fileName ?? photo.caption ?? photo.fileAssetId,
+        fileName: '项目相册照片',
         imageUrl: accessUrl,
       );
       return;
     }
-    _showPhotoFallbackDialog(photo, access.fallbackReason ?? '当前照片暂不支持在线预览。');
+    _showPhotoFallbackDialog(access.fallbackReason ?? '当前照片暂不支持在线预览。');
   }
 
-  void _showPhotoFallbackDialog(ProjectAlbumPhotoView photo, String message) {
+  Future<void> _savePhoto(ProjectAlbumPhotoView photo) async {
+    if (_savingPhotoIds.contains(photo.photoId)) {
+      return;
+    }
+    setState(() {
+      _savingPhotoIds.add(photo.photoId);
+      _feedback = '正在准备保存相册照片。';
+    });
+    final access = await _loadPhotoAccess(
+      photo,
+      onBusyChanged: (_) {},
+      onFailure: (String message) {
+        if (mounted) {
+          setState(() => _feedback = message);
+        }
+      },
+    );
+    if (!mounted) {
+      return;
+    }
+    if (access == null) {
+      setState(() => _savingPhotoIds.remove(photo.photoId));
+      return;
+    }
+    final accessUrl = access.accessUrl?.trim();
+    if (accessUrl == null || accessUrl.isEmpty) {
+      setState(() {
+        _savingPhotoIds.remove(photo.photoId);
+        _feedback = access.fallbackReason ?? '当前照片暂不可保存到本地。';
+      });
+      return;
+    }
+    final savedFile = await _downloadProjectAlbumPhotoToLocal(
+      accessUrl: accessUrl,
+      photo: photo,
+      access: access,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _savingPhotoIds.remove(photo.photoId);
+      _feedback = savedFile == null ? '当前照片保存失败，请稍后重试。' : '相册照片已保存到本地。';
+    });
+    if (savedFile != null) {
+      await _showProjectAlbumSavedSheet(context, file: savedFile);
+    }
+  }
+
+  void _showPhotoFallbackDialog(String message) {
     showDialog<void>(
       context: context,
       builder: (BuildContext context) => AlertDialog(
         title: const Text('照片预览'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            _DetailLine(label: 'FileAsset', value: photo.fileAssetId),
-            _DetailLine(
-              label: '分类',
-              value: _projectAlbumCategoryLabel(photo.category),
-            ),
-            _DetailLine(label: '类型', value: photo.mimeType),
-            if (photo.caption != null)
-              _DetailLine(label: '说明', value: photo.caption!),
-            const SizedBox(height: 8),
-            Text(message),
-          ],
-        ),
+        content: Text(message),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(context).maybePop(),
@@ -318,12 +267,20 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
   @override
   Widget build(BuildContext context) {
     final result = _result;
-    final selectedOption = _projectAlbumCategories.firstWhere(
-      (_ProjectAlbumCategoryOption item) => item.value == _selectedCategory,
-    );
+    final theme = Theme.of(context);
     return _ActionCard(
       title: '项目相册',
-      summary: '照片锚定当前 projectId，最多 50 张；相册照片不是聊天消息。',
+      summary: '共 ${_photos.length} / $_projectAlbumLimit 张',
+      titleTrailing: IconButton(
+        onPressed: _loading ? null : () => _load(feedback: '已刷新项目相册。'),
+        tooltip: '刷新相册',
+        icon: _loading
+            ? const SizedBox.square(
+                dimension: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            : const Icon(Icons.refresh_rounded),
+      ),
       children: <Widget>[
         Wrap(
           spacing: 8,
@@ -346,22 +303,20 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
               .toList(growable: false),
         ),
         const SizedBox(height: 10),
-        _StateMessage(
-          title: selectedOption.label,
-          body: selectedOption.summary,
-        ),
-        const SizedBox(height: 10),
-        _DetailLine(
-          label: '当前数量',
-          value: '${_photos.length} / $_projectAlbumLimit',
-          highlight: _photos.length < _projectAlbumLimit,
-        ),
-        if (_feedback != null) _DetailLine(label: '状态', value: _feedback!),
-        const SizedBox(height: 10),
-        Wrap(
-          spacing: 10,
-          runSpacing: 10,
+        Row(
           children: <Widget>[
+            Expanded(
+              child: Text(
+                _projectAlbumCategorySummary(_selectedCategory),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
             FilledButton.icon(
               onPressed: _uploading || _photos.length >= _projectAlbumLimit
                   ? null
@@ -374,13 +329,12 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
                   : const Icon(Icons.add_photo_alternate_outlined),
               label: Text(_uploading ? '上传中' : '上传图片'),
             ),
-            OutlinedButton.icon(
-              onPressed: _loading ? null : () => _load(feedback: '已刷新项目相册。'),
-              icon: const Icon(Icons.refresh_rounded),
-              label: const Text('刷新相册'),
-            ),
           ],
         ),
+        if (_feedback != null) ...<Widget>[
+          const SizedBox(height: 10),
+          _ProjectAlbumFeedbackBanner(message: _feedback!),
+        ],
         const SizedBox(height: 12),
         if (_loading)
           const _StateMessage(title: '正在读取项目相册', body: '请稍候片刻。')
@@ -399,98 +353,14 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection> {
                 photo: photo,
                 deleting: _deletingPhotoIds.contains(photo.photoId),
                 loadingPreview: _loadingPreviewPhotoIds.contains(photo.photoId),
+                saving: _savingPhotoIds.contains(photo.photoId),
                 onPreview: () => unawaited(_previewPhoto(photo)),
-                onDelete: () => _deletePhoto(photo),
+                onSave: () => unawaited(_savePhoto(photo)),
+                onDelete: () => unawaited(_deletePhoto(photo)),
               ),
             ),
           ),
       ],
     );
   }
-}
-
-class _ProjectAlbumPhotoTile extends StatelessWidget {
-  const _ProjectAlbumPhotoTile({
-    required this.photo,
-    required this.deleting,
-    required this.loadingPreview,
-    required this.onPreview,
-    required this.onDelete,
-  });
-
-  final ProjectAlbumPhotoView photo;
-  final bool deleting;
-  final bool loadingPreview;
-  final VoidCallback onPreview;
-  final VoidCallback onDelete;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerLowest,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
-            Text(
-              photo.caption ?? photo.fileAssetId,
-              style: theme.textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w900,
-              ),
-            ),
-            const SizedBox(height: 8),
-            _DetailLine(
-              label: '分类',
-              value: _projectAlbumCategoryLabel(photo.category),
-            ),
-            _DetailLine(label: 'FileAsset', value: photo.fileAssetId),
-            _DetailLine(label: '类型', value: photo.mimeType),
-            const SizedBox(height: 10),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: <Widget>[
-                OutlinedButton.icon(
-                  onPressed: loadingPreview ? null : onPreview,
-                  icon: loadingPreview
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.visibility_outlined),
-                  label: Text(loadingPreview ? '预览中' : '预览'),
-                ),
-                OutlinedButton.icon(
-                  onPressed: deleting ? null : onDelete,
-                  icon: deleting
-                      ? const SizedBox.square(
-                          dimension: 16,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : const Icon(Icons.delete_outline_rounded),
-                  label: Text(deleting ? '删除中' : '删除'),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-String _projectAlbumCategoryLabel(String category) {
-  return switch (category) {
-    'contract' => '合同照片',
-    'progress' => '进度照片',
-    'final' => '最终呈现',
-    'defect' => '项目瑕疵',
-    _ => category,
-  };
 }
