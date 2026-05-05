@@ -215,6 +215,8 @@ module ContractsGeneration
 
     registry_literal = JSON.pretty_generate(registry_entries)
     profile_credit_constraints_type_block = build_profile_credit_constraints_contract_types(schemas)
+    profile_organization_credit_scoring_reserve_type_block =
+      build_profile_organization_credit_scoring_reserve_contract_types(schemas)
     project_type_block = build_project_contract_types(schemas)
     message_type_block = build_message_contract_types(schemas)
     trading_type_block = build_trading_contract_types(schemas)
@@ -297,6 +299,8 @@ module ContractsGeneration
       #{indent_block(registry_literal, 2)} as const satisfies readonly RegisteredInstanceEntryItem[];
 
       #{profile_credit_constraints_type_block}
+
+      #{profile_organization_credit_scoring_reserve_type_block}
 
       #{project_type_block}
 
@@ -416,6 +420,75 @@ module ContractsGeneration
         depositHandoff: ProfileCreditConstraintsHandoffBlock;
         transactionGuaranteeHandoff: ProfileCreditConstraintsHandoffBlock;
         dependencyHandoff: ProfileCreditConstraintsDependencyHandoff | null;
+      }
+    TS
+  end
+
+  def build_profile_organization_credit_scoring_reserve_contract_types(schemas)
+    [
+      'ProfileOrganizationCreditScoringReserveSampleStatus',
+      'ProfileOrganizationCreditScoringReserveRiskPosture',
+      'ProfileOrganizationCreditScoringReserveStatusResponse',
+      'ProfileOrganizationCreditScoringReserveExplanationResponse',
+      'ProfileOrganizationCreditScoringReserveHandoffResponse'
+    ].each { |schema_name| schemas.fetch(schema_name) }
+
+    sample_statuses = schemas.fetch('ProfileOrganizationCreditScoringReserveSampleStatus').fetch('enum')
+    risk_postures = schemas.fetch('ProfileOrganizationCreditScoringReserveRiskPosture').fetch('enum')
+
+    <<~TS
+      export const PROFILE_ORGANIZATION_CREDIT_SCORING_RESERVE_SAMPLE_STATUSES =
+        #{json_array(sample_statuses)} as const;
+      export type ProfileOrganizationCreditScoringReserveSampleStatus =
+        (typeof PROFILE_ORGANIZATION_CREDIT_SCORING_RESERVE_SAMPLE_STATUSES)[number];
+
+      export const PROFILE_ORGANIZATION_CREDIT_SCORING_RESERVE_RISK_POSTURES =
+        #{json_array(risk_postures)} as const;
+      export type ProfileOrganizationCreditScoringReserveRiskPostureValue =
+        (typeof PROFILE_ORGANIZATION_CREDIT_SCORING_RESERVE_RISK_POSTURES)[number];
+      export type ProfileOrganizationCreditScoringReserveRiskPosture =
+        ProfileOrganizationCreditScoringReserveRiskPostureValue | null;
+
+      export interface ProfileOrganizationCreditScoringReserveStatusResponse {
+        score: number | null;
+        tierCode: string | null;
+        tierLabel: string | null;
+        sampleStatus: ProfileOrganizationCreditScoringReserveSampleStatus;
+        riskPosture: ProfileOrganizationCreditScoringReserveRiskPosture;
+        ratedCompletedOrderCount: number;
+        positiveRate: number | null;
+        negativeRate: number | null;
+        verySatisfiedCount: number;
+        satisfiedCount: number;
+        passableCount: number;
+        negativeCount: number;
+        actionableState: string | null;
+        updatedAt: string | null;
+      }
+
+      export interface ProfileOrganizationCreditScoringReserveExplanationResponse {
+        reasonSummary: string;
+        reasonCodes: string[];
+        sampleStatus: ProfileOrganizationCreditScoringReserveSampleStatus;
+        riskPosture: ProfileOrganizationCreditScoringReserveRiskPosture;
+        ratedCompletedOrderCount: number;
+        positiveRate: number | null;
+        negativeRate: number | null;
+        verySatisfiedCount: number;
+        satisfiedCount: number;
+        passableCount: number;
+        negativeCount: number;
+        updatedAt: string | null;
+      }
+
+      export interface ProfileOrganizationCreditScoringReserveHandoffResponse {
+        actionableState: string | null;
+        sampleStatus: ProfileOrganizationCreditScoringReserveSampleStatus;
+        riskPosture: ProfileOrganizationCreditScoringReserveRiskPosture;
+        primaryActionCode: string | null;
+        primaryActionLabel: string | null;
+        handoffMessage: string | null;
+        updatedAt: string | null;
       }
     TS
   end

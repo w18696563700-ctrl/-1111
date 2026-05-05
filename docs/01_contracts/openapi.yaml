@@ -737,6 +737,76 @@ paths:
           description: Controlled forbidden response for the current actor or organization scope.
         "404":
           description: Controlled unavailable response when handoff posture cannot be read.
+  /api/app/profile/organization-credit-scoring/status:
+    get:
+      tags: [Profile]
+      summary: Profile organization-credit-scoring reserve status canonical path for Flutter App
+      operationId: getAppProfileOrganizationCreditScoringReserveStatus
+      responses:
+        "200":
+          description: >
+            Future-mainline reserve read-only organization credit-scoring status
+            projection. This path is parallel to current V2.1
+            credit-and-constraints and must not be interpreted as current credit
+            constraints, credit-score algorithm activation, payment execution,
+            deposit execution, governance execution, bidding eligibility, or
+            exposure ranking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveStatusResponse'
+        "401":
+          description: Controlled invalid, expired, or future-visibility-gated app session response.
+        "403":
+          description: Controlled forbidden response for the current actor or organization scope.
+        "404":
+          description: Controlled unavailable response when reserve status cannot be read.
+  /api/app/profile/organization-credit-scoring/explanation:
+    get:
+      tags: [Profile]
+      summary: Profile organization-credit-scoring reserve explanation canonical path for Flutter App
+      operationId: getAppProfileOrganizationCreditScoringReserveExplanation
+      responses:
+        "200":
+          description: >
+            Future-mainline reserve read-only explanation projection for
+            organization credit-scoring. This path carries sample and shadow
+            reason posture only and must not expose current V2.1 credit rules,
+            scoring weights, governance actions, payment execution, deposit
+            execution, bidding eligibility, or exposure ranking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveExplanationResponse'
+        "401":
+          description: Controlled invalid, expired, or future-visibility-gated app session response.
+        "403":
+          description: Controlled forbidden response for the current actor or organization scope.
+        "404":
+          description: Controlled unavailable response when reserve explanation cannot be read.
+  /api/app/profile/organization-credit-scoring/handoff:
+    get:
+      tags: [Profile]
+      summary: Profile organization-credit-scoring reserve handoff canonical path for Flutter App
+      operationId: getAppProfileOrganizationCreditScoringReserveHandoff
+      responses:
+        "200":
+          description: >
+            Future-mainline reserve read-only handoff projection for organization
+            credit-scoring. This path carries guidance copy only and must not
+            execute current V2.1 credit constraints, Admin governance, payment,
+            deposit, refund, settlement, bidding eligibility, or exposure
+            ranking.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveHandoffResponse'
+        "401":
+          description: Controlled invalid, expired, or future-visibility-gated app session response.
+        "403":
+          description: Controlled forbidden response for the current actor or organization scope.
+        "404":
+          description: Controlled unavailable response when reserve handoff cannot be read.
   /api/app/profile/governance/status:
     get:
       tags: [Profile]
@@ -6729,6 +6799,205 @@ components:
           type: string
         body:
           type: string
+    ProfileOrganizationCreditScoringReserveSampleStatus:
+      type: string
+      enum:
+        - UNAVAILABLE
+        - INSUFFICIENT
+        - SUFFICIENT
+      description: >
+        Future-mainline reserve sample posture only. This is not a current V2.1
+        credit-constraint status.
+    ProfileOrganizationCreditScoringReserveRiskPosture:
+      type: string
+      enum:
+        - UNAVAILABLE
+        - LOW
+        - MEDIUM
+        - HIGH
+      description: >
+        Future-mainline reserve risk posture only. This is not a current V2.1
+        credit-constraint, bidding, ranking, deposit, or governance result.
+    ProfileOrganizationCreditScoringReserveStatusResponse:
+      type: object
+      required:
+        - score
+        - tierCode
+        - tierLabel
+        - sampleStatus
+        - riskPosture
+        - ratedCompletedOrderCount
+        - positiveRate
+        - negativeRate
+        - verySatisfiedCount
+        - satisfiedCount
+        - passableCount
+        - negativeCount
+        - actionableState
+        - updatedAt
+      description: >
+        Future-mainline reserve `组织信用评分` status read surface. This schema
+        covers existing reserve runtime fields only and does not activate
+        current V2.1 credit scoring, credit constraints, Admin governance,
+        bidding eligibility, exposure ranking, payment, deposit, refund, or
+        settlement.
+      properties:
+        score:
+          type:
+            - integer
+            - 'null'
+          minimum: 0
+          maximum: 100
+        tierCode:
+          type:
+            - string
+            - 'null'
+        tierLabel:
+          type:
+            - string
+            - 'null'
+        sampleStatus:
+          $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveSampleStatus'
+        riskPosture:
+          oneOf:
+            - $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveRiskPosture'
+            - type: 'null'
+        ratedCompletedOrderCount:
+          type: integer
+          minimum: 0
+        positiveRate:
+          type:
+            - number
+            - 'null'
+        negativeRate:
+          type:
+            - number
+            - 'null'
+        verySatisfiedCount:
+          type: integer
+          minimum: 0
+        satisfiedCount:
+          type: integer
+          minimum: 0
+        passableCount:
+          type: integer
+          minimum: 0
+        negativeCount:
+          type: integer
+          minimum: 0
+        actionableState:
+          type:
+            - string
+            - 'null'
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ProfileOrganizationCreditScoringReserveExplanationResponse:
+      type: object
+      required:
+        - reasonSummary
+        - reasonCodes
+        - sampleStatus
+        - riskPosture
+        - ratedCompletedOrderCount
+        - positiveRate
+        - negativeRate
+        - verySatisfiedCount
+        - satisfiedCount
+        - passableCount
+        - negativeCount
+        - updatedAt
+      description: >
+        Future-mainline reserve `组织信用评分` explanation read surface. This
+        schema carries shadow sample and reason projection only and does not
+        expose current V2.1 credit rules, scoring weights, governance execution,
+        bidding eligibility, exposure ranking, payment, or deposit execution.
+      properties:
+        reasonSummary:
+          type: string
+        reasonCodes:
+          type: array
+          items:
+            type: string
+        sampleStatus:
+          $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveSampleStatus'
+        riskPosture:
+          oneOf:
+            - $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveRiskPosture'
+            - type: 'null'
+        ratedCompletedOrderCount:
+          type: integer
+          minimum: 0
+        positiveRate:
+          type:
+            - number
+            - 'null'
+        negativeRate:
+          type:
+            - number
+            - 'null'
+        verySatisfiedCount:
+          type: integer
+          minimum: 0
+        satisfiedCount:
+          type: integer
+          minimum: 0
+        passableCount:
+          type: integer
+          minimum: 0
+        negativeCount:
+          type: integer
+          minimum: 0
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
+    ProfileOrganizationCreditScoringReserveHandoffResponse:
+      type: object
+      required:
+        - actionableState
+        - sampleStatus
+        - riskPosture
+        - primaryActionCode
+        - primaryActionLabel
+        - handoffMessage
+        - updatedAt
+      description: >
+        Future-mainline reserve `组织信用评分` handoff read surface. This schema
+        carries guidance copy only and does not execute current V2.1 credit
+        constraints, Admin governance, bidding eligibility, exposure ranking,
+        payment, deposit, refund, settlement, or transaction protection.
+      properties:
+        actionableState:
+          type:
+            - string
+            - 'null'
+        sampleStatus:
+          $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveSampleStatus'
+        riskPosture:
+          oneOf:
+            - $ref: '#/components/schemas/ProfileOrganizationCreditScoringReserveRiskPosture'
+            - type: 'null'
+        primaryActionCode:
+          type:
+            - string
+            - 'null'
+        primaryActionLabel:
+          type:
+            - string
+            - 'null'
+        handoffMessage:
+          type:
+            - string
+            - 'null'
+        updatedAt:
+          type:
+            - string
+            - 'null'
+          format: date-time
     MembershipCurrentResponse:
       type: object
       required:
