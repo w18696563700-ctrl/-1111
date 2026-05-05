@@ -783,6 +783,40 @@ paths:
           description: Controlled forbidden message interaction response.
         "404":
           description: Controlled unavailable response for hidden or unavailable interaction surface.
+  /api/app/message/counterpart-conversation/detail:
+    get:
+      tags: [Message]
+      summary: Counterpart conversation detail canonical path for Flutter App messages building
+      operationId: getAppCounterpartConversationDetail
+      parameters:
+        - in: query
+          name: conversationId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Server-owned counterpart conversation detail for project-scoped
+            communication. `projectGroups[].businessTodoSummary` is the only
+            business-todo badge source for second-layer project cards. This
+            route must not become a generic chat, payment, order, fulfillment,
+            settlement, or final amount truth owner.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CounterpartConversationDetailResponse'
+        "400":
+          description: Controlled counterpart conversation invalid response.
+        "403":
+          description: Controlled counterpart conversation forbidden response.
+        "404":
+          description: Controlled counterpart conversation unavailable response.
   /api/app/exhibition/home:
     get:
       tags: [Exhibition]
@@ -2454,6 +2488,44 @@ paths:
           description: Controlled `CONFIRMATION_SOFTLINK_INVALID` response.
         "403":
           description: Controlled `NOTIFICATION_FORBIDDEN` or project communication forbidden response.
+  /api/app/message/project-communication/thread:
+    get:
+      tags: [Message]
+      summary: Project communication thread read model for Flutter App
+      operationId: getAppProjectCommunicationThread
+      parameters:
+        - in: query
+          name: projectId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: threadId
+          required: true
+          schema:
+            type: string
+        - in: query
+          name: counterpartOrganizationId
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: >
+            Server-owned project communication thread read model.
+            `chatAvailability` is the only app-facing send lock / unlock
+            projection. Flutter may disable input from this field, but Server
+            must still enforce the same write lock on message-send commands.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProjectCommunicationThreadReadModel'
+        "400":
+          description: Controlled project communication invalid response.
+        "403":
+          description: Controlled project communication forbidden response.
+        "404":
+          description: Controlled project communication unavailable response.
   /api/app/message/project-communication/workbench:
     get:
       tags: [Message]
@@ -11340,6 +11412,103 @@ components:
           enum:
             - approved
             - rejected
+    ProjectCommunicationBusinessTodoSummary:
+      type: object
+      required:
+        - bidParticipationReviewPendingCount
+        - publisherMaterialReviewPendingCount
+        - bidMaterialReviewPendingCount
+        - dealConfirmationPendingCount
+        - totalPendingCount
+      description: >
+        Server-owned business todo projection for project communication. This
+        summary is not ordinary message unread and must not be inferred by BFF
+        or Flutter from copy, attachment counts, workbench entry counts, or
+        route availability.
+      properties:
+        bidParticipationReviewPendingCount:
+          type: integer
+          minimum: 0
+        publisherMaterialReviewPendingCount:
+          type: integer
+          minimum: 0
+        bidMaterialReviewPendingCount:
+          type: integer
+          minimum: 0
+        dealConfirmationPendingCount:
+          type: integer
+          minimum: 0
+        totalPendingCount:
+          type: integer
+          minimum: 0
+          description: >
+            Server-calculated total business todo count for badge display. A
+            zero value means Flutter must not render a fake red badge.
+    ProjectCommunicationChatAvailability:
+      type: object
+      required:
+        - canSendMessage
+        - lockReasonCode
+        - lockReasonText
+        - requiredNextAction
+      description: >
+        Server-owned send availability projection for one project
+        communication thread. Flutter input locking is display protection only;
+        Server message-write commands must enforce the same rule.
+      properties:
+        canSendMessage:
+          type: boolean
+        lockReasonCode:
+          type:
+            - string
+            - 'null'
+          enum:
+            - bid_participation_review_pending
+            - publisher_material_confirmation_pending
+            - bid_submission_pending
+            - bid_material_confirmation_pending
+            - deal_confirmation_pending
+            - null
+        lockReasonText:
+          type:
+            - string
+            - 'null'
+          description: Chinese display reason when sending is locked.
+        requiredNextAction:
+          type: string
+          enum:
+            - review_bid_participation
+            - confirm_publisher_materials
+            - submit_bid_materials
+            - confirm_bid_materials
+            - open_deal_confirmation
+            - none
+    ProjectCommunicationThreadReadModel:
+      type: object
+      required:
+        - projectId
+        - threadId
+        - chatAvailability
+        - generatedAt
+      description: >
+        Minimal project communication thread read model. It exposes the
+        project/thread anchors and Server-owned chat availability only; it does
+        not own final amount, order, contract, payment, settlement, or
+        fulfillment truth.
+      properties:
+        projectId:
+          type: string
+        threadId:
+          type: string
+        counterpartOrganizationId:
+          type:
+            - string
+            - 'null'
+        chatAvailability:
+          $ref: '#/components/schemas/ProjectCommunicationChatAvailability'
+        generatedAt:
+          type: string
+          format: date-time
     ProjectCommunicationWorkbenchEntryKey:
       type: string
       enum:
@@ -11438,6 +11607,8 @@ components:
         - latestFeedbackText
         - latestFeedbackAt
         - reviewedAt
+        - badgeCount
+        - disabledReason
         - routeTarget
         - truthAnchor
       properties:
@@ -11504,6 +11675,20 @@ components:
             - string
             - 'null'
           format: date-time
+        badgeCount:
+          type: integer
+          minimum: 0
+          description: >
+            Server-owned business todo badge count for this workbench tool. It
+            is not ordinary unread and must not be inferred from attachment
+            count, review state, or local UI state.
+        disabledReason:
+          type:
+            - string
+            - 'null'
+          description: >
+            Chinese controlled reason when the tool is blocked or unavailable.
+            Null means no disabled reason is needed for the current viewer.
         routeTarget:
           oneOf:
             - $ref: '#/components/schemas/ProjectCommunicationWorkbenchRouteTarget'
@@ -11516,6 +11701,8 @@ components:
         - projectId
         - threadId
         - viewerRole
+        - businessTodoSummary
+        - chatAvailability
         - entries
         - generatedAt
       properties:
@@ -11529,6 +11716,10 @@ components:
             - publisher
             - bidder
             - unknown
+        businessTodoSummary:
+          $ref: '#/components/schemas/ProjectCommunicationBusinessTodoSummary'
+        chatAvailability:
+          $ref: '#/components/schemas/ProjectCommunicationChatAvailability'
         entries:
           type: array
           items:
@@ -13742,6 +13933,124 @@ components:
           type: object
           additionalProperties:
             type: string
+    CounterpartConversationDetailResponse:
+      type: object
+      required:
+        - conversationId
+        - counterpart
+        - summary
+        - focusProjectId
+        - latestActivityAt
+        - projectGroups
+      description: >
+        Server-owned counterpart conversation detail read model. It groups
+        project-scoped communication under one counterpart subject and carries
+        business todo only at project-group level.
+      properties:
+        conversationId:
+          type: string
+        counterpart:
+          $ref: '#/components/schemas/MessageInteractionCounterpart'
+        summary:
+          $ref: '#/components/schemas/MessageInteractionSummary'
+        focusProjectId:
+          type: string
+        latestActivityAt:
+          type: string
+          format: date-time
+        projectGroups:
+          type: array
+          items:
+            $ref: '#/components/schemas/CounterpartConversationProjectGroup'
+    CounterpartConversationProjectGroup:
+      type: object
+      required:
+        - projectId
+        - threadId
+        - projectDisplayTitle
+        - titleVisibility
+        - projectState
+        - latestActivityAt
+        - businessTodoSummary
+        - cards
+      description: >
+        Project-scoped group under one counterpart conversation. The
+        `businessTodoSummary` field is the only source for business-todo red
+        badges in the project list; ordinary unread fields remain separate.
+      properties:
+        projectId:
+          type: string
+        threadId:
+          type: string
+        projectDisplayTitle:
+          type: string
+        titleVisibility:
+          type: string
+        projectState:
+          type: string
+        latestActivityAt:
+          type: string
+          format: date-time
+        projectRelation:
+          type:
+            - string
+            - 'null'
+          description: >
+            Current-organization relation hint for UI filtering. This field
+            expresses the current actor's relation, not the counterpart's role.
+        projectUnreadCount:
+          type: integer
+          minimum: 0
+          description: Ordinary message unread count for this project/thread.
+        hasProjectUnread:
+          type: boolean
+          description: Ordinary message unread flag for this project/thread.
+        businessTodoSummary:
+          $ref: '#/components/schemas/ProjectCommunicationBusinessTodoSummary'
+        cards:
+          type: array
+          items:
+            $ref: '#/components/schemas/CounterpartConversationBusinessCard'
+    CounterpartConversationBusinessCard:
+      type: object
+      required:
+        - cardId
+        - cardType
+        - title
+        - summary
+        - status
+        - updatedAt
+        - truthAnchor
+        - detailRouteTarget
+        - decisionAvailability
+      description: >
+        Bounded business-card projection inside a counterpart conversation.
+        This remains a display and route carrier only and must not define
+        business truth.
+      properties:
+        cardId:
+          type: string
+        cardType:
+          type: string
+        title:
+          type: string
+        summary:
+          type: string
+        status:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+        truthAnchor:
+          type: object
+          additionalProperties: true
+        detailRouteTarget:
+          oneOf:
+            - $ref: '#/components/schemas/MessageInteractionRouteTarget'
+            - type: 'null'
+        decisionAvailability:
+          type: object
+          additionalProperties: true
     RatingEntryReadModel:
       type: object
       required:
