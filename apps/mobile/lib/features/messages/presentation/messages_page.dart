@@ -495,7 +495,52 @@ class _MessagesPageState extends State<MessagesPage> {
 
   bool _nonEmpty(String? value) => value != null && value.trim().isNotEmpty;
 
+  String _notificationAvailabilityMessage(String? message) {
+    final normalized = message?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return '当前通知暂时无法定位，请稍后重试或从对应入口进入。';
+    }
+    if (normalized.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+        normalized.contains('routeTarget') ||
+        normalized.contains('routeParams') ||
+        normalized.contains('non-empty strings')) {
+      return '当前通知暂时无法定位，请稍后重试或从对应入口进入。';
+    }
+    return normalized;
+  }
+
   Future<void> _openNotification(AppNotificationItemView item) async {
+    final availability = item.routeTargetAvailability;
+    if (!availability.isAvailable) {
+      final fallbackRouteLocation =
+          availability.fallbackRouteTarget?.routeLocation;
+      if (availability.canOpenFallback &&
+          fallbackRouteLocation != null &&
+          fallbackRouteLocation.trim().isNotEmpty) {
+        final navigator = Navigator.of(context);
+        final messenger = ScaffoldMessenger.maybeOf(context);
+        try {
+          await navigator.pushNamed(fallbackRouteLocation);
+        } catch (_) {
+          messenger?.showSnackBar(
+            SnackBar(
+              content: Text(
+                _notificationAvailabilityMessage(availability.reasonText),
+              ),
+            ),
+          );
+        }
+        return;
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            _notificationAvailabilityMessage(availability.reasonText),
+          ),
+        ),
+      );
+      return;
+    }
     final routeLocation = item.routeTarget?.routeLocation;
     if (_isProjectCommunicationNotification(item) &&
         !_hasCompleteProjectCommunicationRoute(item)) {

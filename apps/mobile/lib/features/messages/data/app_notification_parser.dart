@@ -22,6 +22,7 @@ AppNotificationListView parseAppNotificationList(Object? payload) {
 
 AppNotificationItemView parseAppNotificationItem(Object? payload) {
   final map = _requiredMap(payload, 'app notification item');
+  final routeTarget = parseAppNotificationRouteTarget(map['routeTarget']);
   return AppNotificationItemView(
     notificationId: _requiredString(map, 'notificationId'),
     type: _requiredString(map, 'type'),
@@ -30,10 +31,45 @@ AppNotificationItemView parseAppNotificationItem(Object? payload) {
     body: _nullableString(map['body']),
     projectId: _nullableString(map['projectId']),
     threadId: _nullableString(map['threadId']),
-    routeTarget: parseAppNotificationRouteTarget(map['routeTarget']),
+    routeTarget: routeTarget,
+    routeTargetAvailability: parseAppNotificationRouteTargetAvailability(
+      map['routeTargetAvailability'],
+      routeTarget: routeTarget,
+    ),
     createdAt: _nullableString(map['createdAt']),
     readAt: _nullableString(map['readAt']),
     unread: map['unread'] == true,
+  );
+}
+
+AppNotificationRouteTargetAvailabilityView
+parseAppNotificationRouteTargetAvailability(
+  Object? payload, {
+  required AppNotificationRouteTargetView? routeTarget,
+}) {
+  final map = _optionalMap(payload);
+  if (map == null || map.isEmpty) {
+    final canLocate = routeTarget?.routeLocation?.trim().isNotEmpty == true;
+    return AppNotificationRouteTargetAvailabilityView(
+      state: canLocate ? 'available' : 'missing_context',
+      reasonCode: canLocate ? 'ROUTE_TARGET_AVAILABLE' : 'ROUTE_TARGET_MISSING',
+      reasonText: canLocate ? '当前通知入口可用。' : '当前通知暂时无法定位，请稍后重试或从对应入口进入。',
+      fallbackAction: 'none',
+      fallbackRouteTarget: null,
+    );
+  }
+  final fallbackRouteTarget = parseAppNotificationRouteTarget(
+    map['fallbackRouteTarget'],
+  );
+  return AppNotificationRouteTargetAvailabilityView(
+    state: _nullableString(map['state']) ?? 'missing_context',
+    reasonCode:
+        _nullableString(map['reasonCode']) ??
+        'ROUTE_TARGET_AVAILABILITY_UNKNOWN',
+    reasonText:
+        _nullableString(map['reasonText']) ?? '当前通知暂时无法定位，请稍后重试或从对应入口进入。',
+    fallbackAction: _nullableString(map['fallbackAction']) ?? 'none',
+    fallbackRouteTarget: fallbackRouteTarget,
   );
 }
 

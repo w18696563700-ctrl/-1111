@@ -115,7 +115,7 @@ void main() {
     expect(find.text('消息中心'), findsOneWidget);
     expect(find.text('项目沟通'), findsWidgets);
     expect(find.textContaining('有新的项目沟通消息'), findsOneWidget);
-    expect(find.text('报价确认已发送。'), findsOneWidget);
+    expect(find.text('当前通知暂时无法定位，请稍后重试或从对应入口进入。'), findsOneWidget);
 
     await tester.tap(find.textContaining('有新的项目沟通消息'));
     await tester.pumpAndSettle();
@@ -127,7 +127,7 @@ void main() {
           .length,
       0,
     );
-    expect(find.text('无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。'), findsOneWidget);
+    expect(find.text('当前通知暂时无法定位，请稍后重试或从对应入口进入。'), findsWidgets);
   });
 
   testWidgets('notification center scrolls long lists without overflow', (
@@ -396,6 +396,137 @@ void main() {
         0,
       );
       expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '1');
+    },
+  );
+
+  testWidgets(
+    'stale project notification opens subject fallback without marking read',
+    (WidgetTester tester) async {
+      String? openedRoute;
+      final transport = FakeAppApiTransport(
+        handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+          'GET /api/app/message/interactions': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'lane': 'project_communication',
+                'items': <Object?>[],
+              },
+            );
+          },
+          'GET /api/app/notifications/list': (request) async {
+            return AppApiResponse(
+              statusCode: 200,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'items': <Object?>[
+                  <String, Object?>{
+                    'notificationId': 'notice-stale-1',
+                    'type': 'project_communication_message',
+                    'source': 'project_communication',
+                    'title': '有新的项目沟通消息',
+                    'body': '旧入口已经不可用。',
+                    'projectId': 'project-1',
+                    'threadId': 'thread-stale',
+                    'routeTarget': <String, Object?>{
+                      'state': 'enabled',
+                      'routeParams': <String, Object?>{
+                        'threadId': 'thread-stale',
+                        'projectId': 'project-1',
+                        'conversationId': 'org-1',
+                      },
+                      'canonicalPath':
+                          '/api/app/message/counterpart-conversation/detail',
+                      'localEntryKey': 'counterpart_conversation.open',
+                      'requiredParams': <Object?>[
+                        'conversationId',
+                        'projectId',
+                      ],
+                    },
+                    'routeTargetAvailability': <String, Object?>{
+                      'state': 'expired',
+                      'reasonCode': 'PROJECT_COMMUNICATION_THREAD_NOT_FOUND',
+                      'reasonText': '入口已失效，可从主体项目列表重新进入。',
+                      'fallbackAction': 'open_subject_list',
+                      'fallbackRouteTarget': <String, Object?>{
+                        'state': 'enabled',
+                        'routeParams': <String, Object?>{
+                          'projectId': 'project-1',
+                          'conversationId': 'org-1',
+                        },
+                        'canonicalPath':
+                            '/api/app/message/counterpart-conversation/detail',
+                        'localEntryKey': 'counterpart_conversation.open',
+                        'requiredParams': <Object?>[
+                          'conversationId',
+                          'projectId',
+                        ],
+                      },
+                    },
+                    'createdAt': '2026-05-01T08:00:00Z',
+                    'readAt': null,
+                    'unread': true,
+                  },
+                ],
+                'page': <String, Object?>{'nextCursor': null, 'hasMore': false},
+                'unread': <String, Object?>{
+                  'total': 1,
+                  'projectCommunication': 1,
+                  'businessTodo': 0,
+                  'bidParticipationRequest': 0,
+                  'forumInteraction': 0,
+                  'system': 0,
+                },
+              },
+            );
+          },
+          'POST /api/app/notifications/read': (request) async {
+            throw AssertionError('stale notification must not be marked read');
+          },
+        },
+      );
+      final client = _client(transport);
+      MessagesConsumerLayer.install(MessagesConsumerLayer(client: client));
+      ForumConsumerLayer.install(ForumConsumerLayer(client: client));
+      addTearDown(MessagesConsumerLayer.reset);
+      addTearDown(ForumConsumerLayer.reset);
+
+      await tester.pumpWidget(
+        MaterialApp(
+          onGenerateRoute: (settings) {
+            openedRoute = settings.name;
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const Scaffold(body: Text('主体项目列表')),
+            );
+          },
+          home: const Scaffold(body: MessagesPage()),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await _openNotificationPanel(tester);
+
+      expect(find.text('入口已失效'), findsOneWidget);
+      expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
+
+      await tester.tap(find.textContaining('有新的项目沟通消息'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('主体项目列表'), findsOneWidget);
+      expect(openedRoute, contains('conversationId=org-1'));
+      expect(openedRoute, contains('projectId=project-1'));
+      expect(openedRoute, isNot(contains('threadId=')));
+      expect(
+        transport.requests
+            .where(
+              (request) =>
+                  request.canonicalPath == '/api/app/notifications/read',
+            )
+            .length,
+        0,
+      );
     },
   );
 

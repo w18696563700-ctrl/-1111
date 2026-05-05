@@ -688,6 +688,19 @@ String _projectCommunicationFailureMessage(String? message) {
   return message;
 }
 
+String _notificationFailureMessage(String? message) {
+  if (message == null || message.trim().isEmpty) {
+    return '当前通知暂时无法定位，请稍后重试或从对应入口进入。';
+  }
+  if (message.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+      message.contains('routeTarget') ||
+      message.contains('routeParams') ||
+      message.contains('non-empty strings')) {
+    return '当前通知暂时无法定位，请稍后重试或从对应入口进入。';
+  }
+  return message;
+}
+
 class _MessagesNotificationCard extends StatelessWidget {
   const _MessagesNotificationCard({required this.item, required this.onOpen});
 
@@ -697,11 +710,16 @@ class _MessagesNotificationCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final routeLocation = item.routeTarget?.routeLocation;
+    final availability = item.routeTargetAvailability;
+    final routeLocation = availability.isAvailable
+        ? item.routeTarget?.routeLocation
+        : availability.fallbackRouteTarget?.routeLocation;
     final canLocate = routeLocation != null && routeLocation.trim().isNotEmpty;
     final timeLabel = _relativeCreatedAt(item.createdAt);
     final sourceLabel = _notificationSource(item.source);
-    final body = item.body?.trim();
+    final body = availability.isAvailable
+        ? item.body?.trim()
+        : _notificationFailureMessage(availability.reasonText);
     return Material(
       color: item.unread ? const Color(0xFFFFFBF6) : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -778,6 +796,9 @@ class _MessagesNotificationCard extends StatelessWidget {
                         if (!canLocate) ...<Widget>[
                           const SizedBox(width: 6),
                           const _MessagesMetaPill(label: '暂不可定位'),
+                        ] else if (!availability.isAvailable) ...<Widget>[
+                          const SizedBox(width: 6),
+                          const _MessagesMetaPill(label: '入口已失效'),
                         ],
                       ],
                     ),
