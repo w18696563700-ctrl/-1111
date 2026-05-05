@@ -985,3 +985,24 @@ updated_at_local: 2026-04-27
 - 相关文件：
   - `apps/mobile/lib/features/profile/presentation/profile_identity_legal_pages.dart`
   - `apps/mobile/test/shell_app_test.dart`
+
+### 3.11 macOS 语义树减震规则
+
+- `2026-05-05` 用户确认：
+  - 当前 macOS debug / hot restart 过程中出现的
+    `Failed to update ui::AXTree`
+    应先按 Flutter 引擎层语义树抖动处理，
+    不应直接误判成业务接口或页面功能错误。
+- 当前最小减震实现口径：
+  - 底部消息角标不再作为独立语义节点频繁进出语义树
+  - 消息页通知角标不再作为独立语义节点频繁进出语义树
+  - `IndexedStack` 保活的非当前楼层显式 `ExcludeSemantics`
+  - 非当前楼层同步关闭 `TickerMode`
+- 当前这一条只用于降低 macOS `AXTree` 更新噪声：
+  - 不改变消息业务链路
+  - 不改变 unread 真值
+  - 不改变楼层切换和刷新主流程
+- 相关文件：
+  - `apps/mobile/lib/shell/presentation/app_shell_scaffold.dart`
+  - `apps/mobile/lib/shell/shell_page.dart`
+  - `apps/mobile/lib/features/messages/presentation/messages_page_support.dart`

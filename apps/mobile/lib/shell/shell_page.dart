@@ -192,12 +192,20 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
       return const SizedBox.shrink();
     }
 
-    return KeyedSubtree(
-      key: ValueKey<String>('shell-root-${building.code}'),
-      child: _cachedPages.putIfAbsent(
-        building,
-        () => Builder(
-          builder: (BuildContext context) => _buildingBody(context, building),
+    final active = _currentBuilding == building;
+    return ExcludeSemantics(
+      excluding: !active,
+      child: TickerMode(
+        enabled: active,
+        child: KeyedSubtree(
+          key: ValueKey<String>('shell-root-${building.code}'),
+          child: _cachedPages.putIfAbsent(
+            building,
+            () => Builder(
+              builder: (BuildContext context) =>
+                  _buildingBody(context, building),
+            ),
+          ),
         ),
       ),
     );

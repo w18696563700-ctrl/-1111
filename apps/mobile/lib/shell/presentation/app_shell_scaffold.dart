@@ -334,8 +334,7 @@ class _ShellNavigationIcon extends StatelessWidget {
         Positioned(
           right: -10,
           top: -6,
-          child: Semantics(
-            label: '消息未处理摘要 $label',
+          child: ExcludeSemantics(
             child: DecoratedBox(
               decoration: BoxDecoration(
                 color: theme.colorScheme.error,
