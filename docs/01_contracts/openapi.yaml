@@ -10654,6 +10654,7 @@ components:
             - /api/app/message/project-communication/messages
             - /api/app/message/project-communication/thread
             - /api/app/forum/interaction/inbox
+            - /api/app/message/counterpart-conversation/detail
             - /api/app/project/clarification/list
             - /api/app/confirmation/softlink/detail
             - /api/app/project/bid-participation/thread/detail
@@ -10672,6 +10673,39 @@ components:
           enum:
             - enabled
             - unavailable
+    AppNotificationRouteTargetAvailability:
+      type: object
+      required:
+        - state
+        - reasonCode
+        - reasonText
+        - fallbackAction
+      description: >
+        Server-owned availability projection for a notification routeTarget.
+        It lets Flutter avoid stale technical error pages and prevents
+        automatic mark-read when the target is unavailable.
+      properties:
+        state:
+          type: string
+          enum:
+            - available
+            - unavailable
+            - expired
+            - forbidden
+            - missing_context
+        reasonCode:
+          type: string
+        reasonText:
+          type: string
+        fallbackAction:
+          type: string
+          enum:
+            - none
+            - open_subject_list
+        fallbackRouteTarget:
+          anyOf:
+            - $ref: '#/components/schemas/AppNotificationRouteTarget'
+            - type: 'null'
     AppNotificationReadModel:
       type: object
       required:
@@ -10679,6 +10713,7 @@ components:
         - type
         - source
         - title
+        - routeTargetAvailability
         - createdAt
         - unread
       description: >
@@ -10709,6 +10744,8 @@ components:
           anyOf:
             - $ref: '#/components/schemas/AppNotificationRouteTarget'
             - type: 'null'
+        routeTargetAvailability:
+          $ref: '#/components/schemas/AppNotificationRouteTargetAvailability'
         createdAt:
           type: string
           format: date-time
