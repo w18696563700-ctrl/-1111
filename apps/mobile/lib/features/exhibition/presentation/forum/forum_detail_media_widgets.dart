@@ -94,37 +94,55 @@ class _ForumDetailImageGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final visibleItems = items.take(9).toList(growable: false);
+    final hiddenCount = items.length - visibleItems.length;
+    final columns = _gridColumnCount(visibleItems.length);
     return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 3,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
         crossAxisSpacing: 8,
         mainAxisSpacing: 8,
-        childAspectRatio: 0.86,
+        childAspectRatio: visibleItems.length == 1 ? 1.62 : 1,
       ),
-      itemCount: items.length,
+      itemCount: visibleItems.length,
       itemBuilder: (BuildContext context, int index) {
-        final item = items[index];
+        final item = visibleItems[index];
+        final overflowCount = index == 8 ? hiddenCount : 0;
         return _ForumDetailImageTile(
+          key: ValueKey('forum-detail-image-tile-${item.fileAssetId}'),
           attachment: item,
           access: accessByAssetId[item.fileAssetId],
           loading: loadingAssetIds.contains(item.fileAssetId),
           failed: failedAssetIds.contains(item.fileAssetId),
+          overflowCount: overflowCount,
           onOpen: () => onOpenAttachment(item),
           onRetry: () => onRetryImageAccess(item),
         );
       },
     );
   }
+
+  int _gridColumnCount(int count) {
+    if (count <= 1) {
+      return 1;
+    }
+    if (count == 2) {
+      return 2;
+    }
+    return 3;
+  }
 }
 
 class _ForumDetailImageTile extends StatelessWidget {
   const _ForumDetailImageTile({
+    super.key,
     required this.attachment,
     required this.access,
     required this.loading,
     required this.failed,
+    required this.overflowCount,
     required this.onOpen,
     required this.onRetry,
   });
@@ -133,6 +151,7 @@ class _ForumDetailImageTile extends StatelessWidget {
   final ForumFileAccessView? access;
   final bool loading;
   final bool failed;
+  final int overflowCount;
   final VoidCallback onOpen;
   final VoidCallback onRetry;
 
@@ -156,35 +175,8 @@ class _ForumDetailImageTile extends StatelessWidget {
             child: Stack(
               children: <Widget>[
                 Positioned.fill(child: _previewContent(theme, accessUrl)),
-                Positioned(
-                  left: 0,
-                  right: 0,
-                  bottom: 0,
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: <Color>[
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.62),
-                        ],
-                      ),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(8, 22, 8, 7),
-                      child: Text(
-                        attachment.fileName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w800,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                if (overflowCount > 0)
+                  _ForumDetailImageOverflowOverlay(count: overflowCount),
               ],
             ),
           ),
@@ -282,6 +274,29 @@ class _ForumDetailImageTile extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ForumDetailImageOverflowOverlay extends StatelessWidget {
+  const _ForumDetailImageOverflowOverlay({required this.count});
+
+  final int count;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.46)),
+      child: Center(
+        child: Text(
+          '+$count',
+          style: theme.textTheme.headlineSmall?.copyWith(
+            color: Colors.white,
+            fontWeight: FontWeight.w900,
+          ),
         ),
       ),
     );

@@ -538,10 +538,10 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
   }
 
   void _primeImageAccesses(List<ForumAttachmentRefView> attachments) {
-    for (final item in attachments) {
-      if (!_isImageAttachment(item.mimeType)) {
-        continue;
-      }
+    final visibleImageAttachments = attachments
+        .where((ForumAttachmentRefView item) => _isImageAttachment(item.mimeType))
+        .take(9);
+    for (final item in visibleImageAttachments) {
       if (_imageAccessByAssetId.containsKey(item.fileAssetId) ||
           _imageAccessLoadingAssetIds.contains(item.fileAssetId)) {
         continue;

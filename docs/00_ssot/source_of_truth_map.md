@@ -15,6 +15,10 @@ layer: L0 SSOT
 
 ## Current Round Registrations
 
+### 2026-05-06 Forum Post Detail Image Grid Reopening
+
+- [forum_post_detail_image_grid_reopening_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/forum_post_detail_image_grid_reopening_addendum.md) is the formal `L0` Flutter-only reopening for published Forum post detail image attachments, allowing only real image `attachmentRefs` to render directly as a body-following grid before the interaction bar while continuing to fetch preview URLs through shared `GET /api/app/file/access`, keeping non-image attachments in the existing attachment list, and blocking BFF, Server, OpenAPI, generated-contract, database, cloud-runtime, fake-image, rich-text, upload-chain, list-card, recommendation, and broader Forum changes.
+
 ### 2026-05-05 Company Display Workbench To Public Detail UI Chain
 
 - [company_display_workbench_to_public_detail_ui_chain_truth_freeze_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/company_display_workbench_to_public_detail_ui_chain_truth_freeze_addendum.md) is the formal `L0` truth freeze for the Flutter-only UI refinement across exhibition home company recommendations, company display workbench, and public company detail, freezing company recommendation cards without the `优秀公司` badge and with whole-card detail entry, preserving workbench as draft/current-change management rather than public truth, and requiring company detail to consume public live detail only while blocking BFF, Server, OpenAPI, database, cloud runtime mutation, fake data, analytics, activity feed, review, certification, payment, or new publish capability.
