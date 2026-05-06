@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { RequestContext } from '../../shared/request-context';
 import { UserEntity } from '../identity/entities/user.entity';
+import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ProfileSafetySubmissionEntity } from './entities/profile-safety-submission.entity';
 
 @Injectable()
 export class ProfileSafetyResponsePresenter {
-  toSubmitResponse(
+  constructor(private readonly avatarUrlService: UploadPublicUrlService) {}
+
+  async toSubmitResponse(
     submission: ProfileSafetySubmissionEntity,
     user: UserEntity,
     context: RequestContext
@@ -14,13 +17,13 @@ export class ProfileSafetyResponsePresenter {
       ok: true,
       traceId: context.traceId,
       displayName: this.toDisplayName(user),
-      avatarUrl: this.readAvatarUrl(user),
+      avatarUrl: await this.readAvatarUrl(user),
       profileIntro: this.readIntroValue(user),
       safetySubmission: this.toSubmissionView(submission, submission.status !== 'approved')
     };
   }
 
-  toReviewResponse(
+  async toReviewResponse(
     submission: ProfileSafetySubmissionEntity,
     user: UserEntity,
     context: RequestContext
@@ -29,7 +32,7 @@ export class ProfileSafetyResponsePresenter {
       ok: true,
       traceId: context.traceId,
       displayName: this.toDisplayName(user),
-      avatarUrl: this.readAvatarUrl(user),
+      avatarUrl: await this.readAvatarUrl(user),
       profileIntro: this.readIntroValue(user),
       safetySubmission: this.toSubmissionView(submission, false)
     };
@@ -65,9 +68,12 @@ export class ProfileSafetyResponsePresenter {
     return mobileSuffix ? `用户${mobileSuffix}` : `用户${user.id.slice(0, 6)}`;
   }
 
-  private readAvatarUrl(user: UserEntity) {
+  private async readAvatarUrl(user: UserEntity) {
     const avatarUrl = user.avatarUrl?.trim() ?? '';
-    return avatarUrl ? avatarUrl : null;
+    if (!avatarUrl) {
+      return null;
+    }
+    return (await this.avatarUrlService.buildAccessUrlFromObjectUrl(avatarUrl)) ?? avatarUrl;
   }
 
   private readIntroValue(user: UserEntity) {

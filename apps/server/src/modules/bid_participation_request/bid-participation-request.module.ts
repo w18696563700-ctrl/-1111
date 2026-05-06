@@ -8,6 +8,7 @@ import { OrganizationCertificationEntity } from '../organization/entities/organi
 import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { NotificationModule } from '../notifications/notification.module';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { UploadModule } from '../upload/upload.module';
 import { BidParticipationRequestAccessService } from './bid-participation-request-access.service';
 import { BidParticipationRequestController } from './bid-participation-request.controller';
 import { BidParticipationRequestPresenter } from './bid-participation-request.presenter';
@@ -28,6 +29,7 @@ import { BidParticipationRequestEntity } from './entities/bid-participation-requ
     AuthModule,
     OrganizationModule,
     NotificationModule,
+    UploadModule,
   ],
   controllers: [BidParticipationRequestController],
   providers: [

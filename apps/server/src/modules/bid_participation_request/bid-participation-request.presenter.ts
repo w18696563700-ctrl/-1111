@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationCertificationEntity } from '../organization/entities/organization-certification.entity';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
+import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { BidParticipationRequestEntity } from './entities/bid-participation-request.entity';
 import {
   BID_PARTICIPATION_THREAD_TYPE,
@@ -11,6 +12,8 @@ import {
 
 @Injectable()
 export class BidParticipationRequestPresenter {
+  constructor(private readonly avatarUrlService: UploadPublicUrlService) {}
+
   toRequestAcceptedResponse(request: BidParticipationRequestEntity) {
     return {
       requestId: request.id,
@@ -20,7 +23,7 @@ export class BidParticipationRequestPresenter {
     };
   }
 
-  toPendingListResponse(input: {
+  async toPendingListResponse(input: {
     projectId: string;
     items: Array<{
       request: BidParticipationRequestEntity;
@@ -29,11 +32,10 @@ export class BidParticipationRequestPresenter {
       requesterCertification: OrganizationCertificationEntity | null;
     }>;
   }) {
-    return {
-      projectId: input.projectId,
-      items: input.items.map(({ request, requesterOrganization, requesterUser, requesterCertification }) => ({
+    const items = await Promise.all(
+      input.items.map(async ({ request, requesterOrganization, requesterUser, requesterCertification }) => ({
         requestId: request.id,
-        requesterOrganization: this.toRequesterOrganization({
+        requesterOrganization: await this.toRequesterOrganization({
           request,
           requesterOrganization,
           requesterUser,
@@ -43,10 +45,14 @@ export class BidParticipationRequestPresenter {
         status: request.state,
         threadId: request.id,
       })),
+    );
+    return {
+      projectId: input.projectId,
+      items,
     };
   }
 
-  toThreadDetail(input: {
+  async toThreadDetail(input: {
     threadId: string;
     projectId: string;
     request: BidParticipationRequestEntity;
@@ -57,7 +63,7 @@ export class BidParticipationRequestPresenter {
     ownerCanReview: boolean;
     requesterCanSubmit: boolean;
   }) {
-    const requesterOrganization = this.toRequesterOrganization({
+    const requesterOrganization = await this.toRequesterOrganization({
       request: input.request,
       requesterOrganization: input.requesterOrganization,
       requesterUser: input.requesterUser,
@@ -130,7 +136,7 @@ export class BidParticipationRequestPresenter {
     };
   }
 
-  private toRequesterOrganization(input: {
+  private async toRequesterOrganization(input: {
     request: BidParticipationRequestEntity;
     requesterOrganization: OrganizationEntity | null;
     requesterUser: UserEntity | null;
@@ -143,10 +149,18 @@ export class BidParticipationRequestPresenter {
         input.requesterOrganization?.name?.trim() ||
         input.requesterUser?.nickname?.trim() ||
         '当前申请组织',
-      avatarUrl: input.requesterUser?.avatarUrl?.trim() || null,
+      avatarUrl: await this.readAvatarUrl(input.requesterUser?.avatarUrl ?? null),
       certificationStatus: input.requesterCertification?.certificationStatus ?? null,
       legalName: input.requesterCertification?.legalName?.trim() || null,
       uscc: input.requesterCertification?.uscc?.trim() || null,
     };
+  }
+
+  private async readAvatarUrl(value: string | null) {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+      return null;
+    }
+    return (await this.avatarUrlService.buildAccessUrlFromObjectUrl(normalized)) ?? normalized;
   }
 }
