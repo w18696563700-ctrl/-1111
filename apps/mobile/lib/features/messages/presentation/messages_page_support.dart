@@ -1037,21 +1037,16 @@ class _MessagesProjectCommunicationCard extends StatelessWidget {
           child: Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              CircleAvatar(
+              SafeRemoteAvatar(
                 radius: 27,
+                imageUrl: avatarUrl,
+                label: primaryLabel,
                 backgroundColor: theme.colorScheme.primaryContainer,
-                backgroundImage: avatarUrl == null || avatarUrl.isEmpty
-                    ? null
-                    : NetworkImage(avatarUrl),
-                child: avatarUrl == null || avatarUrl.isEmpty
-                    ? Text(
-                        primaryLabel.characters.first,
-                        style: theme.textTheme.titleSmall?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      )
-                    : null,
+                foregroundColor: theme.colorScheme.onPrimaryContainer,
+                textStyle: theme.textTheme.titleSmall?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(

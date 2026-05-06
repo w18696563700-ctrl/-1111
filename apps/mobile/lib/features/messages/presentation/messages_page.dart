@@ -8,6 +8,7 @@ import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
+import 'package:mobile/shared/ui/safe_remote_image.dart';
 
 part 'messages_page_support.dart';
 

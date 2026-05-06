@@ -125,9 +125,13 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
   }
 
   Future<void> _loadThumbnailAccess(ProjectAlbumPhotoView photo) async {
-    if (_previewCache.containsKey(photo.fileAssetId) ||
+    final cached = _previewCache[photo.fileAssetId];
+    if ((cached != null && _isPreviewAccessFresh(cached)) ||
         _loadingThumbnailPhotoIds.contains(photo.photoId)) {
       return;
+    }
+    if (cached != null) {
+      _previewCache.remove(photo.fileAssetId);
     }
     setState(() => _loadingThumbnailPhotoIds.add(photo.photoId));
     await _loadPhotoAccess(photo, onBusyChanged: (_) {}, onFailure: (_) {});
@@ -169,6 +173,10 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
       return null;
     }
     var access = _previewCache[photo.fileAssetId];
+    if (access != null && !_isPreviewAccessFresh(access)) {
+      _previewCache.remove(photo.fileAssetId);
+      access = null;
+    }
     if (access == null) {
       onBusyChanged(true);
       final result = await CounterpartConversationConsumerLayer.instance
@@ -189,6 +197,20 @@ class _ProjectAlbumSectionState extends State<_ProjectAlbumSection>
       _previewCache[photo.fileAssetId] = access;
     }
     return access;
+  }
+
+  bool _isPreviewAccessFresh(ProjectCommunicationFilePreviewAccessView access) {
+    final expiresAt = access.expiresAt?.trim();
+    if (expiresAt == null || expiresAt.isEmpty) {
+      return true;
+    }
+    final parsed = DateTime.tryParse(expiresAt);
+    if (parsed == null) {
+      return true;
+    }
+    return parsed.toLocal().isAfter(
+      DateTime.now().add(const Duration(seconds: 30)),
+    );
   }
 
   Future<void> _previewPhoto(ProjectAlbumPhotoView photo) async {

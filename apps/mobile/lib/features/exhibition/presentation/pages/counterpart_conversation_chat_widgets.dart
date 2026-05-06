@@ -507,15 +507,7 @@ class _ConversationAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = avatarUrl?.trim();
-    return CircleAvatar(
-      radius: 18,
-      backgroundImage: normalized == null || normalized.isEmpty
-          ? null
-          : NetworkImage(normalized),
-      child: normalized == null || normalized.isEmpty
-          ? Text(label.trim().isEmpty ? '?' : label.characters.first)
-          : null,
-    );
+    return SafeRemoteAvatar(radius: 18, imageUrl: normalized, label: label);
   }
 }
 

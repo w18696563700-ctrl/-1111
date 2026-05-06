@@ -168,15 +168,7 @@ class _CompactConversationParty extends StatelessWidget {
     final normalizedAvatar = avatarUrl?.trim();
     final content = Row(
       children: <Widget>[
-        CircleAvatar(
-          radius: 15,
-          backgroundImage: normalizedAvatar == null || normalizedAvatar.isEmpty
-              ? null
-              : NetworkImage(normalizedAvatar),
-          child: normalizedAvatar == null || normalizedAvatar.isEmpty
-              ? Text(name.trim().isEmpty ? '?' : name.characters.first)
-              : null,
-        ),
+        SafeRemoteAvatar(radius: 15, imageUrl: normalizedAvatar, label: name),
         const SizedBox(width: 7),
         Expanded(
           child: Column(
@@ -668,21 +660,16 @@ class _CounterpartProjectListSubjectCard extends StatelessWidget {
           padding: const EdgeInsets.all(12),
           child: Row(
             children: <Widget>[
-              CircleAvatar(
+              SafeRemoteAvatar(
                 radius: 25,
+                imageUrl: avatarUrl,
+                label: subjectName,
                 backgroundColor: theme.colorScheme.primaryContainer,
-                backgroundImage: avatarUrl == null || avatarUrl.isEmpty
-                    ? null
-                    : NetworkImage(avatarUrl),
-                child: avatarUrl == null || avatarUrl.isEmpty
-                    ? Text(
-                        subjectName.characters.first,
-                        style: theme.textTheme.titleMedium?.copyWith(
-                          color: theme.colorScheme.onPrimaryContainer,
-                          fontWeight: FontWeight.w900,
-                        ),
-                      )
-                    : null,
+                foregroundColor: theme.colorScheme.onPrimaryContainer,
+                textStyle: theme.textTheme.titleMedium?.copyWith(
+                  color: theme.colorScheme.onPrimaryContainer,
+                  fontWeight: FontWeight.w900,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(

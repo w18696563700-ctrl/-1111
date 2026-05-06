@@ -53,19 +53,15 @@ class ForumAuthorAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final visibleAvatarUrl = avatarUrl?.trim();
-    return CircleAvatar(
+    return SafeRemoteAvatar(
       radius: radius,
+      imageUrl: visibleAvatarUrl,
+      label: label,
       backgroundColor: AppVisualTokens.brandGoldLight,
       foregroundColor: AppVisualTokens.brandGoldDark,
-      foregroundImage: visibleAvatarUrl == null || visibleAvatarUrl.isEmpty
-          ? null
-          : NetworkImage(visibleAvatarUrl),
-      child: Text(
-        _forumAvatarSeed(label),
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-          fontWeight: FontWeight.w900,
-          color: AppVisualTokens.brandGoldDark,
-        ),
+      textStyle: Theme.of(context).textTheme.titleSmall?.copyWith(
+        fontWeight: FontWeight.w900,
+        color: AppVisualTokens.brandGoldDark,
       ),
     );
   }
@@ -430,11 +426,3 @@ String _attachmentTypeLabel(String mimeType) => switch (mimeType) {
   final value when value.contains('pdf') => 'PDF',
   _ => '文件',
 };
-
-String _forumAvatarSeed(String rawName) {
-  final trimmed = rawName.trim();
-  if (trimmed.isEmpty) {
-    return '坛';
-  }
-  return trimmed.characters.first;
-}

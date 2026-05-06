@@ -35,6 +35,7 @@ import 'package:mobile/shared/file/file_open_coordinator.dart';
 import 'package:mobile/shared/state/submit_guard.dart';
 import 'package:mobile/shared/ui/app_visual_components.dart';
 import 'package:mobile/shared/ui/app_visual_tokens.dart';
+import 'package:mobile/shared/ui/safe_remote_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher_string.dart';

@@ -1340,6 +1340,10 @@ class _CounterpartConversationPageState
 
   void _openProjectAlbum(CounterpartConversationProjectGroupView group) {
     final threadId = _threadResult?.data?.threadId.trim();
+    if (threadId == null || threadId.isEmpty) {
+      _showSnack('无法进入项目相册，缺少项目沟通上下文，请返回项目列表重新进入。');
+      return;
+    }
     final base = Uri.parse(
       ExhibitionRoutes.projectAlbumWithProjectId(group.projectId),
     );
@@ -1347,7 +1351,7 @@ class _CounterpartConversationPageState
         .replace(
           queryParameters: <String, String>{
             ...base.queryParameters,
-            if (threadId != null && threadId.isNotEmpty) 'threadId': threadId,
+            'threadId': threadId,
           },
         )
         .toString();
@@ -1550,6 +1554,10 @@ class _CounterpartConversationPageState
   }
 
   void _openWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
+    if (!_hasWorkbenchEntryContext(entry)) {
+      _showSnack('无法进入资料确认单，缺少项目沟通上下文，请返回项目列表重新进入。');
+      return;
+    }
     if (entry.group == 'deal_confirmation') {
       _openDealConfirmationEntry(entry);
       return;
@@ -1563,6 +1571,13 @@ class _CounterpartConversationPageState
         ),
       ),
     );
+  }
+
+  bool _hasWorkbenchEntryContext(ProjectCommunicationWorkbenchEntryView entry) {
+    return entry.projectId.trim().isNotEmpty &&
+        entry.threadId.trim().isNotEmpty &&
+        entry.truthAnchor.projectId.trim().isNotEmpty &&
+        entry.truthAnchor.threadId.trim().isNotEmpty;
   }
 
   Future<void> _openDealConfirmationEntry(
