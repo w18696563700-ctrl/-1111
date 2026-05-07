@@ -67,9 +67,12 @@ Future<void> _expandWorkbenchGroup(WidgetTester tester, String label) async {
 }
 
 Future<void> _openMaterialTools(WidgetTester tester) async {
-  var tools = find.widgetWithText(OutlinedButton, '资料确认 · 8项');
-  if (tools.evaluate().isEmpty) {
-    tools = find.widgetWithText(OutlinedButton, '资料确认单');
+  var tools = find.widgetWithText(OutlinedButton, '资料确认 · 待处理3项');
+  for (final label in const <String>['资料确认 · 待处理1项', '资料确认 · 8项', '资料确认单']) {
+    if (tools.evaluate().isNotEmpty) {
+      break;
+    }
+    tools = find.widgetWithText(OutlinedButton, label);
   }
   await _ensureVisible(tester, tools);
   await tester.tap(tools);
@@ -270,7 +273,12 @@ Map<String, Object?> _workbenchEntry({
 
 List<Map<String, Object?>> _workbenchEntries({
   String effectState = 'pending_review',
+  String materialSampleState = 'needs_supplement',
+  String equipmentState = 'pending_review',
+  String serviceState = 'pending_review',
+  String projectUnderstandingState = 'pending_review',
   String quoteState = 'pending_review',
+  String scheduleState = 'pending_review',
 }) {
   return <Map<String, Object?>>[
     _workbenchEntry(
@@ -294,26 +302,31 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'publisher_material_sample_review',
       group: 'publisher_materials',
       label: '材质图 / 材料样板确认',
-      reviewState: 'needs_supplement',
+      reviewState: materialSampleState,
       materialKind: 'material_sample',
-      latestFeedbackText: '缺少材料品牌说明',
+      latestFeedbackText: materialSampleState == 'needs_supplement'
+          ? '缺少材料品牌说明'
+          : null,
     ),
     _workbenchEntry(
       entryKey: 'publisher_equipment_material_list_review',
       group: 'publisher_materials',
       label: '设备物料清单确认',
+      reviewState: equipmentState,
       materialKind: 'equipment_material_list',
     ),
     _workbenchEntry(
       entryKey: 'publisher_service_list_review',
       group: 'publisher_materials',
       label: '服务清单确认',
+      reviewState: serviceState,
       materialKind: 'service_list',
     ),
     _workbenchEntry(
       entryKey: 'bid_project_understanding_review',
       group: 'bid_materials',
       label: '项目理解确认',
+      reviewState: projectUnderstandingState,
       bidMaterialSlot: 'project_understanding',
     ),
     _workbenchEntry(
@@ -327,6 +340,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'bid_schedule_plan_review',
       group: 'bid_materials',
       label: '进度安排确认',
+      reviewState: scheduleState,
       bidMaterialSlot: 'schedule_plan',
     ),
     _workbenchEntry(
@@ -346,14 +360,20 @@ List<Map<String, Object?>> _workbenchEntries({
 
 Map<String, Object?> _workbenchPayload({
   String effectState = 'pending_review',
+  String materialSampleState = 'needs_supplement',
+  String equipmentState = 'pending_review',
+  String serviceState = 'pending_review',
+  String projectUnderstandingState = 'pending_review',
   String quoteState = 'pending_review',
+  String scheduleState = 'pending_review',
+  int materialReviewPendingCount = 3,
 }) {
   return <String, Object?>{
     'projectId': 'project-1',
     'threadId': 'thread-1',
     'viewerRole': 'bidder',
     'businessTodoSummary': _businessTodoSummary(
-      publisherMaterialReviewPendingCount: 3,
+      publisherMaterialReviewPendingCount: materialReviewPendingCount,
     ),
     'chatAvailability': _chatAvailability(
       canSendMessage: false,
@@ -363,7 +383,12 @@ Map<String, Object?> _workbenchPayload({
     ),
     'entries': _workbenchEntries(
       effectState: effectState,
+      materialSampleState: materialSampleState,
+      equipmentState: equipmentState,
+      serviceState: serviceState,
+      projectUnderstandingState: projectUnderstandingState,
       quoteState: quoteState,
+      scheduleState: scheduleState,
     ),
     'generatedAt': '2026-05-04T10:00:00Z',
   };
@@ -482,7 +507,7 @@ _baseHandlers({String projectRelation = 'my_bid'}) {
 
 void main() {
   testWidgets(
-    'workbench folds material groups by default and keeps 8 material entries',
+    'material confirmation entry opens first pending review before continuation',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(handlers: _baseHandlers());
 
@@ -490,19 +515,44 @@ void main() {
       await tester.pumpAndSettle();
       await _enterProjectCommunication(tester);
 
-      expect(find.text('资料确认 · 8项'), findsOneWidget);
-      expect(find.text('发布方资料'), findsNothing);
+      expect(find.text('资料确认 · 待处理3项'), findsOneWidget);
+      await tester.tap(find.widgetWithText(OutlinedButton, '后续承接'));
+      await tester.pumpAndSettle();
+      expect(find.text('请先处理资料确认单，再进入后续承接。'), findsOneWidget);
       await _openMaterialTools(tester);
-      await _ensureVisible(tester, find.text('发布方资料'));
-      expect(find.text('发布方资料'), findsOneWidget);
-      expect(find.text('竞标资料'), findsOneWidget);
-      expect(find.text('成交确认'), findsNothing);
-      expect(find.text('需补充'), findsOneWidget);
-      expect(find.text('有待确认资料'), findsOneWidget);
-      expect(find.text('效果图确认'), findsNothing);
-      expect(find.text('项目理解确认'), findsNothing);
-      expect(find.text('合同确认'), findsNothing);
+      expect(find.text('effect.pdf'), findsOneWidget);
+      expect(find.text('确认无误'), findsOneWidget);
+      expect(find.text('发布方资料'), findsNothing);
+    },
+  );
 
+  testWidgets(
+    'material tools can still expand when there is no pending material',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers();
+      handlers['GET /api/app/message/project-communication/workbench'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _workbenchPayload(
+              effectState: 'confirmed',
+              materialSampleState: 'confirmed',
+              equipmentState: 'confirmed',
+              serviceState: 'confirmed',
+              projectUnderstandingState: 'confirmed',
+              quoteState: 'confirmed',
+              scheduleState: 'confirmed',
+              materialReviewPendingCount: 0,
+            ),
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+
+      expect(find.text('资料确认 · 8项'), findsOneWidget);
+      await _openMaterialTools(tester);
       await _expandWorkbenchGroup(tester, '发布方资料');
       expect(find.text('效果图确认'), findsOneWidget);
       expect(find.text('尺寸图 / 施工图确认'), findsOneWidget);
@@ -561,10 +611,7 @@ void main() {
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
       await _enterProjectCommunication(tester);
-      await _expandWorkbenchGroup(tester, '发布方资料');
-      await _ensureVisible(tester, find.text('效果图确认'));
-      await tester.tap(find.text('效果图确认'));
-      await tester.pumpAndSettle();
+      await _openMaterialTools(tester);
       expect(find.text('effect.pdf'), findsOneWidget);
       await tester.tap(find.text('预览').first);
       await tester.pumpAndSettle();
@@ -575,7 +622,6 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('已确认。'), findsOneWidget);
-      expect(find.text('已确认'), findsOneWidget);
       expect(
         transport.requests.where(
           (request) =>
@@ -597,7 +643,16 @@ void main() {
         (AppApiRequest request) async => AppApiResponse(
           statusCode: 200,
           uri: request.uri,
-          body: _workbenchPayload(quoteState: quoteState),
+          body: _workbenchPayload(
+            effectState: 'confirmed',
+            materialSampleState: 'confirmed',
+            equipmentState: 'confirmed',
+            serviceState: 'confirmed',
+            projectUnderstandingState: 'confirmed',
+            quoteState: quoteState,
+            scheduleState: 'confirmed',
+            materialReviewPendingCount: 1,
+          ),
         );
     handlers['POST /api/app/message/project-communication/workbench/material-review'] =
         (AppApiRequest request) async {
@@ -623,23 +678,35 @@ void main() {
     await tester.pumpWidget(_buildPage(transport));
     await tester.pumpAndSettle();
     await _enterProjectCommunication(tester);
-    await _expandWorkbenchGroup(tester, '竞标资料');
-    await _ensureVisible(tester, find.text('报价表确认'));
-    await tester.tap(find.text('报价表确认'));
-    await tester.pumpAndSettle();
+    await _openMaterialTools(tester);
     expect(find.text('报价表'), findsOneWidget);
     await tester.enterText(find.byType(TextField), '请补充最终报价合计。');
     await tester.tap(find.text('需要补充'));
     await tester.pumpAndSettle();
 
     expect(find.text('反馈已提交。'), findsOneWidget);
-    expect(find.text('需补充'), findsWidgets);
   });
 
   testWidgets('deal confirmation entry is visible but does not charge', (
     WidgetTester tester,
   ) async {
-    final transport = FakeAppApiTransport(handlers: _baseHandlers());
+    final handlers = _baseHandlers();
+    handlers['GET /api/app/message/project-communication/workbench'] =
+        (AppApiRequest request) async => AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: _workbenchPayload(
+            effectState: 'confirmed',
+            materialSampleState: 'confirmed',
+            equipmentState: 'confirmed',
+            serviceState: 'confirmed',
+            projectUnderstandingState: 'confirmed',
+            quoteState: 'confirmed',
+            scheduleState: 'confirmed',
+            materialReviewPendingCount: 0,
+          ),
+        );
+    final transport = FakeAppApiTransport(handlers: handlers);
 
     await tester.pumpWidget(_buildPage(transport));
     await tester.pumpAndSettle();

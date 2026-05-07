@@ -2,114 +2,23 @@
 
 part of '../exhibition_trade_pages.dart';
 
-const List<int> _p0PayQuoteValidHourOptions = <int>[12, 24, 36, 48, 60, 72];
-
 extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
   List<Widget> _buildP0PayFixedPriceBidAuthorizationFields() {
     return <Widget>[
       Text(
-        '竞标服务费预授权额度确认',
+        '竞标服务费预授权说明',
         style: Theme.of(
           context,
         ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
       ),
       const SizedBox(height: 8),
-      const _DetailLine(
-        label: '预授权额度',
-        value: '固定 4000 元竞标服务费预授权额度',
-        highlight: true,
-      ),
-      _DetailLine(label: '平台规则说明', value: _p0PayEstimatedFeeText()),
+      const _DetailLine(label: '当前阶段', value: '先提交报价和三份资料', highlight: true),
       const _StateMessage(
-        title: '你需要做什么',
-        body: '选择报价有效期，核对 4000 元竞标服务费预授权额度，并勾选规则确认。提交前会以平台记录确认预授权状态。',
-      ),
-      const SizedBox(height: 12),
-      _buildP0PayQuoteValiditySelector(),
-      const SizedBox(height: 8),
-      _buildP0PayAuthorizationCheckbox(
-        value: _p0PayReadRuleConfirmed,
-        title: '我已阅读并同意平台成交服务费规则',
-        onChanged: (bool value) =>
-            setState(() => _p0PayReadRuleConfirmed = value),
-      ),
-      _buildP0PayAuthorizationCheckbox(
-        value: _p0PayAuthorizationAwarenessConfirmed,
-        title: '我知晓未中标自动释放，中标并合同确认后正式扣款',
-        onChanged: (bool value) =>
-            setState(() => _p0PayAuthorizationAwarenessConfirmed = value),
-      ),
-      _buildP0PayAuthorizationCheckbox(
-        value: _p0PayPublisherBreachReleaseConfirmed,
-        title: '我知晓发布方毁约或项目条件重大变化时，预授权应按规则释放',
-        onChanged: (bool value) =>
-            setState(() => _p0PayPublisherBreachReleaseConfirmed = value),
+        title: '后续处理',
+        body: '发布方资料确认通过后，系统会提醒完成 4000 元竞标服务费预授权额度；完成后项目级自由发送开启。预授权不是扣款。',
       ),
       ..._buildP0PayAuthorizationResultLines(),
     ];
-  }
-
-  Widget _buildP0PayQuoteValiditySelector() {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        Text(
-          '报价有效期',
-          style: theme.textTheme.labelLarge?.copyWith(
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _p0PayQuoteValidHourOptions
-              .map((int hours) {
-                return ChoiceChip(
-                  key: ValueKey<String>('p0-pay-quote-valid-hours-$hours'),
-                  label: Text('$hours小时'),
-                  selected: _p0PayQuoteValidHours == hours,
-                  onSelected: (_) {
-                    setState(() => _p0PayQuoteValidHours = hours);
-                  },
-                );
-              })
-              .toList(growable: false),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          '默认 48 小时；提交时会自动换算成接口需要的 quoteValidUntil。',
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          ),
-        ),
-        const SizedBox(height: 12),
-      ],
-    );
-  }
-
-  Widget _buildP0PayAuthorizationCheckbox({
-    required bool value,
-    required String title,
-    required ValueChanged<bool> onChanged,
-  }) {
-    return CheckboxListTile(
-      dense: true,
-      contentPadding: EdgeInsets.zero,
-      value: value,
-      title: Text(title),
-      controlAffinity: ListTileControlAffinity.leading,
-      onChanged: (bool? next) => onChanged(next ?? false),
-    );
-  }
-
-  String _p0PayEstimatedFeeText() {
-    final quoteAmount = double.tryParse(_quoteAmountController.text.trim());
-    if (quoteAmount == null || quoteAmount <= 0) {
-      return '固定 4000 元；成交后按平台规则扣取服务费，剩余额度原路释放';
-    }
-    return '固定 4000 元；当前报价仅用于竞标材料，成交后以平台记录处理';
   }
 }
 

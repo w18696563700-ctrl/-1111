@@ -502,13 +502,6 @@ Future<void> _uploadBidAttachment(WidgetTester tester, String label) async {
   await _scrollAndTap(tester, find.widgetWithText(FilledButton, '上传$label'));
 }
 
-Future<void> _confirmBidSubmitServiceFeeRules(WidgetTester tester) async {
-  await _expandBidSubmitFlowIfNeeded(tester);
-  await _scrollAndTap(tester, find.text('我已阅读并同意平台成交服务费规则'));
-  await _scrollAndTap(tester, find.text('我知晓未中标自动释放，中标并合同确认后正式扣款'));
-  await _scrollAndTap(tester, find.text('我知晓发布方毁约或项目条件重大变化时，预授权应按规则释放'));
-}
-
 Finder _projectCreateField(String label) {
   final key = switch (label) {
     '项目名称' => 'project-create-title',
@@ -5014,7 +5007,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _confirmBidSubmitServiceFeeRules(tester);
     await _enterVisibleTextField(tester, label: '方案说明', value: 'phase 2.1 bid');
     await _uploadBidAttachment(tester, '项目理解');
     await _scrollAndTap(
@@ -5399,7 +5391,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-      await _confirmBidSubmitServiceFeeRules(tester);
       await _enterVisibleTextField(
         tester,
         label: '方案说明',
@@ -5757,11 +5748,10 @@ void main() {
       await _expectVisibleText(tester, '地点与安排');
       expect(find.widgetWithText(OutlinedButton, '收起项目信息'), findsOneWidget);
       await _expectVisibleText(tester, '查看报价依据资料');
-      await _expectVisibleText(tester, '填写报价与预授权确认');
-      await _expectVisibleText(tester, '竞标服务费预授权额度确认');
-      await _expectVisibleTextContaining(tester, '成交后按平台规则扣取服务费');
-      await _expectVisibleText(tester, '你需要做什么');
-      await _expectVisibleText(tester, '48小时');
+      await _expectVisibleText(tester, '填写报价');
+      await _expectVisibleText(tester, '竞标服务费预授权说明');
+      expect(find.textContaining('发布方资料确认通过后'), findsWidgets);
+      await _expectVisibleText(tester, '后续处理');
       await _expectVisibleText(tester, '上传方案');
       final fourthStepIndex = tester.allWidgets
           .toList(growable: false)
@@ -6237,28 +6227,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _expectVisibleText(tester, '竞标服务费预授权额度确认');
-    expect(find.textContaining('固定 4000 元', findRichText: true), findsWidgets);
-    expect(find.textContaining('成交后以平台记录处理', findRichText: true), findsWidgets);
-    await _expectVisibleText(tester, '48小时');
+    await _expectVisibleText(tester, '竞标服务费预授权说明');
+    expect(find.textContaining('4000 元', findRichText: true), findsWidgets);
+    expect(find.textContaining('预授权不是扣款', findRichText: true), findsWidgets);
     expect(find.textContaining('成交金额的 3%'), findsNothing);
     expect(find.text('含税'), findsNothing);
     expect(find.text('含运输'), findsNothing);
     expect(find.text('含安装'), findsNothing);
     expect(find.text('支付宝'), findsNothing);
     expect(find.text('微信'), findsNothing);
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(CheckboxListTile, '我已阅读并同意平台成交服务费规则'),
-    );
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(CheckboxListTile, '我知晓未中标自动释放，中标并合同确认后正式扣款'),
-    );
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(CheckboxListTile, '我知晓发布方毁约或项目条件重大变化时，预授权应按规则释放'),
-    );
     await _enterVisibleTextField(tester, label: '方案说明', value: 'phase 2.1 bid');
     await _uploadBidAttachment(tester, '项目理解');
     await _uploadBidAttachment(tester, '报价表');
@@ -6282,7 +6259,7 @@ void main() {
   });
 
   testWidgets(
-    'bid submit disabled copy points to missing quote and service fee confirmations',
+    'bid submit disabled copy points to missing quote and required bid content',
     (WidgetTester tester) async {
       Future<void> pumpBidSubmit(String deviceId) async {
         final transport = FakeAppApiTransport(
@@ -6344,7 +6321,7 @@ void main() {
       await pumpBidSubmit('device-bid-disabled-copy-fee');
       await _expandBidSubmitFlowIfNeeded(tester);
       await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-      await _expectVisibleTextContaining(tester, '请先勾选全部平台服务费确认项。');
+      await _expectVisibleTextContaining(tester, '请先填写方案说明。');
       submitButton = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, '提交竞标'),
       );
@@ -6644,7 +6621,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-      await _confirmBidSubmitServiceFeeRules(tester);
       await _enterVisibleTextField(
         tester,
         label: '方案说明',
@@ -7115,7 +7091,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _confirmBidSubmitServiceFeeRules(tester);
     await _enterVisibleTextField(
       tester,
       label: '方案说明',

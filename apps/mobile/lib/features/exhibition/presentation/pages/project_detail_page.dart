@@ -344,57 +344,125 @@ Widget _buildProjectDetailP0PayReadOnlyCard({
   required bool embeddedFallbackAvailable,
   required VoidCallback onRefresh,
 }) {
-  final statusLines = summary?.statusLines ?? const <P0PayReadOnlyStatusLine>[];
-  final failureText = _projectDetailP0PayFailureText(result);
-  final routeTarget = summary?.routeTarget;
-  return _ActionCard(
-    title: '平台收费只读状态',
-    summary: '这里只展示当前项目的诚意金、竞标预授权和成交确认状态；资金状态以平台记录为准。',
-    tone: _ActionCardTone.muted,
-    children: <Widget>[
-      const _StateMessage(
-        title: '资金状态说明',
-        body: '本页仅用于查看 200 元项目真实性诚意金、4000 元竞标服务费预授权额度和后续成交确认进度，不在这里裁定扣费。',
-      ),
-      if (loading) ...<Widget>[
-        const SizedBox(height: 12),
-        const LinearProgressIndicator(minHeight: 6),
-      ],
-      if (!loading && statusLines.isNotEmpty) ...<Widget>[
-        const SizedBox(height: 12),
-        ...statusLines.map(
-          (P0PayReadOnlyStatusLine line) =>
-              _DetailLine(label: line.label, value: line.value),
-        ),
-      ],
-      if (!loading && routeTarget != null) ...<Widget>[
-        const SizedBox(height: 8),
-        _DetailLine(
-          label: '后续入口',
-          value: routeTarget.displayText.isEmpty
-              ? '已返回后续处理入口'
-              : routeTarget.displayText,
-        ),
-      ],
-      if (!loading && summary?.updatedAt != null)
-        _DetailLine(label: '更新时间', value: summary!.updatedAt!),
-      if (!loading && failureText != null) ...<Widget>[
-        const SizedBox(height: 12),
-        _StateMessage(title: '只读状态暂不可用', body: failureText),
-      ],
-      if (!loading && !embeddedFallbackAvailable) ...<Widget>[
-        const SizedBox(height: 12),
-        Align(
-          alignment: Alignment.centerLeft,
-          child: OutlinedButton.icon(
-            onPressed: onRefresh,
-            icon: const Icon(Icons.refresh_rounded),
-            label: const Text('刷新只读状态'),
-          ),
-        ),
-      ],
-    ],
+  return _ProjectDetailP0PayReadOnlyCard(
+    summary: summary,
+    result: result,
+    loading: loading,
+    embeddedFallbackAvailable: embeddedFallbackAvailable,
+    onRefresh: onRefresh,
   );
+}
+
+class _ProjectDetailP0PayReadOnlyCard extends StatefulWidget {
+  const _ProjectDetailP0PayReadOnlyCard({
+    required this.summary,
+    required this.result,
+    required this.loading,
+    required this.embeddedFallbackAvailable,
+    required this.onRefresh,
+  });
+
+  final P0PayReadOnlySummaryView? summary;
+  final ExhibitionLoadResult? result;
+  final bool loading;
+  final bool embeddedFallbackAvailable;
+  final VoidCallback onRefresh;
+
+  @override
+  State<_ProjectDetailP0PayReadOnlyCard> createState() =>
+      _ProjectDetailP0PayReadOnlyCardState();
+}
+
+class _ProjectDetailP0PayReadOnlyCardState
+    extends State<_ProjectDetailP0PayReadOnlyCard> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final summary = widget.summary;
+    final result = widget.result;
+    final loading = widget.loading;
+    final embeddedFallbackAvailable = widget.embeddedFallbackAvailable;
+    final onRefresh = widget.onRefresh;
+    final statusLines =
+        summary?.statusLines ?? const <P0PayReadOnlyStatusLine>[];
+    final failureText = _projectDetailP0PayFailureText(result);
+    final routeTarget = summary?.routeTarget;
+    final compactLines = statusLines.take(2).toList(growable: false);
+    return _ActionCard(
+      title: '平台收费只读状态',
+      summary: '这里只展示当前项目的诚意金、竞标预授权和成交确认状态；资金状态以平台记录为准。',
+      tone: _ActionCardTone.muted,
+      titleTrailing: TextButton.icon(
+        onPressed: () => setState(() => _expanded = !_expanded),
+        icon: Icon(
+          _expanded ? Icons.expand_less_rounded : Icons.expand_more_rounded,
+        ),
+        label: Text(_expanded ? '收起' : '展开'),
+      ),
+      children: <Widget>[
+        if (loading) ...<Widget>[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(minHeight: 6),
+        ],
+        if (!loading && compactLines.isNotEmpty) ...<Widget>[
+          ...compactLines.map(
+            (P0PayReadOnlyStatusLine line) =>
+                _DetailLine(label: line.label, value: line.value),
+          ),
+        ],
+        if (!loading && !_expanded) ...<Widget>[
+          const SizedBox(height: 8),
+          const _StateMessage(
+            title: '资金说明已折叠',
+            body: '展开后查看完整预授权、诚意金、成交确认和后续入口；本页不裁定扣费。',
+          ),
+        ],
+        if (_expanded) ...<Widget>[
+          const SizedBox(height: 12),
+          const _StateMessage(
+            title: '资金状态说明',
+            body: '本页仅用于查看 200 元项目真实性诚意金、4000 元竞标服务费预授权额度和后续成交确认进度，不在这里裁定扣费。',
+          ),
+          if (!loading && statusLines.length > compactLines.length) ...<Widget>[
+            const SizedBox(height: 12),
+            ...statusLines
+                .skip(compactLines.length)
+                .map(
+                  (P0PayReadOnlyStatusLine line) =>
+                      _DetailLine(label: line.label, value: line.value),
+                ),
+          ],
+          if (!loading && routeTarget != null) ...<Widget>[
+            const SizedBox(height: 8),
+            _DetailLine(
+              label: '后续入口',
+              value: routeTarget.displayText.isEmpty
+                  ? '已返回后续处理入口'
+                  : routeTarget.displayText,
+            ),
+          ],
+          if (!loading && summary?.updatedAt != null)
+            _DetailLine(label: '更新时间', value: summary!.updatedAt!),
+        ],
+        if (!loading && failureText != null) ...<Widget>[
+          const SizedBox(height: 12),
+          _StateMessage(title: '只读状态暂不可用', body: failureText),
+        ],
+        if (!loading && !embeddedFallbackAvailable) ...<Widget>[
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: OutlinedButton.icon(
+              onPressed: onRefresh,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('刷新只读状态'),
+            ),
+          ),
+        ],
+      ],
+    );
+  }
 }
 
 String? _projectDetailP0PayFailureText(ExhibitionLoadResult? result) {

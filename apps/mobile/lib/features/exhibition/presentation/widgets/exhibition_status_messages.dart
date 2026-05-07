@@ -52,7 +52,8 @@ String _frontStageLoadMessage({required String path}) {
     ExhibitionCanonicalPaths.projectDetail => '项目详情已经到位，可以先确认当前项目状态，再继续后续承接。',
     ExhibitionCanonicalPaths.bidResult =>
       '竞标结果已经到位，可以先确认当前项目下的最小结果回读，再决定是否回到项目详情继续。',
-    ExhibitionCanonicalPaths.orderDetail => '后续承接状态已经到位，可以先判断当前要推进里程碑还是进入后半链路入口。',
+    ExhibitionCanonicalPaths.orderDetail =>
+      '后续承接状态已经到位，可以先判断当前要推进里程碑还是进入后半链路入口。',
     ExhibitionCanonicalPaths.milestoneList => '里程碑清单已经到位，现在可以选择当前要推进的里程碑。',
     ExhibitionCanonicalPaths.ratingEntry =>
       '评价入口已经到位，可以先确认当前订单是否已承接评价锚点，再决定是否提交。',
@@ -323,14 +324,14 @@ String? _controlledBusinessFailureMessage({
     'PRICING_RULE_VERSION_MISMATCH' => '当前收费规则版本已更新，请刷新页面后再继续。',
     'BID_DUPLICATE_SUBMISSION' => '当前项目已提交过竞标，本页不再重复提交。请回到项目详情查看最新竞标状态。',
     'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED' =>
-      '竞标申请审核通过后需先冻结 4000 元竞标服务费预授权额度，冻结成功后才能提交竞标。',
+      '资料确认通过后需先完成 4000 元竞标服务费预授权额度，完成后才能开启项目级自由发送。',
     'BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED' =>
       '当前暂不能创建竞标服务费预授权额度，请刷新项目状态后再试。',
     'BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND' => '当前竞标服务费预授权记录暂不可用，请重新拉起后再试。',
     'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED' =>
       '当前暂不能拉起竞标服务费预授权冻结，请稍后再试。',
     'BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE' =>
-      '当前竞标服务费预授权状态暂不允许提交竞标，请完成冻结后再试。',
+      '当前竞标服务费预授权状态暂不允许开启项目级自由发送，请完成预授权后再试。',
     'BID_AWARD_INVALID' => '当前定标参数未通过校验。请回到我的项目详情确认中标投标 ID 与定标原因后再试。',
     'BID_AWARD_INVALID_STATE' => '当前项目状态暂时不能继续定标。请先回到我的项目详情确认项目是否已进入后续链路。',
     'BID_AWARD_DUPLICATE' => '当前项目已经处理过定标，本页不再重复提交。你可以先查看项目详情或我的项目中的最新状态。',

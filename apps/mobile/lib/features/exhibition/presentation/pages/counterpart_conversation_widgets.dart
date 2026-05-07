@@ -962,14 +962,23 @@ class _SelectedProjectBusinessEntrypointsState
 
   @override
   Widget build(BuildContext context) {
-    final materialConfirmationCount = _materialConfirmationCount;
-    final materialConfirmationLabel = materialConfirmationCount == null
-        ? '资料确认单'
-        : '资料确认 · $materialConfirmationCount项';
     final todoSummary =
         widget.workbenchResult?.data?.businessTodoSummary ??
         widget.group.businessTodoSummary;
-    final hasContinuation = widget.orderId != null || _dealEntries.isNotEmpty;
+    final materialPendingCount = todoSummary.materialReviewPendingCount;
+    final materialConfirmationCount = _materialConfirmationCount;
+    final materialConfirmationLabel = materialPendingCount > 0
+        ? '资料确认 · 待处理$materialPendingCount项'
+        : materialConfirmationCount == null
+        ? '资料确认单'
+        : '资料确认 · $materialConfirmationCount项';
+    final hasPendingMaterialConfirmation = materialPendingCount > 0;
+    final hasContinuation =
+        !hasPendingMaterialConfirmation &&
+        (widget.orderId != null || _dealEntries.isNotEmpty);
+    final continuationDisabledReason = hasPendingMaterialConfirmation
+        ? '请先处理资料确认单，再进入后续承接。'
+        : '当前项目暂无订单、合同或最终成交确认入口。';
     final theme = Theme.of(context);
     return Material(
       color: theme.colorScheme.surface,
@@ -1025,26 +1034,25 @@ class _SelectedProjectBusinessEntrypointsState
                   const SizedBox(width: 8),
                   Expanded(
                     child: _ProjectToolEntryButton(
-                      icon: Icons.receipt_long_outlined,
-                      label: '后续承接',
-                      badgeCount: todoSummary.dealConfirmationPendingCount,
-                      enabled: hasContinuation,
-                      disabledReason: '当前项目暂无订单、合同或最终成交确认入口。',
-                      onPressed: hasContinuation
-                          ? widget.onOpenContinuation
-                          : null,
+                      icon: Icons.folder_open_outlined,
+                      label: materialConfirmationLabel,
+                      badgeCount: materialPendingCount,
+                      enabled: true,
+                      selected: _toolsVisible,
+                      onPressed: _handleMaterialConfirmationPressed,
                     ),
                   ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: _ProjectToolEntryButton(
-                      icon: Icons.folder_open_outlined,
-                      label: materialConfirmationLabel,
-                      badgeCount: todoSummary.materialReviewPendingCount,
-                      enabled: true,
-                      selected: _toolsVisible,
-                      onPressed: () =>
-                          setState(() => _toolsVisible = !_toolsVisible),
+                      icon: Icons.receipt_long_outlined,
+                      label: '后续承接',
+                      badgeCount: todoSummary.dealConfirmationPendingCount,
+                      enabled: hasContinuation,
+                      disabledReason: continuationDisabledReason,
+                      onPressed: hasContinuation
+                          ? widget.onOpenContinuation
+                          : null,
                     ),
                   ),
                 ],
@@ -1063,6 +1071,46 @@ class _SelectedProjectBusinessEntrypointsState
       return null;
     }
     return data.entries.where(_isMaterialWorkbenchEntry).length;
+  }
+
+  void _handleMaterialConfirmationPressed() {
+    final pendingEntry = _firstPendingMaterialEntry;
+    if (pendingEntry != null) {
+      widget.onOpenWorkbenchEntry(pendingEntry);
+      return;
+    }
+    final result = widget.workbenchResult;
+    if (result?.state == AppPageState.errorRetryable ||
+        result?.state == AppPageState.errorNonRetryable) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(result?.message ?? '资料确认入口暂不可用，请刷新后重试。')),
+      );
+      return;
+    }
+    setState(() => _toolsVisible = !_toolsVisible);
+  }
+
+  ProjectCommunicationWorkbenchEntryView? get _firstPendingMaterialEntry {
+    final result = widget.workbenchResult;
+    final data = result?.data;
+    if (result?.state != AppPageState.content || data == null) {
+      return null;
+    }
+    for (final entry in data.entries) {
+      if (!_isMaterialWorkbenchEntry(entry)) {
+        continue;
+      }
+      if (entry.reviewState == 'confirmed') {
+        continue;
+      }
+      if (entry.badgeCount > 0 ||
+          entry.reviewState == 'pending_review' ||
+          entry.reviewState == 'needs_supplement' ||
+          entry.actionState == 'enabled') {
+        return entry;
+      }
+    }
+    return null;
   }
 
   List<ProjectCommunicationWorkbenchEntryView> get _dealEntries {

@@ -853,6 +853,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
   const _ProjectCommunicationComposer({
     required this.controller,
     required this.enabled,
+    required this.canSendMessage,
     required this.sending,
     required this.lockReasonText,
     required this.requiredNextAction,
@@ -864,6 +865,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
 
   final TextEditingController controller;
   final bool enabled;
+  final bool canSendMessage;
   final bool sending;
   final String? lockReasonText;
   final String? requiredNextAction;
@@ -877,6 +879,8 @@ class _ProjectCommunicationComposer extends StatelessWidget {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
     final actionLabel = _requiredActionLabel;
+    final showLock = enabled && !canSendMessage && lockReasonText != null;
+    final canInteract = enabled && !sending;
     return AnimatedPadding(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -895,7 +899,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
-                if (!enabled && lockReasonText != null) ...<Widget>[
+                if (showLock) ...<Widget>[
                   Row(
                     children: <Widget>[
                       Icon(
@@ -937,13 +941,13 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                     _ComposerActionButton(
                       icon: Icons.attach_file_rounded,
                       label: '附件',
-                      enabled: enabled && !sending,
+                      enabled: canInteract,
                       onPressed: onAttachFile,
                     ),
                     _ComposerActionButton(
                       icon: Icons.image_outlined,
                       label: '图片',
-                      enabled: enabled && !sending,
+                      enabled: canInteract,
                       onPressed: onAttachImage,
                     ),
                   ],
@@ -955,14 +959,17 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         controller: controller,
-                        enabled: enabled && !sending,
+                        enabled: canInteract,
                         minLines: 1,
                         maxLines: 4,
                         textInputAction: TextInputAction.send,
-                        onSubmitted: (_) =>
-                            enabled && !sending ? onSend() : null,
+                        onSubmitted: (_) => canInteract ? onSend() : null,
                         decoration: InputDecoration(
-                          hintText: enabled ? '围绕当前项目说点什么...' : '业务节点完成后可继续沟通',
+                          hintText: enabled
+                              ? canSendMessage
+                                    ? '围绕当前项目说点什么...'
+                                    : '可先输入草稿，业务节点完成后再发送'
+                              : '业务节点完成后可继续沟通',
                           filled: true,
                           isDense: true,
                           border: OutlineInputBorder(
@@ -974,7 +981,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     IconButton.filled(
-                      onPressed: enabled && !sending ? onSend : null,
+                      onPressed: canInteract ? onSend : null,
                       icon: sending
                           ? const SizedBox(
                               width: 18,
@@ -999,6 +1006,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
       'confirm_publisher_materials' => '打开资料确认单',
       'submit_bid_materials' => '去提交竞标资料',
       'confirm_bid_materials' => '打开资料确认单',
+      'complete_service_fee_authorization' => '去完成预授权',
       'open_deal_confirmation' => '打开成交确认',
       _ => null,
     };

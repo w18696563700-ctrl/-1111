@@ -43,6 +43,7 @@ class _ProjectCommunicationMaterialReviewDetailPageState
   final Map<String, ProjectCommunicationFilePreviewAccessView> _previewCache =
       <String, ProjectCommunicationFilePreviewAccessView>{};
   final Set<String> _loadingPreviewFileIds = <String>{};
+  final Set<String> _previewedFileIds = <String>{};
 
   @override
   void initState() {
@@ -157,8 +158,16 @@ class _ProjectCommunicationMaterialReviewDetailPageState
             ),
           if (entry.canSubmitReview) ...<Widget>[
             const SizedBox(height: 16),
+            if (!_allFilesPreviewed)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _InfoBand(
+                  icon: Icons.visibility_outlined,
+                  text: '请先预览当前资料，确认内容无误后再提交确认。',
+                ),
+              ),
             FilledButton.icon(
-              onPressed: _submitting ? null : _confirm,
+              onPressed: _submitting || !_allFilesPreviewed ? null : _confirm,
               icon: const Icon(Icons.check_circle_outline),
               label: Text(_submitting ? '提交中...' : '确认无误'),
             ),
@@ -228,7 +237,11 @@ class _ProjectCommunicationMaterialReviewDetailPageState
                   )
                 : TextButton(
                     onPressed: () => _openFilePreview(file),
-                    child: const Text('预览'),
+                    child: Text(
+                      _previewedFileIds.contains(file.fileAssetId)
+                          ? '已预览'
+                          : '预览',
+                    ),
                   ),
             onTap: _loadingPreviewFileIds.contains(file.fileAssetId)
                 ? null
@@ -259,6 +272,9 @@ class _ProjectCommunicationMaterialReviewDetailPageState
       }
       _previewCache[file.fileAssetId] = access;
     }
+    if (mounted && !_previewedFileIds.contains(file.fileAssetId)) {
+      setState(() => _previewedFileIds.add(file.fileAssetId));
+    }
 
     final accessUrl = access.accessUrl?.trim();
     if (access.canPreview &&
@@ -273,6 +289,13 @@ class _ProjectCommunicationMaterialReviewDetailPageState
       return;
     }
     await _showWorkbenchFilePreviewDialog(access);
+  }
+
+  bool get _allFilesPreviewed {
+    if (_files.isEmpty) {
+      return false;
+    }
+    return _files.every((file) => _previewedFileIds.contains(file.fileAssetId));
   }
 
   Future<void> _showWorkbenchFilePreviewDialog(

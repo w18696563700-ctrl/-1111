@@ -273,11 +273,6 @@ extension _P0PayBidAuthorizationActions on _BidSubmitPageState {
     if (_p0PayBidAttachmentFileAssetIds().isEmpty) {
       return '请先完成当前页竞标附件上传确认。';
     }
-    if (!_p0PayReadRuleConfirmed ||
-        !_p0PayAuthorizationAwarenessConfirmed ||
-        !_p0PayPublisherBreachReleaseConfirmed) {
-      return '请先勾选全部平台服务费确认项。';
-    }
     return null;
   }
 

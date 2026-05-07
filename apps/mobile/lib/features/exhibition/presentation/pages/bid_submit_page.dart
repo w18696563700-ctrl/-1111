@@ -45,13 +45,13 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   bool _bidFlowExpanded = false;
   bool _projectReviewExpanded = false;
   bool _p0PaySubmitting = false;
-  int _p0PayQuoteValidHours = 48;
+  final int _p0PayQuoteValidHours = 48;
   final bool _p0PayTaxIncluded = true;
   final bool _p0PayTransportIncluded = true;
   final bool _p0PayInstallationIncluded = true;
-  bool _p0PayReadRuleConfirmed = false;
-  bool _p0PayAuthorizationAwarenessConfirmed = false;
-  bool _p0PayPublisherBreachReleaseConfirmed = false;
+  final bool _p0PayReadRuleConfirmed = false;
+  final bool _p0PayAuthorizationAwarenessConfirmed = false;
+  final bool _p0PayPublisherBreachReleaseConfirmed = false;
   final String _p0PayAuthorizationChannel = 'alipay_candidate';
   ExhibitionActionResult? _p0PayFixedPriceBidResult;
   ExhibitionActionResult? _p0PayAuthorizationResult;
@@ -224,18 +224,6 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       _lastResult = null;
     });
 
-    final authorizationFrozen =
-        await _ensureBidServiceFeeAuthorizationBeforeSubmit(projectId);
-    if (!mounted) {
-      return;
-    }
-    if (!authorizationFrozen) {
-      setState(() {
-        _submitting = false;
-      });
-      return;
-    }
-
     final result = await ExhibitionConsumerLayer.instance.submitBid(
       BidSubmitCommand(
         projectId: projectId,
@@ -250,211 +238,47 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     if (!mounted) {
       return;
     }
+    final bidAccepted =
+        result.isSuccess || _isBidDuplicateSubmissionResult(result);
 
     setState(() {
       _submitting = false;
       _lastResult = result;
-      if (result.isSuccess || _isBidDuplicateSubmissionResult(result)) {
+      if (bidAccepted) {
         _bidAlreadySubmitted = true;
       }
     });
 
-    if (result.isSuccess || _isBidDuplicateSubmissionResult(result)) {
+    if (bidAccepted) {
+      _showBidMaterialMessage(
+        _isBidDuplicateSubmissionResult(result)
+            ? '竞标已提交，页面状态已同步。'
+            : '竞标提交成功，资料确认待办已通知发布方。',
+      );
+      unawaited(
+        AppShellScope.read(context).reloadShellContext().catchError((_) {}),
+      );
       final projectId = _normalizeId(_projectIdController.text);
       if (projectId != null) {
+        final refreshedProject = await ExhibitionConsumerLayer.instance
+            .loadProjectDetail(projectId: projectId, forceRefresh: true);
+        if (mounted) {
+          setState(() => _projectDetailResult = refreshedProject);
+        }
         await Future.wait<void>(<Future<void>>[
-          ExhibitionConsumerLayer.instance.loadProjectDetail(
-            projectId: projectId,
-            forceRefresh: true,
-          ),
           ExhibitionConsumerLayer.instance.loadMyProjectList(
             forceRefresh: true,
           ),
           ExhibitionConsumerLayer.instance.loadMyBidList(forceRefresh: true),
         ]);
       }
+    } else {
+      _showBidMaterialMessage(result.message ?? '竞标提交失败，请稍后重试。');
     }
   }
 
   Future<void> _submitCurrentBidFlow() async {
     await _submit();
-  }
-
-  Future<bool> _ensureBidServiceFeeAuthorizationBeforeSubmit(
-    String projectId,
-  ) async {
-    final requestId = _bidParticipationRequestIdForAuthorizationGate();
-    if (requestId == null) {
-      setState(() {
-        _lastResult = ExhibitionActionResult(
-          method: 'POST',
-          path: ExhibitionCanonicalPaths.bidSubmit,
-          isSuccess: false,
-          controlledState: AppPageState.errorNonRetryable,
-          errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED',
-          message: '竞标申请审核通过后需先完成 4000 元竞标服务费预授权额度冻结。',
-        );
-      });
-      return false;
-    }
-
-    final summary = await ExhibitionConsumerLayer.instance
-        .loadProjectPricingSummary(projectId: projectId, forceRefresh: true);
-    if (!mounted) {
-      return false;
-    }
-    if (summary.state == AppPageState.content &&
-        _bidServiceFeeAuthorizationFrozen(summary.payload)) {
-      return true;
-    }
-
-    final authorization = await ExhibitionConsumerLayer.instance
-        .createProjectBidServiceFeeAuthorization(
-          projectId: projectId,
-          command: BidServiceFeeAuthorizationCommand(
-            bidParticipationRequestId: requestId,
-            ruleVersion: 'platform_pricing_rules_master_v1',
-            ruleSnapshotHash: 'platform_pricing_rules_master_v1',
-          ),
-        );
-    if (!mounted) {
-      return false;
-    }
-    if (!authorization.isSuccess) {
-      setState(() => _lastResult = authorization);
-      return false;
-    }
-    if (_bidServiceFeeAuthorizationFrozen(authorization.payload)) {
-      return true;
-    }
-
-    final authorizationId = _authorizationIdFromPayload(authorization.payload);
-    if (authorizationId == null) {
-      setState(() {
-        _lastResult = ExhibitionActionResult(
-          method: 'POST',
-          path: ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizations(
-            projectId,
-          ),
-          isSuccess: false,
-          controlledState: AppPageState.errorNonRetryable,
-          errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_NOT_FOUND',
-          message: '暂未取得竞标服务费预授权编号，当前不能提交竞标。',
-        );
-      });
-      return false;
-    }
-
-    final freezeInit = await ExhibitionConsumerLayer.instance
-        .initProjectBidServiceFeeAuthorizationFreeze(
-          projectId: projectId,
-          authorizationId: authorizationId,
-          command: ProjectPricingPayInitCommand(
-            payChannel:
-                _firstBidServiceFeeAuthorizationChannelCandidate(
-                  authorization.payload,
-                ) ??
-                _p0PayAuthorizationChannel,
-          ),
-        );
-    if (!mounted) {
-      return false;
-    }
-    if (!freezeInit.isSuccess) {
-      setState(() => _lastResult = freezeInit);
-      return false;
-    }
-
-    await _openBidServiceFeeAuthorizationChannelPayload(freezeInit.payload);
-    final poll = await ExhibitionConsumerLayer.instance
-        .pollProjectBidServiceFeeAuthorizationStatus(
-          projectId: projectId,
-          authorizationId: authorizationId,
-          maxAttempts: 1,
-          interval: Duration.zero,
-        );
-    if (!mounted) {
-      return false;
-    }
-    if (poll.isSuccess ||
-        _bidServiceFeeAuthorizationFrozen(poll.result.payload)) {
-      return true;
-    }
-
-    setState(() {
-      _lastResult = ExhibitionActionResult(
-        method: 'POST',
-        path: ExhibitionCanonicalPaths.bidSubmit,
-        isSuccess: false,
-        controlledState: AppPageState.errorNonRetryable,
-        errorCode: 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED',
-        message:
-            '竞标服务费预授权额度尚未完成，当前状态：${_bidServiceFeeAuthorizationStatus(poll.result.payload) ?? '未返回'}。完成后再提交竞标。',
-      );
-    });
-    return false;
-  }
-
-  String? _bidParticipationRequestIdForAuthorizationGate() {
-    final projectDetail = _payloadMap(_projectDetailResult?.payload);
-    return _normalizeId(widget.bidParticipationRequestId) ??
-        _normalizeDynamicText(projectDetail?['bidParticipationRequestId']) ??
-        _normalizeDynamicText(
-          projectDetail?['currentViewerBidParticipationRequestId'],
-        ) ??
-        _normalizeDynamicText(
-          _payloadMap(
-            projectDetail?['currentViewerBidParticipationRequest'],
-          )?['requestId'],
-        );
-  }
-
-  bool _bidServiceFeeAuthorizationFrozen(Object? payload) {
-    final status = _bidServiceFeeAuthorizationStatus(payload);
-    return switch (status) {
-      'frozen' || 'authorized' || 'succeeded' || 'satisfied' => true,
-      _ => false,
-    };
-  }
-
-  String? _bidServiceFeeAuthorizationStatus(Object? payload) {
-    final payloadMap = _payloadMap(payload);
-    if (payloadMap == null) {
-      return null;
-    }
-    final bidderPricing = _payloadMap(payloadMap['bidderPricing']);
-    final authorization =
-        _payloadMap(payloadMap['bidServiceFeeAuthorization']) ??
-        _payloadMap(payloadMap['platformServiceFee']);
-    return _normalizeDynamicText(
-      bidderPricing?['bidServiceFeeAuthorizationStatus'] ??
-          bidderPricing?['authorizationStatus'] ??
-          bidderPricing?['submitGateStatus'] ??
-          authorization?['authorizationStatus'] ??
-          authorization?['status'] ??
-          payloadMap['authorizationStatus'] ??
-          payloadMap['status'],
-    );
-  }
-
-  String? _firstBidServiceFeeAuthorizationChannelCandidate(Object? payload) {
-    final candidates = _payloadMap(payload)?['channelCandidates'];
-    if (candidates is! Iterable) {
-      return null;
-    }
-    for (final candidate in candidates) {
-      final normalized = _normalizeDynamicText(candidate);
-      if (normalized != null) {
-        return normalized;
-      }
-    }
-    return null;
-  }
-
-  Future<void> _openBidServiceFeeAuthorizationChannelPayload(
-    Object? payload,
-  ) async {
-    await _openPaymentChannelPayload(payload);
   }
 
   String? _bidSubmitFinalSubmitDisabledMessage() {
@@ -466,12 +290,6 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       return '请先填写有效的竞标报价。';
     }
 
-    if (!_p0PayReadRuleConfirmed ||
-        !_p0PayAuthorizationAwarenessConfirmed ||
-        !_p0PayPublisherBreachReleaseConfirmed) {
-      return '请先勾选全部平台服务费确认项。';
-    }
-
     if (_proposalSummaryController.text.trim().isEmpty) {
       return '请先填写方案说明。';
     }
@@ -481,10 +299,6 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     );
     if (attachmentBlocker != null) {
       return attachmentBlocker;
-    }
-
-    if (_p0PayTaskIdForFixedPriceBid != null) {
-      return _p0PayFixedPriceBidBlockerMessage();
     }
 
     return null;
@@ -520,7 +334,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     return _SubmissionPageFrame(
       title: '竞标提交',
-      summary: '这里是当前项目下的竞标提交页，按已承接项目、查看报价依据资料、填写报价与预授权确认、上传方案和最终提交依次完成。',
+      summary: '这里是当前项目下的竞标提交页，按已承接项目、查看报价依据资料、填写报价、上传方案和最终提交依次完成。',
       canonicalPath: ExhibitionCanonicalPaths.bidSubmit,
       submitting: _submitting || _p0PaySubmitting,
       lastResult: _lastResult,

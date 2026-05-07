@@ -535,12 +535,18 @@ class _CounterpartConversationPageState
         _openFirstPendingWorkbenchEntry(<String>{'publisher_materials'});
         return;
       case 'submit_bid_materials':
-        Navigator.of(
-          context,
-        ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(group.projectId));
+        unawaited(_openBidSubmitAndRefresh(group.projectId));
         return;
       case 'confirm_bid_materials':
         _openFirstPendingWorkbenchEntry(<String>{'bid_materials'});
+        return;
+      case 'complete_service_fee_authorization':
+        final card = _firstServiceFeeAuthorizationCard(group);
+        if (card == null) {
+          _showSnack('预授权入口暂不可用，请刷新后重试。');
+          return;
+        }
+        _openBusinessCard(card);
         return;
       case 'open_deal_confirmation':
         _openFirstPendingWorkbenchEntry(<String>{'deal_confirmation'});
@@ -576,6 +582,16 @@ class _CounterpartConversationPageState
       return;
     }
     _openWorkbenchEntry(entry);
+  }
+
+  Future<void> _openBidSubmitAndRefresh(String projectId) async {
+    await Navigator.of(
+      context,
+    ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(projectId));
+    if (!mounted) {
+      return;
+    }
+    await _load();
   }
 
   Future<void> _sendCurrentMessage() async {
@@ -650,6 +666,10 @@ class _CounterpartConversationPageState
   }
 
   Future<void> _retryDraft(_DraftProjectCommunicationMessage draft) {
+    if (!_canSendProjectCommunication()) {
+      _showSnack(_chatLockMessage());
+      return Future<void>.value();
+    }
     return _sendDraft(
       draft.copyWith(state: _DraftProjectCommunicationState.sending),
     );
@@ -658,6 +678,16 @@ class _CounterpartConversationPageState
   Future<void> _sendDraft(_DraftProjectCommunicationMessage draft) async {
     final thread = _threadResult?.data;
     if (thread == null || _sending) {
+      return;
+    }
+    if (!thread.chatAvailability.canSendMessage) {
+      _showSnack(_chatLockMessage(thread));
+      _replaceDraft(
+        draft.copyWith(
+          state: _DraftProjectCommunicationState.failed,
+          errorMessage: _chatLockMessage(thread),
+        ),
+      );
       return;
     }
     _replaceDraft(draft);
@@ -1064,7 +1094,8 @@ class _CounterpartConversationPageState
                 ),
                 _ProjectCommunicationComposer(
                   controller: _messageController,
-                  enabled: !_loadingThread && _canSendProjectCommunication(),
+                  enabled: !_loadingThread,
+                  canSendMessage: _canSendProjectCommunication(),
                   sending: _sending,
                   lockReasonText: _chatLockMessage(),
                   requiredNextAction:
@@ -1562,6 +1593,10 @@ class _CounterpartConversationPageState
       _openDealConfirmationEntry(entry);
       return;
     }
+    if (!_hasMaterialReviewRouteTarget(entry)) {
+      _showSnack('资料确认入口暂不可用，请刷新后重试。');
+      return;
+    }
     Navigator.of(context).push(
       MaterialPageRoute<void>(
         builder: (_) => _ProjectCommunicationMaterialReviewDetailPage(
@@ -1578,6 +1613,35 @@ class _CounterpartConversationPageState
         entry.threadId.trim().isNotEmpty &&
         entry.truthAnchor.projectId.trim().isNotEmpty &&
         entry.truthAnchor.threadId.trim().isNotEmpty;
+  }
+
+  bool _hasMaterialReviewRouteTarget(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final routeTarget = entry.routeTarget;
+    if (routeTarget == null ||
+        routeTarget.actionKey != 'project_communication_material_review.open' ||
+        routeTarget.canonicalPath.trim().isEmpty) {
+      return false;
+    }
+    final projectId = routeTarget.params['projectId']?.trim();
+    final threadId = routeTarget.params['threadId']?.trim();
+    final entryKey = routeTarget.params['entryKey']?.trim();
+    final bidId = routeTarget.params['bidId']?.trim();
+    if (projectId == null ||
+        projectId.isEmpty ||
+        threadId == null ||
+        threadId.isEmpty ||
+        entryKey == null ||
+        entryKey.isEmpty) {
+      return false;
+    }
+    if (entry.group == 'bid_materials' &&
+        entry.bidId?.trim().isNotEmpty == true &&
+        (bidId == null || bidId.isEmpty)) {
+      return false;
+    }
+    return true;
   }
 
   Future<void> _openDealConfirmationEntry(
@@ -1864,6 +1928,20 @@ class _CounterpartConversationPageState
   ) {
     for (final card in group.cards) {
       if (card.cardType == cardType) {
+        return card;
+      }
+    }
+    return null;
+  }
+
+  CounterpartConversationBusinessCardView? _firstServiceFeeAuthorizationCard(
+    CounterpartConversationProjectGroupView group,
+  ) {
+    for (final card in group.cards) {
+      final routeAction = card.detailRouteTarget?.actionKey;
+      if (routeAction == 'bid_service_fee_authorization.open' ||
+          card.cardType == 'bid_service_fee_authorization' ||
+          card.truthAnchor.truthType == 'bid_service_fee_authorization') {
         return card;
       }
     }

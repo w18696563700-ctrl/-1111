@@ -143,8 +143,8 @@ List<Widget> _buildBidSubmitBody({
     ),
     const SizedBox(height: 16),
     _ActionCard(
-      title: '填写报价与预授权确认',
-      summary: '先填写本次竞标报价，再核对竞标服务费预授权额度和确认项。',
+      title: '填写报价',
+      summary: '先填写本次竞标报价；服务费预授权将在发布方资料确认通过后再处理。',
       children: <Widget>[
         _InputField(
           controller: quoteAmountController,

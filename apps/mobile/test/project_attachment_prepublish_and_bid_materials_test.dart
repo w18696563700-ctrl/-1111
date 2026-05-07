@@ -321,7 +321,7 @@ void main() {
     expect(find.text('项目附件'), findsNothing);
     expect(find.widgetWithText(FilledButton, '查看报价依据资料'), findsOneWidget);
     expect(find.text('温馨提示'), findsNothing);
-    expect(find.text('填写报价与预授权确认'), findsNothing);
+    expect(find.text('填写报价'), findsNothing);
     expect(find.text('上传方案'), findsNothing);
 
     final continueAction = tester
@@ -414,8 +414,8 @@ void main() {
     );
     expect(openedBidMaterialUri, isNotNull);
 
-    await _scrollTo(tester, find.text('填写报价与预授权确认'));
-    expect(find.text('填写报价与预授权确认'), findsOneWidget);
+    await _scrollTo(tester, find.text('填写报价'));
+    expect(find.text('填写报价'), findsOneWidget);
     await _scrollTo(tester, find.text('上传方案'));
     expect(find.text('上传方案'), findsOneWidget);
   });
