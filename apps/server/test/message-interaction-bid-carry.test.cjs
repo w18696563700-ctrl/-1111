@@ -864,6 +864,132 @@ test('counterpart conversation project title uses concrete project title when vi
   assert.equal(result.myBidUnreadCount, 0);
 });
 
+test('counterpart conversation list badge includes pending business todos', async () => {
+  const {
+    CounterpartConversationProjectionService,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
+  const now = '2026-04-24T08:05:00.000Z';
+  const project = {
+    id: 'project-pending',
+    organizationId: 'org-owner',
+    creatorUserId: 'user-owner',
+    title: '重庆电子展',
+    exhibitionName: '重庆电子展',
+    brandName: '海力士',
+    state: 'published',
+    publishedAt: new Date('2026-04-20T02:30:00.000Z'),
+    updatedAt: new Date('2026-04-21T03:40:00.000Z'),
+  };
+  const sourceWithSeed = {
+    async buildSeeds() {
+      return [
+        {
+          counterpartOrganizationId: 'org-counterpart',
+          counterpartDisplayName: '重庆鸿川展览工厂',
+          counterpartAvatarUrl: null,
+          projectId: 'project-pending',
+          updatedAt: now,
+          card: {
+            cardId: 'bid-participation-request:req-1',
+            cardType: 'bid_participation_request',
+            title: '新的参与申请',
+            summary: '重庆鸿川展览工厂 申请参与当前项目。',
+            status: 'pending',
+            updatedAt: now,
+            truthAnchor: {
+              truthType: 'bid_participation_request',
+              projectId: 'project-pending',
+              requestId: 'req-1',
+            },
+            detailRouteTarget: null,
+            decisionAvailability: {
+              canApprove: true,
+              canReject: true,
+            },
+          },
+        },
+      ];
+    },
+  };
+  const emptySource = {
+    async buildSeeds() {
+      return [];
+    },
+  };
+  const service = new CounterpartConversationProjectionService(
+    {
+      async findBy() {
+        return [project];
+      },
+      async query() {
+        return [];
+      },
+    },
+    {
+      async buildPublicProjectionMap() {
+        return new Map([
+          [
+            'project-pending',
+            {
+              displayTitle: '重庆电子展 - 海力士',
+              nameAccess: {
+                status: 'visible',
+                canRequest: false,
+                requestId: null,
+              },
+            },
+          ],
+        ]);
+      },
+    },
+    sourceWithSeed,
+    emptySource,
+    emptySource,
+    {
+      async buildUnreadStatsForCounterpartProjects(projectIds) {
+        assert.deepEqual(projectIds, ['project-pending']);
+        return new Map([
+          [
+            'project-pending',
+            {
+              unreadCount: 0,
+              hasUnread: false,
+              latestUnreadMessageAt: null,
+            },
+          ],
+        ]);
+      },
+    },
+    {
+      async buildForPair() {
+        return {
+          businessTodoSummary: {
+            bidParticipationReviewPendingCount: 1,
+            publisherMaterialReviewPendingCount: 0,
+            bidMaterialReviewPendingCount: 0,
+            dealConfirmationPendingCount: 0,
+            totalPendingCount: 1,
+          },
+        };
+      },
+      emptyBusinessTodoSummary() {
+        return {
+          bidParticipationReviewPendingCount: 0,
+          publisherMaterialReviewPendingCount: 0,
+          bidMaterialReviewPendingCount: 0,
+          dealConfirmationPendingCount: 0,
+          totalPendingCount: 0,
+        };
+      },
+    },
+  );
+
+  const [result] = await service.listConversations('org-owner');
+
+  assert.equal(result.conversationUnreadCount, 1);
+  assert.equal(result.hasUnread, true);
+});
+
 test('project communication unread query counts counterpart unread messages', async () => {
   const {
     ProjectCommunicationUnreadQueryService,

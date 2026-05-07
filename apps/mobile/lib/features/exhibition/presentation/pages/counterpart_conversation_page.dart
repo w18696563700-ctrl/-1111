@@ -532,13 +532,15 @@ class _CounterpartConversationPageState
         _openBusinessCard(card);
         return;
       case 'confirm_publisher_materials':
-        _openFirstPendingWorkbenchEntry(<String>{'publisher_materials'});
+        _openWorkbenchEntryList(<String>{
+          'publisher_materials',
+        }, title: '发布方资料确认');
         return;
       case 'submit_bid_materials':
         unawaited(_openBidSubmitAndRefresh(group.projectId));
         return;
       case 'confirm_bid_materials':
-        _openFirstPendingWorkbenchEntry(<String>{'bid_materials'});
+        _openWorkbenchEntryList(<String>{'bid_materials'}, title: '竞标资料确认');
         return;
       case 'complete_service_fee_authorization':
         final card = _firstServiceFeeAuthorizationCard(group);
@@ -582,6 +584,21 @@ class _CounterpartConversationPageState
       return;
     }
     _openWorkbenchEntry(entry);
+  }
+
+  void _openWorkbenchEntryList(Set<String> groups, {required String title}) {
+    _showProjectCommunicationWorkbenchEntryListSheet(
+      context: context,
+      result: _workbenchResult,
+      groups: groups,
+      title: title,
+      onUnavailable: _showSnack,
+      onOpenEntry: (entry) {
+        if (mounted) {
+          _openWorkbenchEntry(entry);
+        }
+      },
+    );
   }
 
   Future<void> _openBidSubmitAndRefresh(String projectId) async {
@@ -1179,6 +1196,7 @@ class _CounterpartConversationPageState
               : () => _loadMessages(thread),
           onPreviewAttachment: _openAttachmentPreview,
           onOpenConfirmationSoftLink: _openConfirmationSoftLink,
+          onOpenBusinessAction: _openMessageBusinessAction,
         ),
       ),
     ];
@@ -1248,6 +1266,19 @@ class _CounterpartConversationPageState
       return;
     }
     Navigator.of(context).pushNamed(target.routeLocation);
+  }
+
+  void _openMessageBusinessAction(ProjectCommunicationMessageView message) {
+    final target = message.routeTarget;
+    if (target != null) {
+      Navigator.of(context).pushNamed(target.routeLocation);
+      return;
+    }
+    if (message.requiredNextAction == 'complete_service_fee_authorization') {
+      _openChatRequiredAction();
+      return;
+    }
+    _showSnack('当前系统提醒暂时没有可打开的业务入口。');
   }
 
   void _openOrderDetail(CounterpartConversationProjectGroupView group) {
@@ -1603,7 +1634,25 @@ class _CounterpartConversationPageState
           entry: entry,
           onConfirm: _submitWorkbenchConfirm,
           onFeedback: _submitWorkbenchFeedback,
+          onOpenPublisherSupplement: _openPublisherSupplementPage,
         ),
+      ),
+    );
+  }
+
+  void _openPublisherSupplementPage(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final projectId = entry.projectId.trim();
+    if (projectId.isEmpty) {
+      _showSnack('无法进入补充资料页，缺少项目上下文。');
+      return;
+    }
+    Navigator.of(context).pushNamed(
+      ExhibitionRoutes.myProjectDetailWithProjectId(
+        projectId,
+        stage: 'published',
+        focus: 'attachments',
       ),
     );
   }
@@ -1772,8 +1821,13 @@ class _CounterpartConversationPageState
     final selectedGroup = currentDetail == null
         ? null
         : _selectedProjectGroup(currentDetail);
-    if (currentThread != null && selectedGroup != null) {
-      unawaited(_loadProjectWorkbench(selectedGroup, currentThread));
+    if (currentDetail != null && selectedGroup != null) {
+      await _loadThreadAndMessages(
+        currentDetail,
+        projectId: selectedGroup.projectId,
+      );
+    } else if (currentThread != null && selectedGroup != null) {
+      await _loadProjectWorkbench(selectedGroup, currentThread);
     }
     _showSnack(reviewAction == 'confirm' ? '已确认。' : '反馈已提交。');
     return true;

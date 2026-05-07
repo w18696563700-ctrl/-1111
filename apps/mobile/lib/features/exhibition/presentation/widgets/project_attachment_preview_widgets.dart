@@ -173,3 +173,20 @@ Future<void> _showProjectAttachmentNetworkImagePreviewDialog(
     },
   );
 }
+
+Future<bool> _canDecodeProjectAttachmentImagePreviewBytes(
+  List<int> bytes,
+) async {
+  if (bytes.isEmpty) {
+    return false;
+  }
+  ui.Codec? codec;
+  try {
+    codec = await ui.instantiateImageCodec(Uint8List.fromList(bytes));
+    return true;
+  } on Exception {
+    return false;
+  } finally {
+    codec?.dispose();
+  }
+}

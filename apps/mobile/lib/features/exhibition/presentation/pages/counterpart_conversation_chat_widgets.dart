@@ -65,6 +65,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
     required this.onRefreshMessages,
     required this.onPreviewAttachment,
     required this.onOpenConfirmationSoftLink,
+    required this.onOpenBusinessAction,
   });
 
   final bool loadingThread;
@@ -87,6 +88,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
   final ValueChanged<ProjectCommunicationMessageView> onPreviewAttachment;
   final ValueChanged<ProjectCommunicationMessageView>
   onOpenConfirmationSoftLink;
+  final ValueChanged<ProjectCommunicationMessageView> onOpenBusinessAction;
 
   @override
   Widget build(BuildContext context) {
@@ -177,6 +179,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
                     onPreviewAttachment: () => onPreviewAttachment(message),
                     onOpenConfirmationSoftLink: () =>
                         onOpenConfirmationSoftLink(message),
+                    onOpenBusinessAction: () => onOpenBusinessAction(message),
                   ),
                 for (final draft in drafts)
                   _DraftProjectCommunicationMessageBubble(
@@ -256,6 +259,7 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
     required this.attachmentPreviewLoading,
     required this.onPreviewAttachment,
     required this.onOpenConfirmationSoftLink,
+    required this.onOpenBusinessAction,
   });
 
   final ProjectCommunicationMessageView message;
@@ -267,6 +271,7 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
   final bool attachmentPreviewLoading;
   final VoidCallback onPreviewAttachment;
   final VoidCallback onOpenConfirmationSoftLink;
+  final VoidCallback onOpenBusinessAction;
 
   @override
   Widget build(BuildContext context) {
@@ -276,6 +281,9 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
       body: message.body,
       attachment: message.attachment,
       confirmation: message.confirmation,
+      businessActionLabel: message.isServiceFeeAuthorizationPrompt
+          ? '去完成预授权'
+          : null,
       meta: statusLabel == null ? sentAtLabel : '$sentAtLabel · $statusLabel',
       isMine: isMine,
       senderName: senderName,
@@ -289,6 +297,9 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
       onOpenConfirmationSoftLink: message.confirmation == null
           ? null
           : onOpenConfirmationSoftLink,
+      onOpenBusinessAction: message.isServiceFeeAuthorizationPrompt
+          ? onOpenBusinessAction
+          : null,
     );
   }
 
@@ -362,6 +373,8 @@ class _ChatBubble extends StatelessWidget {
     this.trailing,
     this.onPreviewAttachment,
     this.onOpenConfirmationSoftLink,
+    this.businessActionLabel,
+    this.onOpenBusinessAction,
   });
 
   final String body;
@@ -372,11 +385,13 @@ class _ChatBubble extends StatelessWidget {
   final String? avatarUrl;
   final ProjectCommunicationAttachmentView? attachment;
   final ProjectCommunicationConfirmationView? confirmation;
+  final String? businessActionLabel;
   final ProjectCommunicationFilePreviewAccessView? attachmentPreview;
   final bool attachmentPreviewLoading;
   final Widget? trailing;
   final VoidCallback? onPreviewAttachment;
   final VoidCallback? onOpenConfirmationSoftLink;
+  final VoidCallback? onOpenBusinessAction;
 
   @override
   Widget build(BuildContext context) {
@@ -431,6 +446,12 @@ class _ChatBubble extends StatelessWidget {
               _ConversationConfirmationCard(
                 confirmation: confirmation!,
                 onOpenSoftLink: onOpenConfirmationSoftLink,
+              )
+            else if (businessActionLabel != null)
+              _ConversationBusinessActionCard(
+                body: body,
+                actionLabel: businessActionLabel!,
+                onPressed: onOpenBusinessAction,
               )
             else if (attachment != null)
               _ConversationAttachmentCard(
@@ -768,6 +789,89 @@ class _ConversationImageAttachmentCard extends StatelessWidget {
       borderRadius: BorderRadius.circular(14),
       onTap: onPreview,
       child: content,
+    );
+  }
+}
+
+class _ConversationBusinessActionCard extends StatelessWidget {
+  const _ConversationBusinessActionCard({
+    required this.body,
+    required this.actionLabel,
+    this.onPressed,
+  });
+
+  final String body;
+  final String actionLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7EE),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF8AC79D)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const Icon(Icons.lock_open_rounded, color: Color(0xFF227A3A)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '资料确认已通过',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF166534),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const _ConversationPill(
+                  label: '待预授权',
+                  foregroundColor: Color(0xFF166534),
+                  backgroundColor: Color(0xFFD7F3DF),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              body,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '预授权不是扣款；完成后项目级自由发送将开启。',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: const Color(0xFF227A3A),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: onPressed,
+                icon: const Icon(Icons.payments_outlined, size: 16),
+                label: Text(actionLabel),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF227A3A),
+                  foregroundColor: Colors.white,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

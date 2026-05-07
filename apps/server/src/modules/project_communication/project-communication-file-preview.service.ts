@@ -77,9 +77,9 @@ export class ProjectCommunicationFilePreviewService {
     }
     const previewType = this.previewType(fileAsset.mimeType);
     const canPreview = previewType !== 'unsupported';
-    const accessUrl = canPreview ? await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey) : null;
-    if (canPreview && !accessUrl) {
-      throw this.unavailable('Current file preview access URL is unavailable.');
+    const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
+    if (!accessUrl) {
+      throw this.unavailable('Current file access URL is unavailable.');
     }
     return {
       fileAssetId,
@@ -90,7 +90,7 @@ export class ProjectCommunicationFilePreviewService {
       fileName: this.readPayloadFileName(message?.payload) ?? source?.fileName ?? fileAsset.id,
       mimeType: fileAsset.mimeType,
       accessUrl,
-      expiresAt: accessUrl ? this.buildExpiresAt() : null,
+      expiresAt: this.buildExpiresAt(),
       contentLengthBytes: fileAsset.size,
       downloadAvailable: true,
       fallbackReason: canPreview ? null : 'unsupported_mime_type'

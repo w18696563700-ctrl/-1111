@@ -428,6 +428,58 @@ test('file preview allows active project album photos without exposing objectKey
   assert.equal(result.objectKey, undefined);
 });
 
+test('file preview returns access URL for unsupported workbench files without enabling inline preview', async () => {
+  const {
+    ProjectCommunicationFilePreviewService,
+  } = require('../dist/modules/project_communication/project-communication-file-preview.service.js');
+  const thread = {
+    id: 'thread-1',
+    projectId: 'project-1',
+    counterpartOrganizationId: 'bidder-org',
+  };
+  const fileAsset = {
+    id: 'asset-docx-1',
+    businessType: 'project',
+    businessId: 'project-1',
+    fileKind: 'project_attachment',
+    objectKey: 'private/quote-basis.docx',
+    mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    size: 4096,
+  };
+  const service = new ProjectCommunicationFilePreviewService(
+    { async findOneBy() { return thread; } },
+    { async find() { return []; } },
+    { async findOneBy() { return fileAsset; } },
+    { async findOneBy() {
+      return {
+        projectId: 'project-1',
+        fileAssetId: 'asset-docx-1',
+        attachmentKind: 'effect_image',
+        visibility: 'owner_private',
+        fileName: '报价依据.docx',
+      };
+    } },
+    { async findOneBy() { return null; } },
+    { async findOneBy() { return null; } },
+    { async requireExistingThreadParticipant() { return { organizationId: 'bidder-org' }; } },
+    { async buildObjectAccessUrl(objectKey) { return 'https://signed.example/' + objectKey; } },
+    { uploadSignedUrlExpiresSeconds: 60 },
+  );
+
+  const result = await service.getPreviewAccess(
+    { projectId: 'project-1', threadId: 'thread-1', fileAssetId: 'asset-docx-1' },
+    createContext(),
+  );
+
+  assert.equal(result.previewType, 'unsupported');
+  assert.equal(result.canPreview, false);
+  assert.equal(result.downloadAvailable, true);
+  assert.equal(result.fileName, '报价依据.docx');
+  assert.equal(result.accessUrl, 'https://signed.example/private/quote-basis.docx');
+  assert.equal(result.fallbackReason, 'unsupported_mime_type');
+  assert.equal(result.objectKey, undefined);
+});
+
 test('confirmation softLink maps material_process to bounded material route target', async () => {
   const {
     ProjectCommunicationSoftLinkService,

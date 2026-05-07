@@ -31,10 +31,32 @@ function createRepository(seed = []) {
         return true;
       }) ?? null;
     },
+    async findOne(options = {}) {
+      const where = options.where ?? {};
+      return rows.find((item) => {
+        for (const [key, value] of Object.entries(where)) {
+          if (item[key] !== value) {
+            return false;
+          }
+        }
+        return true;
+      }) ?? null;
+    },
+    async find(options = {}) {
+      const where = options.where ?? {};
+      return rows.filter((item) => {
+        for (const [key, value] of Object.entries(where)) {
+          if (item[key] !== value) {
+            return false;
+          }
+        }
+        return true;
+      });
+    },
   };
 }
 
-function createHarness() {
+function createHarness(overrides = {}) {
   const {
     ProjectCommunicationBusinessEventService,
   } = require('../dist/modules/project_communication/project-communication-business-event.service.js');
@@ -44,8 +66,16 @@ function createHarness() {
   const {
     ProjectCommunicationMessageEntity,
   } = require('../dist/modules/project_communication/entities/project-communication-message.entity.js');
+  const {
+    ProjectCommunicationMaterialReviewEntity,
+  } = require('../dist/modules/project_communication/entities/project-communication-material-review.entity.js');
+  const {
+    BidParticipationRequestEntity,
+  } = require('../dist/modules/bid_participation_request/entities/bid-participation-request.entity.js');
   const threadRepository = createRepository();
   const messageRepository = createRepository();
+  const materialReviewRepository = createRepository(overrides.materialReviews ?? []);
+  const bidParticipationRequestRepository = createRepository(overrides.bidParticipationRequests ?? []);
   const notifications = [];
   const notificationService = {
     async createProjectCommunicationMessageNotification(
@@ -65,6 +95,12 @@ function createHarness() {
       if (entity === ProjectCommunicationMessageEntity) {
         return messageRepository;
       }
+      if (entity === ProjectCommunicationMaterialReviewEntity) {
+        return materialReviewRepository;
+      }
+      if (entity === BidParticipationRequestEntity) {
+        return bidParticipationRequestRepository;
+      }
       throw new Error(`unexpected repository: ${entity.name}`);
     },
   };
@@ -73,6 +109,8 @@ function createHarness() {
     manager,
     threadRepository,
     messageRepository,
+    materialReviewRepository,
+    bidParticipationRequestRepository,
     notifications,
   };
 }
@@ -151,7 +189,19 @@ test('material review business event keeps bidder and publisher in the same proj
 
 test('bid material confirmation completion event asks bidder to complete service fee authorization once', async () => {
   const { service, manager, threadRepository, messageRepository, notifications } =
-    createHarness();
+    createHarness({
+      bidParticipationRequests: [
+        {
+          id: 'request-1',
+          projectId: 'project-1',
+          requesterOrganizationId: 'bidder-org',
+          state: 'approved',
+          reviewedAt: new Date('2026-05-06T09:00:00.000Z'),
+          updatedAt: new Date('2026-05-06T09:00:00.000Z'),
+          createdAt: new Date('2026-05-06T08:00:00.000Z'),
+        },
+      ],
+    });
   const input = {
     manager,
     entry: {
@@ -189,6 +239,85 @@ test('bid material confirmation completion event asks bidder to complete service
     messageRepository.rows[0].payload.requiredNextAction,
     'complete_service_fee_authorization',
   );
+  assert.deepEqual(messageRepository.rows[0].payload.routeTarget, {
+    objectType: 'bid_service_fee_authorization',
+    actionKey: 'bid_service_fee_authorization.open',
+    canonicalPath: '/api/app/project/{projectId}/bid-service-fee-authorizations',
+    params: {
+      projectId: 'project-1',
+      bidParticipationRequestId: 'request-1',
+      bidId: 'bid-1',
+    },
+  });
   assert.equal(messageRepository.rows[0].senderOrganizationId, 'publisher-org');
   assert.equal(notifications.length, 1);
+});
+
+test('publisher material supplement event asks bidder to re-review updated attachment once per review', async () => {
+  const { service, manager, threadRepository, messageRepository, notifications } =
+    createHarness({
+      materialReviews: [
+        {
+          id: 'review-1',
+          projectId: 'project-1',
+          bidId: 'bid-1',
+          entryKey: 'publisher_service_list_review',
+          subjectType: 'publisher_quote_basis_material',
+          materialKind: 'service_list',
+          reviewerOrganizationId: 'bidder-org',
+          reviewState: 'needs_supplement',
+        },
+        {
+          id: 'review-2',
+          projectId: 'project-1',
+          bidId: 'bid-2',
+          entryKey: 'publisher_service_list_review',
+          subjectType: 'publisher_quote_basis_material',
+          materialKind: 'service_list',
+          reviewerOrganizationId: 'bidder-org',
+          reviewState: 'needs_supplement',
+        },
+        {
+          id: 'review-confirmed',
+          projectId: 'project-1',
+          bidId: 'bid-3',
+          entryKey: 'publisher_service_list_review',
+          subjectType: 'publisher_quote_basis_material',
+          materialKind: 'service_list',
+          reviewerOrganizationId: 'other-bidder-org',
+          reviewState: 'confirmed',
+        },
+      ],
+    });
+  const input = {
+    manager,
+    project: { id: 'project-1', organizationId: 'publisher-org' },
+    attachment: {
+      id: 'attachment-new',
+      fileAssetId: 'asset-new',
+      attachmentKind: 'service_list',
+    },
+    actorUserId: 'publisher-user',
+    actorId: 'publisher-actor',
+  };
+
+  await service.emitPublisherMaterialSupplementSubmitted(input);
+  await service.emitPublisherMaterialSupplementSubmitted(input);
+
+  assert.equal(threadRepository.rows.length, 1);
+  assert.equal(threadRepository.rows[0].ownerOrganizationId, 'publisher-org');
+  assert.equal(threadRepository.rows[0].counterpartOrganizationId, 'bidder-org');
+  assert.equal(messageRepository.rows.length, 2);
+  assert.deepEqual(
+    messageRepository.rows.map((item) => item.payload.bidId).sort(),
+    ['bid-1', 'bid-2'],
+  );
+  assert.equal(
+    messageRepository.rows[0].payload.eventType,
+    'publisher_material_supplement_submitted',
+  );
+  assert.equal(messageRepository.rows[0].payload.requiredNextAction, 're_review_material');
+  assert.equal(messageRepository.rows[0].payload.reviewState, 'pending_review');
+  assert.equal(messageRepository.rows[0].senderOrganizationId, 'publisher-org');
+  assert.equal(notifications.length, 2);
 });

@@ -414,6 +414,7 @@ class AppRouter {
       ),
       ExhibitionRoutes.myProjectDetail => MyProjectDetailPage(
         projectId: routeUri.queryParameters['projectId'],
+        initialFocus: routeUri.queryParameters['focus'],
       ),
       ExhibitionRoutes.projectClarification => ProjectClarificationPage(
         projectId: routeUri.queryParameters['projectId'],

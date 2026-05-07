@@ -1471,10 +1471,12 @@ test('bid-material projection filters to quote-basis V1 kinds only', async () =>
   const service = new ProjectBidMaterialService(
     harness.repositories.attachmentRepository,
     harness.repositories.projectRepository,
+    { async findOneBy() { return null; } },
     verificationService,
     eligibilityService,
     new ProjectBidMaterialPresenter(),
     { async requireApprovedForOrganization() {} },
+    { async getWorkbench() { throw new Error('should not build workbench without thread'); } },
   );
 
   const result = await service.list('project-1', createContext('bid-material-list-success'));

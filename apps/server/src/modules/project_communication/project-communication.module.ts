@@ -85,6 +85,7 @@ import { ProjectCommunicationWorkbenchService } from './project-communication-wo
   exports: [
     ProjectCommunicationBusinessStateService,
     ProjectCommunicationBusinessEventService,
+    ProjectCommunicationWorkbenchService,
     ProjectCommunicationMessageService,
     ProjectCommunicationSoftLinkService,
     ProjectCommunicationUnreadQueryService,

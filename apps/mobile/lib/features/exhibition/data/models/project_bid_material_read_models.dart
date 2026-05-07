@@ -46,6 +46,7 @@ class ProjectBidMaterialListReadModel {
   const ProjectBidMaterialListReadModel({
     required this.projectId,
     required this.attachments,
+    required this.materialReview,
   });
 
   factory ProjectBidMaterialListReadModel.fromPayload(Object? payload) {
@@ -70,9 +71,60 @@ class ProjectBidMaterialListReadModel {
             ProjectBidMaterialReadModel.fromPayload,
           )
           .toList(growable: false),
+      materialReview: raw['materialReview'] == null
+          ? null
+          : ProjectBidMaterialReviewProjectionReadModel.fromPayload(
+              raw['materialReview'],
+            ),
     );
   }
 
   final String projectId;
   final List<ProjectBidMaterialReadModel> attachments;
+  final ProjectBidMaterialReviewProjectionReadModel? materialReview;
+}
+
+class ProjectBidMaterialReviewProjectionReadModel {
+  const ProjectBidMaterialReviewProjectionReadModel({
+    required this.projectId,
+    required this.threadId,
+    required this.viewerRole,
+    required this.entries,
+    required this.generatedAt,
+  });
+
+  factory ProjectBidMaterialReviewProjectionReadModel.fromPayload(
+    Object? payload,
+  ) {
+    final raw = _asMap(payload);
+    if (raw == null) {
+      throw const FormatException(
+        'project bid-material materialReview payload must be an object',
+      );
+    }
+    final rawEntries = raw['entries'];
+    if (rawEntries is! List) {
+      throw const FormatException(
+        'project bid-material materialReview payload must contain entries',
+      );
+    }
+    return ProjectBidMaterialReviewProjectionReadModel(
+      projectId: '${raw['projectId']!}',
+      threadId: '${raw['threadId']!}',
+      viewerRole: '${raw['viewerRole']!}',
+      entries: rawEntries
+          .map<ProjectCommunicationWorkbenchEntryView>(
+            parseProjectCommunicationWorkbenchEntry,
+          )
+          .where((entry) => entry.group == 'publisher_materials')
+          .toList(growable: false),
+      generatedAt: '${raw['generatedAt']!}',
+    );
+  }
+
+  final String projectId;
+  final String threadId;
+  final String viewerRole;
+  final List<ProjectCommunicationWorkbenchEntryView> entries;
+  final String generatedAt;
 }

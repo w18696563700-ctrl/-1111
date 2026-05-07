@@ -41,14 +41,19 @@ class _PersistentShellPage extends StatefulWidget {
 class _PersistentShellPageState extends State<_PersistentShellPage>
     with SingleTickerProviderStateMixin {
   static const Duration _messagesAutoRefreshInterval = Duration(seconds: 3);
+  static const Duration _shellContextAutoRefreshInterval = Duration(
+    seconds: 20,
+  );
   final Map<AppBuilding, Widget> _cachedPages = <AppBuilding, Widget>{};
   final Set<AppBuilding> _activatedBottomBuildings = <AppBuilding>{};
   final ValueNotifier<int> _messagesRefreshSignal = ValueNotifier<int>(0);
   final ValueNotifier<int> _messagesEntrySignal = ValueNotifier<int>(0);
   late final AnimationController _rootBuildingTransitionController;
   Timer? _messagesRefreshTimer;
+  Timer? _shellContextRefreshTimer;
   late AppBuilding _currentBuilding = widget.initialBuilding;
   int _rootBuildingTransitionDirection = 0;
+  bool _shellContextRefreshing = false;
 
   @override
   void initState() {
@@ -60,11 +65,13 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
     );
     _activateBuilding(_currentBuilding);
     _syncMessagesRefreshTimer();
+    _startShellContextRefreshTimer();
   }
 
   @override
   void dispose() {
     _messagesRefreshTimer?.cancel();
+    _shellContextRefreshTimer?.cancel();
     _rootBuildingTransitionController.dispose();
     _messagesRefreshSignal.dispose();
     _messagesEntrySignal.dispose();
@@ -132,6 +139,25 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
       }
       _messagesRefreshSignal.value += 1;
     });
+  }
+
+  void _startShellContextRefreshTimer() {
+    _shellContextRefreshTimer ??= Timer.periodic(
+      _shellContextAutoRefreshInterval,
+      (_) => _refreshShellContextForUnreadBadge(),
+    );
+  }
+
+  Future<void> _refreshShellContextForUnreadBadge() async {
+    if (!mounted || _shellContextRefreshing) {
+      return;
+    }
+    _shellContextRefreshing = true;
+    try {
+      await AppShellScope.read(context).reloadShellContext();
+    } finally {
+      _shellContextRefreshing = false;
+    }
   }
 
   @override

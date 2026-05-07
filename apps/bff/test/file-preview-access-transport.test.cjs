@@ -59,3 +59,38 @@ test('file preview forwards project/thread/file anchors and strips objectKey', a
   assert.equal(result.accessUrl, 'https://signed.example/asset-1');
   assert.equal(Object.prototype.hasOwnProperty.call(result, 'objectKey'), false);
 });
+
+test('file preview preserves download URL when inline preview is unsupported', async () => {
+  const service = createService(async () => {
+    return {
+      fileAssetId: 'asset-docx-1',
+      projectId: 'project-1',
+      threadId: 'thread-1',
+      previewType: 'unsupported',
+      canPreview: false,
+      fileName: '报价依据.docx',
+      mimeType: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      accessUrl: 'https://signed.example/asset-docx-1',
+      expiresAt: '2026-05-01T08:10:00.000Z',
+      contentLengthBytes: 4096,
+      downloadAvailable: true,
+      fallbackReason: 'unsupported_mime_type',
+      objectKey: 'must/not/leak.docx',
+    };
+  });
+
+  const result = await service.getPreviewAccess(
+    { authorization: 'Bearer app', 'x-organization-id': 'org-1' },
+    'project-1',
+    'thread-1',
+    'asset-docx-1',
+  );
+
+  assert.equal(result.previewType, 'unsupported');
+  assert.equal(result.canPreview, false);
+  assert.equal(result.downloadAvailable, true);
+  assert.equal(result.accessUrl, 'https://signed.example/asset-docx-1');
+  assert.equal(result.expiresAt, '2026-05-01T08:10:00.000Z');
+  assert.equal(result.fallbackReason, 'unsupported_mime_type');
+  assert.equal(Object.prototype.hasOwnProperty.call(result, 'objectKey'), false);
+});

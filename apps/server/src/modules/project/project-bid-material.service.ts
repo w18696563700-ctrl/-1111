@@ -9,6 +9,8 @@ import { ProjectAttachmentEntity } from './entities/project-attachment.entity';
 import { ProjectEntity } from './entities/project.entity';
 import { ProjectBidMaterialPresenter } from './project-bid-material.presenter';
 import { projectUnavailable } from './project.errors';
+import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
+import { ProjectCommunicationWorkbenchService } from '../project_communication/project-communication-workbench.service';
 
 const BID_VISIBLE_ATTACHMENT_KINDS = [
   'effect_image',
@@ -25,10 +27,13 @@ export class ProjectBidMaterialService {
     private readonly attachmentRepository: Repository<ProjectAttachmentEntity>,
     @InjectRepository(ProjectEntity)
     private readonly projectRepository: Repository<ProjectEntity>,
+    @InjectRepository(ProjectCommunicationThreadEntity)
+    private readonly projectCommunicationThreadRepository: Repository<ProjectCommunicationThreadEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly presenter: ProjectBidMaterialPresenter,
-    private readonly bidParticipationAccessService: BidParticipationRequestAccessService
+    private readonly bidParticipationAccessService: BidParticipationRequestAccessService,
+    private readonly projectCommunicationWorkbenchService: ProjectCommunicationWorkbenchService
   ) {}
 
   async list(projectId: string, context: RequestContext) {
@@ -50,8 +55,43 @@ export class ProjectBidMaterialService {
       },
       order: { sortOrder: 'ASC', createdAt: 'ASC' }
     });
+    const materialReview = await this.buildPublisherMaterialReviewProjection(
+      project,
+      scope.organization.id,
+      context
+    );
 
-    return this.presenter.toListResponse(project.id, attachments);
+    return this.presenter.toListResponse(project.id, attachments, materialReview);
+  }
+
+  private async buildPublisherMaterialReviewProjection(
+    project: ProjectEntity,
+    bidderOrganizationId: string,
+    context: RequestContext
+  ) {
+    const thread = await this.projectCommunicationThreadRepository.findOneBy({
+      projectId: project.id,
+      ownerOrganizationId: project.organizationId,
+      counterpartOrganizationId: bidderOrganizationId
+    });
+    if (!thread) {
+      return null;
+    }
+    const workbench = await this.projectCommunicationWorkbenchService.getWorkbench(
+      { projectId: project.id, threadId: thread.id },
+      context
+    );
+    const entries = Array.isArray(workbench.entries)
+      ? workbench.entries.filter((entry: Record<string, unknown>) => entry.group === 'publisher_materials')
+      : [];
+    return {
+      projectId: workbench.projectId,
+      threadId: workbench.threadId,
+      viewerRole: workbench.viewerRole,
+      chatAvailability: workbench.chatAvailability,
+      entries,
+      generatedAt: workbench.generatedAt
+    };
   }
 
   private async requireBidMaterialProject(projectId: string) {

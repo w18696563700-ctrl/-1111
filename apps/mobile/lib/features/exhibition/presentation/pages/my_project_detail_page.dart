@@ -1,9 +1,10 @@
 part of '../exhibition_trade_pages.dart';
 
 class MyProjectDetailPage extends StatefulWidget {
-  const MyProjectDetailPage({super.key, this.projectId});
+  const MyProjectDetailPage({super.key, this.projectId, this.initialFocus});
 
   final String? projectId;
+  final String? initialFocus;
 
   @override
   State<MyProjectDetailPage> createState() => _MyProjectDetailPageState();
@@ -36,6 +37,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   ExhibitionLoadResult? _pricingSummaryResult;
   ExhibitionLoadResult? _quoteBasisAttachmentResult;
   bool _quoteBasisAttachmentsLoading = false;
+  bool _initialFocusHandled = false;
 
   @override
   void initState() {
@@ -79,12 +81,26 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     }
     if (projectId != null && _myProjectCanOpenAttachmentStage(state)) {
       await _loadQuoteBasisAttachments(projectId, forceRefresh: forceRefresh);
+      _scheduleInitialFocus();
     } else if (mounted) {
       setState(() {
         _quoteBasisAttachmentResult = null;
         _quoteBasisAttachmentsLoading = false;
       });
     }
+  }
+
+  void _scheduleInitialFocus() {
+    if (_initialFocusHandled || widget.initialFocus != 'attachments') {
+      return;
+    }
+    _initialFocusHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_scrollToAttachments());
+    });
   }
 
   String? _myProjectDetailHeaderState(Object? payload) {

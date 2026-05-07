@@ -275,7 +275,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
                 projectMap,
               ),
             ),
-            child: const Text('立即参与竞标'),
+            child: const Text('继续参与竞标'),
           )
         else if (canContinueBid && canRequestParticipation)
           FilledButton(

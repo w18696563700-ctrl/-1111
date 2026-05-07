@@ -116,12 +116,16 @@ final class ExhibitionRoutes {
   static String myProjectDetailWithProjectId(
     String projectId, {
     String? stage,
+    String? focus,
   }) {
     final normalizedStage = stage?.trim();
+    final normalizedFocus = focus?.trim();
     return _withQuery(myProjectDetail, <String, String>{
       'projectId': projectId,
       if (normalizedStage != null && normalizedStage.isNotEmpty)
         'stage': normalizedStage,
+      if (normalizedFocus != null && normalizedFocus.isNotEmpty)
+        'focus': normalizedFocus,
     });
   }
 

@@ -6,6 +6,8 @@ import { AuthModule } from '../auth/auth.module';
 import { BidParticipationRequestModule } from '../bid_participation_request/bid-participation-request.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectNameAccessModule } from '../project_name_access/project-name-access.module';
+import { ProjectCommunicationModule } from '../project_communication/project-communication.module';
+import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
 import { UploadModule } from '../upload/upload.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { BidEntity } from '../bid/entities/bid.entity';
@@ -47,6 +49,7 @@ import { ProjectWriteService } from './project-write.service';
       ProjectExitCaseEntity,
       FileAssetEntity,
       ForumPostEntity,
+      ProjectCommunicationThreadEntity,
       BidEntity,
       ProjectOrderEntity,
       InquiryQuoteDepositEntity,
@@ -58,6 +61,7 @@ import { ProjectWriteService } from './project-write.service';
     OrganizationModule,
     BidParticipationRequestModule,
     ProjectNameAccessModule,
+    ProjectCommunicationModule,
     UploadModule
   ],
   controllers: [

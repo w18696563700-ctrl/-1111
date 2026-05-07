@@ -9,7 +9,8 @@ class ProjectDetailPage extends StatefulWidget {
   State<ProjectDetailPage> createState() => _ProjectDetailPageState();
 }
 
-class _ProjectDetailPageState extends State<ProjectDetailPage> {
+class _ProjectDetailPageState extends State<ProjectDetailPage>
+    with WidgetsBindingObserver {
   late final ExhibitionStageLoadAutoSource _source =
       ExhibitionStageLoadAutoSource(
         futureRealLoader: ({bool forceRefresh = false}) {
@@ -38,7 +39,29 @@ class _ProjectDetailPageState extends State<ProjectDetailPage> {
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addObserver(this);
+    _load(forceRefresh: true);
+  }
+
+  @override
+  void didUpdateWidget(covariant ProjectDetailPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.projectId != widget.projectId) {
+      _load(forceRefresh: true);
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      unawaited(_load(forceRefresh: true));
+    }
   }
 
   Future<void> _load({bool forceRefresh = false}) async {

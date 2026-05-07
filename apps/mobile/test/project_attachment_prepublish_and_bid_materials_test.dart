@@ -7,6 +7,7 @@ import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/presentation/exhibition_trade_pages.dart';
+import 'package:mobile/features/messages/data/counterpart_conversation_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_identity_consumer_layer.dart';
 import 'package:mobile/shell/shell_app.dart';
@@ -69,9 +70,14 @@ Map<String, Object?> _myProjectDetailPayload({
 
 Map<String, Object?> _attachmentListResponse(
   String projectId,
-  List<Map<String, Object?>> attachments,
-) {
-  return <String, Object?>{'projectId': projectId, 'attachments': attachments};
+  List<Map<String, Object?>> attachments, {
+  Map<String, Object?>? materialReview,
+}) {
+  return <String, Object?>{
+    'projectId': projectId,
+    'attachments': attachments,
+    'materialReview': materialReview,
+  };
 }
 
 Map<String, Object?> _bidMaterial({
@@ -99,6 +105,118 @@ Map<String, Object?> _publicResourceListResponse(
   List<Map<String, Object?>> resources,
 ) {
   return <String, Object?>{'resources': resources};
+}
+
+Map<String, Object?> _publisherMaterialReviewProjection(
+  String projectId,
+  List<Map<String, Object?>> attachments,
+) {
+  return <String, Object?>{
+    'projectId': projectId,
+    'threadId': 'thread-1',
+    'viewerRole': 'bidder',
+    'chatAvailability': const <String, Object?>{
+      'canSendMessage': false,
+      'lockReasonCode': 'publisher_material_confirmation_pending',
+      'lockReasonText': '请先确认发布方提供的报价依据资料。',
+      'requiredNextAction': 'confirm_publisher_materials',
+    },
+    'entries': _publisherMaterialReviewEntries(projectId, attachments),
+    'generatedAt': '2026-04-16T10:00:00Z',
+  };
+}
+
+List<Map<String, Object?>> _publisherMaterialReviewEntries(
+  String projectId,
+  List<Map<String, Object?>> attachments,
+) {
+  const definitions = <({String kind, String entryKey, String label})>[
+    (
+      kind: 'effect_image',
+      entryKey: 'publisher_effect_image_review',
+      label: '效果图确认',
+    ),
+    (
+      kind: 'construction_doc',
+      entryKey: 'publisher_construction_doc_review',
+      label: '尺寸图 / 施工图确认',
+    ),
+    (
+      kind: 'material_sample',
+      entryKey: 'publisher_material_sample_review',
+      label: '材质图 / 材料样板确认',
+    ),
+    (
+      kind: 'equipment_material_list',
+      entryKey: 'publisher_equipment_material_list_review',
+      label: '设备物料清单确认',
+    ),
+    (
+      kind: 'service_list',
+      entryKey: 'publisher_service_list_review',
+      label: '服务清单确认',
+    ),
+  ];
+  return definitions
+      .map((definition) {
+        final sourceFiles = attachments
+            .where((item) => item['attachmentKind'] == definition.kind)
+            .map(
+              (item) => <String, Object?>{
+                'fileAssetId': item['fileAssetId'],
+                'fileName': item['fileName'],
+                'mimeType': item['mimeType'],
+                'sortOrder': item['sortOrder'],
+              },
+            )
+            .toList(growable: false);
+        return <String, Object?>{
+          'entryKey': definition.entryKey,
+          'group': 'publisher_materials',
+          'label': definition.label,
+          'summary': null,
+          'projectId': projectId,
+          'threadId': 'thread-1',
+          'bidId': null,
+          'viewerRole': 'bidder',
+          'subjectOwnerRole': 'publisher',
+          'availabilityState': sourceFiles.isEmpty ? 'unsubmitted' : 'readable',
+          'reviewState': sourceFiles.isEmpty ? 'unsubmitted' : 'pending_review',
+          'actionState': sourceFiles.isEmpty ? 'blocked' : 'enabled',
+          'attachmentCount': sourceFiles.length,
+          'badgeCount': sourceFiles.isEmpty ? 0 : 1,
+          'disabledReason': sourceFiles.isEmpty ? '当前资料尚未提交。' : null,
+          'sourceFiles': sourceFiles,
+          'latestFeedbackText': null,
+          'latestFeedbackAt': null,
+          'reviewedAt': null,
+          'routeTarget': <String, Object?>{
+            'actionKey': 'project_communication_material_review.open',
+            'canonicalPath':
+                '/api/app/message/project-communication/workbench/material-review-detail',
+            'params': <String, Object?>{
+              'projectId': projectId,
+              'threadId': 'thread-1',
+              'bidId': null,
+              'entryKey': definition.entryKey,
+            },
+          },
+          'truthAnchor': <String, Object?>{
+            'truthOwner': 'server',
+            'subjectType': 'publisher_quote_basis_material',
+            'projectId': projectId,
+            'threadId': 'thread-1',
+            'bidId': null,
+            'subjectOwnerOrganizationId': 'publisher-org',
+            'reviewerOrganizationId': 'org-1',
+            'materialKind': definition.kind,
+            'bidMaterialSlot': null,
+            'dealConfirmationId': null,
+            'sourceVersionToken': 'source-${definition.kind}',
+          },
+        };
+      })
+      .toList(growable: false);
 }
 
 Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
@@ -178,6 +296,12 @@ ExhibitionMobileApp _buildApp({
         transport: FakeAppApiTransport(handlers: const {}),
       ),
     ),
+    counterpartConversationConsumerLayer: CounterpartConversationConsumerLayer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: transport,
+      ),
+    ),
   );
 }
 
@@ -212,91 +336,103 @@ void main() {
       openedBidMaterialUri = uri;
       return true;
     });
+    final quoteBasisAttachments = <Map<String, Object?>>[
+      _bidMaterial(
+        attachmentId: 'attachment-1',
+        projectId: 'project-1',
+        fileAssetId: 'asset-1',
+        fileName: '效果图说明.docx',
+        attachmentKind: 'effect_image',
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        sortOrder: 0,
+      ),
+      _bidMaterial(
+        attachmentId: 'attachment-2',
+        projectId: 'project-1',
+        fileAssetId: 'asset-2',
+        fileName: '施工图.pdf',
+        attachmentKind: 'construction_doc',
+        mimeType: 'application/pdf',
+        sortOrder: 1,
+      ),
+      _bidMaterial(
+        attachmentId: 'attachment-3',
+        projectId: 'project-1',
+        fileAssetId: 'asset-3',
+        fileName: '材质图.pdf',
+        attachmentKind: 'material_sample',
+        mimeType: 'application/pdf',
+        sortOrder: 2,
+      ),
+      _bidMaterial(
+        attachmentId: 'attachment-4',
+        projectId: 'project-1',
+        fileAssetId: 'asset-4',
+        fileName: '设备物料清单.xlsx',
+        attachmentKind: 'equipment_material_list',
+        mimeType:
+            'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        sortOrder: 3,
+      ),
+      _bidMaterial(
+        attachmentId: 'attachment-5',
+        projectId: 'project-1',
+        fileAssetId: 'asset-5',
+        fileName: '服务清单.csv',
+        attachmentKind: 'service_list',
+        mimeType: 'text/csv',
+        sortOrder: 4,
+      ),
+    ];
     final transport = FakeAppApiTransport(
-      handlers: <String, Future<AppApiResponse> Function(AppApiRequest request)>{
-        'GET /api/app/project/detail': (AppApiRequest request) async =>
-            AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: _projectDetailPayload(
-                projectId: 'project-1',
-                state: 'published',
-                viewerProjectRelation: 'non_owner',
-              ),
-            ),
-        'GET /api/app/project/bid-materials': (AppApiRequest request) async =>
-            AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: _attachmentListResponse('project-1', <Map<String, Object?>>[
-                _bidMaterial(
-                  attachmentId: 'attachment-1',
-                  projectId: 'project-1',
-                  fileAssetId: 'asset-1',
-                  fileName: '效果图.png',
-                  attachmentKind: 'effect_image',
-                  mimeType: 'image/png',
-                  sortOrder: 0,
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/project/detail': (AppApiRequest request) async =>
+                AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _projectDetailPayload(
+                    projectId: 'project-1',
+                    state: 'published',
+                    viewerProjectRelation: 'non_owner',
+                  ),
                 ),
-                _bidMaterial(
-                  attachmentId: 'attachment-2',
-                  projectId: 'project-1',
-                  fileAssetId: 'asset-2',
-                  fileName: '施工图.pdf',
-                  attachmentKind: 'construction_doc',
-                  mimeType: 'application/pdf',
-                  sortOrder: 1,
+            'GET /api/app/project/bid-materials':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _attachmentListResponse(
+                    'project-1',
+                    quoteBasisAttachments,
+                    materialReview: _publisherMaterialReviewProjection(
+                      'project-1',
+                      quoteBasisAttachments,
+                    ),
+                  ),
                 ),
-                _bidMaterial(
-                  attachmentId: 'attachment-3',
-                  projectId: 'project-1',
-                  fileAssetId: 'asset-3',
-                  fileName: '材质图.pdf',
-                  attachmentKind: 'material_sample',
-                  mimeType: 'application/pdf',
-                  sortOrder: 2,
+            'GET /api/app/project/public-resources':
+                (AppApiRequest request) async => AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: _publicResourceListResponse(
+                    const <Map<String, Object?>>[],
+                  ),
                 ),
-                _bidMaterial(
-                  attachmentId: 'attachment-4',
-                  projectId: 'project-1',
-                  fileAssetId: 'asset-4',
-                  fileName: '设备物料清单.xlsx',
-                  attachmentKind: 'equipment_material_list',
-                  mimeType:
-                      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-                  sortOrder: 3,
+            'GET /api/app/file/access': (AppApiRequest request) async =>
+                AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: <String, Object?>{
+                    'fileAssetId': request.uri.queryParameters['fileAssetId'],
+                    'mode': request.uri.queryParameters['mode'],
+                    'accessUrl': 'https://signed.example.test/bid-material',
+                    'fileName': '效果图.png',
+                    'mimeType': 'image/png',
+                    'expiresAt': '2026-04-27T10:00:00.000Z',
+                  },
                 ),
-                _bidMaterial(
-                  attachmentId: 'attachment-5',
-                  projectId: 'project-1',
-                  fileAssetId: 'asset-5',
-                  fileName: '服务清单.csv',
-                  attachmentKind: 'service_list',
-                  mimeType: 'text/csv',
-                  sortOrder: 4,
-                ),
-              ]),
-            ),
-        'GET /api/app/project/public-resources':
-            (AppApiRequest request) async => AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: _publicResourceListResponse(const <Map<String, Object?>>[]),
-            ),
-        'GET /api/app/file/access': (AppApiRequest request) async =>
-            AppApiResponse(
-              statusCode: 200,
-              uri: request.uri,
-              body: <String, Object?>{
-                'fileAssetId': request.uri.queryParameters['fileAssetId'],
-                'mode': request.uri.queryParameters['mode'],
-                'accessUrl': 'https://signed.example.test/bid-material',
-                'fileName': '效果图.png',
-                'mimeType': 'image/png',
-                'expiresAt': '2026-04-27T10:00:00.000Z',
-              },
-            ),
-      },
+          },
     );
 
     await tester.pumpWidget(
@@ -337,7 +473,7 @@ void main() {
     expect(find.widgetWithText(OutlinedButton, '复核项目信息'), findsOneWidget);
     expect(find.text('查看报价依据资料'), findsOneWidget);
     expect(find.text('项目附件'), findsNothing);
-    expect(find.text('效果图.png'), findsOneWidget);
+    expect(find.text('效果图说明.docx'), findsOneWidget);
     expect(find.text('施工图.pdf'), findsOneWidget);
     expect(find.text('材质图.pdf'), findsOneWidget);
     expect(find.text('设备物料清单.xlsx'), findsOneWidget);
@@ -345,6 +481,8 @@ void main() {
     expect(find.textContaining('建议先将资料下载到手机'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '刷新报价依据资料'), findsOneWidget);
     expect(find.widgetWithText(OutlinedButton, '查看 / 下载'), findsWidgets);
+    expect(find.widgetWithText(OutlinedButton, '确认资料'), findsNWidgets(5));
+    expect(find.text('待确认'), findsNWidgets(5));
     expect(find.widgetWithText(OutlinedButton, '预览图片'), findsNothing);
     expect(find.widgetWithText(OutlinedButton, '预览文书'), findsNothing);
     expect(find.text('其他资料'), findsNothing);

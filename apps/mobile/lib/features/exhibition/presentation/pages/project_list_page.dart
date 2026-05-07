@@ -249,6 +249,7 @@ class _ProjectListPageState extends State<ProjectListPage> {
       showTechnicalDisclosure: false,
       showPageSummaryCard: false,
       showContentStateCard: false,
+      onRefresh: () => _load(forceRefresh: true),
       resultSectionsBuilder: (ExhibitionLoadResult result) {
         final rawItems = _itemMapsFromPayload(result.payload);
         final items = _applyLocalFilters(rawItems);

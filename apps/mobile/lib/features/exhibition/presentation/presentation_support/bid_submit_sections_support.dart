@@ -59,6 +59,7 @@ List<Widget> _buildBidSubmitBody({
   required ExhibitionLoadResult? bidMaterialResult,
   required String? bidMaterialProjectId,
   required Set<String> openingBidMaterialIds,
+  required Set<String> openingMaterialReviewEntryKeys,
   required TextEditingController quoteAmountController,
   required TextEditingController proposalSummaryController,
   required bool submitting,
@@ -71,6 +72,8 @@ List<Widget> _buildBidSubmitBody({
   required VoidCallback onRetryBidMaterials,
   required Future<void> Function(ProjectBidMaterialReadModel attachment)
   onOpenBidMaterial,
+  required Future<void> Function(ProjectCommunicationWorkbenchEntryView entry)
+  onOpenMaterialReview,
   required Future<void> Function(_BidSubmitAttachmentSlotState slot)
   onUploadAttachment,
   required Future<void> Function(_BidSubmitAttachmentSlotState slot)
@@ -138,8 +141,10 @@ List<Widget> _buildBidSubmitBody({
       bidMaterialResult: bidMaterialResult,
       projectId: bidMaterialProjectId,
       openingAttachmentIds: openingBidMaterialIds,
+      openingReviewEntryKeys: openingMaterialReviewEntryKeys,
       onRetry: onRetryBidMaterials,
       onOpenAttachment: onOpenBidMaterial,
+      onOpenMaterialReview: onOpenMaterialReview,
     ),
     const SizedBox(height: 16),
     _ActionCard(

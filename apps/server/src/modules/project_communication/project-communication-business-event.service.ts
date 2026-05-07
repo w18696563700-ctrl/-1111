@@ -4,11 +4,16 @@ import { EntityManager } from 'typeorm';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { NotificationService } from '../notifications/notification.service';
+import { ProjectAttachmentEntity } from '../project/entities/project-attachment.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import type { ProjectCommunicationWorkbenchEntryProjection } from './project-communication-workbench.presenter';
+import {
+  projectCommunicationWorkbenchEntryDefinitions,
+  type ProjectQuoteBasisMaterialKind
+} from './project-communication-workbench.types';
 
 type BusinessEventInput = {
   manager: EntityManager;
@@ -129,6 +134,62 @@ export class ProjectCommunicationBusinessEventService {
     });
   }
 
+  async emitPublisherMaterialSupplementSubmitted(input: {
+    manager: EntityManager;
+    project: Pick<ProjectEntity, 'id' | 'organizationId'>;
+    attachment: Pick<ProjectAttachmentEntity, 'id' | 'fileAssetId' | 'attachmentKind'>;
+    actorUserId: string;
+    actorId?: string | null;
+  }) {
+    const materialKind = input.attachment.attachmentKind as ProjectQuoteBasisMaterialKind;
+    const definition = projectCommunicationWorkbenchEntryDefinitions.find(
+      (item) => item.group === 'publisher_materials' && item.materialKind === materialKind
+    );
+    if (!definition) {
+      return [];
+    }
+    const reviews = await input.manager.getRepository(ProjectCommunicationMaterialReviewEntity).find({
+      where: {
+        projectId: input.project.id,
+        materialKind,
+        reviewState: 'needs_supplement',
+        subjectType: 'publisher_quote_basis_material'
+      }
+    });
+    const emitted: Array<ProjectCommunicationMessageEntity | null> = [];
+    for (const review of reviews) {
+      if (!review.reviewerOrganizationId || review.reviewerOrganizationId === input.project.organizationId) {
+        continue;
+      }
+      emitted.push(
+        await this.emitProjectCommunicationBusinessEvent({
+          manager: input.manager,
+          project: input.project,
+          counterpartOrganizationId: review.reviewerOrganizationId,
+          senderOrganizationId: input.project.organizationId,
+          senderUserId: input.actorUserId,
+          senderActorId: input.actorId,
+          body: `发布方已补充${definition.label.replace(/确认$/, '')}，请重新预览确认。`,
+          sourceType: 'project_attachment_supplement',
+          sourceId: `${review.id}:${input.attachment.id}:${input.attachment.fileAssetId}`,
+          eventType: 'publisher_material_supplement_submitted',
+          payload: {
+            entryKey: definition.entryKey,
+            group: definition.group,
+            bidId: review.bidId,
+            reviewState: 'pending_review',
+            materialKind,
+            materialReviewId: review.id,
+            projectAttachmentId: input.attachment.id,
+            fileAssetId: input.attachment.fileAssetId,
+            requiredNextAction: 're_review_material'
+          }
+        })
+      );
+    }
+    return emitted;
+  }
+
   async emitBidMaterialConfirmationCompleted(input: {
     manager: EntityManager;
     entry: ProjectCommunicationWorkbenchEntryProjection;
@@ -138,6 +199,7 @@ export class ProjectCommunicationBusinessEventService {
     if (input.entry.definition.group !== 'bid_materials' || !input.entry.bidId) {
       return null;
     }
+    const routeTarget = await this.bidServiceFeeAuthorizationRouteTarget(input.manager, input.entry);
     return this.emitProjectCommunicationBusinessEvent({
       manager: input.manager,
       project: {
@@ -155,9 +217,42 @@ export class ProjectCommunicationBusinessEventService {
       payload: {
         bidId: input.entry.bidId,
         group: input.entry.definition.group,
-        requiredNextAction: 'complete_service_fee_authorization'
+        requiredNextAction: 'complete_service_fee_authorization',
+        ...(routeTarget ? { routeTarget } : {})
       }
     });
+  }
+
+  private async bidServiceFeeAuthorizationRouteTarget(
+    manager: EntityManager,
+    entry: ProjectCommunicationWorkbenchEntryProjection
+  ) {
+    const projectId = entry.projectId?.trim() ?? '';
+    const bidderOrganizationId = entry.subjectOwnerOrganizationId?.trim() ?? '';
+    if (!projectId || !bidderOrganizationId) {
+      return null;
+    }
+    const request = await manager.getRepository(BidParticipationRequestEntity).findOne({
+      where: {
+        projectId,
+        requesterOrganizationId: bidderOrganizationId,
+        state: 'approved'
+      },
+      order: { reviewedAt: 'DESC', updatedAt: 'DESC', createdAt: 'DESC' }
+    });
+    if (!request) {
+      return null;
+    }
+    return {
+      objectType: 'bid_service_fee_authorization',
+      actionKey: 'bid_service_fee_authorization.open',
+      canonicalPath: '/api/app/project/{projectId}/bid-service-fee-authorizations',
+      params: {
+        projectId,
+        bidParticipationRequestId: request.id,
+        ...(entry.bidId ? { bidId: entry.bidId } : {})
+      }
+    };
   }
 
   private async emitProjectCommunicationBusinessEvent(input: BusinessEventInput) {

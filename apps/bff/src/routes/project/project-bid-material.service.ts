@@ -6,8 +6,13 @@ import { ServerClientService } from '../../core/http/server-client.service';
 import type {
   ProjectBidMaterialKind,
   ProjectBidMaterialListResponse,
-  ProjectBidMaterialReadModel
+  ProjectBidMaterialReadModel,
+  ProjectBidMaterialReviewReadModel
 } from './project-bid-material.read-model';
+import {
+  readProjectCommunicationChatAvailabilityReadModel,
+  readProjectCommunicationWorkbenchEntryReadModel
+} from '../message_interaction/project-communication-workbench.read-model';
 
 const PROJECT_BID_MATERIAL_KINDS = new Set<ProjectBidMaterialKind>([
   'effect_image',
@@ -121,7 +126,35 @@ export class ProjectBidMaterialService {
       projectId,
       attachments: attachments.map((item) =>
         this.toReadModel(this.requireRecord(item, 'Project bid-material item must be an object.'), projectId)
-      )
+      ),
+      materialReview: this.toMaterialReview(result.materialReview, projectId)
+    };
+  }
+
+  private toMaterialReview(
+    value: unknown,
+    fallbackProjectId: string
+  ): ProjectBidMaterialReviewReadModel | null {
+    if (value === undefined || value === null) {
+      return null;
+    }
+    const source = this.requireRecord(value, 'Project bid-material materialReview must be an object.');
+    const projectId = this.asString(source.projectId) || fallbackProjectId;
+    const threadId = this.asString(source.threadId);
+    const viewerRole = this.asString(source.viewerRole) || 'unknown';
+    const generatedAt = this.asString(source.generatedAt);
+    if (!projectId || !threadId || !generatedAt || !Array.isArray(source.entries)) {
+      throw new Error('Project bid-material materialReview is missing required fields.');
+    }
+    return {
+      projectId,
+      threadId,
+      viewerRole,
+      chatAvailability: readProjectCommunicationChatAvailabilityReadModel(source.chatAvailability) as Record<string, unknown>,
+      entries: source.entries.map((item) =>
+        readProjectCommunicationWorkbenchEntryReadModel(item) as Record<string, unknown>
+      ),
+      generatedAt
     };
   }
 

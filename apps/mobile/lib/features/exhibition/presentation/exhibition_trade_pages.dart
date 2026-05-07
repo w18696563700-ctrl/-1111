@@ -3,7 +3,9 @@ import 'dart:io';
 import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'dart:ui' as ui;
 
+import 'package:archive/archive.dart';
 import 'package:crypto/crypto.dart';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
@@ -39,6 +41,7 @@ import 'package:mobile/shared/ui/safe_remote_image.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'package:xml/xml.dart';
 
 part 'models/milestone_link.dart';
 part 'pages/project_list_page.dart';
@@ -53,6 +56,8 @@ part 'pages/counterpart_conversation_widgets.dart';
 part 'pages/counterpart_conversation_workbench_widgets.dart';
 part 'pages/counterpart_conversation_workbench_fold_support.dart';
 part 'pages/counterpart_conversation_workbench_detail_widgets.dart';
+part 'pages/counterpart_conversation_workbench_detail_support.dart';
+part 'pages/counterpart_conversation_workbench_preview_support.dart';
 part 'pages/counterpart_conversation_material_confirmation_widgets.dart';
 part 'pages/counterpart_conversation_chat_widgets.dart';
 part 'pages/project_album_section.dart';

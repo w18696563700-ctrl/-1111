@@ -50,6 +50,18 @@ _SuccessContractValidation _validateProjectBidMaterialListPayload(
     }
   }
 
+  final reviewMessage = _validateProjectBidMaterialReviewProjection(
+    raw['materialReview'],
+    canonicalPath,
+  );
+  if (reviewMessage != null) {
+    return _invalidSuccessPayload(
+      canonicalPath,
+      reviewMessage,
+      payload: sanitized,
+    );
+  }
+
   return _SuccessContractValidation(payload: sanitized);
 }
 
@@ -91,5 +103,78 @@ String? _validateProjectBidMaterialEntity(
     return 'contract drift at $context: invalid attachment kind/mime combination';
   }
 
+  return null;
+}
+
+String? _validateProjectBidMaterialReviewProjection(
+  Object? value,
+  String context,
+) {
+  if (value == null) {
+    return null;
+  }
+  if (value is! Map) {
+    return 'contract drift at $context: materialReview must be an object';
+  }
+  final raw = value.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  final message = _firstValidationError(<String?>[
+    _requireStringField(raw, 'projectId', '$context materialReview'),
+    _requireStringField(raw, 'threadId', '$context materialReview'),
+    _requireStateField(raw, 'viewerRole', const <String>{
+      'publisher',
+      'bidder',
+      'unknown',
+    }, '$context materialReview'),
+    _requireListField(raw, 'entries', '$context materialReview'),
+    _requireStringField(raw, 'generatedAt', '$context materialReview'),
+  ]);
+  if (message != null) {
+    return message;
+  }
+  final entries = raw['entries']! as List;
+  for (var index = 0; index < entries.length; index += 1) {
+    final entry = entries[index];
+    if (entry is! Map) {
+      return 'contract drift at $context materialReview: entries[$index] must be an object';
+    }
+    final entryMap = entry.map(
+      (Object? key, Object? value) => MapEntry('$key', value),
+    );
+    final entryMessage = _firstValidationError(<String?>[
+      _requireStringField(
+        entryMap,
+        'entryKey',
+        '$context materialReview.entries[$index]',
+      ),
+      _requireStateField(entryMap, 'group', const <String>{
+        'publisher_materials',
+      }, '$context materialReview.entries[$index]'),
+      _requireStringField(
+        entryMap,
+        'threadId',
+        '$context materialReview.entries[$index]',
+      ),
+      _requireStringField(
+        entryMap,
+        'reviewState',
+        '$context materialReview.entries[$index]',
+      ),
+      _requireStringField(
+        entryMap,
+        'actionState',
+        '$context materialReview.entries[$index]',
+      ),
+      _requireStringField(
+        entryMap,
+        'availabilityState',
+        '$context materialReview.entries[$index]',
+      ),
+    ]);
+    if (entryMessage != null) {
+      return entryMessage;
+    }
+  }
   return null;
 }

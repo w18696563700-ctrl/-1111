@@ -1074,11 +1074,6 @@ class _SelectedProjectBusinessEntrypointsState
   }
 
   void _handleMaterialConfirmationPressed() {
-    final pendingEntry = _firstPendingMaterialEntry;
-    if (pendingEntry != null) {
-      widget.onOpenWorkbenchEntry(pendingEntry);
-      return;
-    }
     final result = widget.workbenchResult;
     if (result?.state == AppPageState.errorRetryable ||
         result?.state == AppPageState.errorNonRetryable) {
@@ -1088,29 +1083,6 @@ class _SelectedProjectBusinessEntrypointsState
       return;
     }
     setState(() => _toolsVisible = !_toolsVisible);
-  }
-
-  ProjectCommunicationWorkbenchEntryView? get _firstPendingMaterialEntry {
-    final result = widget.workbenchResult;
-    final data = result?.data;
-    if (result?.state != AppPageState.content || data == null) {
-      return null;
-    }
-    for (final entry in data.entries) {
-      if (!_isMaterialWorkbenchEntry(entry)) {
-        continue;
-      }
-      if (entry.reviewState == 'confirmed') {
-        continue;
-      }
-      if (entry.badgeCount > 0 ||
-          entry.reviewState == 'pending_review' ||
-          entry.reviewState == 'needs_supplement' ||
-          entry.actionState == 'enabled') {
-        return entry;
-      }
-    }
-    return null;
   }
 
   List<ProjectCommunicationWorkbenchEntryView> get _dealEntries {

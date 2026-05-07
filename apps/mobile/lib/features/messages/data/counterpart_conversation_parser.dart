@@ -4,6 +4,16 @@ import 'package:mobile/features/messages/data/messages_registered_entry_registry
 
 const String _missingProjectContextMessage = '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
 
+const Set<String> _projectCommunicationRequiredNextActions = <String>{
+  'review_bid_participation',
+  'confirm_publisher_materials',
+  'submit_bid_materials',
+  'confirm_bid_materials',
+  'complete_service_fee_authorization',
+  'open_deal_confirmation',
+  'none',
+};
+
 CounterpartConversationDetailView parseCounterpartConversationDetail(
   Object? payload,
 ) {
@@ -120,16 +130,11 @@ ProjectCommunicationChatAvailabilityView _parseChatAvailability(
             'deal_confirmation_pending',
           }, 'lockReasonCode'),
     lockReasonText: _nullableString(map['lockReasonText']),
-    requiredNextAction:
-        _enumValue(_requiredString(map, 'requiredNextAction'), const <String>{
-          'review_bid_participation',
-          'confirm_publisher_materials',
-          'submit_bid_materials',
-          'confirm_bid_materials',
-          'complete_service_fee_authorization',
-          'open_deal_confirmation',
-          'none',
-        }, 'requiredNextAction'),
+    requiredNextAction: _enumValue(
+      _requiredString(map, 'requiredNextAction'),
+      _projectCommunicationRequiredNextActions,
+      'requiredNextAction',
+    ),
   );
 }
 
@@ -164,6 +169,7 @@ ProjectCommunicationMessageView parseProjectCommunicationMessage(
   Object? payload,
 ) {
   final map = _requiredMap(payload, 'project communication message');
+  final messagePayload = _optionalMessagePayloadMap(map['payload']);
   return ProjectCommunicationMessageView(
     messageId: _requiredString(map, 'messageId'),
     threadId: _requiredString(map, 'threadId'),
@@ -175,6 +181,15 @@ ProjectCommunicationMessageView parseProjectCommunicationMessage(
     body: _requiredBodyString(map, 'body'),
     attachment: _parseProjectCommunicationAttachment(map['payload']),
     confirmation: _parseProjectCommunicationConfirmation(map['payload']),
+    eventType: _nullableString(messagePayload?['eventType']),
+    sourceType: _nullableString(messagePayload?['sourceType']),
+    sourceId: _nullableString(messagePayload?['sourceId']),
+    requiredNextAction: _parseOptionalRequiredNextAction(
+      messagePayload?['requiredNextAction'],
+    ),
+    routeTarget: messagePayload?['routeTarget'] == null
+        ? null
+        : _parseRouteTarget(messagePayload?['routeTarget']),
     clientMessageId: _nullableString(map['clientMessageId']),
     messageState: _requiredString(map, 'messageState'),
     deliveryState: _enumValue(
@@ -193,6 +208,26 @@ ProjectCommunicationMessageView parseProjectCommunicationMessage(
     ),
     readByCounterpartAt: _nullableString(map['readByCounterpartAt']),
     createdAt: _requiredString(map, 'createdAt'),
+  );
+}
+
+Map<String, Object?>? _optionalMessagePayloadMap(Object? payload) {
+  if (payload == null) {
+    return null;
+  }
+  return _requiredMap(payload, 'project communication message payload');
+}
+
+String? _parseOptionalRequiredNextAction(Object? value) {
+  if (value == null) {
+    return null;
+  }
+  return _enumValue(
+    _requiredString(<String, Object?>{
+      'requiredNextAction': value,
+    }, 'requiredNextAction'),
+    _projectCommunicationRequiredNextActions,
+    'requiredNextAction',
   );
 }
 
@@ -422,7 +457,7 @@ ProjectCommunicationWorkbenchRouteTargetView? _parseWorkbenchRouteTarget(
   return ProjectCommunicationWorkbenchRouteTargetView(
     actionKey: _requiredString(map, 'actionKey'),
     canonicalPath: _requiredString(map, 'canonicalPath'),
-    params: _stringMap(map['params']),
+    params: _workbenchRouteParams(map['params']),
   );
 }
 
@@ -921,6 +956,28 @@ Map<String, String> _stringMap(Object? payload) {
     final key = '${entry.key}'.trim();
     final value = entry.value;
     if (key.isEmpty || value is! String || value.trim().isEmpty) {
+      throw const FormatException(_missingProjectContextMessage);
+    }
+    result[key] = value.trim();
+  }
+  return result;
+}
+
+Map<String, String> _workbenchRouteParams(Object? payload) {
+  if (payload is! Map) {
+    throw const FormatException(_missingProjectContextMessage);
+  }
+  final result = <String, String>{};
+  for (final MapEntry<Object?, Object?> entry in payload.entries) {
+    final key = '${entry.key}'.trim();
+    final value = entry.value;
+    if (key.isEmpty) {
+      throw const FormatException(_missingProjectContextMessage);
+    }
+    if (value == null) {
+      continue;
+    }
+    if (value is! String || value.trim().isEmpty) {
       throw const FormatException(_missingProjectContextMessage);
     }
     result[key] = value.trim();

@@ -1,5 +1,7 @@
 import 'dart:async';
+import 'dart:convert';
 
+import 'package:archive/archive.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mobile/core/api/app_api_client.dart';
@@ -15,6 +17,17 @@ AppApiClient _client(FakeAppApiTransport transport) {
   );
 }
 
+List<int> _minimalOfficeDocxBytes(String body) {
+  final archive = Archive()
+    ..addFile(
+      ArchiveFile.string(
+        'word/document.xml',
+        '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body><w:p><w:r><w:t>$body</w:t></w:r></w:p></w:body></w:document>',
+      ),
+    );
+  return ZipEncoder().encode(archive);
+}
+
 Widget _buildPage(FakeAppApiTransport transport) {
   final client = _client(transport);
   ExhibitionConsumerLayer.install(ExhibitionConsumerLayer(client: client));
@@ -26,6 +39,11 @@ Widget _buildPage(FakeAppApiTransport transport) {
     ),
   );
   return MaterialApp(
+    onGenerateRoute: (settings) => MaterialPageRoute<void>(
+      settings: settings,
+      builder: (_) =>
+          Scaffold(body: Center(child: Text('业务入口：${settings.name}'))),
+    ),
     home: const Scaffold(
       body: CounterpartConversationPage(
         conversationId: 'conversation-1',
@@ -59,6 +77,12 @@ Future<void> _enterProjectCommunication(WidgetTester tester) async {
 Future<void> _expandWorkbenchGroup(WidgetTester tester, String label) async {
   if (find.text(label).evaluate().isEmpty) {
     await _openMaterialTools(tester);
+  }
+  if (label == '发布方资料' && find.text('效果图确认').evaluate().isNotEmpty) {
+    return;
+  }
+  if (label == '竞标资料' && find.text('项目理解确认').evaluate().isNotEmpty) {
+    return;
   }
   final group = find.text(label);
   await _ensureVisible(tester, group);
@@ -145,7 +169,11 @@ Map<String, Object?> _detailPayload({String projectRelation = 'my_bid'}) {
   };
 }
 
-Map<String, Object?> _threadPayload() {
+Map<String, Object?> _threadPayload({
+  String lockReasonCode = 'publisher_material_confirmation_pending',
+  String lockReasonText = '请先确认发布方提供的报价依据资料。',
+  String requiredNextAction = 'confirm_publisher_materials',
+}) {
   return <String, Object?>{
     'threadId': 'thread-1',
     'projectId': 'project-1',
@@ -153,15 +181,53 @@ Map<String, Object?> _threadPayload() {
     'counterpartOrganizationId': 'org-counterpart',
     'chatAvailability': _chatAvailability(
       canSendMessage: false,
-      lockReasonCode: 'publisher_material_confirmation_pending',
-      lockReasonText: '请先确认发布方提供的报价依据资料。',
-      requiredNextAction: 'confirm_publisher_materials',
+      lockReasonCode: lockReasonCode,
+      lockReasonText: lockReasonText,
+      requiredNextAction: requiredNextAction,
     ),
     'threadState': 'active',
     'lastMessageId': null,
     'lastMessageAt': null,
     'createdAt': '2026-05-04T10:00:00Z',
     'updatedAt': '2026-05-04T10:00:00Z',
+  };
+}
+
+Map<String, Object?> _serviceFeeAuthorizationMessagePayload() {
+  return <String, Object?>{
+    'messageId': 'message-auth-required',
+    'threadId': 'thread-1',
+    'projectId': 'project-1',
+    'senderUserId': 'publisher-user',
+    'senderActorId': 'publisher-actor',
+    'senderOrganizationId': 'org-counterpart',
+    'messageKind': 'text',
+    'body': '发布方已确认完你的资料：项目理解、报价表、进度安排。请完成 4000 元竞标服务费预授权额度；完成后项目级自由发送将开启。',
+    'payload': <String, Object?>{
+      'eventType': 'bid_materials_confirmed_service_fee_authorization_required',
+      'sourceType': 'project_communication_material_review',
+      'sourceId': 'bid-1',
+      'bidId': 'bid-1',
+      'group': 'bid_materials',
+      'requiredNextAction': 'complete_service_fee_authorization',
+      'routeTarget': <String, Object?>{
+        'objectType': 'bid_service_fee_authorization',
+        'actionKey': 'bid_service_fee_authorization.open',
+        'canonicalPath':
+            '/api/app/project/{projectId}/bid-service-fee-authorizations',
+        'params': <String, Object?>{
+          'projectId': 'project-1',
+          'bidParticipationRequestId': 'request-1',
+          'bidId': 'bid-1',
+        },
+      },
+    },
+    'clientMessageId': null,
+    'messageState': 'active',
+    'deliveryState': 'persisted',
+    'readState': 'not_applicable',
+    'readByCounterpartAt': null,
+    'createdAt': '2026-05-04T11:00:00Z',
   };
 }
 
@@ -204,6 +270,7 @@ Map<String, Object?> _workbenchEntry({
   required String group,
   required String label,
   String? reviewState = 'pending_review',
+  String viewerRole = 'bidder',
   String availabilityState = 'readable',
   String actionState = 'enabled',
   int attachmentCount = 1,
@@ -220,7 +287,7 @@ Map<String, Object?> _workbenchEntry({
     'projectId': 'project-1',
     'threadId': 'thread-1',
     'bidId': 'bid-1',
-    'viewerRole': 'bidder',
+    'viewerRole': viewerRole,
     'subjectOwnerRole': group == 'bid_materials'
         ? 'bidder'
         : group == 'deal_confirmation'
@@ -272,8 +339,10 @@ Map<String, Object?> _workbenchEntry({
 }
 
 List<Map<String, Object?>> _workbenchEntries({
+  String viewerRole = 'bidder',
   String effectState = 'pending_review',
   String materialSampleState = 'needs_supplement',
+  String materialSampleActionState = 'enabled',
   String equipmentState = 'pending_review',
   String serviceState = 'pending_review',
   String projectUnderstandingState = 'pending_review',
@@ -285,6 +354,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'publisher_effect_image_review',
       group: 'publisher_materials',
       label: '效果图确认',
+      viewerRole: viewerRole,
       reviewState: effectState,
       materialKind: 'effect_image',
     ),
@@ -292,6 +362,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'publisher_construction_doc_review',
       group: 'publisher_materials',
       label: '尺寸图 / 施工图确认',
+      viewerRole: viewerRole,
       reviewState: 'unsubmitted',
       availabilityState: 'unsubmitted',
       actionState: 'blocked',
@@ -302,7 +373,9 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'publisher_material_sample_review',
       group: 'publisher_materials',
       label: '材质图 / 材料样板确认',
+      viewerRole: viewerRole,
       reviewState: materialSampleState,
+      actionState: materialSampleActionState,
       materialKind: 'material_sample',
       latestFeedbackText: materialSampleState == 'needs_supplement'
           ? '缺少材料品牌说明'
@@ -312,6 +385,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'publisher_equipment_material_list_review',
       group: 'publisher_materials',
       label: '设备物料清单确认',
+      viewerRole: viewerRole,
       reviewState: equipmentState,
       materialKind: 'equipment_material_list',
     ),
@@ -319,6 +393,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'publisher_service_list_review',
       group: 'publisher_materials',
       label: '服务清单确认',
+      viewerRole: viewerRole,
       reviewState: serviceState,
       materialKind: 'service_list',
     ),
@@ -326,6 +401,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'bid_project_understanding_review',
       group: 'bid_materials',
       label: '项目理解确认',
+      viewerRole: viewerRole,
       reviewState: projectUnderstandingState,
       bidMaterialSlot: 'project_understanding',
     ),
@@ -333,6 +409,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'bid_quote_sheet_review',
       group: 'bid_materials',
       label: '报价表确认',
+      viewerRole: viewerRole,
       reviewState: quoteState,
       bidMaterialSlot: 'quote_sheet',
     ),
@@ -340,6 +417,7 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'bid_schedule_plan_review',
       group: 'bid_materials',
       label: '进度安排确认',
+      viewerRole: viewerRole,
       reviewState: scheduleState,
       bidMaterialSlot: 'schedule_plan',
     ),
@@ -347,33 +425,39 @@ List<Map<String, Object?>> _workbenchEntries({
       entryKey: 'contract_confirmation',
       group: 'deal_confirmation',
       label: '合同确认',
+      viewerRole: viewerRole,
       reviewState: null,
     ),
     _workbenchEntry(
       entryKey: 'final_confirmed_amount_confirmation',
       group: 'deal_confirmation',
       label: '最终成交金额确认',
+      viewerRole: viewerRole,
       reviewState: null,
     ),
   ];
 }
 
 Map<String, Object?> _workbenchPayload({
+  String viewerRole = 'bidder',
   String effectState = 'pending_review',
   String materialSampleState = 'needs_supplement',
+  String materialSampleActionState = 'enabled',
   String equipmentState = 'pending_review',
   String serviceState = 'pending_review',
   String projectUnderstandingState = 'pending_review',
   String quoteState = 'pending_review',
   String scheduleState = 'pending_review',
   int materialReviewPendingCount = 3,
+  int bidMaterialReviewPendingCount = 0,
 }) {
   return <String, Object?>{
     'projectId': 'project-1',
     'threadId': 'thread-1',
-    'viewerRole': 'bidder',
+    'viewerRole': viewerRole,
     'businessTodoSummary': _businessTodoSummary(
       publisherMaterialReviewPendingCount: materialReviewPendingCount,
+      bidMaterialReviewPendingCount: bidMaterialReviewPendingCount,
     ),
     'chatAvailability': _chatAvailability(
       canSendMessage: false,
@@ -382,8 +466,10 @@ Map<String, Object?> _workbenchPayload({
       requiredNextAction: 'confirm_publisher_materials',
     ),
     'entries': _workbenchEntries(
+      viewerRole: viewerRole,
       effectState: effectState,
       materialSampleState: materialSampleState,
+      materialSampleActionState: materialSampleActionState,
       equipmentState: equipmentState,
       serviceState: serviceState,
       projectUnderstandingState: projectUnderstandingState,
@@ -397,14 +483,16 @@ Map<String, Object?> _workbenchPayload({
 Map<String, Object?> _bidMaterial({
   required String attachmentId,
   required String attachmentKind,
+  String? fileName,
+  String mimeType = 'application/pdf',
 }) {
   return <String, Object?>{
     'attachmentId': attachmentId,
     'projectId': 'project-1',
     'fileAssetId': 'file-$attachmentId',
-    'fileName': '$attachmentId.pdf',
+    'fileName': fileName ?? '$attachmentId.pdf',
     'attachmentKind': attachmentKind,
-    'mimeType': 'application/pdf',
+    'mimeType': mimeType,
     'sortOrder': 0,
     'createdAt': '2026-05-04T10:00:00Z',
   };
@@ -506,8 +594,19 @@ _baseHandlers({String projectRelation = 'my_bid'}) {
 }
 
 void main() {
+  setUp(() {
+    ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader((_) async {
+      return base64Decode(
+        'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=',
+      );
+    });
+    ProjectAttachmentDebugOverrides.installExternalUrlOpener((_) async => true);
+  });
+
+  tearDown(ProjectAttachmentDebugOverrides.reset);
+
   testWidgets(
-    'material confirmation entry opens first pending review before continuation',
+    'material confirmation entry opens publisher material list before detail',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(handlers: _baseHandlers());
 
@@ -520,9 +619,17 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text('请先处理资料确认单，再进入后续承接。'), findsOneWidget);
       await _openMaterialTools(tester);
+      expect(find.text('发布方资料'), findsOneWidget);
+      expect(find.text('效果图确认'), findsOneWidget);
+      expect(find.text('材质图 / 材料样板确认'), findsOneWidget);
+      expect(find.text('设备物料清单确认'), findsOneWidget);
+      expect(find.text('服务清单确认'), findsOneWidget);
+      expect(find.text('确认无误'), findsNothing);
+      await tester.tap(find.text('效果图确认'));
+      await tester.pumpAndSettle();
       expect(find.text('effect.pdf'), findsOneWidget);
-      expect(find.text('确认无误'), findsOneWidget);
-      expect(find.text('发布方资料'), findsNothing);
+      expect(find.text('预览后确认'), findsOneWidget);
+      expect(find.text('确认无误'), findsNothing);
     },
   );
 
@@ -612,6 +719,8 @@ void main() {
       await tester.pumpAndSettle();
       await _enterProjectCommunication(tester);
       await _openMaterialTools(tester);
+      await tester.tap(find.text('效果图确认'));
+      await tester.pumpAndSettle();
       expect(find.text('effect.pdf'), findsOneWidget);
       await tester.tap(find.text('预览').first);
       await tester.pumpAndSettle();
@@ -631,6 +740,145 @@ void main() {
         ),
         isEmpty,
       );
+    },
+  );
+
+  testWidgets('failed preview does not unlock material confirmation', (
+    WidgetTester tester,
+  ) async {
+    ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader(
+      (_) async => null,
+    );
+    final transport = FakeAppApiTransport(handlers: _baseHandlers());
+
+    await tester.pumpWidget(_buildPage(transport));
+    await tester.pumpAndSettle();
+    await _enterProjectCommunication(tester);
+    await _openMaterialTools(tester);
+    await tester.tap(find.text('效果图确认'));
+    await tester.pumpAndSettle();
+    expect(find.text('effect.pdf'), findsOneWidget);
+
+    await tester.tap(find.text('预览').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前图片资料暂时无法预览，请稍后再试。'), findsOneWidget);
+    expect(find.text('预览后确认'), findsOneWidget);
+    expect(find.text('确认无误'), findsNothing);
+    expect(
+      transport.requests.where(
+        (request) =>
+            request.method.name.toUpperCase() == 'POST' &&
+            request.canonicalPath ==
+                '/api/app/message/project-communication/workbench/material-review',
+      ),
+      isEmpty,
+    );
+  });
+
+  testWidgets('docx material renders in app before confirmation', (
+    WidgetTester tester,
+  ) async {
+    ProjectAttachmentDebugOverrides.installRemoteImageBytesLoader(
+      (_) async => _minimalOfficeDocxBytes('报价依据资料正文'),
+    );
+    final handlers = _baseHandlers();
+    handlers['GET /api/app/project/bid-materials'] =
+        (AppApiRequest request) async => AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: <String, Object?>{
+            'projectId': 'project-1',
+            'attachments': <Object?>[
+              _bidMaterial(
+                attachmentId: 'effect',
+                attachmentKind: 'effect_image',
+                fileName: '报价依据.docx',
+                mimeType:
+                    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+              ),
+            ],
+          },
+        );
+    handlers['GET /api/app/file/preview/access'] =
+        (AppApiRequest request) async => AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: const <String, Object?>{
+            'fileAssetId': 'file-effect',
+            'projectId': 'project-1',
+            'threadId': 'thread-1',
+            'previewType': 'unsupported',
+            'canPreview': false,
+            'fileName': '报价依据.docx',
+            'mimeType':
+                'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            'accessUrl': 'https://signed.example/quote-basis.docx',
+            'expiresAt': '2026-05-04T12:00:00Z',
+            'contentLengthBytes': 4096,
+            'downloadAvailable': true,
+            'fallbackReason': 'unsupported_mime_type',
+          },
+        );
+    final transport = FakeAppApiTransport(handlers: handlers);
+
+    await tester.pumpWidget(_buildPage(transport));
+    await tester.pumpAndSettle();
+    await _enterProjectCommunication(tester);
+    await _openMaterialTools(tester);
+    await tester.tap(find.text('效果图确认'));
+    await tester.pumpAndSettle();
+    expect(find.text('报价依据.docx'), findsOneWidget);
+
+    await tester.tap(find.text('预览').first);
+    await tester.pumpAndSettle();
+
+    expect(find.text('unsupported_mime_type'), findsNothing);
+    expect(find.text('App 内资料预览'), findsOneWidget);
+    expect(find.text('报价依据资料正文'), findsOneWidget);
+    await tester.tap(find.byIcon(Icons.close_rounded));
+    await tester.pumpAndSettle();
+    expect(find.text('确认无误'), findsOneWidget);
+  });
+
+  testWidgets(
+    'pdf material does not unlock confirmation without embedded viewer',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers();
+      handlers['GET /api/app/file/preview/access'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: const <String, Object?>{
+              'fileAssetId': 'file-effect',
+              'projectId': 'project-1',
+              'threadId': 'thread-1',
+              'previewType': 'pdf',
+              'canPreview': true,
+              'fileName': 'effect.pdf',
+              'mimeType': 'application/pdf',
+              'accessUrl': 'https://signed.example/effect.pdf',
+              'expiresAt': '2026-05-04T12:00:00Z',
+              'contentLengthBytes': 4096,
+              'downloadAvailable': true,
+              'fallbackReason': null,
+            },
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+      await _openMaterialTools(tester);
+      await tester.tap(find.text('效果图确认'));
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('预览').first);
+      await tester.pumpAndSettle();
+
+      expect(find.text('PDF 内嵌预览能力暂未接入，当前不能确认该资料。'), findsOneWidget);
+      expect(find.text('预览后确认'), findsOneWidget);
+      expect(find.text('确认无误'), findsNothing);
     },
   );
 
@@ -679,6 +927,10 @@ void main() {
     await tester.pumpAndSettle();
     await _enterProjectCommunication(tester);
     await _openMaterialTools(tester);
+    await _expandWorkbenchGroup(tester, '竞标资料');
+    await _ensureVisible(tester, find.text('报价表确认'));
+    await tester.tap(find.text('报价表确认'));
+    await tester.pumpAndSettle();
     expect(find.text('报价表'), findsOneWidget);
     await tester.enterText(find.byType(TextField), '请补充最终报价合计。');
     await tester.tap(find.text('需要补充'));
@@ -686,6 +938,198 @@ void main() {
 
     expect(find.text('反馈已提交。'), findsOneWidget);
   });
+
+  testWidgets(
+    'confirmed bid materials refresh messages and render service fee authorization CTA',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers(projectRelation: 'my_published');
+      var completed = false;
+      handlers['GET /api/app/message/project-communication/thread'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: completed
+                ? _threadPayload(
+                    lockReasonCode: 'service_fee_authorization_pending',
+                    lockReasonText:
+                        '资料确认已通过，需等待竞标方完成 4000 元竞标服务费预授权额度后开启项目级自由发送。',
+                    requiredNextAction: 'complete_service_fee_authorization',
+                  )
+                : _threadPayload(
+                    lockReasonCode: 'bid_material_confirmation_pending',
+                    lockReasonText: '请先由发布方确认竞标报价资料。',
+                    requiredNextAction: 'confirm_bid_materials',
+                  ),
+          );
+      handlers['GET /api/app/message/project-communication/messages'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'items': completed
+                  ? <Object?>[_serviceFeeAuthorizationMessagePayload()]
+                  : <Object?>[],
+              'nextCursor': null,
+            },
+          );
+      handlers['GET /api/app/message/project-communication/workbench'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _workbenchPayload(
+              viewerRole: 'publisher',
+              effectState: 'confirmed',
+              materialSampleState: 'confirmed',
+              equipmentState: 'confirmed',
+              serviceState: 'confirmed',
+              projectUnderstandingState: 'confirmed',
+              quoteState: 'confirmed',
+              scheduleState: completed ? 'confirmed' : 'pending_review',
+              materialReviewPendingCount: 0,
+              bidMaterialReviewPendingCount: completed ? 0 : 1,
+            ),
+          );
+      handlers['GET /api/app/bid/submission/snapshot'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: const <String, Object?>{
+              'projectId': 'project-1',
+              'bidId': 'bid-1',
+              'bidder': <String, Object?>{
+                'organizationId': 'org-counterpart',
+                'displayName': '重庆海川展览工厂',
+                'avatarUrl': null,
+              },
+              'submittedAt': '2026-05-04T10:00:00Z',
+              'quoteAmount': 12000,
+              'proposalSummary': '报价说明',
+              'attachmentSummary': <String, Object?>{'count': 3},
+              'attachments': <Object?>[
+                <String, Object?>{
+                  'slotKey': 'schedule_plan',
+                  'slotLabel': '进度安排',
+                  'fileAssetId': 'file-schedule',
+                  'fileKind': 'bid_schedule_plan',
+                  'mimeType': 'image/png',
+                },
+              ],
+              'availability': <String, Object?>{'readable': true},
+            },
+          );
+      handlers['POST /api/app/message/project-communication/workbench/material-review'] =
+          (AppApiRequest request) async {
+            final body = request.body! as Map<String, Object?>;
+            expect(body['entryKey'], 'bid_schedule_plan_review');
+            expect(body['reviewAction'], 'confirm');
+            completed = true;
+            return AppApiResponse(
+              statusCode: 202,
+              uri: request.uri,
+              body: <String, Object?>{
+                'entry': _workbenchEntries(
+                  viewerRole: 'publisher',
+                  projectUnderstandingState: 'confirmed',
+                  quoteState: 'confirmed',
+                  scheduleState: 'confirmed',
+                )[7],
+                'entries': _workbenchEntries(
+                  viewerRole: 'publisher',
+                  projectUnderstandingState: 'confirmed',
+                  quoteState: 'confirmed',
+                  scheduleState: 'confirmed',
+                ),
+                'projectId': 'project-1',
+                'threadId': 'thread-1',
+                'viewerRole': 'publisher',
+                'updatedAt': '2026-05-04T11:00:00Z',
+              },
+            );
+          };
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+      await _openMaterialTools(tester);
+      await _expandWorkbenchGroup(tester, '竞标资料');
+      await _ensureVisible(tester, find.text('进度安排确认'));
+      await tester.tap(find.text('进度安排确认'));
+      await tester.pumpAndSettle();
+      if (find.text('预览').evaluate().isNotEmpty) {
+        await tester.tap(find.text('预览').first);
+        await tester.pumpAndSettle();
+        await tester.tap(find.byIcon(Icons.close_rounded));
+        await tester.pumpAndSettle();
+      }
+      await _ensureVisible(tester, find.text('确认无误'));
+      await tester.tap(find.text('确认无误'));
+      await tester.pumpAndSettle();
+
+      await _ensureVisible(tester, find.text('资料确认已通过'));
+      expect(find.text('资料确认已通过'), findsOneWidget);
+      expect(find.text('去完成预授权'), findsWidgets);
+      await _ensureVisible(tester, find.widgetWithText(FilledButton, '去完成预授权'));
+      await tester.tap(find.widgetWithText(FilledButton, '去完成预授权'));
+      await tester.pumpAndSettle();
+      expect(
+        find.textContaining(
+          '/exhibition/bids/submit?projectId=project-1&bidParticipationRequestId=request-1',
+        ),
+        findsOneWidget,
+      );
+      expect(
+        transport.requests
+            .where(
+              (request) =>
+                  request.method.name.toUpperCase() == 'GET' &&
+                  request.canonicalPath ==
+                      '/api/app/message/project-communication/messages',
+            )
+            .length,
+        greaterThanOrEqualTo(2),
+      );
+    },
+  );
+
+  testWidgets(
+    'publisher supplement request keeps chat locked and opens real material page entry',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers(projectRelation: 'my_published');
+      handlers['GET /api/app/message/project-communication/workbench'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _workbenchPayload(
+              viewerRole: 'publisher',
+              effectState: 'confirmed',
+              materialSampleState: 'needs_supplement',
+              materialSampleActionState: 'readonly',
+              equipmentState: 'confirmed',
+              serviceState: 'confirmed',
+              projectUnderstandingState: 'confirmed',
+              quoteState: 'confirmed',
+              scheduleState: 'confirmed',
+              materialReviewPendingCount: 1,
+            ),
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+      await _openMaterialTools(tester);
+      await _expandWorkbenchGroup(tester, '发布方资料');
+      await _ensureVisible(tester, find.text('材质图 / 材料样板确认'));
+      await tester.tap(find.text('材质图 / 材料样板确认'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('最近反馈：缺少材料品牌说明'), findsOneWidget);
+      expect(find.text('去补充该资料'), findsOneWidget);
+      expect(find.textContaining('当前项目沟通仍处于锁定状态'), findsOneWidget);
+      expect(find.text('确认无误'), findsNothing);
+    },
+  );
 
   testWidgets('deal confirmation entry is visible but does not charge', (
     WidgetTester tester,

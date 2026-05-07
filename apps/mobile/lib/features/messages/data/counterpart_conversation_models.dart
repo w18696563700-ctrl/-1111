@@ -270,6 +270,11 @@ final class ProjectCommunicationMessageView {
     required this.body,
     required this.attachment,
     required this.confirmation,
+    required this.eventType,
+    required this.sourceType,
+    required this.sourceId,
+    required this.requiredNextAction,
+    required this.routeTarget,
     required this.clientMessageId,
     required this.messageState,
     required this.deliveryState,
@@ -288,12 +293,23 @@ final class ProjectCommunicationMessageView {
   final String body;
   final ProjectCommunicationAttachmentView? attachment;
   final ProjectCommunicationConfirmationView? confirmation;
+  final String? eventType;
+  final String? sourceType;
+  final String? sourceId;
+  final String? requiredNextAction;
+  final MessageInteractionRouteTarget? routeTarget;
   final String? clientMessageId;
   final String messageState;
   final String deliveryState;
   final String readState;
   final String? readByCounterpartAt;
   final String createdAt;
+
+  bool get isServiceFeeAuthorizationPrompt {
+    return eventType ==
+            'bid_materials_confirmed_service_fee_authorization_required' &&
+        requiredNextAction == 'complete_service_fee_authorization';
+  }
 }
 
 final class ProjectCommunicationAttachmentView {

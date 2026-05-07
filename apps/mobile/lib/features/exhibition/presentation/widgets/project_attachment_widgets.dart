@@ -370,8 +370,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
       _retryAttachmentKind = null;
       _uploadStatus = _ProjectAttachmentUploadUiStatus.bindSucceeded;
       _uploadMessage = successNames.length == 1
-          ? '${successNames.first} 已形成报价依据资料。最终列表以后端资料读侧回读为准。'
-          : '已形成 ${successNames.length} 个报价依据资料。最终列表以后端资料读侧回读为准。';
+          ? '${successNames.first} 已形成报价依据资料。若存在资料补充请求，系统已通知竞标方重新确认。'
+          : '已形成 ${successNames.length} 个报价依据资料。若存在资料补充请求，系统已通知竞标方重新确认。';
     });
     ExhibitionConsumerLayer.instance.invalidateProjectAttachments(
       projectId: projectId,
@@ -379,8 +379,8 @@ class _ProjectAttachmentSectionState extends State<_ProjectAttachmentSection> {
     await _loadFormalAttachments(
       forceRefresh: true,
       feedbackMessage: successNames.length == 1
-          ? '${successNames.first} 已进入报价依据资料列表。'
-          : '已回读 ${successNames.length} 个新资料。',
+          ? '${successNames.first} 已进入报价依据资料列表，关联补充请求会自动回流。'
+          : '已回读 ${successNames.length} 个新资料，关联补充请求会自动回流。',
     );
   }
 

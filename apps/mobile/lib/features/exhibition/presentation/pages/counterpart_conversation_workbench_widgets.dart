@@ -5,12 +5,16 @@ class _ProjectCommunicationWorkbenchSection extends StatefulWidget {
     required this.loading,
     required this.result,
     required this.onOpenEntry,
+    this.initialExpandedGroupKeys = const <String>{'publisher_materials'},
+    this.allowedGroupKeys,
   });
 
   final bool loading;
   final CounterpartConversationResult<ProjectCommunicationWorkbenchView>?
   result;
   final ValueChanged<ProjectCommunicationWorkbenchEntryView> onOpenEntry;
+  final Set<String> initialExpandedGroupKeys;
+  final Set<String>? allowedGroupKeys;
 
   @override
   State<_ProjectCommunicationWorkbenchSection> createState() =>
@@ -19,7 +23,13 @@ class _ProjectCommunicationWorkbenchSection extends StatefulWidget {
 
 class _ProjectCommunicationWorkbenchSectionState
     extends State<_ProjectCommunicationWorkbenchSection> {
-  final Set<String> _expandedGroupKeys = <String>{};
+  late final Set<String> _expandedGroupKeys;
+
+  @override
+  void initState() {
+    super.initState();
+    _expandedGroupKeys = <String>{...widget.initialExpandedGroupKeys};
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -30,24 +40,30 @@ class _ProjectCommunicationWorkbenchSectionState
         message: widget.result?.message ?? '工作台状态暂不可读',
       );
     }
-    final groups = <_WorkbenchGroupData>[
-      _WorkbenchGroupData(
-        key: 'publisher_materials',
-        title: '发布方资料',
-        summary: '效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料、服务清单',
-        entries: view.entries
-            .where((entry) => entry.group == 'publisher_materials')
-            .toList(growable: false),
-      ),
-      _WorkbenchGroupData(
-        key: 'bid_materials',
-        title: '竞标资料',
-        summary: '项目理解、报价表、进度安排',
-        entries: view.entries
-            .where((entry) => entry.group == 'bid_materials')
-            .toList(growable: false),
-      ),
-    ];
+    final groups =
+        <_WorkbenchGroupData>[
+              _WorkbenchGroupData(
+                key: 'publisher_materials',
+                title: '发布方资料',
+                summary: '效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料、服务清单',
+                entries: view.entries
+                    .where((entry) => entry.group == 'publisher_materials')
+                    .toList(growable: false),
+              ),
+              _WorkbenchGroupData(
+                key: 'bid_materials',
+                title: '竞标资料',
+                summary: '项目理解、报价表、进度安排',
+                entries: view.entries
+                    .where((entry) => entry.group == 'bid_materials')
+                    .toList(growable: false),
+              ),
+            ]
+            .where((group) {
+              final allowed = widget.allowedGroupKeys;
+              return allowed == null || allowed.contains(group.key);
+            })
+            .toList(growable: false);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[

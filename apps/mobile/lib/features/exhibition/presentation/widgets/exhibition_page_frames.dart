@@ -20,6 +20,7 @@ class _LoadPageFrame extends StatelessWidget {
     this.recoveryButtonLabelOverride,
     this.resultSectionsBuilder,
     this.bottomPinnedBuilder,
+    this.onRefresh,
   });
 
   final String title;
@@ -41,6 +42,7 @@ class _LoadPageFrame extends StatelessWidget {
   final List<Widget> Function(ExhibitionLoadResult result)?
   resultSectionsBuilder;
   final Widget? Function(ExhibitionLoadResult result)? bottomPinnedBuilder;
+  final Future<void> Function()? onRefresh;
 
   @override
   Widget build(BuildContext context) {
@@ -49,6 +51,7 @@ class _LoadPageFrame extends StatelessWidget {
         ? bottomPinnedBuilder?.call(loadResult)
         : null;
     final listView = ListView(
+      physics: const AlwaysScrollableScrollPhysics(),
       padding: EdgeInsets.fromLTRB(20, 20, 20, bottomPinned == null ? 28 : 142),
       children: <Widget>[
         if (showPageSummaryCard)
@@ -110,12 +113,15 @@ class _LoadPageFrame extends StatelessWidget {
         ],
       ],
     );
+    final scrollContent = onRefresh == null
+        ? listView
+        : RefreshIndicator(onRefresh: onRefresh!, child: listView);
     if (bottomPinned == null) {
-      return listView;
+      return scrollContent;
     }
     return Stack(
       children: <Widget>[
-        listView,
+        scrollContent,
         Positioned(
           left: 0,
           right: 0,

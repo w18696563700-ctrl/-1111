@@ -41,6 +41,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   ExhibitionLoadResult? _projectDetailResult;
   ExhibitionLoadResult? _bidMaterialResult;
   final Set<String> _openingBidMaterialIds = <String>{};
+  final Set<String> _openingMaterialReviewEntryKeys = <String>{};
   bool _resultLoading = false;
   bool _bidFlowExpanded = false;
   bool _projectReviewExpanded = false;
@@ -108,7 +109,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       _loadBidResultAccessGuard();
       return;
     }
-    _loadSubmitProjectDetail();
+    _loadSubmitProjectDetail(forceRefresh: true);
     _loadAccessGuard();
   }
 
@@ -219,6 +220,24 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       return;
     }
 
+    final publisherMaterialBlocker =
+        _bidSubmitPublisherMaterialReviewSubmitDisabledMessage(
+          _bidMaterialResult,
+        );
+    if (publisherMaterialBlocker != null) {
+      setState(() {
+        _lastResult = ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.bidSubmit,
+          isSuccess: false,
+          controlledState: AppPageState.errorNonRetryable,
+          message: publisherMaterialBlocker,
+        );
+      });
+      _showBidMaterialMessage(publisherMaterialBlocker);
+      return;
+    }
+
     setState(() {
       _submitting = true;
       _lastResult = null;
@@ -301,6 +320,14 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       return attachmentBlocker;
     }
 
+    final publisherMaterialBlocker =
+        _bidSubmitPublisherMaterialReviewSubmitDisabledMessage(
+          _bidMaterialResult,
+        );
+    if (publisherMaterialBlocker != null) {
+      return publisherMaterialBlocker;
+    }
+
     return null;
   }
 
@@ -373,6 +400,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
         bidMaterialResult: _bidMaterialResult,
         bidMaterialProjectId: projectId,
         openingBidMaterialIds: _openingBidMaterialIds,
+        openingMaterialReviewEntryKeys: _openingMaterialReviewEntryKeys,
         quoteAmountController: _quoteAmountController,
         proposalSummaryController: _proposalSummaryController,
         submitting: _submitting,
@@ -386,10 +414,104 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
         onUploadAttachment: _uploadBidSubmitAttachment,
         onRetryBidMaterials: () => _loadBidMaterials(forceRefresh: true),
         onOpenBidMaterial: _openBidMaterial,
+        onOpenMaterialReview: _openBidSubmitMaterialReviewEntry,
         onPreviewAttachment: (slot) =>
             _BidSubmitAttachmentPreviewActions(this).previewAttachment(slot),
       ),
     );
+  }
+
+  Future<void> _openBidSubmitMaterialReviewEntry(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) async {
+    if (_openingMaterialReviewEntryKeys.contains(entry.entryKey)) {
+      return;
+    }
+    if (!_hasBidSubmitMaterialReviewRouteTarget(entry)) {
+      _showBidMaterialMessage('资料确认入口暂不可用，请刷新报价依据资料后重试。');
+      return;
+    }
+    setState(() => _openingMaterialReviewEntryKeys.add(entry.entryKey));
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _ProjectCommunicationMaterialReviewDetailPage(
+          entry: entry,
+          onConfirm: _submitBidSubmitMaterialReviewConfirm,
+          onFeedback: _submitBidSubmitMaterialReviewFeedback,
+        ),
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _openingMaterialReviewEntryKeys.remove(entry.entryKey));
+    await _loadBidMaterials(forceRefresh: true);
+  }
+
+  bool _hasBidSubmitMaterialReviewRouteTarget(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final routeTarget = entry.routeTarget;
+    final projectId = routeTarget?.params['projectId']?.trim();
+    final threadId = routeTarget?.params['threadId']?.trim();
+    final entryKey = routeTarget?.params['entryKey']?.trim();
+    return entry.group == 'publisher_materials' &&
+        entry.projectId.trim().isNotEmpty &&
+        entry.threadId.trim().isNotEmpty &&
+        routeTarget?.actionKey ==
+            'project_communication_material_review.open' &&
+        routeTarget?.canonicalPath.trim().isNotEmpty == true &&
+        projectId != null &&
+        projectId.isNotEmpty &&
+        threadId != null &&
+        threadId.isNotEmpty &&
+        entryKey != null &&
+        entryKey.isNotEmpty;
+  }
+
+  Future<bool> _submitBidSubmitMaterialReviewConfirm(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    return _submitBidSubmitMaterialReview(entry, reviewAction: 'confirm');
+  }
+
+  Future<bool> _submitBidSubmitMaterialReviewFeedback(
+    ProjectCommunicationWorkbenchEntryView entry,
+    String feedbackText,
+  ) {
+    return _submitBidSubmitMaterialReview(
+      entry,
+      reviewAction: 'request_supplement',
+      feedbackText: feedbackText,
+    );
+  }
+
+  Future<bool> _submitBidSubmitMaterialReview(
+    ProjectCommunicationWorkbenchEntryView entry, {
+    required String reviewAction,
+    String? feedbackText,
+  }) async {
+    final result = await CounterpartConversationConsumerLayer.instance
+        .submitProjectCommunicationMaterialReview(
+          projectId: entry.projectId,
+          threadId: entry.threadId,
+          bidId: entry.bidId,
+          entryKey: entry.entryKey,
+          reviewAction: reviewAction,
+          feedbackText: feedbackText,
+          sourceVersionToken: entry.truthAnchor.sourceVersionToken,
+          idempotencyKey:
+              '${entry.entryKey}-$reviewAction-${DateTime.now().microsecondsSinceEpoch}',
+        );
+    if (result.state != AppPageState.content || result.data == null) {
+      _showBidMaterialMessage(result.message ?? '资料确认提交失败。');
+      return false;
+    }
+    await _loadBidMaterials(forceRefresh: true);
+    if (mounted) {
+      _showBidMaterialMessage(reviewAction == 'confirm' ? '已确认。' : '反馈已提交。');
+    }
+    return true;
   }
 
   Widget _buildResultMode() {
@@ -601,7 +723,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     }
 
     final detailResult = await ExhibitionConsumerLayer.instance
-        .loadProjectDetail(projectId: projectId);
+        .loadProjectDetail(projectId: projectId, forceRefresh: true);
     if (mounted) {
       setState(() {
         _projectDetailResult = detailResult;
@@ -736,7 +858,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       );
     });
 
-    await _loadBidMaterials();
+    await _loadBidMaterials(forceRefresh: true);
   }
 
   void _toggleProjectReview() {
@@ -766,6 +888,14 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       });
       return;
     }
+
+    setState(() {
+      _bidMaterialResult = ExhibitionLoadResult(
+        state: AppPageState.loading,
+        method: 'GET',
+        path: ExhibitionCanonicalPaths.projectBidMaterials,
+      );
+    });
 
     final result = await ExhibitionConsumerLayer.instance
         .loadProjectBidMaterials(

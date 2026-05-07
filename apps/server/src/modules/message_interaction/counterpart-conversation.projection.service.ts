@@ -424,16 +424,19 @@ export class CounterpartConversationProjectionService {
   ) {
     return projectGroups.reduce(
       (summary, group) => {
-        summary.conversationUnreadCount += group.projectUnreadCount;
+        const businessTodoCount =
+          group.businessTodoSummary?.totalPendingCount ?? 0;
+        const badgeCount = group.projectUnreadCount + businessTodoCount;
+        summary.conversationUnreadCount += badgeCount;
         summary.latestUnreadMessageAt = this.maxIso(
           summary.latestUnreadMessageAt,
           group.latestUnreadMessageAt,
         );
         if (group.projectRelation === 'my_published') {
-          summary.myPublishedUnreadCount += group.projectUnreadCount;
+          summary.myPublishedUnreadCount += badgeCount;
         }
         if (group.projectRelation === 'my_bid') {
-          summary.myBidUnreadCount += group.projectUnreadCount;
+          summary.myBidUnreadCount += badgeCount;
         }
         return summary;
       },

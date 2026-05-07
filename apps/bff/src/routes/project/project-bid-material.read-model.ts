@@ -16,7 +16,17 @@ export type ProjectBidMaterialReadModel = {
   createdAt: string;
 };
 
+export type ProjectBidMaterialReviewReadModel = {
+  projectId: string;
+  threadId: string;
+  viewerRole: string;
+  chatAvailability: Record<string, unknown>;
+  entries: Record<string, unknown>[];
+  generatedAt: string;
+};
+
 export type ProjectBidMaterialListResponse = {
   projectId: string;
   attachments: ProjectBidMaterialReadModel[];
+  materialReview: ProjectBidMaterialReviewReadModel | null;
 };

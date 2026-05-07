@@ -6,6 +6,8 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/protected_app_request.dart';
+import 'package:mobile/features/messages/data/counterpart_conversation_models.dart';
+import 'package:mobile/features/messages/data/counterpart_conversation_parser.dart';
 
 part 'commands/bid_submit_command.dart';
 part 'commands/bid_award_command.dart';

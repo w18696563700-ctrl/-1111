@@ -181,72 +181,77 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
       color: ExhibitionHomeVisualTokens.pageBackground,
       child: Stack(
         children: <Widget>[
-          ListView(
-            controller: _scrollController,
-            padding: EdgeInsets.fromLTRB(
-              ExhibitionHomeVisualTokens.spacingPage,
-              14,
-              ExhibitionHomeVisualTokens.spacingPage,
-              bottomClearance,
+          RefreshIndicator(
+            onRefresh: () => _refreshWholePage(useRefreshPath: true),
+            child: ListView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                ExhibitionHomeVisualTokens.spacingPage,
+                14,
+                ExhibitionHomeVisualTokens.spacingPage,
+                bottomClearance,
+              ),
+              children: <Widget>[
+                const _HomeHeroHeader(),
+                const SizedBox(height: 14),
+                _HomeWeatherCard(
+                  expanded: _weatherExpanded,
+                  refreshing: _refreshing,
+                  locating: _locating,
+                  locationSnapshot: _locationSnapshot,
+                  manualLocationSelection: _manualLocationSelection,
+                  homeResult: _homeResult,
+                  weatherProjection: weatherProjection,
+                  onToggleExpanded: () {
+                    setState(() {
+                      _weatherExpanded = !_weatherExpanded;
+                    });
+                  },
+                  onRefreshPressed: () =>
+                      _refreshWholePage(useRefreshPath: true),
+                  onRelocatePressed: () => _refreshWholePage(
+                    useRefreshPath: true,
+                    forceDeviceRelocation: true,
+                  ),
+                  onManualSelectionPressed: _openManualLocationSelect,
+                ),
+                const SizedBox(height: 10),
+                const _HomeSectionHeader(eyebrow: '公开入口', title: '推荐频道'),
+                const SizedBox(height: 6),
+                _HomeModuleDeck(
+                  selectedTab: _selectedModuleTab,
+                  onTabSelected: (_HomeModuleTab tab) {
+                    setState(() {
+                      _selectedModuleTab = tab;
+                    });
+                  },
+                  loading: _refreshing,
+                  locationSnapshot: _locationSnapshot,
+                  projectResult: _projectResult,
+                  projectItems: projectItems,
+                  onRefreshHome: () => _refreshWholePage(useRefreshPath: true),
+                  onRelocateHome: () => _refreshWholePage(
+                    useRefreshPath: true,
+                    forceDeviceRelocation: true,
+                  ),
+                  onOpenProjectList: _openShowcase,
+                  onOpenProjectCreate: _openProjectCreate,
+                  onOpenProjectDetail: _openProjectDetail,
+                  onOpenForum: _openForum,
+                  onOpenForumPublish: _openForumPublish,
+                  onOpenForumPost: _openForumPost,
+                  onOpenCompanyBoard: () =>
+                      _openEnterpriseBoard(EnterpriseBoardType.company),
+                  onOpenFactoryBoard: () =>
+                      _openEnterpriseBoard(EnterpriseBoardType.factory),
+                  onOpenSupplierBoard: () =>
+                      _openEnterpriseBoard(EnterpriseBoardType.supplier),
+                  onOpenEnterpriseItem: _openEnterpriseListItem,
+                  onOpenTeamExplanation: _openTeamPlaceholderExplanation,
+                ),
+              ],
             ),
-            children: <Widget>[
-              const _HomeHeroHeader(),
-              const SizedBox(height: 14),
-              _HomeWeatherCard(
-                expanded: _weatherExpanded,
-                refreshing: _refreshing,
-                locating: _locating,
-                locationSnapshot: _locationSnapshot,
-                manualLocationSelection: _manualLocationSelection,
-                homeResult: _homeResult,
-                weatherProjection: weatherProjection,
-                onToggleExpanded: () {
-                  setState(() {
-                    _weatherExpanded = !_weatherExpanded;
-                  });
-                },
-                onRefreshPressed: () => _refreshWholePage(useRefreshPath: true),
-                onRelocatePressed: () => _refreshWholePage(
-                  useRefreshPath: true,
-                  forceDeviceRelocation: true,
-                ),
-                onManualSelectionPressed: _openManualLocationSelect,
-              ),
-              const SizedBox(height: 10),
-              const _HomeSectionHeader(eyebrow: '公开入口', title: '推荐频道'),
-              const SizedBox(height: 6),
-              _HomeModuleDeck(
-                selectedTab: _selectedModuleTab,
-                onTabSelected: (_HomeModuleTab tab) {
-                  setState(() {
-                    _selectedModuleTab = tab;
-                  });
-                },
-                loading: _refreshing,
-                locationSnapshot: _locationSnapshot,
-                projectResult: _projectResult,
-                projectItems: projectItems,
-                onRefreshHome: () => _refreshWholePage(useRefreshPath: true),
-                onRelocateHome: () => _refreshWholePage(
-                  useRefreshPath: true,
-                  forceDeviceRelocation: true,
-                ),
-                onOpenProjectList: _openShowcase,
-                onOpenProjectCreate: _openProjectCreate,
-                onOpenProjectDetail: _openProjectDetail,
-                onOpenForum: _openForum,
-                onOpenForumPublish: _openForumPublish,
-                onOpenForumPost: _openForumPost,
-                onOpenCompanyBoard: () =>
-                    _openEnterpriseBoard(EnterpriseBoardType.company),
-                onOpenFactoryBoard: () =>
-                    _openEnterpriseBoard(EnterpriseBoardType.factory),
-                onOpenSupplierBoard: () =>
-                    _openEnterpriseBoard(EnterpriseBoardType.supplier),
-                onOpenEnterpriseItem: _openEnterpriseListItem,
-                onOpenTeamExplanation: _openTeamPlaceholderExplanation,
-              ),
-            ],
           ),
           Positioned(
             right: 20,

@@ -61,6 +61,14 @@ export function readProjectCommunicationMaterialReviewResponseReadModel(value: u
   };
 }
 
+export function readProjectCommunicationWorkbenchEntryReadModel(value: unknown) {
+  return readWorkbenchEntry(value);
+}
+
+export function readProjectCommunicationChatAvailabilityReadModel(value: unknown) {
+  return readChatAvailability(value);
+}
+
 function readWorkbenchEntry(value: unknown) {
   const source = requireRecord(value, 'Project communication workbench entry is invalid.');
   const group = readEnum(source.group, 'entry.group', GROUPS);
