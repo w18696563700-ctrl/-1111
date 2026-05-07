@@ -754,11 +754,11 @@ export const PROJECT_COMMUNICATION_MATERIAL_REVIEW_STATES = ["unsubmitted","pend
 export type ProjectCommunicationMaterialReviewState =
   (typeof PROJECT_COMMUNICATION_MATERIAL_REVIEW_STATES)[number];
 
-export const PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES = ["bid_participation_review_pending","publisher_material_confirmation_pending","bid_submission_pending","bid_material_confirmation_pending","deal_confirmation_pending",null] as const;
+export const PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES = ["bid_participation_review_pending","publisher_material_confirmation_pending","bid_submission_pending","bid_material_confirmation_pending","service_fee_authorization_pending","deal_confirmation_pending",null] as const;
 export type ProjectCommunicationChatLockReasonCode =
   (typeof PROJECT_COMMUNICATION_CHAT_LOCK_REASON_CODES)[number];
 
-export const PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS = ["review_bid_participation","confirm_publisher_materials","submit_bid_materials","confirm_bid_materials","open_deal_confirmation","none"] as const;
+export const PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS = ["review_bid_participation","confirm_publisher_materials","submit_bid_materials","confirm_bid_materials","complete_service_fee_authorization","open_deal_confirmation","none"] as const;
 export type ProjectCommunicationChatRequiredNextAction =
   (typeof PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS)[number];
 

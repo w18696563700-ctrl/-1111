@@ -4083,14 +4083,17 @@ paths:
     post:
       tags:
       - Bid
-      summary: Exhibition bid submit canonical path for Flutter App with pricing gate
+      summary: Exhibition bid submit canonical path for Flutter App
       operationId: submitAppBid
       requestBody:
         required: true
         description: 'Minimum bid submit command request for current Flutter App consumption.
-          This request freezes only the current page-submitted fields. Pricing truth
-          stays outside this body and must be admitted by upstream `approved bidParticipationRequest
-          + frozen 4000 元竞标服务费预授权额度` gate truth before submit may succeed.
+          This request freezes only the current page-submitted fields. Bid submit
+          must be admitted by Server-owned participation eligibility, project-biddable
+          state, confirmed three-file attachment truth, legal quote fields, duplicate-submit
+          protection, and permission checks. The bounded `4000 元竞标服务费预授权额度`
+          truth stays outside this body and must not block bid submit; it becomes
+          the project-level free-send opening gate after publisher material confirmation.
 
 '
         content:
@@ -4103,8 +4106,11 @@ paths:
             current frontend success chain freezes only `bidId`; this response must
             not expand into a full bid read projection, bid compare truth, shortlist
             or win-loss management, or order-create truth. Success is admitted only
-            when the current actor already owns an `approved` participation truth
-            and a `frozen` bounded `4000 元竞标服务费预授权额度`.
+            when the current actor owns an `approved` participation truth and Server
+            has accepted the quote fields plus the three confirmed bid material attachments.
+            It does not mean publisher material confirmation, BidAward, deal completion,
+            final contract amount confirmation, service-fee authorization completion,
+            or payment deduction.
 
 '
           content:
@@ -4112,10 +4118,14 @@ paths:
               schema:
                 "$ref": "#/components/schemas/BidSubmitAcceptedResponse"
         '409':
-          description: 'Controlled bid-submit pricing-gate or invalid-state response.
-            Server must fail closed with `BID_SERVICE_FEE_AUTHORIZATION_REQUIRED`
-            or `BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE` when the required current
-            `4000 元竞标服务费预授权额度` truth is absent or not yet frozen.
+          description: 'Controlled bid-submit invalid-state response. Server may fail
+            closed for invalid project state, missing approved participation truth,
+            invalid or unconfirmed bid material attachments, illegal quote fields,
+            duplicate submission, or permission mismatch. Server must not return
+            `BID_SERVICE_FEE_AUTHORIZATION_REQUIRED` solely because the bounded
+            `4000 元竞标服务费预授权额度` truth is absent or not yet frozen; that authorization
+            gate belongs after publisher material confirmation and before project-level
+            free-send opening.
 
 '
   "/api/app/bid/seat/lock":
@@ -13716,7 +13726,7 @@ components:
           type: boolean
           description: 'Minimum current pricing-gate carrier for the admitted thread
             continuation only. `true` means the current actor must complete a bounded
-            pricing gate before bid submit may open.
+            pricing gate before project-level free-send continuation may open.
 
 '
         pricingGateType:
@@ -19283,7 +19293,10 @@ components:
       - requiredNextAction
       description: 'Server-owned send availability projection for one project communication
         thread. Flutter input locking is display protection only; Server message-write
-        commands must enforce the same rule.
+        commands must enforce the same rule. Project communication entry visibility
+        does not mean project-level free-send availability; after publisher confirms
+        bid materials, the bounded `4000 元竞标服务费预授权额度` may still lock free-send
+        until Server marks the authorization requirement satisfied.
 
 '
       properties:
@@ -19298,6 +19311,7 @@ components:
           - publisher_material_confirmation_pending
           - bid_submission_pending
           - bid_material_confirmation_pending
+          - service_fee_authorization_pending
           - deal_confirmation_pending
           - null
         lockReasonText:
@@ -19312,6 +19326,7 @@ components:
           - confirm_publisher_materials
           - submit_bid_materials
           - confirm_bid_materials
+          - complete_service_fee_authorization
           - open_deal_confirmation
           - none
     ProjectCommunicationThreadReadModel:

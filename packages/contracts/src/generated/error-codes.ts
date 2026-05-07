@@ -286,7 +286,7 @@ export const ERROR_CODE_DEFINITIONS =
     },
     "BID_SERVICE_FEE_AUTHORIZATION_REQUIRED": {
       "owner": "Server",
-      "meaning": "Bid submit is blocked because the current actor does not yet have an admitted `approved` participation truth plus a `frozen` bounded `4000 元竞标服务费预授权额度`."
+      "meaning": "Project-level free-send is blocked after publisher material confirmation because the current actor does not yet have a `frozen` bounded `4000 元竞标服务费预授权额度`; bid submit itself must not use this code solely for missing or unfinished authorization."
     },
     "BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED": {
       "owner": "Server",
