@@ -253,12 +253,12 @@ function readThreadItemAction(
 
 function readPricingGate(
   record: Record<string, unknown>,
-  requestStatus: BidParticipationReviewStatus,
+  _requestStatus: BidParticipationReviewStatus,
 ) {
   const pricingGateRequired =
     typeof record.pricingGateRequired === "boolean"
       ? record.pricingGateRequired
-      : requestStatus === "approved";
+      : false;
   const pricingGateType = pricingGateRequired
     ? "bid_service_fee_authorization_required" as const
     : "none" as const;
@@ -279,7 +279,7 @@ function buildBidServiceFeeAuthorizationRouteTarget(projectId: string, requestId
     actionKey: "bid_service_fee_authorization.open" as const,
     objectType: "bid_service_fee_authorization" as const,
     canonicalPath: "/api/app/project/{projectId}/bid-service-fee-authorizations",
-    label: "冻结竞标服务费预授权额度",
+    label: "完成竞标服务费预授权额度",
     params: {
       projectId,
       bidParticipationRequestId: requestId,

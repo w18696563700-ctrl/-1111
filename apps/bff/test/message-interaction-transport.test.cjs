@@ -788,12 +788,11 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.equal(bidParticipationCard.requesterCompanyName, "重庆海川展览工厂");
   assert.equal(bidParticipationCard.requesterOrganizationId, "org-1");
   assert.deepEqual(bidParticipationCard.detailRouteTarget, {
-    objectType: "bid_service_fee_authorization",
-    actionKey: "bid_service_fee_authorization.open",
-    canonicalPath: "/api/app/project/{projectId}/bid-service-fee-authorizations",
+    objectType: "bid_submit",
+    actionKey: "bid_submit.open",
+    canonicalPath: "/api/app/bid/submit",
     params: {
       projectId: "project-1",
-      bidParticipationRequestId: "request-2",
     },
   });
   assert.deepEqual(result.projectGroups[0].ratingEntry, {

@@ -125,7 +125,7 @@ test('bid participation request service forwards review decisions without owning
   });
 });
 
-test('approved bid participation thread points to 4000 authorization gate before bid submit', async () => {
+test('approved bid participation thread keeps bid submit route without 4000 authorization pre-gate', async () => {
   const service = createService({
     serverClient: {
       async get(path, options) {
@@ -171,19 +171,18 @@ test('approved bid participation thread points to 4000 authorization gate before
   });
 
   const result = await service.getThreadDetail('thread-1', {});
-  assert.equal(result.pricingGateRequired, true);
-  assert.equal(result.pricingGateType, 'bid_service_fee_authorization_required');
-  assert.deepEqual(result.pricingGateRouteTarget, {
-    actionKey: 'bid_service_fee_authorization.open',
-    objectType: 'bid_service_fee_authorization',
-    canonicalPath: '/api/app/project/{projectId}/bid-service-fee-authorizations',
-    label: '冻结竞标服务费预授权额度',
+  assert.equal(result.pricingGateRequired, false);
+  assert.equal(result.pricingGateType, 'none');
+  assert.equal(result.pricingGateRouteTarget, null);
+  assert.deepEqual(result.items[0].action, {
+    actionKey: 'bid_submit.open',
+    objectType: 'bid_submit',
+    canonicalPath: '/api/app/bid/submit',
+    label: '提交竞标',
     params: {
       projectId: 'project-1',
-      bidParticipationRequestId: 'request-1',
     },
   });
-  assert.deepEqual(result.items[0].action, result.pricingGateRouteTarget);
 });
 
 test('bid participation request service rewrites forbidden and invalid-state errors', async () => {

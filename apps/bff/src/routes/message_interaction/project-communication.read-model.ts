@@ -5,6 +5,7 @@ const CHAT_LOCK_REASON_CODES = new Set([
   'publisher_material_confirmation_pending',
   'bid_submission_pending',
   'bid_material_confirmation_pending',
+  'service_fee_authorization_pending',
   'deal_confirmation_pending'
 ]);
 const CHAT_REQUIRED_NEXT_ACTIONS = new Set([
@@ -12,6 +13,7 @@ const CHAT_REQUIRED_NEXT_ACTIONS = new Set([
   'confirm_publisher_materials',
   'submit_bid_materials',
   'confirm_bid_materials',
+  'complete_service_fee_authorization',
   'open_deal_confirmation',
   'none'
 ]);

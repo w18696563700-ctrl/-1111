@@ -141,7 +141,7 @@ test('BFF bid/submit maps duplicate submission to controlled duplicate message',
   );
 });
 
-test('BFF bid/submit maps missing 4000 authorization gate to controlled pricing handoff message', async () => {
+test('BFF bid/submit maps missing 4000 authorization gate to free-send handoff message', async () => {
   await expectSubmitError(
     createAxiosError(
       409,
@@ -150,6 +150,6 @@ test('BFF bid/submit maps missing 4000 authorization gate to controlled pricing 
     ),
     409,
     'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED',
-    '竞标申请已通过后需先冻结 4000 元竞标服务费预授权额度，冻结成功后才能提交竞标。',
+    '资料确认通过后需先完成 4000 元竞标服务费预授权额度，完成后才能开启项目级自由发送。',
   );
 });

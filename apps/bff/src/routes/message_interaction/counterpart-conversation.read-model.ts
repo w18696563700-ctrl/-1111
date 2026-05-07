@@ -425,7 +425,7 @@ function normalizePricingGateRouteTarget(input: {
     input.cardType === "bid_participation_request" &&
     input.status === "approved" &&
     input.detailRouteTarget?.actionKey === "bid_submit.open" &&
-    input.pricingGateRequired !== false;
+    input.pricingGateRequired === true;
   if (!shouldGate) {
     return input.detailRouteTarget;
   }
