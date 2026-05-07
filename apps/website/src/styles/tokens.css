@@ -1,0 +1,20 @@
+:root {
+  color-scheme: light;
+  --color-ink: #10251a;
+  --color-green-900: #0d3b2a;
+  --color-green-800: #124832;
+  --color-green-100: #e8f2ec;
+  --color-gold: #b8862b;
+  --color-gold-soft: #fff3d7;
+  --color-bg: #f7faf6;
+  --color-card: #ffffff;
+  --color-border: rgba(16, 37, 26, 0.12);
+  --color-muted: #66736c;
+  --shadow-soft: 0 18px 48px rgba(16, 37, 26, 0.1);
+  --shadow-card: 0 14px 36px rgba(16, 37, 26, 0.08);
+  --radius-lg: 28px;
+  --radius-md: 22px;
+  --radius-sm: 14px;
+  --page-x: 32px;
+  font-family: Arial, "PingFang SC", "Microsoft YaHei", sans-serif;
+}

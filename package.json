@@ -5,6 +5,11 @@
   "scripts": {
     "contracts:generate": "ruby packages/contracts/scripts/generate_contracts.rb",
     "contracts:check": "ruby packages/contracts/scripts/check_contracts.rb",
+    "website:dev": "pnpm --filter website dev",
+    "website:build": "pnpm --filter website build",
+    "website:start": "pnpm --filter website start",
+    "website:lint": "pnpm --filter website lint",
+    "website:typecheck": "pnpm --filter website typecheck",
     "runtime:credit-constraints:payload-parity": "node packages/tooling/runtime_checks/credit_constraints_payload_parity_check.cjs",
     "runtime:organization-credit-scoring-reserve:payload-parity": "node packages/tooling/runtime_checks/organization_credit_scoring_reserve_payload_parity_check.cjs",
     "dc:up": "docker compose -f infra/docker-compose.yml --env-file infra/env/.env.example up -d",
