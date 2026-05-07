@@ -5,6 +5,8 @@ import { In, Repository } from 'typeorm';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { ContractConfirmationEntity } from '../p0_pay/entities/contract-confirmation.entity';
+import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
+import { BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT } from '../p0_pay/p0-pay.state';
 import { ProjectAttachmentEntity } from '../project/entities/project-attachment.entity';
 import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
@@ -31,6 +33,7 @@ export type ProjectCommunicationChatAvailability = {
     | 'publisher_material_confirmation_pending'
     | 'bid_submission_pending'
     | 'bid_material_confirmation_pending'
+    | 'service_fee_authorization_pending'
     | 'deal_confirmation_pending'
     | null;
   lockReasonText: string | null;
@@ -39,6 +42,7 @@ export type ProjectCommunicationChatAvailability = {
     | 'confirm_publisher_materials'
     | 'submit_bid_materials'
     | 'confirm_bid_materials'
+    | 'complete_service_fee_authorization'
     | 'open_deal_confirmation'
     | 'none';
 };
@@ -93,7 +97,9 @@ export class ProjectCommunicationBusinessStateService {
     @InjectRepository(ProjectCommunicationMaterialReviewEntity)
     private readonly reviewRepository: Repository<ProjectCommunicationMaterialReviewEntity>,
     @InjectRepository(ContractConfirmationEntity)
-    private readonly contractConfirmationRepository: Repository<ContractConfirmationEntity>
+    private readonly contractConfirmationRepository: Repository<ContractConfirmationEntity>,
+    @InjectRepository(PlatformServiceFeeAuthorizationEntity)
+    private readonly authorizationRepository?: Repository<PlatformServiceFeeAuthorizationEntity>
   ) {}
 
   async buildForThread(input: {
@@ -117,12 +123,16 @@ export class ProjectCommunicationBusinessStateService {
       bidParticipationReviewPendingCount,
       publisherMaterialReviewPendingCount,
       bidMaterialReviewPendingCount,
-      dealConfirmationPendingCount
+      bidMaterialReviewPendingForChatCount,
+      dealConfirmationPendingCount,
+      serviceFeeAuthorizationSatisfied
     ] = await Promise.all([
       this.countPendingBidParticipationReviews(input),
       this.countPublisherMaterialReviews(input, bid),
       this.countBidMaterialReviews(input, bid),
-      this.countPendingDealConfirmations(input)
+      this.countBidMaterialReviewsForChat(input, bid),
+      this.countPendingDealConfirmations(input),
+      this.hasFrozenServiceFeeAuthorization(input, bid)
     ]);
     const businessTodoSummary = this.toBusinessTodoSummary({
       bidParticipationReviewPendingCount,
@@ -135,9 +145,11 @@ export class ProjectCommunicationBusinessStateService {
       chatAvailability: this.toChatAvailability({
         hasPendingParticipationReview: await this.hasPendingBidParticipation(input),
         publisherMaterialReviewPendingCount,
-        bidMaterialReviewPendingCount,
+        bidMaterialReviewPendingCount: bidMaterialReviewPendingForChatCount,
         dealConfirmationPendingCount,
-        bid
+        bid,
+        viewerOrganizationId: input.viewerOrganizationId,
+        serviceFeeAuthorizationSatisfied
       })
     };
   }
@@ -246,6 +258,25 @@ export class ProjectCommunicationBusinessStateService {
       ).length;
   }
 
+  private async countBidMaterialReviewsForChat(
+    input: ProjectCommunicationBusinessStateInput,
+    bid: BidEntity | null
+  ) {
+    if (!bid) {
+      return 0;
+    }
+    const reviews = await this.loadReviews(input.projectId, bid.id, input.ownerOrganizationId);
+    return projectCommunicationWorkbenchEntryDefinitions
+      .filter((definition) => definition.group === 'bid_materials')
+      .filter((definition) =>
+        this.needsMaterialReview(
+          this.bidMaterialSource(bid, definition.bidMaterialSlot),
+          definition,
+          reviews
+        )
+      ).length;
+  }
+
   private async countPendingDealConfirmations(input: ProjectCommunicationBusinessStateInput) {
     const confirmations = await this.contractConfirmationRepository.find({
       where: {
@@ -265,6 +296,37 @@ export class ProjectCommunicationBusinessStateService {
         !confirmation.factoryConfirmedAt
       );
     }).length;
+  }
+
+  private async hasFrozenServiceFeeAuthorization(
+    input: ProjectCommunicationBusinessStateInput,
+    bid: BidEntity | null
+  ) {
+    if (!bid || !this.authorizationRepository) {
+      return false;
+    }
+    const bidderOrganizationId = this.bidderOrganizationId(bid);
+    const authorization = await this.authorizationRepository.findOne({
+      where: [
+        {
+          taskId: input.projectId,
+          bidId: bid.id,
+          bidderOrganizationId,
+          status: 'frozen'
+        },
+        {
+          taskId: input.projectId,
+          bidId: bid.id,
+          factoryOrganizationId: bidderOrganizationId,
+          status: 'frozen'
+        }
+      ],
+      order: { updatedAt: 'DESC' }
+    });
+    return (
+      authorization?.status === 'frozen' &&
+      this.normalizeMoney(authorization.authorizationQuotaAmount) === BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT
+    );
   }
 
   private async publisherMaterialSources(projectId: string) {
@@ -333,6 +395,8 @@ export class ProjectCommunicationBusinessStateService {
     bidMaterialReviewPendingCount: number;
     dealConfirmationPendingCount: number;
     bid: BidEntity | null;
+    viewerOrganizationId: string;
+    serviceFeeAuthorizationSatisfied: boolean;
   }): ProjectCommunicationChatAvailability {
     if (input.hasPendingParticipationReview) {
       return this.locked(
@@ -341,14 +405,14 @@ export class ProjectCommunicationBusinessStateService {
         'review_bid_participation'
       );
     }
-    if (input.publisherMaterialReviewPendingCount > 0) {
-      return this.locked(
-        'publisher_material_confirmation_pending',
-        '请先确认发布方提供的报价依据资料。',
-        'confirm_publisher_materials'
-      );
-    }
     if (!input.bid || !this.hasCompleteBidMaterials(input.bid)) {
+      if (input.publisherMaterialReviewPendingCount > 0) {
+        return this.locked(
+          'publisher_material_confirmation_pending',
+          '请先确认发布方提供的报价依据资料。',
+          'confirm_publisher_materials'
+        );
+      }
       return this.locked('bid_submission_pending', '请先完成竞标报价与三项附件提交。', 'submit_bid_materials');
     }
     if (input.bidMaterialReviewPendingCount > 0) {
@@ -356,6 +420,16 @@ export class ProjectCommunicationBusinessStateService {
         'bid_material_confirmation_pending',
         '请先由发布方确认竞标报价资料。',
         'confirm_bid_materials'
+      );
+    }
+    if (!input.serviceFeeAuthorizationSatisfied) {
+      const bidderOrganizationId = this.bidderOrganizationId(input.bid);
+      return this.locked(
+        'service_fee_authorization_pending',
+        input.viewerOrganizationId === bidderOrganizationId
+          ? '资料确认已通过，请先完成 4000 元竞标服务费预授权额度后开启项目级自由发送。'
+          : '资料确认已通过，需等待竞标方完成 4000 元竞标服务费预授权额度后开启项目级自由发送。',
+        'complete_service_fee_authorization'
       );
     }
     if (input.dealConfirmationPendingCount > 0) {
@@ -403,15 +477,26 @@ export class ProjectCommunicationBusinessStateService {
     return bid.schedulePlanFileAssetId;
   }
 
+  private bidderOrganizationId(bid: BidEntity) {
+    return bid.bidderOrganizationId || bid.organizationId;
+  }
+
   private isPairBid(input: ProjectCommunicationBusinessStateInput, bid: BidEntity | null) {
     if (!bid) {
       return false;
     }
-    const bidderOrganizationId = bid.bidderOrganizationId || bid.organizationId;
-    return bid.projectId === input.projectId && bidderOrganizationId === input.counterpartOrganizationId;
+    return bid.projectId === input.projectId && this.bidderOrganizationId(bid) === input.counterpartOrganizationId;
   }
 
   private hashSource(parts: string[]) {
     return createHash('sha256').update(parts.join('|'), 'utf8').digest('hex');
+  }
+
+  private normalizeMoney(value: string | number | null) {
+    if (value === null || value === undefined) {
+      return '';
+    }
+    const amount = Number(value);
+    return Number.isFinite(amount) ? amount.toFixed(2) : '';
   }
 }

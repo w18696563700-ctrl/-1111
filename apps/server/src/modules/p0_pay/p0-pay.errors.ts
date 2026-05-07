@@ -123,7 +123,7 @@ export function projectAuthenticitySincerityInvalidState(
 }
 
 export function bidServiceFeeAuthorizationRequired(
-  message = 'Bid service fee authorization freeze is required before bid submission.'
+  message = 'Bid service fee authorization freeze is required before project communication free-send opens.'
 ) {
   return pricingStateConflict('BID_SERVICE_FEE_AUTHORIZATION_REQUIRED', message);
 }

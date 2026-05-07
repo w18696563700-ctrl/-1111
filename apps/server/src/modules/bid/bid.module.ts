@@ -5,8 +5,8 @@ import { ProjectPublishAuditModule } from '../audit/project-publish-audit.module
 import { AuthModule } from '../auth/auth.module';
 import { BidParticipationRequestModule } from '../bid_participation_request/bid-participation-request.module';
 import { OrganizationModule } from '../organization/organization.module';
-import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectCommunicationModule } from '../project_communication/project-communication.module';
 import { TradingImModule } from '../trading_im/trading-im.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { BidController } from './bid.controller';
@@ -26,7 +26,6 @@ import { BidSeatEntity } from './entities/bid-seat.entity';
       BidEntity,
       BidSeatEntity,
       ProjectEntity,
-      PlatformServiceFeeAuthorizationEntity,
       IdentityAuditLogEntity,
       FileAssetEntity,
     ]),
@@ -34,6 +33,7 @@ import { BidSeatEntity } from './entities/bid-seat.entity';
     BidParticipationRequestModule,
     OrganizationModule,
     ProjectPublishAuditModule,
+    ProjectCommunicationModule,
     TradingImModule
   ],
   controllers: [BidController, BidPackageController],

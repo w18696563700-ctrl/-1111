@@ -8,6 +8,7 @@ import { ProjectAttachmentEntity } from '../project/entities/project-attachment.
 import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
+import { ProjectCommunicationBusinessEventService } from './project-communication-business-event.service';
 import { ProjectCommunicationBusinessStateService } from './project-communication-business-state.service';
 import {
   projectCommunicationForbidden,
@@ -43,6 +44,8 @@ type WorkbenchScope = {
   bid: BidEntity | null;
   viewerOrganizationId: string;
   viewerRole: ProjectCommunicationWorkbenchViewerRole;
+  actorUserId: string;
+  actorId: string;
 };
 
 type MaterialSource = {
@@ -73,7 +76,8 @@ export class ProjectCommunicationWorkbenchService {
     private readonly dataSource: DataSource,
     private readonly accessService: ProjectCommunicationAccessService,
     private readonly presenter: ProjectCommunicationWorkbenchPresenter,
-    private readonly businessStateService: ProjectCommunicationBusinessStateService
+    private readonly businessStateService: ProjectCommunicationBusinessStateService,
+    private readonly businessEventService?: ProjectCommunicationBusinessEventService
   ) {}
 
   async getWorkbench(query: Record<string, unknown>, context: RequestContext) {
@@ -119,6 +123,13 @@ export class ProjectCommunicationWorkbenchService {
       }
       this.assertWritableReviewEntry(currentEntry, command, scope);
       const saved = await this.saveReview(currentEntry, command, context, manager.getRepository(ProjectCommunicationMaterialReviewEntity));
+      await this.businessEventService?.emitMaterialReviewResult({
+        manager,
+        entry: currentEntry,
+        review: saved,
+        actorUserId: scope.actorUserId,
+        actorId: scope.actorId
+      });
       const refreshedEntries = await this.buildEntries(
         scope,
         manager.getRepository(ProjectAttachmentEntity),
@@ -126,6 +137,14 @@ export class ProjectCommunicationWorkbenchService {
       );
       const updatedEntry =
         refreshedEntries.find((entry) => entry.definition.entryKey === saved.entryKey) ?? currentEntry;
+      if (this.shouldEmitBidMaterialConfirmationCompleted(saved, updatedEntry, refreshedEntries)) {
+        await this.businessEventService?.emitBidMaterialConfirmationCompleted({
+          manager,
+          entry: updatedEntry,
+          actorUserId: scope.actorUserId,
+          actorId: scope.actorId
+        });
+      }
       return this.presenter.toMaterialReviewResponse({
         entry: updatedEntry,
         entries: refreshedEntries,
@@ -155,7 +174,9 @@ export class ProjectCommunicationWorkbenchService {
       thread,
       bid,
       viewerOrganizationId: actor.organizationId,
-      viewerRole: actor.isOwner ? 'publisher' : 'bidder'
+      viewerRole: actor.isOwner ? 'publisher' : 'bidder',
+      actorUserId: actor.currentSession.userId,
+      actorId: actor.currentSession.actorId
     };
   }
 
@@ -458,6 +479,21 @@ export class ProjectCommunicationWorkbenchService {
     review.feedbackAt = now;
     review.confirmedByUserId = null;
     review.confirmedAt = null;
+  }
+
+  private shouldEmitBidMaterialConfirmationCompleted(
+    review: ProjectCommunicationMaterialReviewEntity,
+    entry: ProjectCommunicationWorkbenchEntryProjection,
+    entries: ProjectCommunicationWorkbenchEntryProjection[]
+  ) {
+    if (review.reviewState !== 'confirmed' || entry.definition.group !== 'bid_materials' || !entry.bidId) {
+      return false;
+    }
+    const bidMaterialEntries = entries.filter((item) => item.definition.group === 'bid_materials');
+    return (
+      bidMaterialEntries.length > 0 &&
+      bidMaterialEntries.every((item) => item.bidId === entry.bidId && item.reviewState === 'confirmed')
+    );
   }
 
   private bidSlotFileAssetId(bid: BidEntity, slot: ProjectBidMaterialSlot) {

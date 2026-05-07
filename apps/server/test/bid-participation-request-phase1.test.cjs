@@ -130,6 +130,8 @@ function createServiceHarness({ requests = [], project = createProject() } = {})
   const { BidParticipationRequestEntity } = require('../dist/modules/bid_participation_request/entities/bid-participation-request.entity.js');
   const { IdentityAuditLogEntity } = require('../dist/modules/audit/identity-audit-log.entity.js');
   const { AppNotificationEntity } = require('../dist/modules/notifications/entities/app-notification.entity.js');
+  const { DevicePushTokenEntity } = require('../dist/modules/notifications/entities/device-push-token.entity.js');
+  const { PushDeliveryAttemptEntity } = require('../dist/modules/notifications/entities/push-delivery-attempt.entity.js');
   const { BidParticipationRequestPresenter } = require('../dist/modules/bid_participation_request/bid-participation-request.presenter.js');
   const { BidParticipationRequestWriteService } = require('../dist/modules/bid_participation_request/bid-participation-request.write.service.js');
   const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
@@ -137,6 +139,7 @@ function createServiceHarness({ requests = [], project = createProject() } = {})
   const requestRepository = createRequestRepository(requests);
   const auditRepository = createAuditRepository();
   const notificationRepository = createNotificationRepository();
+  const deliveryAttemptRepository = createNotificationRepository();
   const projectRepository = {
     async findOneBy(where) {
       return where.id === project.id ? project : null;
@@ -154,6 +157,16 @@ function createServiceHarness({ requests = [], project = createProject() } = {})
           }
           if (entity === AppNotificationEntity) {
             return notificationRepository;
+          }
+          if (entity === DevicePushTokenEntity) {
+            return {
+              async findBy() {
+                return [];
+              },
+            };
+          }
+          if (entity === PushDeliveryAttemptEntity) {
+            return deliveryAttemptRepository;
           }
           throw new Error('unexpected repository');
         },

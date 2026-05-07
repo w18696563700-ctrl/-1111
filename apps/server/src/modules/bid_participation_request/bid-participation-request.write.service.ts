@@ -9,6 +9,7 @@ import { CurrentSessionVerificationService } from '../auth/current-session-verif
 import { NotificationService } from '../notifications/notification.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectCommunicationBusinessEventService } from '../project_communication/project-communication-business-event.service';
 import {
   bidParticipationConflict,
   bidParticipationForbidden,
@@ -31,6 +32,7 @@ export class BidParticipationRequestWriteService {
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly presenter: BidParticipationRequestPresenter,
     private readonly notificationService: NotificationService,
+    private readonly projectCommunicationBusinessEventService?: ProjectCommunicationBusinessEventService,
   ) {}
 
   async createRequest(payload: Record<string, unknown>, context: RequestContext) {
@@ -145,6 +147,14 @@ export class BidParticipationRequestWriteService {
 
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(BidParticipationRequestEntity).save(request);
+      await this.projectCommunicationBusinessEventService?.emitBidParticipationReviewResult({
+        manager,
+        project,
+        request,
+        reviewState: nextState,
+        actorUserId: currentSession.userId,
+        actorId: currentSession.actorId,
+      });
       await this.recordAudit(manager.getRepository(IdentityAuditLogEntity), {
         objectType: 'bid_participation_request',
         objectId: request.id,
