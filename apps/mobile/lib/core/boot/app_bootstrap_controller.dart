@@ -53,7 +53,7 @@ class AppShellContextSnapshot {
 }
 
 class AppBootstrapController extends ChangeNotifier {
-  static const Duration _bootstrapShellContextTimeout = Duration(seconds: 1);
+  static const Duration _bootstrapShellContextTimeout = Duration(seconds: 5);
 
   AppBootstrapController({
     AppConfigManifest? bootstrapManifest,
@@ -77,6 +77,7 @@ class AppBootstrapController extends ChangeNotifier {
   String? _blockingMessage;
   bool _disposed = false;
   bool _initialized = false;
+  bool _hasLoadedShellContext = false;
 
   AppShellContextSnapshot get snapshot => AppShellContextSnapshot(
     manifest: _manifest,
@@ -159,12 +160,14 @@ class AppBootstrapController extends ChangeNotifier {
   void handleLoggedOut() {
     AppSessionStore.instance.clearSession();
     _shellContext = AppShellContextData.bootstrapDefaults(manifest: _manifest);
+    _hasLoadedShellContext = false;
     _setBlockingState(GlobalShellState.unauthenticated);
     notifyListeners();
   }
 
   void applyShellContext(AppShellContextData data) {
     _shellContext = data;
+    _hasLoadedShellContext = true;
     _setBlockingState(
       data.organizationId == null ? GlobalShellState.noOrganization : null,
     );
@@ -221,6 +224,16 @@ class AppBootstrapController extends ChangeNotifier {
       return;
     }
 
+    if (refreshResult.state == AppPageState.unauthorized) {
+      _hasLoadedShellContext = false;
+    }
+    if (_hasLoadedShellContext &&
+        refreshResult.state == AppPageState.errorRetryable) {
+      _setBlockingState(_stateForCurrentShellContext());
+      notifyListeners();
+      return;
+    }
+
     _setBlockingState(
       refreshResult.state == AppPageState.unauthorized
           ? GlobalShellState.unauthenticated
@@ -251,6 +264,7 @@ class AppBootstrapController extends ChangeNotifier {
         _setBlockingState(GlobalShellState.unavailable);
       } else {
         _shellContext = data;
+        _hasLoadedShellContext = true;
         _setBlockingState(
           data.organizationId == null ? GlobalShellState.noOrganization : null,
         );
@@ -268,7 +282,14 @@ class AppBootstrapController extends ChangeNotifier {
       }
 
       AppSessionStore.instance.clearSession();
+      _hasLoadedShellContext = false;
       _setBlockingState(GlobalShellState.unauthenticated);
+      notifyListeners();
+      return;
+    }
+
+    if (_hasLoadedShellContext && result.state == AppPageState.errorRetryable) {
+      _setBlockingState(_stateForCurrentShellContext());
       notifyListeners();
       return;
     }
@@ -280,6 +301,12 @@ class AppBootstrapController extends ChangeNotifier {
       _ => GlobalShellState.offline,
     }, message: result.message);
     notifyListeners();
+  }
+
+  GlobalShellState? _stateForCurrentShellContext() {
+    return _shellContext.organizationId == null
+        ? GlobalShellState.noOrganization
+        : null;
   }
 
   void _setBlockingState(GlobalShellState? state, {String? message}) {

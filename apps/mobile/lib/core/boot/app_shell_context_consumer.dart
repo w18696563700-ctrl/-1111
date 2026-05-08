@@ -15,7 +15,7 @@ final class AppShellContextCanonicalPaths {
 class AppShellContextConsumer {
   AppShellContextConsumer._(this._client);
 
-  static const Duration _shellContextRequestTimeout = Duration(seconds: 1);
+  static const Duration _shellContextRequestTimeout = Duration(seconds: 5);
 
   factory AppShellContextConsumer({AppApiClient? client}) {
     return AppShellContextConsumer._(client ?? AppApiClient());
