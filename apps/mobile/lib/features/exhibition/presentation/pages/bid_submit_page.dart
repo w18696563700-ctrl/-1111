@@ -70,6 +70,8 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
   bool get _isSupplementMode => widget.mode?.trim() == 'supplement';
+  bool get _isServiceFeeAuthorizationMode =>
+      widget.mode?.trim() == 'service_fee_authorization';
 
   void _setBidAttachmentPreviewOpening(
     _BidSubmitAttachmentSlotState slot,
@@ -371,16 +373,65 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
         (_bidAlreadySubmitted ||
             _hasCurrentViewerBid(_projectDetailResult?.payload) ||
             _isBidDuplicateSubmissionResult(_lastResult));
-    final submitDisabledMessage = bidAlreadySubmitted
+    final submitDisabledMessage =
+        bidAlreadySubmitted || _isServiceFeeAuthorizationMode
         ? null
         : _bidSubmitFinalSubmitDisabledMessage();
-    final pageTitle = _isSupplementMode ? '补充竞标资料' : '竞标提交';
-    final pageSummary = _isSupplementMode
+    final pageTitle = _isServiceFeeAuthorizationMode
+        ? '竞标服务费预授权'
+        : _isSupplementMode
+        ? '补充竞标资料'
+        : '竞标提交';
+    final pageSummary = _isServiceFeeAuthorizationMode
+        ? '资料确认通过后，在这里承接 4000 元竞标服务费预授权额度；预授权不是扣款。'
+        : _isSupplementMode
         ? '根据发布方反馈补充项目理解、报价表或进度安排。补充成功后，发布方会重新确认资料。'
         : '这里是当前项目下的竞标提交页，按已承接项目、查看报价依据资料、填写报价、上传方案和最终提交依次完成。';
-    final canonicalPath = _isSupplementMode
+    final canonicalPath = _isServiceFeeAuthorizationMode
+        ? _serviceFeeAuthorizationCanonicalPath(projectId ?? routeProjectId)
+        : _isSupplementMode
         ? ExhibitionCanonicalPaths.bidSubmissionSupplement
         : ExhibitionCanonicalPaths.bidSubmit;
+    final body = _isServiceFeeAuthorizationMode
+        ? _buildServiceFeeAuthorizationBody(
+            routeProjectId: routeProjectId,
+            guardLoading: _guardLoading,
+            accessGuard: _accessGuard,
+          )
+        : _buildBidSubmitBody(
+            context: context,
+            routeProjectId: routeProjectId,
+            guardLoading: _guardLoading,
+            accessGuard: _accessGuard,
+            flowExpanded: _bidFlowExpanded,
+            projectReviewExpanded: _projectReviewExpanded,
+            showContinueBidFlowAction: showContinueBidFlowAction,
+            canContinueBidFlow: canContinueBidFlow,
+            onContinueBidFlow: _continueBidFlow,
+            onToggleProjectReview: _toggleProjectReview,
+            projectDetailResult: _projectDetailResult,
+            bidMaterialResult: _bidMaterialResult,
+            bidMaterialProjectId: projectId,
+            openingBidMaterialIds: _openingBidMaterialIds,
+            openingMaterialReviewEntryKeys: _openingMaterialReviewEntryKeys,
+            quoteAmountController: _quoteAmountController,
+            proposalSummaryController: _proposalSummaryController,
+            submitting: _submitting,
+            attachmentSlots: _attachmentSlots,
+            quoteAmountFieldKey: _quoteAmountFieldKey,
+            proposalSummaryFieldKey: _proposalSummaryFieldKey,
+            platformServiceFeeChildren:
+                _buildP0PayFixedPriceBidAuthorizationFields(),
+            onQuoteAmountChanged: () => setState(() {}),
+            onProposalSummaryChanged: () => setState(() {}),
+            onUploadAttachment: _uploadBidSubmitAttachment,
+            onRetryBidMaterials: () => _loadBidMaterials(forceRefresh: true),
+            onOpenBidMaterial: _openBidMaterial,
+            onOpenMaterialReview: _openBidSubmitMaterialReviewEntry,
+            onPreviewAttachment: (slot) => _BidSubmitAttachmentPreviewActions(
+              this,
+            ).previewAttachment(slot),
+          );
 
     return _SubmissionPageFrame(
       title: pageTitle,
@@ -395,6 +446,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           ? '提交补充资料'
           : '提交竞标',
       showSubmitButton:
+          !_isServiceFeeAuthorizationMode &&
           !_guardLoading &&
           _accessGuard == null &&
           (_bidFlowExpanded || bidAlreadySubmitted),
@@ -412,40 +464,89 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
             result: result,
             projectId: projectId,
           ),
-      body: _buildBidSubmitBody(
-        context: context,
-        routeProjectId: routeProjectId,
-        guardLoading: _guardLoading,
-        accessGuard: _accessGuard,
-        flowExpanded: _bidFlowExpanded,
-        projectReviewExpanded: _projectReviewExpanded,
-        showContinueBidFlowAction: showContinueBidFlowAction,
-        canContinueBidFlow: canContinueBidFlow,
-        onContinueBidFlow: _continueBidFlow,
-        onToggleProjectReview: _toggleProjectReview,
-        projectDetailResult: _projectDetailResult,
-        bidMaterialResult: _bidMaterialResult,
-        bidMaterialProjectId: projectId,
-        openingBidMaterialIds: _openingBidMaterialIds,
-        openingMaterialReviewEntryKeys: _openingMaterialReviewEntryKeys,
-        quoteAmountController: _quoteAmountController,
-        proposalSummaryController: _proposalSummaryController,
-        submitting: _submitting,
-        attachmentSlots: _attachmentSlots,
-        quoteAmountFieldKey: _quoteAmountFieldKey,
-        proposalSummaryFieldKey: _proposalSummaryFieldKey,
-        platformServiceFeeChildren:
-            _buildP0PayFixedPriceBidAuthorizationFields(),
-        onQuoteAmountChanged: () => setState(() {}),
-        onProposalSummaryChanged: () => setState(() {}),
-        onUploadAttachment: _uploadBidSubmitAttachment,
-        onRetryBidMaterials: () => _loadBidMaterials(forceRefresh: true),
-        onOpenBidMaterial: _openBidMaterial,
-        onOpenMaterialReview: _openBidSubmitMaterialReviewEntry,
-        onPreviewAttachment: (slot) =>
-            _BidSubmitAttachmentPreviewActions(this).previewAttachment(slot),
-      ),
+      body: body,
     );
+  }
+
+  String _serviceFeeAuthorizationCanonicalPath(String? projectId) {
+    final normalizedProjectId = _normalizeId(projectId);
+    if (normalizedProjectId == null) {
+      return '/api/app/project/{projectId}/bid-service-fee-authorizations';
+    }
+    return ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizations(
+      normalizedProjectId,
+    );
+  }
+
+  List<Widget> _buildServiceFeeAuthorizationBody({
+    required String? routeProjectId,
+    required bool guardLoading,
+    required _BidAccessGuard? accessGuard,
+  }) {
+    final requestId = _normalizeId(widget.bidParticipationRequestId);
+    final bidId = _normalizeId(widget.bidId);
+    final sections = <Widget>[
+      _ActionCard(
+        title: '竞标服务费预授权',
+        summary: '资料确认已通过，当前只承接 4000 元竞标服务费预授权额度处理；预授权不是扣款。',
+        tone: _ActionCardTone.emphasis,
+        children: <Widget>[
+          const _DetailLine(
+            label: '处理边界',
+            value: '本页只消费 Server/BFF 返回的预授权入口，不在消息楼内判断支付真值。',
+            highlight: true,
+          ),
+          if (routeProjectId != null)
+            const _DetailLine(label: '项目定位', value: '已从消息入口带入'),
+          if (requestId != null)
+            const _DetailLine(label: '参与申请', value: '已定位', highlight: true),
+          if (bidId != null)
+            const _DetailLine(label: '竞标记录', value: '已定位', highlight: true),
+          const SizedBox(height: 12),
+          ..._buildP0PayFixedPriceBidAuthorizationFields(),
+        ],
+      ),
+    ];
+    if (guardLoading) {
+      sections.addAll(const <Widget>[
+        SizedBox(height: 16),
+        _ActionCard(
+          title: '正在核对入口守卫',
+          summary: '正在检查当前登录、组织和项目状态，请稍候。',
+          tone: _ActionCardTone.emphasis,
+          children: <Widget>[
+            _DetailLine(label: '当前状态', value: '守卫状态读取中，当前先不开放预授权操作。'),
+          ],
+        ),
+      ]);
+    }
+    if (!guardLoading && accessGuard != null) {
+      sections.addAll(<Widget>[
+        const SizedBox(height: 16),
+        _ActionCard(
+          title: accessGuard.title,
+          summary: accessGuard.message,
+          tone: _ActionCardTone.emphasis,
+          children: <Widget>[
+            const _DetailLine(
+              label: '守卫说明',
+              value: '当前以前端登录态、组织类型、双重认证和项目只读状态作为导流守卫依据；最终业务权限仍以后端判定为准。',
+            ),
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pushNamed(
+                _resolveBidGuardRouteName(
+                  accessGuard,
+                  projectId: routeProjectId,
+                ),
+              ),
+              child: Text(accessGuard.actionLabel),
+            ),
+          ],
+        ),
+      ]);
+    }
+    return sections;
   }
 
   Future<void> _openBidSubmitMaterialReviewEntry(

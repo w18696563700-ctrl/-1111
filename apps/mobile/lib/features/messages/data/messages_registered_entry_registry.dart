@@ -355,7 +355,9 @@ String? _bidServiceFeeAuthorizationRouteLocation(
   }
   return ExhibitionRoutes.bidSubmitWithProjectId(
     projectId,
+    mode: 'service_fee_authorization',
     bidParticipationRequestId: requestId,
+    bidId: routeParams['bidId'],
   );
 }
 

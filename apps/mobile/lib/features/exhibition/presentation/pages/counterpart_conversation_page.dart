@@ -500,6 +500,17 @@ class _CounterpartConversationPageState
     return _threadResult?.data?.chatAvailability.canSendMessage == true;
   }
 
+  String? _composerRequiredNextAction(
+    CounterpartConversationProjectGroupView? group,
+  ) {
+    final action = _threadResult?.data?.chatAvailability.requiredNextAction;
+    if (action == 'complete_service_fee_authorization' &&
+        (group == null || _firstServiceFeeAuthorizationCard(group) == null)) {
+      return null;
+    }
+    return action;
+  }
+
   String _chatLockMessage([ProjectCommunicationThreadView? thread]) {
     final availability =
         thread?.chatAvailability ?? _threadResult?.data?.chatAvailability;
@@ -1133,8 +1144,9 @@ class _CounterpartConversationPageState
                   canSendMessage: _canSendProjectCommunication(),
                   sending: _sending,
                   lockReasonText: _chatLockMessage(),
-                  requiredNextAction:
-                      _threadResult?.data?.chatAvailability.requiredNextAction,
+                  requiredNextAction: _composerRequiredNextAction(
+                    selectedGroup,
+                  ),
                   onOpenRequiredAction: _openChatRequiredAction,
                   onSend: _sendCurrentMessage,
                   onAttachFile: () => _sendAttachmentMessage(imageOnly: false),
@@ -1294,6 +1306,12 @@ class _CounterpartConversationPageState
     }
     if (message.requiredNextAction == 'complete_service_fee_authorization') {
       _openChatRequiredAction();
+      return;
+    }
+    if (message.requiredNextAction == 're_review_material') {
+      _openWorkbenchEntryList(<String>{
+        'publisher_materials',
+      }, title: '发布方资料确认');
       return;
     }
     _showSnack('当前系统提醒暂时没有可打开的业务入口。');

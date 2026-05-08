@@ -4,6 +4,7 @@ part of '../exhibition_trade_pages.dart';
 
 extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
   List<Widget> _buildP0PayFixedPriceBidAuthorizationFields() {
+    final serviceFeeAuthorizationMode = _isServiceFeeAuthorizationMode;
     return <Widget>[
       Text(
         '竞标服务费预授权说明',
@@ -12,10 +13,16 @@ extension _P0PayBidAuthorizationSupport on _BidSubmitPageState {
         ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
       ),
       const SizedBox(height: 8),
-      const _DetailLine(label: '当前阶段', value: '先提交报价和三份资料', highlight: true),
-      const _StateMessage(
-        title: '后续处理',
-        body: '发布方资料确认通过后，系统会提醒完成 4000 元竞标服务费预授权额度；完成后项目级自由发送开启。预授权不是扣款。',
+      _DetailLine(
+        label: '当前阶段',
+        value: serviceFeeAuthorizationMode ? '资料确认已通过，待完成预授权' : '先提交报价和三份资料',
+        highlight: true,
+      ),
+      _StateMessage(
+        title: serviceFeeAuthorizationMode ? '处理说明' : '后续处理',
+        body: serviceFeeAuthorizationMode
+            ? '当前入口只处理 4000 元竞标服务费预授权额度；完成后项目级自由发送开启。预授权不是扣款。'
+            : '发布方资料确认通过后，系统会提醒完成 4000 元竞标服务费预授权额度；完成后项目级自由发送开启。预授权不是扣款。',
       ),
       ..._buildP0PayAuthorizationResultLines(),
     ];

@@ -499,8 +499,11 @@ class AppRouter {
       ExhibitionRoutes.bidParticipationThread => '参与竞标申请',
       ExhibitionRoutes.counterpartConversation => '项目沟通',
       ExhibitionRoutes.bidThread => '沟通与投标',
-      ExhibitionRoutes.bidSubmit =>
-        routeUri.queryParameters['mode'] == 'result' ? '竞标结果' : '竞标提交',
+      ExhibitionRoutes.bidSubmit => switch (routeUri.queryParameters['mode']) {
+        'result' => '竞标结果',
+        'service_fee_authorization' => '竞标服务费预授权',
+        _ => '竞标提交',
+      },
       ExhibitionRoutes.orderDetail => '后续承接状态',
       ExhibitionRoutes.contractDetail => '合同承接状态',
       ExhibitionRoutes.milestoneList => '里程碑列表',

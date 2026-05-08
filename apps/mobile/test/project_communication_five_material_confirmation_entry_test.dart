@@ -125,7 +125,10 @@ final class _NoopProjectCommunicationRealtimeClient
   }
 }
 
-Map<String, Object?> _detailPayload({String projectRelation = 'my_bid'}) {
+Map<String, Object?> _detailPayload({
+  String projectRelation = 'my_bid',
+  bool includeServiceFeeAuthorizationCard = false,
+}) {
   return <String, Object?>{
     'conversationId': 'conversation-1',
     'counterpart': const <String, Object?>{
@@ -164,9 +167,44 @@ Map<String, Object?> _detailPayload({String projectRelation = 'my_bid'}) {
         'businessTodoSummary': _businessTodoSummary(
           publisherMaterialReviewPendingCount: 3,
         ),
-        'cards': <Object?>[],
+        'cards': <Object?>[
+          if (includeServiceFeeAuthorizationCard)
+            _serviceFeeAuthorizationBusinessCard(),
+        ],
       },
     ],
+  };
+}
+
+Map<String, Object?> _serviceFeeAuthorizationBusinessCard() {
+  return <String, Object?>{
+    'cardId': 'bid-participation:request-1',
+    'cardType': 'bid_participation_request',
+    'title': '参与竞标申请结果',
+    'summary': '参与竞标申请已通过。',
+    'status': 'approved',
+    'updatedAt': '2026-05-04T10:00:00Z',
+    'requesterCompanyName': '重庆海川展览工厂',
+    'requesterOrganizationId': 'org-counterpart',
+    'truthAnchor': <String, Object?>{
+      'truthType': 'bid_participation_request',
+      'projectId': 'project-1',
+      'requestId': 'request-1',
+      'bidId': 'bid-1',
+      'threadId': 'request-1',
+    },
+    'detailRouteTarget': <String, Object?>{
+      'objectType': 'bid_service_fee_authorization',
+      'actionKey': 'bid_service_fee_authorization.open',
+      'canonicalPath':
+          '/api/app/project/{projectId}/bid-service-fee-authorizations',
+      'params': <String, Object?>{
+        'projectId': 'project-1',
+        'bidParticipationRequestId': 'request-1',
+        'bidId': 'bid-1',
+      },
+    },
+    'decisionAvailability': null,
   };
 }
 
@@ -500,13 +538,20 @@ Map<String, Object?> _bidMaterial({
 }
 
 Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
-_baseHandlers({String projectRelation = 'my_bid'}) {
+_baseHandlers({
+  String projectRelation = 'my_bid',
+  bool includeServiceFeeAuthorizationCard = false,
+}) {
   return <String, Future<AppApiResponse> Function(AppApiRequest request)>{
     'GET /api/app/message/counterpart-conversation/detail':
         (AppApiRequest request) async => AppApiResponse(
           statusCode: 200,
           uri: request.uri,
-          body: _detailPayload(projectRelation: projectRelation),
+          body: _detailPayload(
+            projectRelation: projectRelation,
+            includeServiceFeeAuthorizationCard:
+                includeServiceFeeAuthorizationCard,
+          ),
         ),
     'GET /api/app/message/project-communication/thread':
         (AppApiRequest request) async => AppApiResponse(
@@ -631,6 +676,67 @@ void main() {
       expect(find.text('effect.pdf'), findsOneWidget);
       expect(find.text('预览后确认'), findsOneWidget);
       expect(find.text('确认无误'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'service fee authorization lock CTA opens frozen card route target',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers(includeServiceFeeAuthorizationCard: true);
+      handlers['GET /api/app/message/project-communication/thread'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _threadPayload(
+              lockReasonCode: 'service_fee_authorization_pending',
+              lockReasonText: '资料确认已通过，请先完成 4000 元竞标服务费预授权额度后开启项目级自由发送。',
+              requiredNextAction: 'complete_service_fee_authorization',
+            ),
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+      await _ensureVisible(tester, find.widgetWithText(TextButton, '去完成预授权'));
+      await tester.tap(find.widgetWithText(TextButton, '去完成预授权').first);
+      await tester.pumpAndSettle();
+
+      expect(
+        find.textContaining(
+          '/exhibition/bids/submit?projectId=project-1&mode=service_fee_authorization&bidParticipationRequestId=request-1&bidId=bid-1',
+        ),
+        findsOneWidget,
+      );
+      expect(find.text('预授权入口暂不可用，请刷新后重试。'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'publisher waiting for service fee authorization does not show executable CTA',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers(projectRelation: 'my_published');
+      handlers['GET /api/app/message/project-communication/thread'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _threadPayload(
+              lockReasonCode: 'service_fee_authorization_pending',
+              lockReasonText: '资料确认已通过，需等待竞标方完成 4000 元竞标服务费预授权额度后开启项目级自由发送。',
+              requiredNextAction: 'complete_service_fee_authorization',
+            ),
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+
+      expect(
+        find.text('资料确认已通过，需等待竞标方完成 4000 元竞标服务费预授权额度后开启项目级自由发送。'),
+        findsOneWidget,
+      );
+      expect(find.text('去完成预授权'), findsNothing);
     },
   );
 
@@ -1075,7 +1181,7 @@ void main() {
       await tester.pumpAndSettle();
       expect(
         find.textContaining(
-          '/exhibition/bids/submit?projectId=project-1&bidParticipationRequestId=request-1',
+          '/exhibition/bids/submit?projectId=project-1&mode=service_fee_authorization&bidParticipationRequestId=request-1&bidId=bid-1',
         ),
         findsOneWidget,
       );
