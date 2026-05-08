@@ -74,6 +74,7 @@ test("message interactions route is materialized and no longer router 404 locall
               params: {
                 conversationId: "org-1",
                 projectId: "project-1",
+                threadId: "thread-1",
               },
             },
           },
@@ -240,6 +241,7 @@ test("message interactions route is materialized and no longer router 404 locall
             params: {
               conversationId: "org-1",
               projectId: "project-1",
+              threadId: "thread-1",
             },
           },
         },
@@ -365,6 +367,7 @@ test("message interactions service forwards frozen server path and hides raw rou
                 params: {
                   conversationId: "org-1",
                   projectId: "project-1",
+                  threadId: "thread-1",
                 },
               },
             },
@@ -434,6 +437,7 @@ test("message interactions service forwards frozen server path and hides raw rou
           params: {
             conversationId: "org-1",
             projectId: "project-1",
+            threadId: "thread-1",
           },
         },
       },
@@ -522,6 +526,7 @@ test("message interactions service preserves server-owned counterpart identity w
                 params: {
                   conversationId: "org-certified",
                   projectId: "project-1",
+                  threadId: "thread-certified",
                 },
               },
             },
@@ -610,6 +615,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
           projectGroups: [
             {
               projectId: "project-1",
+              threadId: "thread-1",
               projectDisplayTitle: "西洽会 - 泸州",
               titleVisibility: "visible",
               projectRelation: "my_published",
@@ -749,6 +755,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
     result.projectGroups[0].cards[0].truthAnchor.projectId,
     "project-1",
   );
+  assert.equal(result.projectGroups[0].threadId, "thread-1");
   assert.equal(result.projectGroups[0].projectDisplayTitle, "西洽会 - 泸州");
   assert.equal(result.projectGroups[0].titleVisibility, "visible");
   assert.equal(result.projectGroups[0].projectRelation, "my_published");

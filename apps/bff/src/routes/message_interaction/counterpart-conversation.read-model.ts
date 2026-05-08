@@ -27,6 +27,7 @@ export type CounterpartConversationDetailReadModel = {
   myBidUnreadCount: number;
   projectGroups: Array<{
     projectId: string;
+    threadId: string;
     projectDisplayTitle: string;
     titleVisibility: "masked" | "visible";
     projectRelation: "my_published" | "my_bid" | "unknown";
@@ -200,6 +201,7 @@ function readProjectGroup(value: unknown) {
   const pricingSummary = readOptionalPricingSummary(record.pricingSummary);
   return {
     projectId,
+    threadId: readRequiredString(record.threadId, "projectGroup.threadId"),
     projectDisplayTitle: readRequiredString(
       record.projectDisplayTitle,
       "projectGroup.projectDisplayTitle",

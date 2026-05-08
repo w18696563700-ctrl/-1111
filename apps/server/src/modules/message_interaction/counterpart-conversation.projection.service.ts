@@ -10,6 +10,7 @@ import {
   ProjectCommunicationBusinessStateService,
   ProjectCommunicationBusinessTodoSummary,
 } from '../project_communication/project-communication-business-state.service';
+import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
@@ -35,6 +36,7 @@ type ConversationAggregate = {
   counterpart: CounterpartConversationDetailProjection['counterpart'];
   summary: CounterpartConversationDetailProjection['summary'];
   focusProjectId: string;
+  focusThreadId: string;
   pricingSummary?: Record<string, unknown>;
   latestActivityAt: string;
   conversationUnreadCount: number;
@@ -83,6 +85,9 @@ export class CounterpartConversationProjectionService {
     private readonly businessStateService?: ProjectCommunicationBusinessStateService,
     @Optional()
     projectNameAccessSource?: CounterpartConversationProjectNameAccessSource,
+    @Optional()
+    @InjectRepository(ProjectCommunicationThreadEntity)
+    private readonly threadRepository?: Repository<ProjectCommunicationThreadEntity>,
   ) {
     this.cardSources = [
       bidThreadSource,
@@ -108,6 +113,7 @@ export class CounterpartConversationProjectionService {
       routeTarget: buildCounterpartConversationRouteTarget({
         conversationId: conversation.conversationId,
         projectId: conversation.focusProjectId,
+        threadId: conversation.focusThreadId,
       }),
       conversationUnreadCount: conversation.conversationUnreadCount,
       hasUnread: conversation.hasUnread,
@@ -177,13 +183,18 @@ export class CounterpartConversationProjectionService {
     const conversationMap = this.groupSeedsByConversation(seeds);
 
     const conversations = await Promise.all([...conversationMap.entries()]
-      .map(async ([conversationId, aggregate]): Promise<ConversationAggregate> => {
+      .map(async ([conversationId, aggregate]): Promise<ConversationAggregate | null> => {
         const businessTodoSummaryByProjectId =
           await this.buildBusinessTodoSummaryMap({
             aggregate,
             projectMap,
             viewerOrganizationId,
           });
+        const threadIdByProjectId = await this.buildProjectCommunicationThreadIdMap({
+          aggregate,
+          projectMap,
+          viewerOrganizationId,
+        });
         const projectGroups = this.buildProjectGroups({
           aggregate,
           projectMap,
@@ -192,8 +203,12 @@ export class CounterpartConversationProjectionService {
           ratingEntryMap,
           unreadStatsByProjectId,
           businessTodoSummaryByProjectId,
+          threadIdByProjectId,
         });
         const focusProject = projectGroups[0];
+        if (!focusProject) {
+          return null;
+        }
         const latestCard = focusProject.cards[0];
         const unreadSummary = this.summarizeProjectGroupUnread(projectGroups);
         return {
@@ -207,6 +222,7 @@ export class CounterpartConversationProjectionService {
             latestCardType: latestCard.cardType,
           },
           focusProjectId: focusProject.projectId,
+          focusThreadId: focusProject.threadId,
           ...(focusProject.pricingSummary ? { pricingSummary: focusProject.pricingSummary } : {}),
           latestActivityAt: aggregate.latestActivityAt,
           conversationUnreadCount: unreadSummary.conversationUnreadCount,
@@ -217,9 +233,13 @@ export class CounterpartConversationProjectionService {
           projectGroups,
         };
       }));
-    return conversations.sort((left, right) =>
-      right.latestActivityAt.localeCompare(left.latestActivityAt),
-    );
+    return conversations
+      .filter((conversation): conversation is ConversationAggregate =>
+        Boolean(conversation),
+      )
+      .sort((left, right) =>
+        right.latestActivityAt.localeCompare(left.latestActivityAt),
+      );
   }
 
   private async loadCardSeeds(viewerOrganizationId: string) {
@@ -332,20 +352,26 @@ export class CounterpartConversationProjectionService {
     ratingEntryMap: Map<string, CounterpartConversationRatingEntryProjection>;
     unreadStatsByProjectId: Map<string, ProjectCommunicationUnreadStats>;
     businessTodoSummaryByProjectId: Map<string, ProjectCommunicationBusinessTodoSummary>;
+    threadIdByProjectId: Map<string, string>;
     nameAccessProjectionMap: Awaited<
       ReturnType<ProjectNameAccessProjectionService['buildPublicProjectionMap']>
     >;
   }) {
     return [...input.aggregate.projectGroups.entries()]
-      .map(([projectId, group]): CounterpartConversationProjectGroupProjection => {
+      .map(([projectId, group]): CounterpartConversationProjectGroupProjection | null => {
         const project = input.projectMap.get(projectId);
         const projection = input.nameAccessProjectionMap.get(projectId);
+        const threadId = input.threadIdByProjectId.get(projectId);
+        if (!threadId) {
+          return null;
+        }
         const titleVisibility =
           projection?.nameAccess.status === 'visible' ? 'visible' : 'masked';
         const unreadStats =
           input.unreadStatsByProjectId.get(projectId) ?? this.emptyUnreadStats();
         return {
           projectId,
+          threadId,
           projectDisplayTitle: this.buildCounterpartProjectDisplayTitle({
             project,
             projection,
@@ -376,6 +402,9 @@ export class CounterpartConversationProjectionService {
           ),
         };
       })
+      .filter((group): group is CounterpartConversationProjectGroupProjection =>
+        Boolean(group),
+      )
       .sort((left, right) =>
         right.latestActivityAt.localeCompare(left.latestActivityAt),
       );
@@ -421,6 +450,108 @@ export class CounterpartConversationProjectionService {
       return [projectId, state.businessTodoSummary] as const;
     }));
     return new Map(entries);
+  }
+
+  private async buildProjectCommunicationThreadIdMap(input: {
+    aggregate: SeedConversationAggregate;
+    projectMap: Map<string, ProjectEntity>;
+    viewerOrganizationId: string;
+  }) {
+    const projectGroups = [...input.aggregate.projectGroups.entries()];
+    if (!this.threadRepository) {
+      return new Map(
+        projectGroups
+          .map(([projectId, group]) => [
+            projectId,
+            this.legacyProjectCommunicationThreadId(group),
+          ] as const)
+          .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
+      );
+    }
+    const lookup = projectGroups
+      .map(([projectId]) => {
+        const project = input.projectMap.get(projectId);
+        const ownerOrganizationId = project?.organizationId?.trim() ?? '';
+        const counterpartOrganizationId = project
+          ? this.resolveThreadCounterpartOrganizationId({
+              project,
+              aggregate: input.aggregate,
+              viewerOrganizationId: input.viewerOrganizationId,
+            })
+          : '';
+        if (
+          !ownerOrganizationId ||
+          !counterpartOrganizationId ||
+          ownerOrganizationId === counterpartOrganizationId
+        ) {
+          return null;
+        }
+        return {
+          projectId,
+          ownerOrganizationId,
+          counterpartOrganizationId,
+        };
+      })
+      .filter((item): item is {
+        projectId: string;
+        ownerOrganizationId: string;
+        counterpartOrganizationId: string;
+      } => Boolean(item));
+    if (!lookup.length) {
+      return new Map<string, string>();
+    }
+    const threads = await this.threadRepository.find({
+      where: lookup.map((item) => ({
+        projectId: item.projectId,
+        ownerOrganizationId: item.ownerOrganizationId,
+        counterpartOrganizationId: item.counterpartOrganizationId,
+      })),
+    });
+    const threadIdByPair = new Map(
+      threads.map((thread) => [
+        this.projectThreadKey({
+          projectId: thread.projectId,
+          ownerOrganizationId: thread.ownerOrganizationId,
+          counterpartOrganizationId: thread.counterpartOrganizationId,
+        }),
+        thread.id,
+      ]),
+    );
+    return new Map(
+      lookup
+        .map((item) => [
+          item.projectId,
+          threadIdByPair.get(this.projectThreadKey(item)),
+        ] as const)
+        .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
+    );
+  }
+
+  private legacyProjectCommunicationThreadId(group: ProjectGroupAggregate) {
+    return group.cards.find((card) => card.truthAnchor.threadId)?.truthAnchor.threadId ?? null;
+  }
+
+  private resolveThreadCounterpartOrganizationId(input: {
+    project: ProjectEntity;
+    aggregate: SeedConversationAggregate;
+    viewerOrganizationId: string;
+  }) {
+    const ownerOrganizationId = input.project.organizationId?.trim() ?? '';
+    return input.aggregate.counterpart.organizationId === ownerOrganizationId
+      ? input.viewerOrganizationId
+      : input.aggregate.counterpart.organizationId;
+  }
+
+  private projectThreadKey(input: {
+    projectId: string;
+    ownerOrganizationId: string;
+    counterpartOrganizationId: string;
+  }) {
+    return [
+      input.projectId,
+      input.ownerOrganizationId,
+      input.counterpartOrganizationId,
+    ].join(':');
   }
 
   private summarizeProjectGroupUnread(

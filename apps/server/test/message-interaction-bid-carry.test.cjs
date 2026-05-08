@@ -579,6 +579,7 @@ test('message interactions list returns counterpart conversation container cards
               params: {
                 conversationId: 'org-1',
                 projectId: 'project-1',
+                threadId: 'thread-1',
               },
             },
           },
@@ -674,6 +675,7 @@ test('counterpart conversation detail keeps every business card anchored to proj
           projectGroups: [
             {
               projectId: 'project-1',
+              threadId: 'thread-1',
               projectDisplayTitle: '项目名称需申请查看',
               titleVisibility: 'masked',
               projectState: 'published',
@@ -768,6 +770,7 @@ test('counterpart conversation project title uses concrete project title when vi
       truthType: 'bid_thread',
       projectId: 'project-luzhou',
       bidId: 'bid-luzhou',
+      threadId: 'bid-thread-luzhou',
     },
     detailRouteTarget: null,
     decisionAvailability: null,
@@ -851,6 +854,7 @@ test('counterpart conversation project title uses concrete project title when vi
   assert.equal(result.projectGroups.length, 1);
   assert.equal(result.projectGroups[0].titleVisibility, 'visible');
   assert.equal(result.projectGroups[0].projectDisplayTitle, '西洽会 - 泸州');
+  assert.equal(result.projectGroups[0].threadId, 'bid-thread-luzhou');
   assert.equal(result.projectGroups[0].projectPublishedAt, publishedAt.toISOString());
   assert.equal(result.projectGroups[0].projectUpdatedAt, projectUpdatedAt.toISOString());
   assert.equal(result.projectGroups[0].latestActivityAt, now);
@@ -906,6 +910,7 @@ test('counterpart conversation includes project name access source in the card c
               truthType: 'project_name_access_request',
               projectId: 'project-name-access',
               requestId: 'req-1',
+              threadId: 'thread-name-access',
             },
             detailRouteTarget: null,
             decisionAvailability: {
@@ -994,6 +999,7 @@ test('counterpart conversation ordinary unread does not mix pending business tod
               truthType: 'bid_participation_request',
               projectId: 'project-pending',
               requestId: 'req-1',
+              threadId: 'thread-pending',
             },
             detailRouteTarget: null,
             decisionAvailability: {

@@ -78,6 +78,7 @@ export type CounterpartConversationBusinessCardProjection = {
 
 export type CounterpartConversationProjectGroupProjection = {
   projectId: string;
+  threadId: string;
   projectDisplayTitle: string;
   titleVisibility: 'masked' | 'visible';
   projectRelation: 'my_published' | 'my_bid' | 'unknown';

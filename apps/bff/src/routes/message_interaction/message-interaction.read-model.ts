@@ -243,10 +243,11 @@ function readRouteTarget(value: unknown): MessageInteractionRouteTarget {
   const params = requireStringMap(record.params, "routeTarget.params");
   if (
     typeof params.conversationId !== "string" ||
-    typeof params.projectId !== "string"
+    typeof params.projectId !== "string" ||
+    typeof params.threadId !== "string"
   ) {
     throw new Error(
-      "Message interaction counterpart_conversation routeTarget.params must include conversationId and projectId.",
+      "Message interaction counterpart_conversation routeTarget.params must include conversationId, projectId, and threadId.",
     );
   }
   return {

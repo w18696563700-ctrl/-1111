@@ -4,6 +4,7 @@ export const COUNTERPART_CONVERSATION_CANONICAL_PATH =
 export function buildCounterpartConversationRouteTarget(input: {
   conversationId: string;
   projectId: string;
+  threadId: string;
 }) {
   return {
     objectType: 'counterpart_conversation',
@@ -12,6 +13,7 @@ export function buildCounterpartConversationRouteTarget(input: {
     params: {
       conversationId: input.conversationId,
       projectId: input.projectId,
+      threadId: input.threadId,
     },
   };
 }
