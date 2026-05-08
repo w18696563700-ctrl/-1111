@@ -595,3 +595,72 @@ Default deferrals:
 The more stable option is to freeze truth and verify runtime before implementation. The lower-cost option is to update root rules before changing subdirectory rules. The current-stage option is to protect boundaries and close existing drift before expanding features. The highest-risk option is to continue adding product surfaces while docs, contracts, local source, and cloud runtime are not clearly aligned.
 
 Root AGENTS.md only stores durable repo-wide rules. Detailed layer-specific rules should be moved to the closest subdirectory AGENTS.md when repeated mistakes appear.
+
+## 21. Audit-First Workflow Addendum
+
+### Working Mode
+
+For architecture, product, module-boundary, workflow, contract, and platform-planning tasks, default to audit-first mode.
+
+Do not modify code before producing an evidence-based read-only report unless:
+
+- the user explicitly asks for implementation
+- the relevant stage gates have passed
+- the change scope is bounded
+
+For large audits, propose parallel subagent decomposition only when the user explicitly authorizes it. The main thread must consolidate findings, risks, boundaries, and final decisions.
+
+### Product Architecture Review Standard
+
+When reviewing any module or product surface, classify findings into:
+
+1. Current minimum viable closed loop
+2. Reserved but not enabled yet
+3. Future extension slots
+
+The review must explicitly state:
+
+- which option is more stable
+- which option is lower cost
+- which option fits the current stage
+- which option carries higher risk
+
+### Evidence Standard
+
+Every conclusion, risk, boundary decision, and implementation recommendation must cite concrete evidence, such as:
+
+- file paths
+- functions
+- components
+- API names
+- schema names
+- OpenAPI paths
+- generated types
+- tests
+- logs
+- runtime smoke evidence
+
+Do not use local code existence as proof of cloud runtime availability.
+
+### Risk Standard
+
+Classify issues as:
+
+- `P0`: core flow broken, data corruption, permission leak, build failure, runtime unavailable
+- `P1`: functional inconsistency, unstable API, state mismatch, broken navigation, contract drift
+- `P2`: UX issue, naming issue, structure issue, test gap, extensibility risk
+
+If a required truth source, contract, or runtime proof is missing, mark it as `NO-GO` or `Gate Blocker` instead of treating it as a normal `P2` risk.
+
+### Boundary Standard
+
+Reviews and implementations must prevent:
+
+- over-heavy architecture
+- module boundary pollution
+- hidden cross-module coupling
+- BFF becoming business truth owner
+- Flutter or Admin inventing business state
+- message module becoming a business execution center
+- reserved buildings being exposed before formal unlock
+- mock, fake transport, or visual demo being treated as runtime evidence
