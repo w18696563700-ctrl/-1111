@@ -15,6 +15,10 @@ layer: L0 SSOT
 
 ## Current Round Registrations
 
+### 2026-05-09 Project Communication Service Fee Authorization Entry Projection
+
+- [project_communication_service_fee_authorization_entry_projection_gate_addendum.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/project_communication_service_fee_authorization_entry_projection_gate_addendum.md) is the formal `L0` gate addendum for projecting the bounded project-communication service-fee authorization entry, freezing that `complete_service_fee_authorization` may expose a `bid_service_fee_authorization.open` `detailRouteTarget` only on the existing `bid_participation_request` business card for the bidder organization, while preserving Server-owned truth, BFF validation-only behavior, Flutter consumption-only behavior, and blocking real payment authorization, `freeze-init`, callbacks, service-fee state-machine expansion, generic IM, and BFF/Flutter-local payment truth.
+
 ### 2026-05-07 Bid Service Fee Test Authorization Minimal Path
 
 - [bid_service_fee_test_authorization_minimal_addendum_v1.md](/Users/wangweiwei/Desktop/展览装修之家总控/docs/00_ssot/bid_service_fee_test_authorization_minimal_addendum_v1.md) is the formal `L0` SSOT freeze for the minimum Server-owned test authorization path, reusing the existing controlled `other` channel, signed callback, `PaymentOrder`, `PaymentCallbackEvent`, `PaymentTransaction`, `PlatformServiceFeeAuthorization`, and audit chain to validate project communication free-send unlock without adding OpenAPI, generated types, DB schema, wallet, settlement, invoice, guarantee deposit, real Alipay/WeChat integration, or Flutter-local bypass.

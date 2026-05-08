@@ -896,6 +896,14 @@ module ContractsGeneration
       .fetch('properties')
       .fetch('requiredNextAction')
       .fetch('enum')
+    counterpart_conversation_card_types = schemas.fetch('CounterpartConversationCard')
+      .fetch('properties')
+      .fetch('cardType')
+      .fetch('enum')
+    message_interaction_route_action_keys = schemas.fetch('MessageInteractionRouteTarget')
+      .fetch('properties')
+      .fetch('actionKey')
+      .fetch('enum')
     rating_entry_states = schemas.fetch('RatingEntryReadModel')
       .fetch('properties')
       .fetch('state')
@@ -1163,6 +1171,14 @@ module ContractsGeneration
       export const PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS = #{json_array(chat_required_next_actions)} as const;
       export type ProjectCommunicationChatRequiredNextAction =
         (typeof PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS)[number];
+
+      export const COUNTERPART_CONVERSATION_CARD_TYPES = #{json_array(counterpart_conversation_card_types)} as const;
+      export type CounterpartConversationCardType =
+        (typeof COUNTERPART_CONVERSATION_CARD_TYPES)[number];
+
+      export const MESSAGE_INTERACTION_ROUTE_ACTION_KEYS = #{json_array(message_interaction_route_action_keys)} as const;
+      export type MessageInteractionRouteActionKey =
+        (typeof MESSAGE_INTERACTION_ROUTE_ACTION_KEYS)[number];
 
       export interface ProjectCommunicationBusinessTodoSummary {
         bidParticipationReviewPendingCount: number;

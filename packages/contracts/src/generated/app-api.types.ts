@@ -866,6 +866,14 @@ export const PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS = ["review_bid_par
 export type ProjectCommunicationChatRequiredNextAction =
   (typeof PROJECT_COMMUNICATION_CHAT_REQUIRED_NEXT_ACTIONS)[number];
 
+export const COUNTERPART_CONVERSATION_CARD_TYPES = ["project_name_access_request","bid_participation_request","bid_thread","project_clarification","project_order","system_notice"] as const;
+export type CounterpartConversationCardType =
+  (typeof COUNTERPART_CONVERSATION_CARD_TYPES)[number];
+
+export const MESSAGE_INTERACTION_ROUTE_ACTION_KEYS = ["counterpart_conversation.open","project_name_access_thread.open","bid_participation_request.open","bid_service_fee_authorization.open","bid_submit.open","bid_thread.open","project_clarification.open","order_detail.open"] as const;
+export type MessageInteractionRouteActionKey =
+  (typeof MESSAGE_INTERACTION_ROUTE_ACTION_KEYS)[number];
+
 export interface ProjectCommunicationBusinessTodoSummary {
   bidParticipationReviewPendingCount: number;
   publisherMaterialReviewPendingCount: number;

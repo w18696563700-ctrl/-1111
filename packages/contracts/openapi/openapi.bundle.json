@@ -19498,7 +19498,14 @@
           "actionKey": {
             "type": "string",
             "enum": [
-              "counterpart_conversation.open"
+              "counterpart_conversation.open",
+              "project_name_access_thread.open",
+              "bid_participation_request.open",
+              "bid_service_fee_authorization.open",
+              "bid_submit.open",
+              "bid_thread.open",
+              "project_clarification.open",
+              "order_detail.open"
             ]
           },
           "canonicalPath": {
