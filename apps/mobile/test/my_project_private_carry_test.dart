@@ -1051,7 +1051,7 @@ void main() {
 
     await _scrollTo(tester, find.text('发布前待办'));
     expect(find.text('发布前待办'), findsOneWidget);
-    expect(find.text('项目真实性诚意金绿色通道'), findsOneWidget);
+    expect(find.text('项目真实性绿色通道'), findsOneWidget);
     expect(find.text('报价依据资料'), findsWidgets);
     await _capturePrepublishWorkbench(
       boundaryKey,
@@ -1394,7 +1394,7 @@ void main() {
     expect(find.text('下架关闭'), findsNothing);
     await _scrollTo(tester, find.text('报价依据资料'));
     expect(find.text('报价依据资料'), findsOneWidget);
-    expect(find.text('报价依据资料 checklist'), findsOneWidget);
+    expect(find.text('报价依据资料 checklist'), findsNothing);
     expect(find.textContaining('这里用于补充项目正式文书资料'), findsNothing);
     expect(find.text('当前说明'), findsNothing);
     await _scrollTo(tester, find.text('公共资源下载区'));
@@ -1513,12 +1513,11 @@ void main() {
       title: '项目 project-publish-flow',
       actionLabel: '补资料后确认发布',
     );
-    await _scrollTo(
-      tester,
-      find.widgetWithText(OutlinedButton, '支持项目真实性诚意金机制 1'),
-    );
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '去表态'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '去表态').first);
+    await tester.pumpAndSettle();
     await tester.tap(
-      find.widgetWithText(OutlinedButton, '支持项目真实性诚意金机制 1').first,
+      find.widgetWithText(OutlinedButton, '支持项目真实性诚意金机制 1').last,
     );
     await tester.pumpAndSettle();
     await _scrollTo(tester, find.widgetWithText(FilledButton, '确认并发布'));
@@ -1605,11 +1604,15 @@ void main() {
     );
     expect(find.text('发布进度'), findsOneWidget);
     await _scrollTo(tester, find.text('发布前待办'));
-    expect(find.text('项目真实性诚意金绿色通道'), findsOneWidget);
+    expect(find.text('项目真实性绿色通道'), findsOneWidget);
     expect(find.text('查看诚意金规则说明', skipOffstage: false), findsOneWidget);
-    await _tapVisible(tester, find.text('查看诚意金规则说明'));
+    await _scrollTo(tester, find.widgetWithText(OutlinedButton, '去表态'));
+    await tester.tap(find.widgetWithText(OutlinedButton, '去表态').first);
+    await tester.pumpAndSettle();
     expect(find.text('支持项目真实性诚意金机制 1'), findsOneWidget);
     expect(find.text('暂不支持项目真实性诚意金机制 0'), findsOneWidget);
+    await tester.tap(find.byType(ModalBarrier).last);
+    await tester.pumpAndSettle();
     await _scrollTo(tester, find.widgetWithText(OutlinedButton, '继续处理'));
     expect(find.widgetWithText(OutlinedButton, '继续处理'), findsWidgets);
 

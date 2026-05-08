@@ -44,7 +44,7 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
       summary: '先核对必传资料，再完成诚意金绿色通道表态并确认发布。',
       tone: _ActionCardTone.emphasis,
       children: <Widget>[
-        _PrepublishTodoGrid(
+        _PrepublishTodoList(
           children: <Widget>[
             _PrepublishTodoTile(
               icon: Icons.attach_file_rounded,
@@ -66,10 +66,11 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
             ),
             _PrepublishTodoTile(
               icon: Icons.verified_user_outlined,
-              title: '项目真实性诚意金绿色通道',
-              body: sincerity == null
-                  ? '当前状态以云端费用回读为准。'
-                  : '${sincerity!.amountLabel} · ${sincerity!.statusLabel}',
+              title: '项目真实性绿色通道',
+              body: _prepublishGreenChannelTodoBody(
+                sincerity: sincerity,
+                feedback: feedback,
+              ),
               statusLabel: pricingLoading
                   ? '读取中'
                   : _sincerityGreenChannelChoiceCompleted(sincerity)
@@ -79,24 +80,17 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
               accentColor: _sincerityGreenChannelChoiceCompleted(sincerity)
                   ? _prepublishReadyGreen
                   : null,
-              action: sincerity?.canContinuePayment == true
-                  ? OutlinedButton(
-                      onPressed: continuingSincerity || pricingLoading
-                          ? null
-                          : onContinueSincerity,
-                      child: Text(continuingSincerity ? '处理中...' : '继续处理'),
-                    )
-                  : OutlinedButton(
-                      onPressed: pricingLoading ? null : onRefreshSincerity,
-                      child: const Text('刷新状态'),
-                    ),
-            ),
-            if (feedback != null)
-              _PrepublishGreenChannelTodoTile(
+              action: _PrepublishGreenChannelTodoActions(
+                sincerity: sincerity,
+                pricingLoading: pricingLoading,
+                continuingSincerity: continuingSincerity,
+                onContinueSincerity: onContinueSincerity,
+                onRefreshSincerity: onRefreshSincerity,
                 summary: feedback,
                 submittingChoice: submittingFeedbackChoice,
                 onChoice: onFeedbackChoice,
               ),
+            ),
             _PrepublishTodoTile(
               icon: Icons.fact_check_outlined,
               title: '发布确认',
@@ -245,51 +239,38 @@ class _SincerityRuleDetails extends StatelessWidget {
   }
 }
 
-class _PrepublishTodoGrid extends StatelessWidget {
-  const _PrepublishTodoGrid({required this.children});
+String _prepublishGreenChannelTodoBody({
+  required _ProjectAuthenticitySinceritySnapshot? sincerity,
+  required _ProjectAuthenticitySincerityFreezeFeedbackSummary? feedback,
+}) {
+  final statusLine = sincerity == null
+      ? '当前状态以云端费用回读为准。'
+      : '${sincerity.amountLabel} · ${sincerity.statusLabel}';
+  if (feedback == null) {
+    return statusLine;
+  }
+  final choiceLabel = switch (feedback.myChoice) {
+    'support_freeze' => '已选择支持',
+    'oppose_freeze' => '已选择暂不支持',
+    _ => '待表态',
+  };
+  return '$statusLine\n$choiceLabel · 支持 ${feedback.supportFreezeCount} / 暂不支持 ${feedback.opposeFreezeCount}';
+}
+
+class _PrepublishTodoList extends StatelessWidget {
+  const _PrepublishTodoList({required this.children});
 
   final List<Widget> children;
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (BuildContext context, BoxConstraints constraints) {
-        if (constraints.maxWidth >= 360) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              for (var index = 0; index < children.length; index++) ...[
-                if (index > 0) const SizedBox(width: 10),
-                Expanded(child: children[index]),
-              ],
-            ],
-          );
-        }
-
-        if (constraints.maxWidth < 300) {
-          return Column(
-            children: <Widget>[
-              for (var index = 0; index < children.length; index++) ...[
-                if (index > 0) const SizedBox(height: 10),
-                children[index],
-              ],
-            ],
-          );
-        }
-
-        return Wrap(
-          spacing: 10,
-          runSpacing: 10,
-          children: children
-              .map(
-                (Widget child) => SizedBox(
-                  width: (constraints.maxWidth - 10) / 2,
-                  child: child,
-                ),
-              )
-              .toList(growable: false),
-        );
-      },
+    return Column(
+      children: <Widget>[
+        for (var index = 0; index < children.length; index++) ...[
+          if (index > 0) const SizedBox(height: 10),
+          children[index],
+        ],
+      ],
     );
   }
 }
@@ -321,78 +302,95 @@ class _PrepublishTodoTile extends StatelessWidget {
         ? (accentColor ?? _prepublishReadyGreen)
         : AppVisualTokens.brandGold;
     return ConstrainedBox(
-      constraints: const BoxConstraints(minHeight: 118),
+      constraints: const BoxConstraints(minHeight: 84),
       child: DecoratedBox(
         decoration: BoxDecoration(
           color: stateColor.withValues(alpha: emphasized ? 0.10 : 0.06),
-          borderRadius: BorderRadius.circular(18),
+          borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: stateColor.withValues(alpha: emphasized ? 0.30 : 0.20),
           ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(12),
           child: LayoutBuilder(
             builder: (BuildContext context, BoxConstraints constraints) {
-              final compact = constraints.maxWidth < 125;
-              return Column(
+              final compact = constraints.maxWidth < 360;
+              final leading = DecoratedBox(
+                decoration: BoxDecoration(
+                  color: stateColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Icon(icon, size: 18, color: stateColor),
+                ),
+              );
+              final content = Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.center,
                     children: <Widget>[
-                      DecoratedBox(
-                        decoration: BoxDecoration(
-                          color: stateColor.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Padding(
-                          padding: EdgeInsets.all(compact ? 6 : 7),
-                          child: Icon(
-                            icon,
-                            size: compact ? 16 : 18,
-                            color: stateColor,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 7),
                       Expanded(
                         child: Text(
                           title,
-                          maxLines: compact ? 2 : 2,
+                          maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: theme.textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w900,
                             height: 1.16,
-                            fontSize: compact ? 12 : null,
                           ),
                         ),
                       ),
+                      const SizedBox(width: 8),
+                      _TinyStatusPill(label: statusLabel, color: stateColor),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  _TinyStatusPill(label: statusLabel, color: stateColor),
-                  const SizedBox(height: 7),
+                  const SizedBox(height: 5),
                   Text(
                     body,
-                    maxLines: compact ? 2 : 3,
+                    maxLines: compact ? 3 : 2,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
-                      height: 1.34,
-                      fontSize: compact ? 11 : null,
+                      height: 1.35,
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Align(
-                    alignment: Alignment.centerRight,
-                    child: FittedBox(
-                      fit: BoxFit.scaleDown,
+                ],
+              );
+
+              if (compact) {
+                return Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        leading,
+                        const SizedBox(width: 10),
+                        Expanded(child: content),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Align(
                       alignment: Alignment.centerRight,
-                      child: action,
+                      child: _PrepublishTodoActionWrap(child: action),
                     ),
-                  ),
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: <Widget>[
+                  leading,
+                  const SizedBox(width: 12),
+                  Expanded(child: content),
+                  const SizedBox(width: 12),
+                  _PrepublishTodoActionWrap(child: action),
                 ],
               );
             },
@@ -403,35 +401,69 @@ class _PrepublishTodoTile extends StatelessWidget {
   }
 }
 
-class _PrepublishGreenChannelTodoTile extends StatelessWidget {
-  const _PrepublishGreenChannelTodoTile({
+class _PrepublishTodoActionWrap extends StatelessWidget {
+  const _PrepublishTodoActionWrap({required this.child});
+
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    return FittedBox(
+      fit: BoxFit.scaleDown,
+      alignment: Alignment.centerRight,
+      child: child,
+    );
+  }
+}
+
+class _PrepublishGreenChannelTodoActions extends StatelessWidget {
+  const _PrepublishGreenChannelTodoActions({
+    required this.sincerity,
+    required this.pricingLoading,
+    required this.continuingSincerity,
+    required this.onContinueSincerity,
+    required this.onRefreshSincerity,
     required this.summary,
     required this.submittingChoice,
     required this.onChoice,
   });
 
-  final _ProjectAuthenticitySincerityFreezeFeedbackSummary summary;
+  final _ProjectAuthenticitySinceritySnapshot? sincerity;
+  final bool pricingLoading;
+  final bool continuingSincerity;
+  final VoidCallback? onContinueSincerity;
+  final VoidCallback? onRefreshSincerity;
+  final _ProjectAuthenticitySincerityFreezeFeedbackSummary? summary;
   final String? submittingChoice;
   final ValueChanged<String>? onChoice;
 
   @override
   Widget build(BuildContext context) {
-    final completed =
-        summary.myChoice == 'support_freeze' ||
-        summary.myChoice == 'oppose_freeze';
-    return _PrepublishTodoTile(
-      icon: Icons.eco_outlined,
-      title: '绿色通道表态',
-      body:
-          '支持机制 ${summary.supportFreezeCount} / 暂不支持 ${summary.opposeFreezeCount}',
-      statusLabel: completed ? '已选择' : '待选择',
-      emphasized: completed,
-      accentColor: completed ? _prepublishReadyGreen : null,
-      action: _PrepublishGreenChannelChoiceAction(
-        summary: summary,
-        submittingChoice: submittingChoice,
-        onChoice: onChoice,
-      ),
+    final feedback = summary;
+    return Wrap(
+      spacing: 8,
+      runSpacing: 8,
+      alignment: WrapAlignment.end,
+      children: <Widget>[
+        if (sincerity?.canContinuePayment == true)
+          OutlinedButton(
+            onPressed: continuingSincerity || pricingLoading
+                ? null
+                : onContinueSincerity,
+            child: Text(continuingSincerity ? '处理中...' : '继续处理'),
+          )
+        else
+          OutlinedButton(
+            onPressed: pricingLoading ? null : onRefreshSincerity,
+            child: const Text('刷新状态'),
+          ),
+        if (feedback != null)
+          _PrepublishGreenChannelChoiceAction(
+            summary: feedback,
+            submittingChoice: submittingChoice,
+            onChoice: onChoice,
+          ),
+      ],
     );
   }
 }
@@ -460,21 +492,26 @@ class _PrepublishGreenChannelChoiceAction extends StatelessWidget {
     );
   }
 
-  List<Widget> _choiceButtons() {
+  List<Widget> _choiceButtons(BuildContext sheetContext) {
+    void handleChoice(String choice) {
+      Navigator.of(sheetContext).maybePop();
+      onChoice?.call(choice);
+    }
+
     return <Widget>[
       _SincerityFreezeFeedbackButton(
         label: '支持项目真实性诚意金机制 ${summary.supportFreezeCount}',
         choice: 'support_freeze',
         selected: summary.myChoice == 'support_freeze',
         submittingChoice: submittingChoice,
-        onChoice: onChoice,
+        onChoice: onChoice == null ? null : handleChoice,
       ),
       _SincerityFreezeFeedbackButton(
         label: '暂不支持项目真实性诚意金机制 ${summary.opposeFreezeCount}',
         choice: 'oppose_freeze',
         selected: summary.myChoice == 'oppose_freeze',
         submittingChoice: submittingChoice,
-        onChoice: onChoice,
+        onChoice: onChoice == null ? null : handleChoice,
       ),
     ];
   }
@@ -498,7 +535,7 @@ class _PrepublishGreenChannelChoiceAction extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                ..._choiceButtons().map(
+                ..._choiceButtons(context).map(
                   (Widget child) => Padding(
                     padding: const EdgeInsets.only(bottom: 10),
                     child: child,
