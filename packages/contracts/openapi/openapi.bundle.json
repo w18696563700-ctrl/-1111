@@ -5325,6 +5325,41 @@
         }
       }
     },
+    "/api/app/bid/submission/supplement": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Supplement existing bid submission materials after publisher feedback",
+        "operationId": "supplementAppBidSubmission",
+        "requestBody": {
+          "required": true,
+          "description": "Supplement command for an existing bid material review that is explicitly in `needs_supplement`. This path is not first bid submit and must not create a second bid. It updates the existing bid quote/proposal and three bid material FileAsset references, then returns the targeted material review to `pending_review` for publisher re-check. It must not carry final contract amount, payment, service-fee charging, or settlement fields.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Existing bid submission supplement accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidSubmissionSupplementAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Controlled conflict when the target material is no longer in `needs_supplement`, sourceVersionToken changed, or the entry does not match the requested bid material slot."
+          }
+        }
+      }
+    },
     "/api/app/bid/seat/lock": {
       "post": {
         "tags": [
@@ -7108,6 +7143,38 @@
             "application/json": {
               "schema": {
                 "$ref": "#/components/schemas/BidSubmitRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/bids/submission/supplement": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for bid submission supplement",
+        "operationId": "supplementBidSubmission",
+        "responses": {
+          "202": {
+            "description": "Internal bid submission supplement accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidSubmissionSupplementAcceptedResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Internal truth pair for `POST /api/app/bid/submission/supplement`. Server owns permissions, needs_supplement gating, FileAsset ownership, sourceVersionToken concurrency, audit, and business event emission. BFF must only forward and shape errors.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementRequest"
               }
             }
           }
@@ -16914,6 +16981,82 @@
             "description": "Confirmed FileAsset id for the schedule-plan bid material."
           }
         }
+      },
+      "BidSubmissionSupplementEntryKey": {
+        "type": "string",
+        "enum": [
+          "bid_project_understanding_review",
+          "bid_quote_sheet_review",
+          "bid_schedule_plan_review"
+        ],
+        "description": "Target bid material review entry that is currently in needs_supplement."
+      },
+      "BidSubmissionSupplementSlot": {
+        "type": "string",
+        "enum": [
+          "project_understanding",
+          "quote_sheet",
+          "schedule_plan"
+        ],
+        "description": "Optional focused bid material slot used by Flutter for direct positioning."
+      },
+      "BidSubmissionSupplementRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BidSubmitRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "bidId",
+              "entryKey",
+              "sourceVersionToken"
+            ],
+            "properties": {
+              "bidId": {
+                "type": "string"
+              },
+              "entryKey": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementEntryKey"
+              },
+              "bidMaterialSlot": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementSlot"
+              },
+              "sourceVersionToken": {
+                "type": "string",
+                "description": "Current material review source token used to prevent stale supplement writes."
+              }
+            }
+          }
+        ],
+        "description": "Existing bid supplement request. It intentionally reuses the three bid material FileAsset fields because supplement submission replaces the existing bid material package for publisher re-review. It does not create a new bid and must not contain final contract amount or service-fee fields.\n"
+      },
+      "BidSubmissionSupplementAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "bidId",
+          "projectId",
+          "entryKey",
+          "reviewState"
+        ],
+        "properties": {
+          "bidId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "entryKey": {
+            "$ref": "#/components/schemas/BidSubmissionSupplementEntryKey"
+          },
+          "reviewState": {
+            "type": "string",
+            "enum": [
+              "pending_review"
+            ]
+          }
+        },
+        "description": "Existing bid supplement accepted response. The targeted material review is returned to pending_review for publisher confirmation."
       },
       "BidSeatLockRequest": {
         "type": "object",
