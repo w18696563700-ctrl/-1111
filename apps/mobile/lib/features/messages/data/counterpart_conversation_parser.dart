@@ -4,13 +4,24 @@ import 'package:mobile/features/messages/data/messages_registered_entry_registry
 
 const String _missingProjectContextMessage = '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
 
-const Set<String> _projectCommunicationRequiredNextActions = <String>{
+const Set<String> _projectCommunicationChatRequiredNextActions = <String>{
   'review_bid_participation',
   'confirm_publisher_materials',
   'submit_bid_materials',
   'confirm_bid_materials',
   'complete_service_fee_authorization',
   'open_deal_confirmation',
+  'none',
+};
+
+const Set<String> _projectCommunicationMessageRequiredNextActions = <String>{
+  'review_bid_participation',
+  'confirm_publisher_materials',
+  'submit_bid_materials',
+  'confirm_bid_materials',
+  'complete_service_fee_authorization',
+  'open_deal_confirmation',
+  're_review_material',
   'none',
 };
 
@@ -132,7 +143,7 @@ ProjectCommunicationChatAvailabilityView _parseChatAvailability(
     lockReasonText: _nullableString(map['lockReasonText']),
     requiredNextAction: _enumValue(
       _requiredString(map, 'requiredNextAction'),
-      _projectCommunicationRequiredNextActions,
+      _projectCommunicationChatRequiredNextActions,
       'requiredNextAction',
     ),
   );
@@ -226,7 +237,7 @@ String? _parseOptionalRequiredNextAction(Object? value) {
     _requiredString(<String, Object?>{
       'requiredNextAction': value,
     }, 'requiredNextAction'),
-    _projectCommunicationRequiredNextActions,
+    _projectCommunicationMessageRequiredNextActions,
     'requiredNextAction',
   );
 }

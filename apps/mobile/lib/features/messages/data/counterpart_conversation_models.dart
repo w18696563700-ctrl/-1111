@@ -312,6 +312,15 @@ final class ProjectCommunicationMessageView {
             'bid_materials_confirmed_service_fee_authorization_required' &&
         requiredNextAction == 'complete_service_fee_authorization';
   }
+
+  bool get isPublisherMaterialReReviewPrompt {
+    return eventType == 'publisher_material_supplement_submitted' &&
+        requiredNextAction == 're_review_material';
+  }
+
+  bool get hasBusinessActionPrompt {
+    return isServiceFeeAuthorizationPrompt || isPublisherMaterialReReviewPrompt;
+  }
 }
 
 final class ProjectCommunicationAttachmentView {

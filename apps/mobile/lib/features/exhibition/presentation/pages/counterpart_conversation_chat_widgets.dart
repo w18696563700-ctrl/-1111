@@ -281,9 +281,7 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
       body: message.body,
       attachment: message.attachment,
       confirmation: message.confirmation,
-      businessActionLabel: message.isServiceFeeAuthorizationPrompt
-          ? '去完成预授权'
-          : null,
+      businessActionLabel: _businessActionLabel(message),
       meta: statusLabel == null ? sentAtLabel : '$sentAtLabel · $statusLabel',
       isMine: isMine,
       senderName: senderName,
@@ -297,10 +295,20 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
       onOpenConfirmationSoftLink: message.confirmation == null
           ? null
           : onOpenConfirmationSoftLink,
-      onOpenBusinessAction: message.isServiceFeeAuthorizationPrompt
+      onOpenBusinessAction: message.hasBusinessActionPrompt
           ? onOpenBusinessAction
           : null,
     );
+  }
+
+  String? _businessActionLabel(ProjectCommunicationMessageView message) {
+    if (message.isServiceFeeAuthorizationPrompt) {
+      return '去完成预授权';
+    }
+    if (message.isPublisherMaterialReReviewPrompt) {
+      return '重新确认资料';
+    }
+    return null;
   }
 
   String? _messageStatusLabel(

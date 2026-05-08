@@ -256,6 +256,35 @@ void main() {
     expect(messages.items.single.readState, 'read_by_counterpart');
     expect(messages.items.single.readByCounterpartAt, '2026-05-04T10:01:00Z');
   });
+
+  test(
+    'project communication message accepts publisher material re-review action',
+    () {
+      final message = parseProjectCommunicationMessage(<String, Object?>{
+        'messageId': 'message-1',
+        'threadId': 'thread-1',
+        'projectId': 'project-1',
+        'senderUserId': 'user-1',
+        'senderOrganizationId': 'org-1',
+        'messageKind': 'text',
+        'body': '发布方已补充服务清单，请重新预览确认。',
+        'payload': <String, Object?>{
+          'eventType': 'publisher_material_supplement_submitted',
+          'sourceType': 'project_attachment_supplement',
+          'requiredNextAction': 're_review_material',
+        },
+        'messageState': 'active',
+        'deliveryState': 'persisted',
+        'readState': 'not_applicable',
+        'readByCounterpartAt': null,
+        'createdAt': '2026-05-04T10:00:00Z',
+      });
+
+      expect(message.requiredNextAction, 're_review_material');
+      expect(message.isPublisherMaterialReReviewPrompt, isTrue);
+      expect(message.hasBusinessActionPrompt, isTrue);
+    },
+  );
 }
 
 Map<String, Object?> _businessTodoSummary({
