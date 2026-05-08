@@ -152,7 +152,7 @@ Widget _buildBidSubmitAttachmentSlotCard({
   final statusLine = _bidSubmitAttachmentCompactStatusLine(slot);
 
   return DecoratedBox(
-    key: ValueKey<String>('bid-submit-attachment-card-${slot.key}'),
+    key: slot.focusKey,
     decoration: BoxDecoration(
       color: compact
           ? Colors.transparent

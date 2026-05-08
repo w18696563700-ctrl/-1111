@@ -505,6 +505,12 @@ class ExhibitionConsumerLayer {
     return _actionService.submitBid(command);
   }
 
+  Future<ExhibitionActionResult> supplementBidSubmission(
+    BidSubmissionSupplementCommand command,
+  ) {
+    return _actionService.supplementBidSubmission(command);
+  }
+
   Future<ExhibitionActionResult> submitExhibitionReport({
     required String? projectId,
     String reasonCode = 'fabricated_project',

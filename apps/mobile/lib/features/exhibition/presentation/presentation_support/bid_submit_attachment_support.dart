@@ -67,6 +67,7 @@ class _BidSubmitAttachmentSlotState {
   });
 
   final String key;
+  final GlobalKey focusKey = GlobalKey();
   final String label;
   final String summary;
   final String fileKind;

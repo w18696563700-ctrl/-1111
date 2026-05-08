@@ -601,10 +601,24 @@ class _CounterpartConversationPageState
     );
   }
 
-  Future<void> _openBidSubmitAndRefresh(String projectId) async {
-    await Navigator.of(
-      context,
-    ).pushNamed(ExhibitionRoutes.bidSubmitWithProjectId(projectId));
+  Future<void> _openBidSubmitAndRefresh(
+    String projectId, {
+    String? mode,
+    String? bidId,
+    String? focusEntryKey,
+    String? focusSlot,
+    String? sourceVersionToken,
+  }) async {
+    await Navigator.of(context).pushNamed(
+      ExhibitionRoutes.bidSubmitWithProjectId(
+        projectId,
+        mode: mode,
+        bidId: bidId,
+        focusEntryKey: focusEntryKey,
+        focusSlot: focusSlot,
+        sourceVersionToken: sourceVersionToken,
+      ),
+    );
     if (!mounted) {
       return;
     }
@@ -1670,7 +1684,24 @@ class _CounterpartConversationPageState
       _showSnack('无法进入补充竞标资料页，缺少项目上下文。');
       return;
     }
-    await _openBidSubmitAndRefresh(projectId);
+    final bidId = (entry.bidId ?? entry.truthAnchor.bidId)?.trim();
+    if (bidId == null || bidId.isEmpty) {
+      _showSnack('无法进入补充竞标资料页，缺少竞标上下文。');
+      return;
+    }
+    final sourceVersionToken = entry.truthAnchor.sourceVersionToken?.trim();
+    if (sourceVersionToken == null || sourceVersionToken.isEmpty) {
+      _showSnack('无法进入补充竞标资料页，资料版本已变化，请刷新后重试。');
+      return;
+    }
+    await _openBidSubmitAndRefresh(
+      projectId,
+      mode: 'supplement',
+      bidId: bidId,
+      focusEntryKey: entry.entryKey,
+      focusSlot: entry.truthAnchor.bidMaterialSlot,
+      sourceVersionToken: sourceVersionToken,
+    );
   }
 
   bool _hasWorkbenchEntryContext(ProjectCommunicationWorkbenchEntryView entry) {

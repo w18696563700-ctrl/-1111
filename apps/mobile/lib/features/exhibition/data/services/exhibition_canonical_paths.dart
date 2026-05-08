@@ -42,6 +42,8 @@ final class ExhibitionCanonicalPaths {
   static const String exhibitionReportSubmit =
       '/api/app/exhibition/report/submit';
   static const String bidSubmit = '/api/app/bid/submit';
+  static const String bidSubmissionSupplement =
+      '/api/app/bid/submission/supplement';
   static const String bidAward = '/api/app/bid/award';
   static const String bidSelectAndCreateOrder =
       '/api/app/bid/select-bid-and-create-order';

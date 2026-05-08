@@ -6,11 +6,19 @@ class BidSubmitPage extends StatefulWidget {
     this.projectId,
     this.mode,
     this.bidParticipationRequestId,
+    this.bidId,
+    this.focusEntryKey,
+    this.focusSlot,
+    this.sourceVersionToken,
   });
 
   final String? projectId;
   final String? mode;
   final String? bidParticipationRequestId;
+  final String? bidId;
+  final String? focusEntryKey;
+  final String? focusSlot;
+  final String? sourceVersionToken;
 
   @override
   State<BidSubmitPage> createState() => _BidSubmitPageState();
@@ -61,6 +69,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   P0PayPaymentPollResult? _p0PayAuthorizationPollResult;
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
+  bool get _isSupplementMode => widget.mode?.trim() == 'supplement';
 
   void _setBidAttachmentPreviewOpening(
     _BidSubmitAttachmentSlotState slot,
@@ -84,7 +93,9 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       } else {
         _lastResult = ExhibitionActionResult(
           method: 'POST',
-          path: ExhibitionCanonicalPaths.bidSubmit,
+          path: _isSupplementMode
+              ? ExhibitionCanonicalPaths.bidSubmissionSupplement
+              : ExhibitionCanonicalPaths.bidSubmit,
           isSuccess: false,
           controlledState: AppPageState.notFound,
           message:
@@ -111,6 +122,9 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     }
     _loadSubmitProjectDetail(forceRefresh: true);
     _loadAccessGuard();
+    if (_isSupplementMode) {
+      unawaited(_prepareSupplementBidFlow());
+    }
   }
 
   @override
@@ -220,10 +234,11 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       return;
     }
 
-    final publisherMaterialBlocker =
-        _bidSubmitPublisherMaterialReviewSubmitDisabledMessage(
-          _bidMaterialResult,
-        );
+    final publisherMaterialBlocker = _isSupplementMode
+        ? null
+        : _bidSubmitPublisherMaterialReviewSubmitDisabledMessage(
+            _bidMaterialResult,
+          );
     if (publisherMaterialBlocker != null) {
       setState(() {
         _lastResult = ExhibitionActionResult(
@@ -352,21 +367,33 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
         showContinueBidFlowAction &&
         _projectDetailResult?.state == AppPageState.content;
     final bidAlreadySubmitted =
-        _bidAlreadySubmitted ||
-        _hasCurrentViewerBid(_projectDetailResult?.payload) ||
-        _isBidDuplicateSubmissionResult(_lastResult);
+        !_isSupplementMode &&
+        (_bidAlreadySubmitted ||
+            _hasCurrentViewerBid(_projectDetailResult?.payload) ||
+            _isBidDuplicateSubmissionResult(_lastResult));
     final submitDisabledMessage = bidAlreadySubmitted
         ? null
         : _bidSubmitFinalSubmitDisabledMessage();
+    final pageTitle = _isSupplementMode ? '补充竞标资料' : '竞标提交';
+    final pageSummary = _isSupplementMode
+        ? '根据发布方反馈补充项目理解、报价表或进度安排。补充成功后，发布方会重新确认资料。'
+        : '这里是当前项目下的竞标提交页，按已承接项目、查看报价依据资料、填写报价、上传方案和最终提交依次完成。';
+    final canonicalPath = _isSupplementMode
+        ? ExhibitionCanonicalPaths.bidSubmissionSupplement
+        : ExhibitionCanonicalPaths.bidSubmit;
 
     return _SubmissionPageFrame(
-      title: '竞标提交',
-      summary: '这里是当前项目下的竞标提交页，按已承接项目、查看报价依据资料、填写报价、上传方案和最终提交依次完成。',
-      canonicalPath: ExhibitionCanonicalPaths.bidSubmit,
+      title: pageTitle,
+      summary: pageSummary,
+      canonicalPath: canonicalPath,
       submitting: _submitting || _p0PaySubmitting,
       lastResult: _lastResult,
       onSubmitPressed: _submitCurrentBidFlow,
-      submitButtonLabel: bidAlreadySubmitted ? '已提交竞标' : '提交竞标',
+      submitButtonLabel: bidAlreadySubmitted
+          ? '已提交竞标'
+          : _isSupplementMode
+          ? '提交补充资料'
+          : '提交竞标',
       showSubmitButton:
           !_guardLoading &&
           _accessGuard == null &&
@@ -727,7 +754,7 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     if (mounted) {
       setState(() {
         _projectDetailResult = detailResult;
-        if (_hasCurrentViewerBid(detailResult.payload)) {
+        if (!_isSupplementMode && _hasCurrentViewerBid(detailResult.payload)) {
           _bidAlreadySubmitted = true;
         }
       });
@@ -837,10 +864,149 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
 
     setState(() {
       _projectDetailResult = result;
-      if (_hasCurrentViewerBid(result.payload)) {
+      if (!_isSupplementMode && _hasCurrentViewerBid(result.payload)) {
         _bidAlreadySubmitted = true;
       }
     });
+  }
+
+  Future<void> _prepareSupplementBidFlow() async {
+    final projectId = _normalizeId(_projectIdController.text);
+    final bidId = _normalizeId(widget.bidId);
+    final sourceVersionToken = _normalizeId(widget.sourceVersionToken);
+    if (projectId == null || bidId == null || sourceVersionToken == null) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _bidFlowExpanded = true;
+        _lastResult = ExhibitionActionResult(
+          method: 'POST',
+          path: ExhibitionCanonicalPaths.bidSubmissionSupplement,
+          isSuccess: false,
+          controlledState: AppPageState.errorNonRetryable,
+          message: '当前补充资料入口缺少竞标上下文，请返回消息楼刷新后重试。',
+        );
+      });
+      return;
+    }
+
+    setState(() {
+      _bidFlowExpanded = true;
+      _projectReviewExpanded = false;
+      _bidMaterialResult = ExhibitionLoadResult(
+        state: AppPageState.loading,
+        method: 'GET',
+        path: ExhibitionCanonicalPaths.projectBidMaterials,
+      );
+    });
+
+    await Future.wait<void>(<Future<void>>[
+      _loadBidMaterials(forceRefresh: true),
+      _loadSupplementBidSnapshot(projectId: projectId, bidId: bidId),
+    ]);
+    if (!mounted) {
+      return;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _scrollToSupplementFocusSlot();
+      }
+    });
+  }
+
+  Future<void> _loadSupplementBidSnapshot({
+    required String projectId,
+    required String bidId,
+  }) async {
+    final result = await TradingImConsumerLayer.instance
+        .loadBidSubmissionSnapshot(projectId: projectId, bidId: bidId);
+    if (!mounted) {
+      return;
+    }
+    if (!result.isSuccess || result.data == null) {
+      _showBidMaterialMessage(result.message ?? '当前竞标资料暂不可读，请稍后重试。');
+      return;
+    }
+
+    final snapshot = result.data!;
+    setState(() {
+      if (_quoteAmountController.text.trim().isEmpty) {
+        _quoteAmountController.text = snapshot.quoteAmount.toString();
+      }
+      if (_proposalSummaryController.text.trim().isEmpty) {
+        _proposalSummaryController.text = snapshot.proposalSummary;
+      }
+      for (final attachment in snapshot.attachments) {
+        final slot = _slotForBidSnapshotAttachment(attachment);
+        if (slot == null) {
+          continue;
+        }
+        slot.fileAssetId = attachment.fileAssetId;
+        slot.uploadState = AppUploadState.uploadBound;
+        slot.uploadMessage = '${slot.label}已承接上一版资料，可重新上传补充。';
+        slot.uploadErrorCode = null;
+        slot.uploadPath = TradingImCanonicalPaths.bidSubmissionSnapshot;
+      }
+    });
+  }
+
+  _BidSubmitAttachmentSlotState? _slotForBidSnapshotAttachment(
+    BidSubmissionAttachmentView attachment,
+  ) {
+    final byFileKind = switch (attachment.fileKind.trim()) {
+      _bidSubmitProjectUnderstandingFileKind => 'project-understanding',
+      _bidSubmitQuoteSheetFileKind => 'quote-sheet',
+      _bidSubmitSchedulePlanFileKind => 'schedule-plan',
+      _ => null,
+    };
+    final bySlotKey = switch (attachment.slotKey.trim()) {
+      'project_understanding' ||
+      'project-understanding' => 'project-understanding',
+      'quote_sheet' || 'quote-sheet' => 'quote-sheet',
+      'schedule_plan' || 'schedule-plan' => 'schedule-plan',
+      _ => null,
+    };
+    return _slotByKey(byFileKind ?? bySlotKey);
+  }
+
+  _BidSubmitAttachmentSlotState? _slotByKey(String? key) {
+    final normalized = _normalizeId(key);
+    if (normalized == null) {
+      return null;
+    }
+    for (final slot in _attachmentSlots) {
+      if (slot.key == normalized) {
+        return slot;
+      }
+    }
+    return null;
+  }
+
+  void _scrollToSupplementFocusSlot() {
+    final focusKey = _slotByKey(_supplementFocusSlotKey())?.focusKey;
+    final focusContext = focusKey?.currentContext;
+    if (focusContext == null) {
+      return;
+    }
+    Scrollable.ensureVisible(
+      focusContext,
+      duration: const Duration(milliseconds: 260),
+      curve: Curves.easeOutCubic,
+      alignment: 0.22,
+    );
+  }
+
+  String? _supplementFocusSlotKey() {
+    final focusSlot = _normalizeId(widget.focusSlot);
+    final focusEntryKey = _normalizeId(widget.focusEntryKey);
+    return switch (focusSlot ?? focusEntryKey) {
+      'project_understanding' ||
+      'bid_project_understanding_review' => 'project-understanding',
+      'quote_sheet' || 'bid_quote_sheet_review' => 'quote-sheet',
+      'schedule_plan' || 'bid_schedule_plan_review' => 'schedule-plan',
+      _ => null,
+    };
   }
 
   Future<void> _continueBidFlow() async {

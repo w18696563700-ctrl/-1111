@@ -365,6 +365,10 @@ final class ExhibitionRoutes {
     String projectId, {
     String? mode,
     String? bidParticipationRequestId,
+    String? bidId,
+    String? focusEntryKey,
+    String? focusSlot,
+    String? sourceVersionToken,
   }) {
     return _withQuery(bidSubmit, <String, String>{
       'projectId': projectId,
@@ -372,6 +376,13 @@ final class ExhibitionRoutes {
       if (bidParticipationRequestId != null &&
           bidParticipationRequestId.trim().isNotEmpty)
         'bidParticipationRequestId': bidParticipationRequestId,
+      if (bidId != null && bidId.trim().isNotEmpty) 'bidId': bidId,
+      if (focusEntryKey != null && focusEntryKey.trim().isNotEmpty)
+        'focusEntryKey': focusEntryKey,
+      if (focusSlot != null && focusSlot.trim().isNotEmpty)
+        'focusSlot': focusSlot,
+      if (sourceVersionToken != null && sourceVersionToken.trim().isNotEmpty)
+        'sourceVersionToken': sourceVersionToken,
     });
   }
 

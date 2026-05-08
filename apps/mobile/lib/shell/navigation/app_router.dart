@@ -443,6 +443,10 @@ class AppRouter {
         mode: routeUri.queryParameters['mode'],
         bidParticipationRequestId:
             routeUri.queryParameters['bidParticipationRequestId'],
+        bidId: routeUri.queryParameters['bidId'],
+        focusEntryKey: routeUri.queryParameters['focusEntryKey'],
+        focusSlot: routeUri.queryParameters['focusSlot'],
+        sourceVersionToken: routeUri.queryParameters['sourceVersionToken'],
       ),
       ExhibitionRoutes.orderDetail => OrderDetailPage(
         orderId: routeUri.queryParameters['orderId'],

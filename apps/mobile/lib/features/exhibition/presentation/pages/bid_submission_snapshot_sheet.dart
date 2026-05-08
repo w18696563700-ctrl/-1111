@@ -160,15 +160,18 @@ class _BidSubmissionSnapshotSheetState
                         Center(
                           child: CircleAvatar(
                             radius: 28,
-                            backgroundImage:
-                                data.bidder.avatarUrl == null
+                            backgroundImage: data.bidder.avatarUrl == null
                                 ? null
                                 : NetworkImage(data.bidder.avatarUrl!),
                             child: data.bidder.avatarUrl == null
                                 ? Text(
                                     data.bidder.displayName.trim().isEmpty
                                         ? '?'
-                                        : data.bidder.displayName.trim().characters.first.toUpperCase(),
+                                        : data.bidder.displayName
+                                              .trim()
+                                              .characters
+                                              .first
+                                              .toUpperCase(),
                                   )
                                 : null,
                           ),
@@ -247,8 +250,11 @@ class _BidSubmissionSnapshotSheetState
                                   Align(
                                     alignment: Alignment.centerLeft,
                                     child: OutlinedButton.icon(
-                                      onPressed: () => _openAttachment(attachment),
-                                      icon: const Icon(Icons.attach_file_rounded),
+                                      onPressed: () =>
+                                          _openAttachment(attachment),
+                                      icon: const Icon(
+                                        Icons.attach_file_rounded,
+                                      ),
                                       label: const Text('查看附件'),
                                     ),
                                   ),

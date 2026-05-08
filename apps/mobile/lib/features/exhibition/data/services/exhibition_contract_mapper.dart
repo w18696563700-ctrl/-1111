@@ -100,6 +100,7 @@ const Set<String> _stableErrorCodes = <String>{
   'PROJECT_BREACH_RECORD_INVALID',
   'BID_SUBMIT_INVALID',
   'BID_DUPLICATE_SUBMISSION',
+  'BID_SUBMISSION_SUPPLEMENT_CONFLICT',
   'BID_AWARD_INVALID',
   'BID_AWARD_INVALID_STATE',
   'BID_AWARD_DUPLICATE',
@@ -357,6 +358,24 @@ Map<String, Object?>? _sanitizeBidSubmitPayload(Object? payload) {
   );
   return _compactMap(<String, Object?>{
     'bidId': _normalize(map['bidId'] as String?),
+  });
+}
+
+Map<String, Object?>? _sanitizeBidSubmissionSupplementPayload(Object? payload) {
+  if (payload is! Map) {
+    return null;
+  }
+
+  final map = payload.map(
+    (Object? key, Object? value) => MapEntry('$key', value),
+  );
+  return _compactMap(<String, Object?>{
+    'bidId': _normalize(map['bidId'] as String?),
+    'projectId': _normalize(map['projectId'] as String?),
+    'entryKey': _normalize(map['entryKey'] as String?),
+    'reviewState': _sanitizeState(map['reviewState'], const <String>{
+      'pending_review',
+    }),
   });
 }
 
