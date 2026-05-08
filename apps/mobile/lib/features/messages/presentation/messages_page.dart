@@ -24,6 +24,9 @@ enum _MessagesNotificationFilter {
   system,
 }
 
+const int _notificationUnreadDiscoveryMaxPages = 3;
+const int _notificationUnreadDiscoveryMaxItems = 100;
+
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key, this.refreshSignal, this.entrySignal});
 
@@ -200,12 +203,14 @@ class _MessagesPageState extends State<MessagesPage> {
 
   Future<void> _loadNotifications({bool showLoading = true}) async {
     final shouldShowLoading = showLoading || _notificationResult == null;
+    final filter = _selectedNotificationFilter;
     if (shouldShowLoading) {
       setState(() => _notificationLoading = true);
     }
-    final result = await MessagesConsumerLayer.instance.loadNotifications(
-      source: _notificationFilterQuery(_selectedNotificationFilter),
+    var result = await MessagesConsumerLayer.instance.loadNotifications(
+      source: _notificationFilterQuery(filter),
     );
+    result = await _loadUnreadNotificationWindow(result, filter: filter);
     if (!mounted) {
       return;
     }
@@ -214,6 +219,48 @@ class _MessagesPageState extends State<MessagesPage> {
       _notificationLoading = false;
     });
     _syncShellMessagesUnreadBadge(result);
+  }
+
+  Future<AppNotificationListResult> _loadUnreadNotificationWindow(
+    AppNotificationListResult initial, {
+    required _MessagesNotificationFilter filter,
+  }) async {
+    var result = initial;
+    var loadedPages = 1;
+    while (_shouldLoadMoreForUnreadDiscovery(result, filter) &&
+        loadedPages < _notificationUnreadDiscoveryMaxPages) {
+      final data = result.data;
+      if (data == null ||
+          data.items.length >= _notificationUnreadDiscoveryMaxItems) {
+        break;
+      }
+      final next = await MessagesConsumerLayer.instance.loadNotifications(
+        cursor: data.nextCursor,
+        source: _notificationFilterQuery(filter),
+      );
+      if (!mounted || next.data == null) {
+        break;
+      }
+      result = _mergeNotificationResults(result, next);
+      loadedPages += 1;
+    }
+    return result;
+  }
+
+  bool _shouldLoadMoreForUnreadDiscovery(
+    AppNotificationListResult result,
+    _MessagesNotificationFilter filter,
+  ) {
+    final data = result.data;
+    if (data == null || !data.hasMore || data.nextCursor == null) {
+      return false;
+    }
+    final expectedUnread = _notificationFilterUnreadCount(data.unread, filter);
+    if (expectedUnread <= 0) {
+      return false;
+    }
+    final loadedUnread = _notificationItemsForFilter(data.items, filter).length;
+    return loadedUnread < expectedUnread;
   }
 
   @override
@@ -426,27 +473,48 @@ class _MessagesPageState extends State<MessagesPage> {
       return;
     }
     final next = result.data;
+    final mergedResult = next == null || _notificationResult == null
+        ? result
+        : _mergeNotificationResults(_notificationResult!, result);
     setState(() {
       _notificationLoading = false;
-      if (result.state == AppPageState.content && next != null) {
-        _notificationResult = AppNotificationListResult(
-          state: result.state,
-          method: result.method,
-          path: result.path,
-          data: AppNotificationListView(
-            items: <AppNotificationItemView>[...current.items, ...next.items],
-            nextCursor: next.nextCursor,
-            hasMore: next.hasMore,
-            unread: next.unread,
-          ),
-          message: result.message,
-          errorCode: result.errorCode,
-        );
-      } else {
-        _notificationResult = result;
-      }
+      _notificationResult = mergedResult;
     });
-    _syncShellMessagesUnreadBadge(result);
+    _syncShellMessagesUnreadBadge(mergedResult);
+  }
+
+  AppNotificationListResult _mergeNotificationResults(
+    AppNotificationListResult current,
+    AppNotificationListResult next,
+  ) {
+    final currentData = current.data;
+    final nextData = next.data;
+    if (currentData == null || nextData == null) {
+      return next;
+    }
+    final seen = <String>{};
+    final items = <AppNotificationItemView>[];
+    for (final item in <AppNotificationItemView>[
+      ...currentData.items,
+      ...nextData.items,
+    ]) {
+      if (seen.add(item.notificationId)) {
+        items.add(item);
+      }
+    }
+    return AppNotificationListResult(
+      state: items.isEmpty ? AppPageState.empty : AppPageState.content,
+      method: next.method,
+      path: next.path,
+      data: AppNotificationListView(
+        items: items,
+        nextCursor: nextData.nextCursor,
+        hasMore: nextData.hasMore,
+        unread: nextData.unread,
+      ),
+      message: next.message ?? current.message,
+      errorCode: next.errorCode ?? current.errorCode,
+    );
   }
 
   List<MessageInteractionItemView> _projectCommunicationItems(
@@ -570,7 +638,7 @@ class _MessagesPageState extends State<MessagesPage> {
       );
       return;
     }
-    if (item.unread && !_isProjectCommunicationNotification(item)) {
+    if (item.unread) {
       final result = await MessagesConsumerLayer.instance.markNotificationsRead(
         <String>[item.notificationId],
       );

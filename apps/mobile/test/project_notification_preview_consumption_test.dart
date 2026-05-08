@@ -207,6 +207,121 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+  testWidgets('notification center discovers unread items beyond first page', (
+    WidgetTester tester,
+  ) async {
+    final transport = FakeAppApiTransport(
+      handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
+        'GET /api/app/message/interactions': (request) async {
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: const <String, Object?>{
+              'lane': 'project_communication',
+              'items': <Object?>[],
+            },
+          );
+        },
+        'GET /api/app/notifications/list': (request) async {
+          final cursor = request.uri.queryParameters['cursor'];
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'items': cursor == null
+                  ? <Object?>[
+                      for (var index = 1; index <= 30; index += 1)
+                        <String, Object?>{
+                          'notificationId': 'read-notice-$index',
+                          'type': 'project_communication_message',
+                          'source': 'project_communication',
+                          'title': '已读通知 $index',
+                          'body': '已读消息 $index',
+                          'projectId': 'project-1',
+                          'threadId': 'thread-$index',
+                          'routeTarget': null,
+                          'createdAt': '2026-05-01T08:00:00Z',
+                          'readAt': '2026-05-01T08:30:00Z',
+                          'unread': false,
+                        },
+                    ]
+                  : <Object?>[
+                      <String, Object?>{
+                        'notificationId': 'late-unread-1',
+                        'type': 'project_communication_message',
+                        'source': 'project_communication',
+                        'title': '第 31 条未读项目沟通',
+                        'body': '这条未读在下一页。',
+                        'projectId': 'project-1',
+                        'threadId': 'thread-31',
+                        'routeTarget': <String, Object?>{
+                          'canonicalPath':
+                              '/api/app/message/counterpart-conversation/detail',
+                          'params': <String, Object?>{
+                            'conversationId': 'org-1',
+                            'projectId': 'project-1',
+                            'threadId': 'thread-31',
+                          },
+                          'localEntryKey': 'counterpart_conversation.open',
+                          'requiredParams': <Object?>[
+                            'conversationId',
+                            'projectId',
+                            'threadId',
+                          ],
+                        },
+                        'routeTargetAvailability': <String, Object?>{
+                          'state': 'available',
+                          'reasonCode': null,
+                          'reasonText': null,
+                          'fallbackAction': null,
+                          'fallbackRouteTarget': null,
+                        },
+                        'createdAt': '2026-05-01T09:00:00Z',
+                        'readAt': null,
+                        'unread': true,
+                      },
+                    ],
+              'page': <String, Object?>{
+                'nextCursor': cursor == null ? 'cursor-page-2' : null,
+                'hasMore': cursor == null,
+              },
+              'unread': const <String, Object?>{
+                'total': 1,
+                'projectCommunication': 1,
+                'businessTodo': 0,
+                'bidParticipationRequest': 0,
+                'forumInteraction': 0,
+                'system': 0,
+              },
+            },
+          );
+        },
+      },
+    );
+    final client = _client(transport);
+    MessagesConsumerLayer.install(MessagesConsumerLayer(client: client));
+    ForumConsumerLayer.install(ForumConsumerLayer(client: client));
+    addTearDown(MessagesConsumerLayer.reset);
+    addTearDown(ForumConsumerLayer.reset);
+
+    await tester.pumpWidget(
+      const MaterialApp(home: Scaffold(body: MessagesPage())),
+    );
+    await tester.pumpAndSettle();
+
+    await _openNotificationPanel(tester);
+
+    expect(find.textContaining('第 31 条未读项目沟通'), findsOneWidget);
+    expect(
+      transport.requests
+          .where(
+            (request) => request.canonicalPath == '/api/app/notifications/list',
+          )
+          .length,
+      2,
+    );
+  });
+
   testWidgets('project communication refresh does not reload shell context', (
     WidgetTester tester,
   ) async {
@@ -278,8 +393,9 @@ void main() {
   });
 
   testWidgets(
-    'project communication notification opens target without direct read mutation',
+    'project communication notification marks read after opening available target',
     (WidgetTester tester) async {
+      var dismissed = false;
       final transport = FakeAppApiTransport(
         handlers: <String, Future<AppApiResponse> Function(AppApiRequest)>{
           'GET /api/app/message/interactions': (request) async {
@@ -293,6 +409,27 @@ void main() {
             );
           },
           'GET /api/app/notifications/list': (request) async {
+            if (dismissed) {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'items': <Object?>[],
+                  'page': <String, Object?>{
+                    'nextCursor': null,
+                    'hasMore': false,
+                  },
+                  'unread': <String, Object?>{
+                    'total': 0,
+                    'projectCommunication': 0,
+                    'businessTodo': 0,
+                    'bidParticipationRequest': 0,
+                    'forumInteraction': 0,
+                    'system': 0,
+                  },
+                },
+              );
+            }
             return AppApiResponse(
               statusCode: 200,
               uri: request.uri,
@@ -347,6 +484,14 @@ void main() {
             );
           },
           'POST /api/app/notifications/read': (request) async {
+            dismissed = true;
+            expect(request.body, <String, Object?>{
+              'notificationIds': <String>['notice-1'],
+              'readContext': const <String, Object?>{
+                'routeTargetAvailabilityState': 'available',
+                'completion': 'navigated_to_available_target',
+              },
+            });
             return AppApiResponse(
               statusCode: 200,
               uri: request.uri,
@@ -405,9 +550,9 @@ void main() {
                   request.canonicalPath == '/api/app/notifications/read',
             )
             .length,
-        0,
+        1,
       );
-      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, '1');
+      expect(controller.snapshot.shellContext.messagesUnreadBadgeLabel, isNull);
     },
   );
 

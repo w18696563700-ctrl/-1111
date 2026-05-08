@@ -189,6 +189,9 @@ class _MessagesNotificationPanel extends StatelessWidget {
     );
     final unread = data?.unread;
     final unreadCount = unread?.total ?? 0;
+    final selectedUnreadCount = unread == null
+        ? 0
+        : _notificationFilterUnreadCount(unread, selectedFilter);
     final failed = _notificationFailed(result);
     final hasMore = data?.hasMore == true;
     final fallbackActionCount = items
@@ -273,7 +276,9 @@ class _MessagesNotificationPanel extends StatelessWidget {
               else if (items.isEmpty)
                 _MessagesInlinePanel(
                   title: '${_notificationFilterLabel(selectedFilter)}当前为空',
-                  body: '当前分组没有可展示的真实提醒。',
+                  body: selectedUnreadCount > 0
+                      ? '还有未读提醒暂未定位，请稍后重试。'
+                      : '当前分组没有可展示的真实提醒。',
                 )
               else
                 SizedBox(
