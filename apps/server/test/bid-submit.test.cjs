@@ -228,6 +228,7 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
         return createProject();
       },
     },
+    {},
     {
       async transaction(callback) {
         return callback({
@@ -366,6 +367,7 @@ test('bid submit no longer requires 4000 authorization before validating attachm
         return createProject();
       },
     },
+    {},
     {
       async transaction(callback) {
         return callback({
@@ -479,6 +481,7 @@ test('bid submit rejects same organization duplicate submission with controlled 
         return createProject();
       },
     },
+    {},
     {
       async transaction(callback) {
         return callback({
@@ -599,6 +602,7 @@ test('bid submit rejects malformed body and unavailable project with controlled 
         return null;
       },
     },
+    {},
     {
       async transaction() {
         throw new Error('should not start transaction');
@@ -607,6 +611,7 @@ test('bid submit rejects malformed body and unavailable project with controlled 
     { async verifyCurrentSessionContext() { throw new Error('should not verify'); } },
     { async requireBidSubmitEligibilityFromContext() { throw new Error('should not check eligibility'); } },
     { async validateAndNormalize() { throw new Error('should not validate attachments'); } },
+    { async createForSubmittedBid() { throw new Error('should not seed bid'); } },
     { toAcceptedResponse(bidId) { return { bidId }; } },
     { async requireApprovedForOrganization() { throw new Error('should not check participation'); } },
   );
