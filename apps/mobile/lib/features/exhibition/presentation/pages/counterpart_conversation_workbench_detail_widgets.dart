@@ -18,6 +18,7 @@ class _ProjectCommunicationMaterialReviewDetailPage extends StatefulWidget {
     required this.onConfirm,
     required this.onFeedback,
     this.onOpenPublisherSupplement,
+    this.onOpenBidMaterialSupplement,
   });
 
   final ProjectCommunicationWorkbenchEntryView entry;
@@ -30,6 +31,8 @@ class _ProjectCommunicationMaterialReviewDetailPage extends StatefulWidget {
   onFeedback;
   final ValueChanged<ProjectCommunicationWorkbenchEntryView>?
   onOpenPublisherSupplement;
+  final ValueChanged<ProjectCommunicationWorkbenchEntryView>?
+  onOpenBidMaterialSupplement;
 
   @override
   State<_ProjectCommunicationMaterialReviewDetailPage> createState() =>
@@ -163,8 +166,7 @@ class _ProjectCommunicationMaterialReviewDetailPageState
             const SizedBox(height: 16),
             const _InfoBand(
               icon: Icons.lock_outline,
-              text:
-                  '当前项目沟通仍处于锁定状态，请从真实项目资料页补充对应资料；补充成功后系统会通知竞标方重新确认。',
+              text: '当前项目沟通仍处于锁定状态，请从真实项目资料页补充对应资料；补充成功后系统会通知竞标方重新确认。',
             ),
             const SizedBox(height: 12),
             FilledButton.icon(
@@ -174,7 +176,21 @@ class _ProjectCommunicationMaterialReviewDetailPageState
               label: const Text('去补充该资料'),
             ),
           ],
-          if (entry.canSubmitReview) ...<Widget>[
+          if (_shouldShowBidMaterialSupplementAction) ...<Widget>[
+            const SizedBox(height: 16),
+            const _InfoBand(
+              icon: Icons.lock_outline,
+              text: '当前项目沟通仍处于锁定状态，请回到竞标提交页补充项目理解、报价表或进度安排；补充成功后发布方可重新确认。',
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () =>
+                  widget.onOpenBidMaterialSupplement?.call(widget.entry),
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('去补充竞标资料'),
+            ),
+          ],
+          if (_canSubmitCurrentReview) ...<Widget>[
             const SizedBox(height: 16),
             if (!_allFilesPreviewed)
               const Padding(
@@ -214,16 +230,31 @@ class _ProjectCommunicationMaterialReviewDetailPageState
             ),
           ] else ...<Widget>[
             const SizedBox(height: 16),
-            _InfoBand(
-              icon: Icons.lock_outline,
-              text: entry.availabilityState == 'unsubmitted'
-                  ? '当前资料尚未提交，不能确认。'
-                  : '当前账号只能查看该资料审阅结果。',
-            ),
+            _InfoBand(icon: Icons.lock_outline, text: _readonlyReviewMessage),
           ],
         ],
       ),
     );
+  }
+
+  String get _readonlyReviewMessage {
+    final entry = widget.entry;
+    if (entry.availabilityState == 'unsubmitted') {
+      return '当前资料尚未提交，不能确认。';
+    }
+    if (_shouldShowBidMaterialSupplementAction) {
+      return '请先补充竞标资料，补充成功后等待发布方重新确认。';
+    }
+    if (_shouldShowPublisherSupplementAction) {
+      return '请先补充该资料，补充成功后等待对方重新确认。';
+    }
+    return '当前账号只能查看该资料审阅结果。';
+  }
+
+  bool get _canSubmitCurrentReview {
+    return widget.entry.canSubmitReview &&
+        !_shouldShowPublisherSupplementAction &&
+        !_shouldShowBidMaterialSupplementAction;
   }
 
   bool get _shouldShowPublisherSupplementAction {
@@ -232,6 +263,14 @@ class _ProjectCommunicationMaterialReviewDetailPageState
         widget.entry.subjectOwnerRole == 'publisher' &&
         widget.entry.reviewState == 'needs_supplement' &&
         widget.onOpenPublisherSupplement != null;
+  }
+
+  bool get _shouldShowBidMaterialSupplementAction {
+    return widget.entry.group == 'bid_materials' &&
+        widget.entry.viewerRole == 'bidder' &&
+        widget.entry.subjectOwnerRole == 'bidder' &&
+        widget.entry.reviewState == 'needs_supplement' &&
+        widget.onOpenBidMaterialSupplement != null;
   }
 
   Widget _sourceSection(BuildContext context) {

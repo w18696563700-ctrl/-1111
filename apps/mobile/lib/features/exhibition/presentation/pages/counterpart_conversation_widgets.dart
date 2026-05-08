@@ -936,7 +936,7 @@ class _SelectedProjectBusinessEntrypoints extends StatefulWidget {
     required this.onOpenNameAccess,
     required this.onOpenContinuation,
     required this.onOpenProjectAlbum,
-    required this.onOpenWorkbenchEntry,
+    required this.onOpenMaterialConfirmation,
   });
 
   final CounterpartConversationProjectGroupView group;
@@ -948,8 +948,7 @@ class _SelectedProjectBusinessEntrypoints extends StatefulWidget {
   final ValueChanged<CounterpartConversationBusinessCardView> onOpenNameAccess;
   final VoidCallback onOpenContinuation;
   final VoidCallback onOpenProjectAlbum;
-  final ValueChanged<ProjectCommunicationWorkbenchEntryView>
-  onOpenWorkbenchEntry;
+  final VoidCallback onOpenMaterialConfirmation;
 
   @override
   State<_SelectedProjectBusinessEntrypoints> createState() =>
@@ -958,8 +957,6 @@ class _SelectedProjectBusinessEntrypoints extends StatefulWidget {
 
 class _SelectedProjectBusinessEntrypointsState
     extends State<_SelectedProjectBusinessEntrypoints> {
-  bool _toolsVisible = false;
-
   @override
   Widget build(BuildContext context) {
     final todoSummary =
@@ -992,19 +989,6 @@ class _SelectedProjectBusinessEntrypointsState
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              if (_toolsVisible) ...<Widget>[
-                ConstrainedBox(
-                  constraints: const BoxConstraints(maxHeight: 260),
-                  child: SingleChildScrollView(
-                    child: _ProjectCommunicationWorkbenchSection(
-                      loading: widget.loadingWorkbench,
-                      result: widget.workbenchResult,
-                      onOpenEntry: widget.onOpenWorkbenchEntry,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-              ],
               Row(
                 children: <Widget>[
                   Expanded(
@@ -1038,7 +1022,6 @@ class _SelectedProjectBusinessEntrypointsState
                       label: materialConfirmationLabel,
                       badgeCount: materialPendingCount,
                       enabled: true,
-                      selected: _toolsVisible,
                       onPressed: _handleMaterialConfirmationPressed,
                     ),
                   ),
@@ -1082,7 +1065,7 @@ class _SelectedProjectBusinessEntrypointsState
       );
       return;
     }
-    setState(() => _toolsVisible = !_toolsVisible);
+    widget.onOpenMaterialConfirmation();
   }
 
   List<ProjectCommunicationWorkbenchEntryView> get _dealEntries {
@@ -1101,7 +1084,6 @@ class _ProjectToolEntryButton extends StatelessWidget {
     required this.label,
     required this.enabled,
     required this.onPressed,
-    this.selected = false,
     this.badgeCount = 0,
     this.disabledReason,
   });
@@ -1110,7 +1092,6 @@ class _ProjectToolEntryButton extends StatelessWidget {
   final String label;
   final bool enabled;
   final VoidCallback? onPressed;
-  final bool selected;
   final int badgeCount;
   final String? disabledReason;
 
@@ -1131,14 +1112,8 @@ class _ProjectToolEntryButton extends StatelessWidget {
                   ).showSnackBar(SnackBar(content: Text(disabledReason!))),
             style: OutlinedButton.styleFrom(
               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
-              side: BorderSide(
-                color: selected
-                    ? theme.colorScheme.primary
-                    : theme.colorScheme.outlineVariant,
-              ),
-              backgroundColor: selected
-                  ? theme.colorScheme.primaryContainer.withValues(alpha: 0.28)
-                  : theme.colorScheme.surface,
+              side: BorderSide(color: theme.colorScheme.outlineVariant),
+              backgroundColor: theme.colorScheme.surface,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14),
               ),

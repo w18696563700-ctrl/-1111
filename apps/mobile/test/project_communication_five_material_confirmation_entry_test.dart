@@ -1131,6 +1131,49 @@ void main() {
     },
   );
 
+  testWidgets(
+    'bidder supplement request opens bid submit from material detail',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers();
+      handlers['GET /api/app/message/project-communication/workbench'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _workbenchPayload(
+              effectState: 'confirmed',
+              materialSampleState: 'confirmed',
+              equipmentState: 'confirmed',
+              serviceState: 'confirmed',
+              projectUnderstandingState: 'confirmed',
+              quoteState: 'needs_supplement',
+              scheduleState: 'confirmed',
+              materialReviewPendingCount: 1,
+            ),
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+      await _openMaterialTools(tester);
+      await _expandWorkbenchGroup(tester, '竞标资料');
+      await _ensureVisible(tester, find.text('报价表确认'));
+      await tester.tap(find.text('报价表确认'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('去补充竞标资料'), findsOneWidget);
+      expect(find.textContaining('请回到竞标提交页补充项目理解'), findsOneWidget);
+      expect(find.text('当前账号只能查看该资料审阅结果。'), findsNothing);
+      expect(find.text('请先补充竞标资料，补充成功后等待发布方重新确认。'), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(FilledButton, '去补充竞标资料'));
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('/exhibition/bids/submit'), findsOneWidget);
+      expect(find.textContaining('projectId=project-1'), findsOneWidget);
+    },
+  );
+
   testWidgets('deal confirmation entry is visible but does not charge', (
     WidgetTester tester,
   ) async {

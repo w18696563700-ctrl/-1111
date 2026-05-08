@@ -92,6 +92,29 @@ function createAttachment(overrides = {}) {
   };
 }
 
+function createBid(overrides = {}) {
+  return {
+    id: 'bid-1',
+    bidNo: 'BID-2026-1',
+    projectId: 'project-1',
+    bidderOrganizationId: 'supplier-org',
+    organizationId: 'supplier-org',
+    actorId: 'supplier-user',
+    userId: 'supplier-user',
+    quoteAmount: '10000.00',
+    proposalSummary: '竞标方案摘要',
+    projectUnderstandingFileAssetId: 'bid-understanding-asset',
+    quoteSheetFileAssetId: 'bid-quote-asset',
+    schedulePlanFileAssetId: 'bid-schedule-asset',
+    state: 'submitted',
+    submittedBy: 'supplier-user',
+    submittedAt: new Date('2026-05-08T10:00:00.000Z'),
+    createdAt: new Date('2026-05-08T10:00:00.000Z'),
+    updatedAt: new Date('2026-05-08T10:00:00.000Z'),
+    ...overrides,
+  };
+}
+
 function createForumPost(overrides = {}) {
   return {
     id: 'forum-post-1',
@@ -142,6 +165,7 @@ function createAttachmentHarness(overrides = {}) {
     projectMissing: overrides.projectMissing ?? false,
     fileAssets: structuredClone(overrides.fileAssets ?? [createFileAsset()]),
     attachments: structuredClone(overrides.attachments ?? []),
+    bids: structuredClone(overrides.bids ?? []),
     forumPosts: structuredClone(overrides.forumPosts ?? []),
     publicResources: structuredClone(overrides.publicResources ?? []),
     auditLogs: structuredClone(overrides.auditLogs ?? []),
@@ -253,6 +277,38 @@ function createAttachmentHarness(overrides = {}) {
       };
     }
 
+    if (entity?.name === 'BidEntity') {
+      return {
+        createQueryBuilder() {
+          const query = { fileAssetId: null };
+          return {
+            where(_expression, parameters = {}) {
+              query.fileAssetId = parameters.fileAssetId ?? null;
+              return this;
+            },
+            orWhere(_expression, parameters = {}) {
+              query.fileAssetId = query.fileAssetId ?? parameters.fileAssetId ?? null;
+              return this;
+            },
+            async getOne() {
+              return (
+                draft.bids.find((item) => {
+                  if (!query.fileAssetId) {
+                    return false;
+                  }
+                  return (
+                    item.projectUnderstandingFileAssetId === query.fileAssetId ||
+                    item.quoteSheetFileAssetId === query.fileAssetId ||
+                    item.schedulePlanFileAssetId === query.fileAssetId
+                  );
+                }) ?? null
+              );
+            },
+          };
+        },
+      };
+    }
+
     if (entity?.name === 'ProjectPublicResourceEntity') {
       return {
         async findOneBy(where) {
@@ -327,6 +383,7 @@ function createAttachmentHarness(overrides = {}) {
       projectRepository: getRepository({ name: 'ProjectEntity' }, state),
       attachmentRepository: getRepository({ name: 'ProjectAttachmentEntity' }, state),
       fileAssetRepository: getRepository({ name: 'FileAssetEntity' }, state),
+      bidRepository: getRepository({ name: 'BidEntity' }, state),
       publicResourceRepository: getRepository({ name: 'ProjectPublicResourceEntity' }, state),
       forumPostRepository: getRepository({ name: 'ForumPostEntity' }, state),
     },
@@ -430,6 +487,7 @@ function createFileAccessService(harness, overrides = {}) {
     harness.repositories.fileAssetRepository,
     harness.repositories.attachmentRepository,
     harness.repositories.projectRepository,
+    harness.repositories.bidRepository,
     harness.repositories.publicResourceRepository,
     harness.repositories.forumPostRepository,
     {
@@ -874,6 +932,121 @@ test('file/access returns signed access for published forum post attachment', as
   assert.equal(result.contentLengthBytes, 2048);
   assert.deepEqual(publicUrlCalls, ['forum_draft_attachment/media/2026/05/forum-image.jpg']);
   assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
+test('file/access returns bid submission attachment signed access for publisher organization', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    fileAssets: [
+      createFileAsset({
+        id: 'bid-understanding-asset',
+        businessType: 'project',
+        businessId: 'project-1',
+        organizationId: 'supplier-org',
+        fileKind: 'bid_project_understanding',
+        objectKey: 'project/bid/bid-understanding.pdf',
+        mimeType: 'application/pdf',
+      }),
+    ],
+    bids: [createBid()],
+  });
+  const service = createFileAccessService(harness, {
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/bid-understanding';
+      },
+    },
+  });
+
+  const result = await service.getAccess(
+    { fileAssetId: 'bid-understanding-asset', mode: 'preview', projectId: 'project-1' },
+    createContext('file-access-bid-submission-publisher'),
+  );
+
+  assert.equal(result.fileAssetId, 'bid-understanding-asset');
+  assert.equal(result.mode, 'preview');
+  assert.equal(result.accessUrl, 'https://signed.example.test/bid-understanding');
+  assert.equal(result.fileName, 'bid-understanding.pdf');
+  assert.equal(result.mimeType, 'application/pdf');
+  assert.deepEqual(publicUrlCalls, ['project/bid/bid-understanding.pdf']);
+  assert.ok(!Object.prototype.hasOwnProperty.call(result, 'objectKey'));
+});
+
+test('file/access returns bid submission attachment signed access for owning bidder organization', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    fileAssets: [
+      createFileAsset({
+        id: 'bid-quote-asset',
+        businessType: 'project',
+        businessId: 'project-1',
+        organizationId: 'supplier-org',
+        fileKind: 'bid_quote_sheet',
+        objectKey: 'project/bid/bid-quote.xlsx',
+        mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      }),
+    ],
+    bids: [createBid()],
+  });
+  const service = createFileAccessService(harness, {
+    sessionOrganizationId: 'supplier-org',
+    roleKey: 'supplier_admin',
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/bid-quote';
+      },
+    },
+  });
+
+  const result = await service.getAccess(
+    { fileAssetId: 'bid-quote-asset', mode: 'download', projectId: 'project-1' },
+    createContext('file-access-bid-submission-bidder'),
+  );
+
+  assert.equal(result.fileAssetId, 'bid-quote-asset');
+  assert.equal(result.mode, 'download');
+  assert.equal(result.accessUrl, 'https://signed.example.test/bid-quote');
+  assert.equal(result.fileName, 'bid-quote.xlsx');
+  assert.deepEqual(publicUrlCalls, ['project/bid/bid-quote.xlsx']);
+});
+
+test('file/access rejects unrelated organization for bid submission attachment before signing URL', async () => {
+  const publicUrlCalls = [];
+  const harness = createAttachmentHarness({
+    fileAssets: [
+      createFileAsset({
+        id: 'bid-schedule-asset',
+        businessType: 'project',
+        businessId: 'project-1',
+        organizationId: 'supplier-org',
+        fileKind: 'bid_schedule_plan',
+        objectKey: 'project/bid/bid-schedule.pdf',
+        mimeType: 'application/pdf',
+      }),
+    ],
+    bids: [createBid()],
+  });
+  const service = createFileAccessService(harness, {
+    sessionOrganizationId: 'other-org',
+    publicUrlService: {
+      async buildObjectAccessUrl(objectKey) {
+        publicUrlCalls.push(objectKey);
+        return 'https://signed.example.test/bid-schedule';
+      },
+    },
+  });
+
+  await assert.rejects(
+    () =>
+      service.getAccess(
+        { fileAssetId: 'bid-schedule-asset', mode: 'preview', projectId: 'project-1' },
+        createContext('file-access-bid-submission-unrelated-denied'),
+      ),
+    (error) => error?.response?.code === 'FILE_ACCESS_PERMISSION_DENIED',
+  );
+  assert.deepEqual(publicUrlCalls, []);
 });
 
 test('file/access rejects non-owner before signing URL', async () => {

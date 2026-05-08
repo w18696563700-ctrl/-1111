@@ -1107,7 +1107,10 @@ class _CounterpartConversationPageState
                   onOpenContinuation: () =>
                       _openContinuationPanel(selectedGroup),
                   onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
-                  onOpenWorkbenchEntry: _openWorkbenchEntry,
+                  onOpenMaterialConfirmation: () => _openWorkbenchEntryList(
+                    <String>{'publisher_materials', 'bid_materials'},
+                    title: '资料确认单',
+                  ),
                 ),
                 _ProjectCommunicationComposer(
                   controller: _messageController,
@@ -1635,6 +1638,7 @@ class _CounterpartConversationPageState
           onConfirm: _submitWorkbenchConfirm,
           onFeedback: _submitWorkbenchFeedback,
           onOpenPublisherSupplement: _openPublisherSupplementPage,
+          onOpenBidMaterialSupplement: _openBidMaterialSupplementPage,
         ),
       ),
     );
@@ -1655,6 +1659,17 @@ class _CounterpartConversationPageState
         focus: 'attachments',
       ),
     );
+  }
+
+  Future<void> _openBidMaterialSupplementPage(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) async {
+    final projectId = entry.projectId.trim();
+    if (projectId.isEmpty) {
+      _showSnack('无法进入补充竞标资料页，缺少项目上下文。');
+      return;
+    }
+    await _openBidSubmitAndRefresh(projectId);
   }
 
   bool _hasWorkbenchEntryContext(ProjectCommunicationWorkbenchEntryView entry) {
