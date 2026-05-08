@@ -770,34 +770,49 @@ class _ProjectAttachmentRequirementPanel extends StatelessWidget {
                               ),
                             ),
                             const SizedBox(width: 8),
-                            Text(
-                              statusLabel,
-                              style: Theme.of(context).textTheme.bodySmall
-                                  ?.copyWith(
-                                    color: draftCount > 0 || satisfied
-                                        ? AppVisualTokens.brandGold
-                                        : Theme.of(
-                                            context,
-                                          ).colorScheme.onSurfaceVariant,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                            ),
-                            if (onAddKind != null) ...<Widget>[
-                              const SizedBox(width: 8),
-                              if (draftCount > 0)
-                                _TinyStatusPill(
-                                  label: '已选择',
-                                  color: AppVisualTokens.brandGold,
-                                )
-                              else
-                                TextButton(
-                                  key: ValueKey<String>(
-                                    'project-attachment-add-${option.value}',
-                                  ),
-                                  onPressed: () => onAddKind!(option.value),
-                                  child: const Text('添加'),
+                            Flexible(
+                              fit: FlexFit.loose,
+                              child: FittedBox(
+                                fit: BoxFit.scaleDown,
+                                alignment: Alignment.centerRight,
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    Text(
+                                      statusLabel,
+                                      style: Theme.of(context)
+                                          .textTheme
+                                          .bodySmall
+                                          ?.copyWith(
+                                            color: draftCount > 0 || satisfied
+                                                ? AppVisualTokens.brandGold
+                                                : Theme.of(context)
+                                                      .colorScheme
+                                                      .onSurfaceVariant,
+                                            fontWeight: FontWeight.w800,
+                                          ),
+                                    ),
+                                    if (onAddKind != null) ...<Widget>[
+                                      const SizedBox(width: 8),
+                                      if (draftCount > 0)
+                                        _TinyStatusPill(
+                                          label: '已选择',
+                                          color: AppVisualTokens.brandGold,
+                                        )
+                                      else
+                                        TextButton(
+                                          key: ValueKey<String>(
+                                            'project-attachment-add-${option.value}',
+                                          ),
+                                          onPressed: () =>
+                                              onAddKind!(option.value),
+                                          child: const Text('添加'),
+                                        ),
+                                    ],
+                                  ],
                                 ),
-                            ],
+                              ),
+                            ),
                             if (formalAttachments.isNotEmpty) ...<Widget>[
                               const SizedBox(width: 4),
                               Icon(
