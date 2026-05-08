@@ -515,6 +515,23 @@ function validateDetailRouteTarget(input: {
   canonicalPath: string;
   params: Record<string, unknown>;
 }) {
+  if (input.actionKey === "bid_service_fee_authorization.open") {
+    if (
+      input.objectType !== "bid_service_fee_authorization" ||
+      input.canonicalPath !== "/api/app/project/{projectId}/bid-service-fee-authorizations" ||
+      typeof input.params.projectId !== "string" ||
+      typeof input.params.bidParticipationRequestId !== "string" ||
+      (
+        input.params.bidId != null &&
+        typeof input.params.bidId !== "string"
+      )
+    ) {
+      throw new Error(
+        "Counterpart conversation bid service fee authorization routeTarget must include the frozen object, canonical template path, projectId, and bidParticipationRequestId.",
+      );
+    }
+    return;
+  }
   if (input.actionKey !== "order_detail.open") {
     return;
   }

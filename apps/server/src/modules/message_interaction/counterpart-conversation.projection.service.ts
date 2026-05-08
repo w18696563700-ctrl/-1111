@@ -8,9 +8,11 @@ import {
 } from '../project_communication/project-communication-unread.query.service';
 import {
   ProjectCommunicationBusinessStateService,
+  ProjectCommunicationBusinessState,
   ProjectCommunicationBusinessTodoSummary,
 } from '../project_communication/project-communication-business-state.service';
 import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import { ProjectNameAccessProjectionService } from '../project_name_access/project-name-access-projection.service';
 import { PROJECT_NAME_ACCESS_MASKED_TITLE } from '../project_name_access/project-name-access.support';
 import { messageInteractionUnavailable } from './message-interaction.errors';
@@ -28,6 +30,7 @@ import {
   CounterpartConversationListItemProjection,
   CounterpartConversationProjectGroupProjection,
   CounterpartConversationRatingEntryProjection,
+  CounterpartConversationRouteTarget,
 } from './counterpart-conversation.types';
 import { buildCounterpartConversationRouteTarget } from './counterpart-conversation.support';
 
@@ -88,6 +91,9 @@ export class CounterpartConversationProjectionService {
     @Optional()
     @InjectRepository(ProjectCommunicationThreadEntity)
     private readonly threadRepository?: Repository<ProjectCommunicationThreadEntity>,
+    @Optional()
+    @InjectRepository(BidParticipationRequestEntity)
+    private readonly bidParticipationRepository?: Repository<BidParticipationRequestEntity>,
   ) {
     this.cardSources = [
       bidThreadSource,
@@ -184,8 +190,8 @@ export class CounterpartConversationProjectionService {
 
     const conversations = await Promise.all([...conversationMap.entries()]
       .map(async ([conversationId, aggregate]): Promise<ConversationAggregate | null> => {
-        const businessTodoSummaryByProjectId =
-          await this.buildBusinessTodoSummaryMap({
+        const businessStateByProjectId =
+          await this.buildBusinessStateMap({
             aggregate,
             projectMap,
             viewerOrganizationId,
@@ -195,6 +201,13 @@ export class CounterpartConversationProjectionService {
           projectMap,
           viewerOrganizationId,
         });
+        const serviceFeeAuthorizationRouteTargetByProjectId =
+          await this.buildServiceFeeAuthorizationRouteTargetMap({
+            aggregate,
+            projectMap,
+            viewerOrganizationId,
+            businessStateByProjectId,
+          });
         const projectGroups = this.buildProjectGroups({
           aggregate,
           projectMap,
@@ -202,8 +215,9 @@ export class CounterpartConversationProjectionService {
           viewerOrganizationId,
           ratingEntryMap,
           unreadStatsByProjectId,
-          businessTodoSummaryByProjectId,
+          businessStateByProjectId,
           threadIdByProjectId,
+          serviceFeeAuthorizationRouteTargetByProjectId,
         });
         const focusProject = projectGroups[0];
         if (!focusProject) {
@@ -351,8 +365,9 @@ export class CounterpartConversationProjectionService {
     viewerOrganizationId: string;
     ratingEntryMap: Map<string, CounterpartConversationRatingEntryProjection>;
     unreadStatsByProjectId: Map<string, ProjectCommunicationUnreadStats>;
-    businessTodoSummaryByProjectId: Map<string, ProjectCommunicationBusinessTodoSummary>;
+    businessStateByProjectId: Map<string, ProjectCommunicationBusinessState>;
     threadIdByProjectId: Map<string, string>;
+    serviceFeeAuthorizationRouteTargetByProjectId: Map<string, CounterpartConversationRouteTarget>;
     nameAccessProjectionMap: Awaited<
       ReturnType<ProjectNameAccessProjectionService['buildPublicProjectionMap']>
     >;
@@ -361,14 +376,19 @@ export class CounterpartConversationProjectionService {
       .map(([projectId, group]): CounterpartConversationProjectGroupProjection | null => {
         const project = input.projectMap.get(projectId);
         const projection = input.nameAccessProjectionMap.get(projectId);
-        const threadId = input.threadIdByProjectId.get(projectId);
-        if (!threadId) {
-          return null;
-        }
         const titleVisibility =
           projection?.nameAccess.status === 'visible' ? 'visible' : 'masked';
         const unreadStats =
           input.unreadStatsByProjectId.get(projectId) ?? this.emptyUnreadStats();
+        const threadId = input.threadIdByProjectId.get(projectId);
+        if (!threadId) {
+          return null;
+        }
+        const cards = this.withServiceFeeAuthorizationRouteTarget(
+          group.cards,
+          input.serviceFeeAuthorizationRouteTargetByProjectId.get(projectId),
+        );
+        const businessState = input.businessStateByProjectId.get(projectId);
         return {
           projectId,
           threadId,
@@ -390,14 +410,14 @@ export class CounterpartConversationProjectionService {
           hasProjectUnread: unreadStats.hasUnread,
           latestUnreadMessageAt: unreadStats.latestUnreadMessageAt,
           businessTodoSummary:
-            input.businessTodoSummaryByProjectId.get(projectId) ??
+            businessState?.businessTodoSummary ??
             this.emptyBusinessTodoSummary(),
           ...(group.pricingSummary ? { pricingSummary: group.pricingSummary } : {}),
           ratingEntry:
             input.ratingEntryMap.get(
               this.ratingEntryKey(projectId, input.aggregate.counterpart.organizationId),
             ) ?? null,
-          cards: [...group.cards].sort((left, right) =>
+          cards: cards.sort((left, right) =>
             right.updatedAt.localeCompare(left.updatedAt),
           ),
         };
@@ -423,7 +443,7 @@ export class CounterpartConversationProjectionService {
     );
   }
 
-  private async buildBusinessTodoSummaryMap(input: {
+  private async buildBusinessStateMap(input: {
     aggregate: SeedConversationAggregate;
     projectMap: Map<string, ProjectEntity>;
     viewerOrganizationId: string;
@@ -432,24 +452,128 @@ export class CounterpartConversationProjectionService {
       return new Map(
         [...input.aggregate.projectGroups.keys()].map((projectId) => [
           projectId,
-          this.emptyBusinessTodoSummary(),
+          this.emptyBusinessState(),
         ]),
       );
     }
     const entries = await Promise.all([...input.aggregate.projectGroups.keys()].map(async (projectId) => {
       const project = input.projectMap.get(projectId);
       if (!project?.organizationId) {
-        return [projectId, this.emptyBusinessTodoSummary()] as const;
+        return [projectId, this.emptyBusinessState()] as const;
       }
       const state = await this.businessStateService.buildForPair({
         projectId,
         ownerOrganizationId: project.organizationId,
-        counterpartOrganizationId: input.aggregate.counterpart.organizationId,
+        counterpartOrganizationId: this.resolveThreadCounterpartOrganizationId({
+          project,
+          aggregate: input.aggregate,
+          viewerOrganizationId: input.viewerOrganizationId,
+        }),
         viewerOrganizationId: input.viewerOrganizationId,
       });
-      return [projectId, state.businessTodoSummary] as const;
+      return [projectId, state] as const;
     }));
     return new Map(entries);
+  }
+
+  private async buildServiceFeeAuthorizationRouteTargetMap(input: {
+    aggregate: SeedConversationAggregate;
+    projectMap: Map<string, ProjectEntity>;
+    viewerOrganizationId: string;
+    businessStateByProjectId: Map<string, ProjectCommunicationBusinessState>;
+  }) {
+    if (!this.bidParticipationRepository) {
+      return new Map<string, CounterpartConversationRouteTarget>();
+    }
+    const candidateProjectIds = [...input.aggregate.projectGroups.keys()]
+      .filter((projectId) => {
+        const project = input.projectMap.get(projectId);
+        const businessState = input.businessStateByProjectId.get(projectId);
+        return (
+          project?.organizationId &&
+          project.organizationId !== input.viewerOrganizationId &&
+          businessState?.chatAvailability.requiredNextAction ===
+            'complete_service_fee_authorization'
+        );
+      });
+    if (!candidateProjectIds.length) {
+      return new Map<string, CounterpartConversationRouteTarget>();
+    }
+    const requests = await this.bidParticipationRepository.find({
+      where: candidateProjectIds.map((projectId) => ({
+        projectId,
+        requesterOrganizationId: input.viewerOrganizationId,
+        state: 'approved',
+      })),
+      order: { reviewedAt: 'DESC', updatedAt: 'DESC', createdAt: 'DESC' },
+    });
+    const requestByProjectId = new Map<string, BidParticipationRequestEntity>();
+    for (const request of requests) {
+      if (!requestByProjectId.has(request.projectId)) {
+        requestByProjectId.set(request.projectId, request);
+      }
+    }
+    return new Map(
+      candidateProjectIds
+        .map((projectId) => {
+          const request = requestByProjectId.get(projectId);
+          return request
+            ? [
+                projectId,
+                this.toServiceFeeAuthorizationRouteTarget(
+                  request,
+                  input.aggregate.projectGroups.get(projectId),
+                ),
+              ] as const
+            : null;
+        })
+        .filter((entry): entry is readonly [
+          string,
+          CounterpartConversationRouteTarget,
+        ] => Boolean(entry)),
+    );
+  }
+
+  private toServiceFeeAuthorizationRouteTarget(
+    request: BidParticipationRequestEntity,
+    group: ProjectGroupAggregate | undefined,
+  ): CounterpartConversationRouteTarget {
+    const bidId = this.serviceFeeAuthorizationBidId(group);
+    return {
+      objectType: 'bid_service_fee_authorization',
+      actionKey: 'bid_service_fee_authorization.open',
+      canonicalPath: '/api/app/project/{projectId}/bid-service-fee-authorizations',
+      params: {
+        projectId: request.projectId,
+        bidParticipationRequestId: request.id,
+        ...(bidId ? { bidId } : {}),
+      },
+    };
+  }
+
+  private withServiceFeeAuthorizationRouteTarget(
+    cards: CounterpartConversationBusinessCardProjection[],
+    routeTarget: CounterpartConversationRouteTarget | undefined,
+  ) {
+    if (!routeTarget) {
+      return [...cards];
+    }
+    return cards.map((card) => {
+      if (
+        card.cardType !== 'bid_participation_request' ||
+        card.truthAnchor.requestId !== routeTarget.params.bidParticipationRequestId
+      ) {
+        return card;
+      }
+      return {
+        ...card,
+        detailRouteTarget: routeTarget,
+      };
+    });
+  }
+
+  private serviceFeeAuthorizationBidId(group: ProjectGroupAggregate | undefined) {
+    return group?.cards.find((card) => card.truthAnchor.bidId)?.truthAnchor.bidId ?? null;
   }
 
   private async buildProjectCommunicationThreadIdMap(input: {
@@ -610,6 +734,18 @@ export class CounterpartConversationProjectionService {
         totalPendingCount: 0,
       }
     );
+  }
+
+  private emptyBusinessState(): ProjectCommunicationBusinessState {
+    return {
+      businessTodoSummary: this.emptyBusinessTodoSummary(),
+      chatAvailability: {
+        canSendMessage: false,
+        lockReasonCode: null,
+        lockReasonText: null,
+        requiredNextAction: 'none',
+      },
+    };
   }
 
   private buildCounterpartProjectDisplayTitle(input: {

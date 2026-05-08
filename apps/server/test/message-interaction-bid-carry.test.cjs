@@ -843,6 +843,27 @@ test('counterpart conversation project title uses concrete project title when vi
         ]);
       },
     },
+    undefined,
+    undefined,
+    {
+      async find({ where }) {
+        assert.deepEqual(where, [
+          {
+            projectId: 'project-luzhou',
+            ownerOrganizationId: 'org-owner',
+            counterpartOrganizationId: 'org-counterpart',
+          },
+        ]);
+        return [
+          {
+            id: 'pc-thread-luzhou',
+            projectId: 'project-luzhou',
+            ownerOrganizationId: 'org-owner',
+            counterpartOrganizationId: 'org-counterpart',
+          },
+        ];
+      },
+    },
   );
 
   const result = await service.getConversationDetail({
@@ -854,7 +875,7 @@ test('counterpart conversation project title uses concrete project title when vi
   assert.equal(result.projectGroups.length, 1);
   assert.equal(result.projectGroups[0].titleVisibility, 'visible');
   assert.equal(result.projectGroups[0].projectDisplayTitle, '西洽会 - 泸州');
-  assert.equal(result.projectGroups[0].threadId, 'bid-thread-luzhou');
+  assert.equal(result.projectGroups[0].threadId, 'pc-thread-luzhou');
   assert.equal(result.projectGroups[0].projectPublishedAt, publishedAt.toISOString());
   assert.equal(result.projectGroups[0].projectUpdatedAt, projectUpdatedAt.toISOString());
   assert.equal(result.projectGroups[0].latestActivityAt, now);
@@ -1088,6 +1109,350 @@ test('counterpart conversation ordinary unread does not mix pending business tod
 
   assert.equal(result.conversationUnreadCount, 0);
   assert.equal(result.hasUnread, false);
+});
+
+test('counterpart conversation switches approved bid participation card to service fee authorization for bidder lock', async () => {
+  const {
+    CounterpartConversationProjectionService,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
+  const now = '2026-05-09T08:05:00.000Z';
+  const project = {
+    id: 'project-auth',
+    organizationId: 'org-owner',
+    creatorUserId: 'user-owner',
+    title: '重庆电子展 - 海力士',
+    exhibitionName: '重庆电子展',
+    brandName: '海力士',
+    state: 'published',
+    publishedAt: new Date('2026-05-08T02:30:00.000Z'),
+    updatedAt: new Date('2026-05-08T03:40:00.000Z'),
+  };
+  const sourceWithSeed = {
+    async buildSeeds() {
+      return [
+        {
+          counterpartOrganizationId: 'org-owner',
+          counterpartDisplayName: '重庆海川展览工厂',
+          counterpartAvatarUrl: null,
+          projectId: 'project-auth',
+          updatedAt: now,
+          card: {
+            cardId: 'bid-thread:bid-auth',
+            cardType: 'bid_thread',
+            title: '新的竞标已提交',
+            summary: '江北嘴嘴帅 已对当前项目提交竞标。',
+            status: 'open',
+            updatedAt: now,
+            requesterCompanyName: null,
+            requesterOrganizationId: null,
+            truthAnchor: {
+              truthType: 'bid_thread',
+              projectId: 'project-auth',
+              bidId: 'bid-auth',
+              threadId: 'bid-thread-auth',
+            },
+            detailRouteTarget: {
+              objectType: 'bid_thread',
+              actionKey: 'bid_thread.open',
+              canonicalPath: '/api/app/bid/thread/detail',
+              params: {
+                projectId: 'project-auth',
+                bidId: 'bid-auth',
+              },
+            },
+            decisionAvailability: null,
+          },
+        },
+        {
+          counterpartOrganizationId: 'org-owner',
+          counterpartDisplayName: '重庆海川展览工厂',
+          counterpartAvatarUrl: null,
+          projectId: 'project-auth',
+          updatedAt: now,
+          card: {
+            cardId: 'bid-participation:request-auth',
+            cardType: 'bid_participation_request',
+            title: '参与竞标申请结果',
+            summary: '参与竞标申请已通过。',
+            status: 'approved',
+            updatedAt: now,
+            requesterCompanyName: '江北嘴嘴帅',
+            requesterOrganizationId: 'org-bidder',
+            truthAnchor: {
+              truthType: 'bid_participation_request',
+              projectId: 'project-auth',
+              requestId: 'request-auth',
+              threadId: 'request-auth',
+            },
+            detailRouteTarget: {
+              objectType: 'bid_submit',
+              actionKey: 'bid_submit.open',
+              canonicalPath: '/api/app/bid/submit',
+              params: {
+                projectId: 'project-auth',
+              },
+            },
+            decisionAvailability: null,
+          },
+        },
+      ];
+    },
+  };
+  const emptySource = {
+    async buildSeeds() {
+      return [];
+    },
+  };
+  const service = new CounterpartConversationProjectionService(
+    {
+      async findBy() {
+        return [project];
+      },
+      async query() {
+        return [];
+      },
+    },
+    {
+      async buildPublicProjectionMap() {
+        return new Map([
+          [
+            'project-auth',
+            {
+              displayTitle: '重庆电子展 - 海力士',
+              nameAccess: {
+                status: 'visible',
+                canRequest: false,
+                requestId: null,
+              },
+            },
+          ],
+        ]);
+      },
+    },
+    sourceWithSeed,
+    emptySource,
+    emptySource,
+    undefined,
+    {
+      async buildForPair(input) {
+        assert.equal(input.ownerOrganizationId, 'org-owner');
+        assert.equal(input.counterpartOrganizationId, 'org-bidder');
+        return {
+          businessTodoSummary: {
+            bidParticipationReviewPendingCount: 0,
+            publisherMaterialReviewPendingCount: 0,
+            bidMaterialReviewPendingCount: 0,
+            dealConfirmationPendingCount: 0,
+            totalPendingCount: 0,
+          },
+          chatAvailability: {
+            canSendMessage: false,
+            lockReasonCode: 'service_fee_authorization_pending',
+            lockReasonText: '资料确认已通过，请先完成 4000 元竞标服务费预授权额度后开启项目级自由发送。',
+            requiredNextAction: 'complete_service_fee_authorization',
+          },
+        };
+      },
+      emptyBusinessTodoSummary() {
+        return {
+          bidParticipationReviewPendingCount: 0,
+          publisherMaterialReviewPendingCount: 0,
+          bidMaterialReviewPendingCount: 0,
+          dealConfirmationPendingCount: 0,
+          totalPendingCount: 0,
+        };
+      },
+    },
+    undefined,
+    undefined,
+    {
+      async find(options) {
+        assert.deepEqual(options.where, [
+          {
+            projectId: 'project-auth',
+            requesterOrganizationId: 'org-bidder',
+            state: 'approved',
+          },
+        ]);
+        return [
+          {
+            id: 'request-auth',
+            projectId: 'project-auth',
+            requesterOrganizationId: 'org-bidder',
+            state: 'approved',
+            reviewedAt: new Date('2026-05-09T06:00:00.000Z'),
+            updatedAt: new Date('2026-05-09T05:00:00.000Z'),
+            createdAt: new Date('2026-05-09T04:00:00.000Z'),
+          },
+        ];
+      },
+    },
+  );
+
+  const result = await service.getConversationDetail({
+    viewerOrganizationId: 'org-bidder',
+    conversationId: 'org-owner',
+    focusProjectId: 'project-auth',
+  });
+  const bidParticipationCard = result.projectGroups[0].cards.find(
+    (card) => card.cardType === 'bid_participation_request',
+  );
+
+  assert.deepEqual(bidParticipationCard.detailRouteTarget, {
+    objectType: 'bid_service_fee_authorization',
+    actionKey: 'bid_service_fee_authorization.open',
+    canonicalPath: '/api/app/project/{projectId}/bid-service-fee-authorizations',
+    params: {
+      projectId: 'project-auth',
+      bidParticipationRequestId: 'request-auth',
+      bidId: 'bid-auth',
+    },
+  });
+});
+
+test('counterpart conversation keeps publisher service fee authorization entry non-executable', async () => {
+  const {
+    CounterpartConversationProjectionService,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
+  const now = '2026-05-09T08:05:00.000Z';
+  const project = {
+    id: 'project-auth',
+    organizationId: 'org-owner',
+    creatorUserId: 'user-owner',
+    title: '重庆电子展 - 海力士',
+    exhibitionName: '重庆电子展',
+    brandName: '海力士',
+    state: 'published',
+    publishedAt: new Date('2026-05-08T02:30:00.000Z'),
+    updatedAt: new Date('2026-05-08T03:40:00.000Z'),
+  };
+  const sourceWithSeed = {
+    async buildSeeds() {
+      return [
+        {
+          counterpartOrganizationId: 'org-bidder',
+          counterpartDisplayName: '江北嘴嘴帅',
+          counterpartAvatarUrl: null,
+          projectId: 'project-auth',
+          updatedAt: now,
+          card: {
+            cardId: 'bid-participation:request-auth',
+            cardType: 'bid_participation_request',
+            title: '参与竞标申请结果',
+            summary: '参与竞标申请已通过。',
+            status: 'approved',
+            updatedAt: now,
+            requesterCompanyName: '江北嘴嘴帅',
+            requesterOrganizationId: 'org-bidder',
+            truthAnchor: {
+              truthType: 'bid_participation_request',
+              projectId: 'project-auth',
+              requestId: 'request-auth',
+              threadId: 'request-auth',
+            },
+            detailRouteTarget: {
+              objectType: 'bid_participation_request',
+              actionKey: 'bid_participation_request.open',
+              canonicalPath: '/api/app/project/bid-participation/thread/detail',
+              params: {
+                threadId: 'request-auth',
+                projectId: 'project-auth',
+                requestId: 'request-auth',
+              },
+            },
+            decisionAvailability: null,
+          },
+        },
+      ];
+    },
+  };
+  const emptySource = {
+    async buildSeeds() {
+      return [];
+    },
+  };
+  const service = new CounterpartConversationProjectionService(
+    {
+      async findBy() {
+        return [project];
+      },
+      async query() {
+        return [];
+      },
+    },
+    {
+      async buildPublicProjectionMap() {
+        return new Map([
+          [
+            'project-auth',
+            {
+              displayTitle: '重庆电子展 - 海力士',
+              nameAccess: {
+                status: 'visible',
+                canRequest: false,
+                requestId: null,
+              },
+            },
+          ],
+        ]);
+      },
+    },
+    sourceWithSeed,
+    emptySource,
+    emptySource,
+    undefined,
+    {
+      async buildForPair(input) {
+        assert.equal(input.ownerOrganizationId, 'org-owner');
+        assert.equal(input.counterpartOrganizationId, 'org-bidder');
+        return {
+          businessTodoSummary: {
+            bidParticipationReviewPendingCount: 0,
+            publisherMaterialReviewPendingCount: 0,
+            bidMaterialReviewPendingCount: 0,
+            dealConfirmationPendingCount: 0,
+            totalPendingCount: 0,
+          },
+          chatAvailability: {
+            canSendMessage: false,
+            lockReasonCode: 'service_fee_authorization_pending',
+            lockReasonText: '资料确认已通过，需等待竞标方完成 4000 元竞标服务费预授权额度后开启项目级自由发送。',
+            requiredNextAction: 'complete_service_fee_authorization',
+          },
+        };
+      },
+      emptyBusinessTodoSummary() {
+        return {
+          bidParticipationReviewPendingCount: 0,
+          publisherMaterialReviewPendingCount: 0,
+          bidMaterialReviewPendingCount: 0,
+          dealConfirmationPendingCount: 0,
+          totalPendingCount: 0,
+        };
+      },
+    },
+    undefined,
+    undefined,
+    {
+      async find() {
+        assert.fail('publisher view must not query service fee authorization request target');
+      },
+    },
+  );
+
+  const result = await service.getConversationDetail({
+    viewerOrganizationId: 'org-owner',
+    conversationId: 'org-bidder',
+    focusProjectId: 'project-auth',
+  });
+  const bidParticipationCard = result.projectGroups[0].cards.find(
+    (card) => card.cardType === 'bid_participation_request',
+  );
+
+  assert.equal(
+    bidParticipationCard.detailRouteTarget.actionKey,
+    'bid_participation_request.open',
+  );
 });
 
 test('project communication unread query counts counterpart unread messages', async () => {

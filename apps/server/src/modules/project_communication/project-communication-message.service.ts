@@ -73,15 +73,40 @@ export class ProjectCommunicationMessageService {
   async getOrCreateThread(query: Record<string, unknown>, context: RequestContext) {
     const projectId = this.readRequiredString(query.projectId, 'projectId');
     const counterpartOrganizationId = this.readOptionalString(query.counterpartOrganizationId);
+    const threadId = this.readOptionalString(query.threadId);
 
     return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ProjectCommunicationThreadEntity);
+      if (threadId) {
+        const thread = await repository.findOneBy({ id: threadId, projectId });
+        if (!thread) {
+          throw projectCommunicationUnavailable('Current project communication thread is unavailable.');
+        }
+        const actor = await this.accessService.requireExistingThreadParticipant(thread, context, manager);
+        if (counterpartOrganizationId) {
+          const expectedCounterpartOrganizationId = this.counterpartOrganizationIdForViewer(
+            thread,
+            actor.organizationId
+          );
+          if (counterpartOrganizationId !== expectedCounterpartOrganizationId) {
+            throw projectCommunicationInvalid(
+              'Field `counterpartOrganizationId` does not match this communication thread.'
+            );
+          }
+        }
+        const state = await this.buildBusinessStateForThread({
+          thread,
+          viewerOrganizationId: actor.organizationId
+        });
+        return this.presenter.toThread(thread, state.chatAvailability);
+      }
+
       const pair = await this.accessService.requireProjectConversationPair(
         projectId,
         counterpartOrganizationId ?? undefined,
         context,
         manager
       );
-      const repository = manager.getRepository(ProjectCommunicationThreadEntity);
       const presentThread = async (thread: ProjectCommunicationThreadEntity) => {
         const state = await this.buildBusinessStateForThread({
           thread,

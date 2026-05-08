@@ -719,11 +719,14 @@ test("counterpart conversation detail service forwards frozen server path and hi
                     threadId: "request-2",
                   },
                   detailRouteTarget: {
-                    objectType: "bid_submit",
-                    actionKey: "bid_submit.open",
-                    canonicalPath: "/api/app/bid/submit",
+                    objectType: "bid_service_fee_authorization",
+                    actionKey: "bid_service_fee_authorization.open",
+                    canonicalPath:
+                      "/api/app/project/{projectId}/bid-service-fee-authorizations",
                     params: {
                       projectId: "project-1",
+                      bidParticipationRequestId: "request-2",
+                      bidId: "bid-1",
                     },
                   },
                   decisionAvailability: null,
@@ -796,11 +799,14 @@ test("counterpart conversation detail service forwards frozen server path and hi
   assert.equal(bidParticipationCard.requesterCompanyName, "重庆海川展览工厂");
   assert.equal(bidParticipationCard.requesterOrganizationId, "org-1");
   assert.deepEqual(bidParticipationCard.detailRouteTarget, {
-    objectType: "bid_submit",
-    actionKey: "bid_submit.open",
-    canonicalPath: "/api/app/bid/submit",
+    objectType: "bid_service_fee_authorization",
+    actionKey: "bid_service_fee_authorization.open",
+    canonicalPath:
+      "/api/app/project/{projectId}/bid-service-fee-authorizations",
     params: {
       projectId: "project-1",
+      bidParticipationRequestId: "request-2",
+      bidId: "bid-1",
     },
   });
   assert.deepEqual(result.projectGroups[0].ratingEntry, {
@@ -1029,6 +1035,55 @@ test("project communication routes forward thread, message list, send, and read 
       },
     },
   ]);
+});
+
+test("project communication thread preserves upstream errors for bare threadId requests", async () => {
+  const service = new MessageInteractionService(
+    {
+      async get(pathName, options) {
+        assert.equal(pathName, "/server/project-communication/thread");
+        assert.deepEqual(options.params, {
+          projectId: "project-1",
+          counterpartOrganizationId: undefined,
+          threadId: "thread-1",
+        });
+        throw createAxiosResponseError(400, {
+          statusCode: 400,
+          code: "PROJECT_COMMUNICATION_INVALID",
+          message:
+            "Field `counterpartOrganizationId` is required for owner-side thread open.",
+          source: "server",
+        });
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {
+          authorization: "Bearer token",
+          "x-organization-id": "org-1",
+          "x-actor-role": "buyer_admin",
+        };
+      },
+    },
+    new ErrorNormalizerService(),
+  );
+
+  await assert.rejects(
+    () => service.getProjectCommunicationThread("project-1", undefined, "thread-1", {}),
+    (error) => {
+      assert.equal(error.getStatus(), 400);
+      const response = error.getResponse();
+      assert.equal(response.statusCode, 400);
+      assert.equal(response.code, "PROJECT_COMMUNICATION_INVALID");
+      assert.equal(
+        response.message,
+        "Field `counterpartOrganizationId` is required for owner-side thread open.",
+      );
+      assert.equal(response.source, "server");
+      assert.equal(response.details.transportCode, "ERR_BAD_REQUEST");
+      return true;
+    },
+  );
 });
 
 test("project communication service passes through image and confirmation payloads", async () => {
