@@ -775,18 +775,53 @@ Never push `main` directly unless the user explicitly approves the exact operati
 
 Prefer PR-based merge or owner-approved squash merge for feature branches.
 
+### Standard Mainline Merge Flow
+
+For any branch that may be merged into `main`, use this standard flow unless the user explicitly approves a narrower process.
+
+`latest main` means the current remote `origin/main` after fetch unless the repository owner explicitly names another baseline.
+
+1. Current branch worktree self-check:
+   - run `git status --short`
+   - explain staged, unstaged, untracked, and forbidden-file items
+   - stop if the worktree is dirty
+2. Fetch and review the latest `main` baseline before branch comparison.
+3. Review all commits on the current branch against latest `main`.
+4. Review the final branch diff against latest `main`.
+5. Review current `main` functional behavior that the branch must preserve.
+6. Sync latest `main` into the current branch before final merge recommendation.
+7. Use owner-approved merge or rebase only:
+   - prefer merge for shared or already-pushed branches
+   - use rebase only when the owner explicitly approves history rewriting for that branch
+8. Resolve conflicts without weakening SSOT, OpenAPI, generated types, Server, BFF, Flutter, security, runtime, or current-state fidelity rules.
+9. Run targeted tests, typecheck, analyze, contract checks, or smoke checks for the affected layers.
+10. Create a PR or enter owner-approved merge review.
+11. Merge into `main` only through PR, owner-approved squash merge, or an explicitly approved repository workflow.
+12. Do not directly push `main` unless the user explicitly approves the exact operation.
+13. After merge, perform smoke or regression validation on the updated `main`.
+14. Record the merge commit or squash commit, validation evidence, unresolved risks, and rollback point.
+
+This flow must preserve current-state fidelity:
+
+- Mainline merge uses the current functional behavior of latest `main` as the baseline.
+- Do not reinterpret, replace, or redesign existing working flows during merge unless explicitly approved.
+- Do not use future ideal-state architecture to override current usable functionality.
+- Only approved gate-scoped fixes may be merged.
+- Local tests on a merged `main` are not cloud runtime proof; cloud runtime claims still require approved runtime evidence.
+
 Before merging, always perform:
 
 1. Worktree audit.
-2. Commit audit.
-3. Final diff audit against latest `main`.
-4. Main baseline audit.
-5. Contract consistency audit.
-6. Targeted tests / typecheck / analyze.
-7. Forbidden-file audit.
-8. Merge simulation or conflict precheck.
-9. Post-merge validation.
-10. Rollback point identification.
+2. Latest `main` fetch and baseline audit.
+3. Commit audit against latest `main`.
+4. Final diff audit against latest `main`.
+5. Main sync audit after merge or approved rebase.
+6. Contract consistency audit.
+7. Targeted tests / typecheck / analyze.
+8. Forbidden-file audit.
+9. Merge simulation or conflict precheck.
+10. Post-merge validation.
+11. Rollback point identification.
 
 Do not merge if:
 
@@ -798,6 +833,10 @@ Do not merge if:
 - P0 or unresolved P1 issues remain.
 - Tests fail due to this branch.
 - The change expands beyond the approved gate.
+- Latest `main` has not been fetched and reviewed.
+- Latest `main` has not been synced into the branch before final merge recommendation.
+- Merge or conflict resolution would weaken current-state fidelity.
+- Rollback point is missing or unclear.
 
 ### Forbidden Files And Cloud Safety
 
@@ -887,12 +926,15 @@ Before any merge, output a merge review report with:
 1. Summary decision:
    - merge allowed / not allowed
    - whether main sync is required
+   - whether latest `main` was fetched and reviewed
    - whether P0/P1 blockers exist
    - whether forbidden files were touched
+   - rollback point
 
 2. Worktree status:
    - include `git status --short`
    - explain every item
+   - distinguish staged, unstaged, untracked, and forbidden-file items
 
 3. Commit review:
    - each commit
@@ -911,8 +953,15 @@ Before any merge, output a merge review report with:
    - latest main state
    - related main changes
    - possible conflict with this branch
+   - current main functionality that must be preserved
 
-6. Contract consistency review:
+6. Main sync and conflict review:
+   - merge or approved rebase method
+   - conflict files
+   - conflict resolution summary
+   - current-state fidelity risk
+
+7. Contract consistency review:
    - SSOT
    - OpenAPI
    - generated
@@ -921,17 +970,24 @@ Before any merge, output a merge review report with:
    - Flutter
    - error codes
 
-7. Test and validation review:
+8. Test and validation review:
    - command
    - result
    - whether failure is blocking
    - whether failure is from this branch or pre-existing main
+   - whether local validation is being separated from cloud runtime proof
 
-8. Final recommendation:
+9. Forbidden-file audit:
+   - files checked
+   - forbidden files touched or not touched
+   - sensitive values exposed or not exposed
+
+10. Final recommendation:
    - can merge
    - cannot merge
    - needs fixes
    - needs owner approval
+   - rollback recommendation
 
 ## 23. Approval Matrix
 
