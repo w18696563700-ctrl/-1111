@@ -146,7 +146,13 @@ class MessagesConsumerLayer {
       final response = await runProtectedAppRequest(
         () => _client.post(
           AppNotificationCanonicalPaths.notificationRead,
-          body: <String, Object?>{'notificationIds': notificationIds},
+          body: <String, Object?>{
+            'notificationIds': notificationIds,
+            'readContext': const <String, Object?>{
+              'routeTargetAvailabilityState': 'available',
+              'completion': 'navigated_to_available_target',
+            },
+          },
         ),
       );
       return _mapNotificationReadResponse(response);

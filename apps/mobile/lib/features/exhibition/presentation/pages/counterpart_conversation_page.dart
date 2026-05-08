@@ -146,8 +146,10 @@ class _CounterpartConversationPageState
           _workbenchResult = null;
           _loadingWorkbench = true;
         });
+        await _loadThreadAndMessages(result.data!, group: selectedGroup);
+      } else {
+        _notifyChatWindowActive(false);
       }
-      await _loadThreadAndMessages(result.data!, projectId: selectedProjectId);
     }
   }
 
@@ -161,7 +163,7 @@ class _CounterpartConversationPageState
 
   Future<void> _loadThreadAndMessages(
     CounterpartConversationDetailView data, {
-    required String projectId,
+    required CounterpartConversationProjectGroupView group,
   }) async {
     setState(() {
       _loadingThread = true;
@@ -169,7 +171,8 @@ class _CounterpartConversationPageState
     });
     final threadResult = await CounterpartConversationConsumerLayer.instance
         .loadProjectCommunicationThread(
-          projectId: projectId,
+          projectId: group.projectId,
+          threadId: group.threadId,
           counterpartOrganizationId: data.counterpart.organizationId,
         );
     if (!mounted) {
@@ -181,10 +184,7 @@ class _CounterpartConversationPageState
     });
     if (threadResult.state == AppPageState.content &&
         threadResult.data != null) {
-      final selectedGroup = _selectedProjectGroup(data);
-      if (selectedGroup != null) {
-        unawaited(_loadProjectWorkbench(selectedGroup, threadResult.data!));
-      }
+      unawaited(_loadProjectWorkbench(group, threadResult.data!));
       await _loadMessages(threadResult.data!);
       await _connectRealtime(threadResult.data!, data.counterpart);
     } else if (mounted) {
@@ -988,6 +988,7 @@ class _CounterpartConversationPageState
   ) async {
     final data = _result?.data;
     if (group.projectId.trim().isEmpty ||
+        group.threadId.trim().isEmpty ||
         data == null ||
         data.counterpart.organizationId.trim().isEmpty) {
       _showSnack(_missingProjectContextMessage);
@@ -1011,7 +1012,7 @@ class _CounterpartConversationPageState
     });
     _notifyChatWindowActive(true);
     _scheduleScrollToTop();
-    await _loadThreadAndMessages(data, projectId: group.projectId);
+    await _loadThreadAndMessages(data, group: group);
     if (!mounted) {
       return;
     }
@@ -1837,10 +1838,7 @@ class _CounterpartConversationPageState
         ? null
         : _selectedProjectGroup(currentDetail);
     if (currentDetail != null && selectedGroup != null) {
-      await _loadThreadAndMessages(
-        currentDetail,
-        projectId: selectedGroup.projectId,
-      );
+      await _loadThreadAndMessages(currentDetail, group: selectedGroup);
     } else if (currentThread != null && selectedGroup != null) {
       await _loadProjectWorkbench(selectedGroup, currentThread);
     }
@@ -1900,6 +1898,7 @@ class _CounterpartConversationPageState
         .map(
           (group) => CounterpartConversationProjectGroupView(
             projectId: group.projectId,
+            threadId: group.threadId,
             projectDisplayTitle: group.projectDisplayTitle,
             titleVisibility: group.titleVisibility,
             projectRelation: group.projectRelation,

@@ -41,6 +41,7 @@ void main() {
             'params': const <String, Object?>{
               'conversationId': 'conversation-1',
               'projectId': 'project-1',
+              'threadId': 'thread-1',
             },
           },
         },
@@ -79,6 +80,7 @@ void main() {
       'projectGroups': <Object?>[
         <String, Object?>{
           'projectId': 'project-1',
+          'threadId': 'thread-1',
           'projectDisplayTitle': '西洽会 - 泸州',
           'titleVisibility': 'visible',
           'projectRelation': 'my_published',
@@ -89,11 +91,14 @@ void main() {
           'latestUnreadMessageAt': '2026-05-04T10:03:00Z',
           'projectUnreadCount': 3,
           'hasProjectUnread': true,
-          'businessTodoSummary': _businessTodoSummary(),
+          'businessTodoSummary': _businessTodoSummary(
+            bidParticipationReviewPendingCount: 2,
+          ),
           'cards': const <Object?>[],
         },
         <String, Object?>{
           'projectId': 'project-2',
+          'threadId': 'thread-2',
           'projectDisplayTitle': '西洽会 - 成都',
           'titleVisibility': 'visible',
           'projectRelation': 'my_bid',
@@ -108,6 +113,7 @@ void main() {
         },
         <String, Object?>{
           'projectId': 'project-3',
+          'threadId': 'thread-3',
           'projectDisplayTitle': '身份待确认项目',
           'titleVisibility': 'visible',
           'projectRelation': 'unknown',
@@ -133,6 +139,10 @@ void main() {
     );
     expect(detail.projectGroups.first.projectUnreadCount, 3);
     expect(detail.projectGroups.first.hasProjectUnread, isTrue);
+    expect(detail.projectGroups.first.threadId, 'thread-1');
+    expect(detail.projectGroups.first.businessTodoSummary.totalPendingCount, 2);
+    expect(detail.projectGroups[1].projectUnreadCount, 2);
+    expect(detail.projectGroups[1].businessTodoSummary.totalPendingCount, 0);
     expect(
       detail.projectGroups.first.latestUnreadMessageAt,
       '2026-05-04T10:03:00Z',
@@ -160,6 +170,7 @@ void main() {
       'projectGroups': const <Object?>[
         <String, Object?>{
           'projectId': 'project-legacy',
+          'threadId': 'thread-legacy',
           'projectDisplayTitle': '旧云端项目',
           'titleVisibility': 'visible',
           'projectRelation': 'my_published',
@@ -247,12 +258,22 @@ void main() {
   });
 }
 
-Map<String, Object?> _businessTodoSummary() {
-  return const <String, Object?>{
-    'bidParticipationReviewPendingCount': 0,
-    'publisherMaterialReviewPendingCount': 0,
-    'bidMaterialReviewPendingCount': 0,
-    'dealConfirmationPendingCount': 0,
-    'totalPendingCount': 0,
+Map<String, Object?> _businessTodoSummary({
+  int bidParticipationReviewPendingCount = 0,
+  int publisherMaterialReviewPendingCount = 0,
+  int bidMaterialReviewPendingCount = 0,
+  int dealConfirmationPendingCount = 0,
+}) {
+  final total =
+      bidParticipationReviewPendingCount +
+      publisherMaterialReviewPendingCount +
+      bidMaterialReviewPendingCount +
+      dealConfirmationPendingCount;
+  return <String, Object?>{
+    'bidParticipationReviewPendingCount': bidParticipationReviewPendingCount,
+    'publisherMaterialReviewPendingCount': publisherMaterialReviewPendingCount,
+    'bidMaterialReviewPendingCount': bidMaterialReviewPendingCount,
+    'dealConfirmationPendingCount': dealConfirmationPendingCount,
+    'totalPendingCount': total,
   };
 }

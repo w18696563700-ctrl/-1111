@@ -151,6 +151,7 @@ Map<String, Object?> _detailPayload({String projectRelation = 'my_bid'}) {
     'projectGroups': <Object?>[
       <String, Object?>{
         'projectId': 'project-1',
+        'threadId': 'thread-1',
         'projectDisplayTitle': '立嘉机械展·大族激光',
         'titleVisibility': 'visible',
         'projectRelation': projectRelation,

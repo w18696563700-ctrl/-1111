@@ -157,7 +157,7 @@ messagesRegisteredEntryByActionKey =
         actionKey: 'counterpart_conversation.open',
         canonicalPath: '/api/app/message/counterpart-conversation/detail',
         localEntryKey: 'registered.counterpart_conversation.open',
-        requiredParams: <String>['conversationId', 'projectId'],
+        requiredParams: <String>['conversationId', 'projectId', 'threadId'],
       ),
       'project_name_access_thread.open': MessagesRegisteredEntryDefinition(
         objectType: 'project_name_access_thread',
@@ -221,8 +221,9 @@ String? _singleParamRouteLocation({
 
 String? _counterpartConversationRouteLocation(Map<String, String> routeParams) {
   if (!routeParams.containsKey('conversationId') ||
-      !routeParams.containsKey('projectId')) {
-    return 'routeTarget.routeParams must include "conversationId" and "projectId"';
+      !routeParams.containsKey('projectId') ||
+      !routeParams.containsKey('threadId')) {
+    return 'routeTarget.routeParams must include "conversationId", "projectId", and "threadId"';
   }
   final conversationId = routeParams['conversationId'];
   final projectId = routeParams['projectId'];
@@ -230,11 +231,10 @@ String? _counterpartConversationRouteLocation(Map<String, String> routeParams) {
   if (conversationId == null ||
       conversationId.trim().isEmpty ||
       projectId == null ||
-      projectId.trim().isEmpty) {
-    return 'routeTarget.routeParams conversationId and projectId must be non-empty';
-  }
-  if (threadId != null && threadId.trim().isEmpty) {
-    return 'routeTarget.routeParams threadId must be non-empty when provided';
+      projectId.trim().isEmpty ||
+      threadId == null ||
+      threadId.trim().isEmpty) {
+    return 'routeTarget.routeParams conversationId, projectId, and threadId must be non-empty';
   }
   return ExhibitionRoutes.counterpartConversationWithIds(
     conversationId: conversationId,

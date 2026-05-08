@@ -9,6 +9,11 @@ type RecordAuditInput = {
   aggregateType: string;
   aggregateId: string;
   eventType: string;
+  verifiedActor?: {
+    actorId: string | null;
+    userId: string | null;
+    organizationId: string | null;
+  };
   payload?: Record<string, unknown>;
 };
 
@@ -26,9 +31,9 @@ export class ProjectPublishAuditService {
       aggregateType: input.aggregateType,
       aggregateId: input.aggregateId,
       eventType: input.eventType,
-      actorId: this.nullable(context.actorId),
-      userId: this.nullable(context.userId),
-      organizationId: context.organizationId ?? '',
+      actorId: this.nullable(input.verifiedActor?.actorId ?? context.actorId),
+      userId: this.nullable(input.verifiedActor?.userId ?? context.userId),
+      organizationId: this.nonNullable(input.verifiedActor?.organizationId ?? context.organizationId),
       requestId: context.requestId ?? '',
       traceId: context.traceId ?? '',
       payload: input.payload ?? {}
@@ -36,8 +41,12 @@ export class ProjectPublishAuditService {
     await repository.save(entry);
   }
 
-  private nullable(value: string) {
-    const normalized = value.trim();
+  private nullable(value: string | null | undefined) {
+    const normalized = value?.trim() ?? '';
     return normalized ? normalized : null;
+  }
+
+  private nonNullable(value: string | null | undefined) {
+    return value?.trim() ?? '';
   }
 }

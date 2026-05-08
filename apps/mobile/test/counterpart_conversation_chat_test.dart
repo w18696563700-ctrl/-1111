@@ -262,6 +262,7 @@ Map<String, Object?> _detailPayload({
     'projectGroups': <Object?>[
       <String, Object?>{
         'projectId': 'project-1',
+        'threadId': 'project-thread-1',
         'projectDisplayTitle': '项目名称需申请查看',
         'titleVisibility': 'masked',
         'projectRelation': 'my_published',
@@ -402,6 +403,7 @@ Map<String, Object?> _twoProjectDetailPayload() {
 
   Map<String, Object?> groupPayload({
     required String projectId,
+    required String threadId,
     required String title,
     required String requestId,
     required String bidId,
@@ -410,6 +412,7 @@ Map<String, Object?> _twoProjectDetailPayload() {
   }) {
     return <String, Object?>{
       'projectId': projectId,
+      'threadId': threadId,
       'projectDisplayTitle': title,
       'titleVisibility': 'visible',
       'projectRelation': projectRelation,
@@ -503,6 +506,7 @@ Map<String, Object?> _twoProjectDetailPayload() {
     'projectGroups': <Object?>[
       groupPayload(
         projectId: 'project-luzhou',
+        threadId: 'thread-luzhou',
         title: '西洽会 - 泸州',
         requestId: 'request-luzhou',
         bidId: 'bid-luzhou',
@@ -510,6 +514,7 @@ Map<String, Object?> _twoProjectDetailPayload() {
       ),
       groupPayload(
         projectId: 'project-chengdu',
+        threadId: 'thread-chengdu',
         title: '西洽会 - 成都',
         requestId: 'request-chengdu',
         bidId: 'bid-chengdu',

@@ -75,18 +75,23 @@ class CounterpartConversationConsumerLayer {
   Future<CounterpartConversationResult<ProjectCommunicationThreadView>>
   loadProjectCommunicationThread({
     required String? projectId,
+    required String? threadId,
     required String? counterpartOrganizationId,
   }) {
     final normalizedProjectId = _normalize(projectId);
-    if (normalizedProjectId == null) {
+    final normalizedThreadId = _normalize(threadId);
+    if (normalizedProjectId == null || normalizedThreadId == null) {
       return Future.value(
         _invalid(
           MessagesCanonicalPaths.projectCommunicationThread,
-          'projectId is required before loading project communication thread',
+          'projectId and threadId are required before loading project communication thread',
         ),
       );
     }
-    final queryParameters = <String, String>{'projectId': normalizedProjectId};
+    final queryParameters = <String, String>{
+      'projectId': normalizedProjectId,
+      'threadId': normalizedThreadId,
+    };
     final normalizedCounterpartId = _normalize(counterpartOrganizationId);
     if (normalizedCounterpartId != null) {
       queryParameters['counterpartOrganizationId'] = normalizedCounterpartId;
@@ -240,7 +245,9 @@ class CounterpartConversationConsumerLayer {
   }
 
   Future<
-    CounterpartConversationResult<ProjectCommunicationMaterialReviewResponseView>
+    CounterpartConversationResult<
+      ProjectCommunicationMaterialReviewResponseView
+    >
   >
   submitProjectCommunicationMaterialReview({
     required String? projectId,

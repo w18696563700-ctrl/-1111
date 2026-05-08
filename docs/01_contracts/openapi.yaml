@@ -1054,6 +1054,13 @@ paths:
       - Message
       summary: Project communication thread read model for Flutter App
       operationId: getAppProjectCommunicationThread
+      description: 'Get-or-create app-facing project communication thread read model.
+        When `threadId` is absent, Server resolves or creates the canonical thread
+        from `projectId + counterpartOrganizationId`. When `threadId` is present,
+        Server verifies it belongs to the requested `projectId` and current actor
+        boundary before returning the read model.
+
+'
       parameters:
       - in: query
         name: projectId
@@ -1067,15 +1074,15 @@ paths:
           type: string
       - in: query
         name: threadId
-        required: true
+        required: false
         schema:
           type: string
       responses:
         '200':
-          description: 'Server-owned project communication thread read model. `chatAvailability`
-            is the only app-facing send lock / unlock projection. Flutter may disable
-            input from this field, but Server must still enforce the same write lock
-            on message-send commands.
+          description: 'Server-owned project communication thread get-or-create read
+            model. `chatAvailability` is the only app-facing send lock / unlock projection.
+            Flutter may disable input from this field, but Server must still enforce
+            the same write lock on message-send commands.
 
 '
           content:
@@ -7606,12 +7613,14 @@ x-instance-todo-registry:
     - inspection
     - dispute
     - project_clarification
+    - counterpart_conversation
     - bid_thread
   actionKeys:
     first_batch:
     - inspection.submit
     - dispute.open
     - project_clarification.open
+    - counterpart_conversation.open
     - bid_thread.open
   routeTargetBoundary:
     existing_signed_instance_entry_only: true
@@ -7649,6 +7658,17 @@ x-unified-instance-entry-registry:
     consumerBuilding: messages
     localEntryKey: registered.project_clarification.open
     state: enabled
+  - entryKey: counterpart_conversation_open_entry
+    objectType: counterpart_conversation
+    actionKey: counterpart_conversation.open
+    canonicalPath: "/api/app/message/counterpart-conversation/detail"
+    requiredParams:
+    - conversationId
+    - projectId
+    - threadId
+    consumerBuilding: messages
+    localEntryKey: registered.counterpart_conversation.open
+    state: enabled
   - entryKey: bid_thread_open_entry
     objectType: bid_thread
     actionKey: bid_thread.open
@@ -7658,7 +7678,7 @@ x-unified-instance-entry-registry:
     - bidId
     consumerBuilding: messages
     localEntryKey: registered.bid_thread.open
-    state: enabled
+    state: carrier_only
 components:
   schemas:
     AppVisibleBuilding:
@@ -11754,18 +11774,26 @@ components:
         projectCommunication:
           type: integer
           minimum: 0
+          description: Ordinary project-communication notification unread count;
+            not business todo.
         forumInteraction:
           type: integer
           minimum: 0
+          description: Ordinary forum-interaction notification unread count.
         system:
           type: integer
           minimum: 0
+          description: Ordinary system notification unread count.
         businessTodo:
           type: integer
           minimum: 0
+          description: Business-todo notification unread lane. This must not be mixed
+            with project communication `businessTodoSummary` badge truth.
         bidParticipationRequest:
           type: integer
           minimum: 0
+          description: Compatibility projection only; it must be included in or reconciled
+            with `businessTodo`, not rendered as a second business-todo truth.
     AppNotificationListResponse:
       type: object
       required:
@@ -11781,10 +11809,40 @@ components:
           "$ref": "#/components/schemas/ForumCursorPageInfo"
         unread:
           "$ref": "#/components/schemas/AppNotificationUnreadProjection"
+    AppNotificationMarkReadContext:
+      type: object
+      required:
+      - routeTargetAvailabilityState
+      - completion
+      description: 'Client read context for notification mark-read. Day 1 forbids
+        ordinary mark-read for unavailable route targets; Server must re-check current
+        routeTargetAvailability before accepting the write.
+
+'
+      properties:
+        routeTargetAvailabilityState:
+          type: string
+          enum:
+          - available
+          description: The only client-admitted state for mark-read. Any unavailable,
+            expired, forbidden, or missing-context target must not be submitted.
+        completion:
+          type: string
+          enum:
+          - navigated_to_available_target
+          description: Client confirms it has completed safe navigation to the currently
+            available original route target. Fallback navigation does not satisfy
+            this condition.
     AppNotificationReadRequest:
       type: object
       required:
       - notificationIds
+      - readContext
+      description: 'Notification-center mark-read request. This is not project communication
+        read-cursor and not business-todo completion; unavailable route targets must
+        be rejected instead of being cleared as ordinary unread.
+
+'
       properties:
         notificationIds:
           type: array
@@ -11792,6 +11850,8 @@ components:
           maxItems: 100
           items:
             type: string
+        readContext:
+          "$ref": "#/components/schemas/AppNotificationMarkReadContext"
     AppNotificationReadResponse:
       type: object
       required:
@@ -15343,6 +15403,8 @@ components:
             "$ref": "#/components/schemas/CounterpartConversationBusinessCard"
         threadId:
           type: string
+          description: Required project communication thread anchor for this project
+            group. Flutter must not infer it from `projectId` alone.
         businessTodoSummary:
           "$ref": "#/components/schemas/ProjectCommunicationBusinessTodoSummary"
       description: 'Project-scoped group under one counterpart conversation. The `businessTodoSummary`
@@ -15615,7 +15677,8 @@ components:
       - lastReadMessageId
       description: 'Read cursor payload for the current authenticated organization.
         The organizationId is always derived by Server and must not be accepted from
-        Flutter.
+        Flutter. New writes must include a non-empty `lastReadMessageId`; historical
+        null cursor values are compatible only on read responses / stored old cursors.
 
 '
       properties:
@@ -15625,6 +15688,8 @@ components:
           type: string
         lastReadMessageId:
           type: string
+          description: Required message anchor for new read-cursor writes. It must
+            belong to the submitted `projectId + threadId`.
     ProjectCommunicationReadCursorResponse:
       type: object
       required:
@@ -15645,6 +15710,8 @@ components:
           type:
           - string
           - 'null'
+          description: Nullable only for historical or empty stored cursor reads;
+            new write requests must not submit null.
         lastReadAt:
           type: string
           format: date-time
@@ -18479,6 +18546,7 @@ components:
           - inspection
           - dispute
           - project_clarification
+          - counterpart_conversation
           - bid_thread
         instanceId:
           type: string
@@ -18503,6 +18571,7 @@ components:
           - "/api/app/inspection/detail"
           - "/api/app/order/detail"
           - "/api/app/project/clarification/list"
+          - "/api/app/message/counterpart-conversation/detail"
           - "/api/app/bid/thread/detail"
           description: App-facing canonical entry reference only.
         localEntryKey:
@@ -18516,6 +18585,8 @@ components:
             - orderId
             - milestoneId
             - projectId
+            - conversationId
+            - threadId
             - bidId
           description: 'Frozen minimum parameter shape for the selected registered
             entry.
@@ -18563,7 +18634,12 @@ components:
           - inspection.submit
           - dispute.open
           - project_clarification.open
+          - counterpart_conversation.open
           - bid_thread.open
+          description: '`counterpart_conversation.open` is the messages-building
+            mainline. `bid_thread.open` remains only as an old business detail carrier.
+
+'
         title:
           type: string
         summary:
@@ -18601,6 +18677,7 @@ components:
           - inspection
           - dispute
           - project_clarification
+          - counterpart_conversation
           - bid_thread
         actionKey:
           type: string
@@ -18608,13 +18685,20 @@ components:
           - inspection.submit
           - dispute.open
           - project_clarification.open
+          - counterpart_conversation.open
           - bid_thread.open
+          description: '`counterpart_conversation.open` is the messages-building
+            mainline action. `bid_thread.open` is carrier-only and must not be used
+            as the primary messages-building entry.
+
+'
         canonicalPath:
           type: string
           enum:
           - "/api/app/inspection/detail"
           - "/api/app/order/detail"
           - "/api/app/project/clarification/list"
+          - "/api/app/message/counterpart-conversation/detail"
           - "/api/app/bid/thread/detail"
           description: App-facing canonical entry reference only; not frontend routing
             detail.
@@ -18626,6 +18710,8 @@ components:
             - orderId
             - milestoneId
             - projectId
+            - conversationId
+            - threadId
             - bidId
         consumerBuilding:
           type: string
@@ -18641,6 +18727,11 @@ components:
           type: string
           enum:
           - enabled
+          - carrier_only
+          description: '`carrier_only` means the entry is retained for legacy business
+            detail handoff only and must not become the main messages-building entry.
+
+'
     ForumMyPostItem:
       type: object
       required:
@@ -19336,9 +19427,10 @@ components:
       - threadId
       - chatAvailability
       - generatedAt
-      description: 'Minimal project communication thread read model. It exposes the
-        project/thread anchors and Server-owned chat availability only; it does not
-        own final amount, order, contract, payment, settlement, or fulfillment truth.
+      description: 'Minimal project communication get-or-create thread read model.
+        It exposes the project/thread anchors and Server-owned chat availability only;
+        it does not own final amount, order, contract, payment, settlement, or fulfillment
+        truth.
 
 '
       properties:

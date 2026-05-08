@@ -63,6 +63,9 @@ namespaces:
   - RATING
   - DISPUTE
   - FORUM
+  - MESSAGE_INTERACTION
+  - COUNTERPART_CONVERSATION
+  - PROJECT_COMMUNICATION
   - ENTERPRISE_HUB
   - GOVERNANCE
   - FILE
@@ -319,6 +322,18 @@ codes:
   - code: BID_THREAD_FORBIDDEN
     owner: Server
     meaning: The current actor or organization scope is not an admitted participant for the targeted project-bid private thread.
+  - code: PROJECT_COMMUNICATION_THREAD_INVALID
+    owner: Server
+    meaning: Project communication thread get-or-create request is missing required project/counterpart anchors, carries a threadId outside the submitted project, or violates the current actor boundary.
+  - code: PROJECT_COMMUNICATION_THREAD_UNAVAILABLE
+    owner: Server
+    meaning: The requested project communication thread cannot be resolved, created, or returned under the current project/counterpart boundary.
+  - code: PROJECT_COMMUNICATION_READ_CURSOR_INVALID
+    owner: Server
+    meaning: Project communication read-cursor write is missing required projectId, threadId, or lastReadMessageId, or the message anchor does not belong to the submitted project/thread.
+  - code: PROJECT_COMMUNICATION_READ_CURSOR_UNAVAILABLE
+    owner: Server
+    meaning: Project communication read-cursor truth is unavailable for the current actor, project, thread, or stored cursor boundary.
   - code: DEAL_CONFIRMATION_INVALID
     owner: Server
     meaning: The current deal-confirmation request body is missing one or more required bounded fields, uses unsupported confirmation role truth, or references confirmation material outside the current project-deal boundary.
@@ -466,6 +481,33 @@ codes:
   - code: FORUM_SEARCH_INVALID
     owner: Server
     meaning: Forum search request is missing the minimum required query fields or violates the current search input boundary.
+  - code: MESSAGE_INTERACTION_INVALID
+    owner: Server
+    meaning: Message interaction list request is missing required fields or carries unsupported lane or route-target parameters.
+  - code: MESSAGE_INTERACTION_UNAVAILABLE
+    owner: Server
+    meaning: Message interaction list projection is unavailable, hidden, or not materialized for the current actor and organization scope.
+  - code: MESSAGE_INTERACTION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read the requested message interaction projection.
+  - code: COUNTERPART_CONVERSATION_INVALID
+    owner: Server
+    meaning: Counterpart conversation request is missing required identifiers or violates the current messages-building route boundary.
+  - code: COUNTERPART_CONVERSATION_UNAVAILABLE
+    owner: Server
+    meaning: Counterpart conversation read model is unavailable, hidden, or not materialized for the current actor and organization scope.
+  - code: COUNTERPART_CONVERSATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read the requested counterpart conversation.
+  - code: PROJECT_COMMUNICATION_INVALID
+    owner: Server
+    meaning: Project communication request is missing required fields, including required read-cursor fields, or violates the bounded project communication contract.
+  - code: PROJECT_COMMUNICATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not an admitted participant for the requested project communication thread.
+  - code: PROJECT_COMMUNICATION_UNAVAILABLE
+    owner: Server
+    meaning: Project communication thread, message, or projection is unavailable, hidden, or not materialized under the current project relation boundary.
   - code: ENTERPRISE_HUB_INVALID_BOARD_TYPE
     owner: BFF
     meaning: Enterprise hub boardType is missing, unsupported, or outside the current frozen company/factory/supplier boundary.
@@ -580,6 +622,15 @@ codes:
   - code: NOTIFICATION_READ_INVALID
     owner: Server
     meaning: Notification mark-read request is missing required ids, contains unsupported ids, or violates the bounded read contract.
+  - code: NOTIFICATION_ROUTE_TARGET_UNAVAILABLE
+    owner: Server
+    meaning: Notification route target is unavailable, expired, forbidden, missing required context, or cannot be safely opened for the current actor.
+  - code: NOTIFICATION_MARK_READ_TARGET_UNAVAILABLE
+    owner: Server
+    meaning: Notification mark-read is rejected because the current routeTargetAvailability is not available or the client did not provide the required available-target navigation context.
+  - code: NOTIFICATION_BUSINESS_TODO_READ_UNSUPPORTED
+    owner: Server
+    meaning: Notification mark-read attempted to clear a business-todo state or project communication business badge that must remain governed by the Server-owned business todo truth.
   - code: PUSH_TOKEN_INVALID
     owner: Server
     meaning: Device push token registration request is missing required fields, carries an unsupported platform/provider pair, or fails token-shape validation.

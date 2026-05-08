@@ -105,10 +105,10 @@ test("message interactions route is materialized and no longer router 404 locall
         projectGroups: [],
       };
     },
-    getProjectCommunicationThread(projectId, counterpartOrganizationId) {
-      calls.push(`thread:${projectId}:${counterpartOrganizationId}`);
+    getProjectCommunicationThread(projectId, counterpartOrganizationId, threadId) {
+      calls.push(`thread:${projectId}:${counterpartOrganizationId}:${threadId}`);
       return {
-        threadId: "thread-1",
+        threadId: threadId ?? "thread-1",
         projectId,
         ownerOrganizationId: "owner-org",
         counterpartOrganizationId,
@@ -151,7 +151,7 @@ test("message interactions route is materialized and no longer router 404 locall
       };
     },
     markProjectCommunicationReadCursor(payload) {
-      calls.push(`read:${payload.threadId}:${payload.projectId}`);
+      calls.push(`read:${payload.threadId}:${payload.projectId}:${payload.reader?.source ?? "none"}`);
       return {
         threadId: payload.threadId,
         projectId: payload.projectId,
@@ -253,7 +253,7 @@ test("message interactions route is materialized and no longer router 404 locall
     assert.equal((await detailResponse.json()).conversationId, "org-1");
 
     const threadResponse = await fetch(
-      `${url}/api/app/message/project-communication/thread?projectId=project-1&counterpartOrganizationId=org-1`,
+      `${url}/api/app/message/project-communication/thread?projectId=project-1&counterpartOrganizationId=org-1&threadId=thread-1`,
     );
     assert.equal(threadResponse.status, 200);
     const threadBody = await threadResponse.json();
@@ -293,6 +293,7 @@ test("message interactions route is materialized and no longer router 404 locall
           threadId: "thread-1",
           projectId: "project-1",
           lastReadMessageId: "message-1",
+          reader: { source: "project_communication" },
         }),
       },
     );
@@ -305,10 +306,10 @@ test("message interactions route is materialized and no longer router 404 locall
   assert.deepEqual(calls, [
     "project_communication",
     "org-1:project-1",
-    "thread:project-1:org-1",
+    "thread:project-1:org-1:thread-1",
     "messages:thread-1:project-1",
     "send:thread-1:project-1:在吗",
-    "read:thread-1:project-1",
+    "read:thread-1:project-1:project_communication",
   ]);
 });
 
@@ -849,7 +850,7 @@ test("project communication routes forward thread, message list, send, and read 
             threadId: "thread-1",
             projectId: options.params.projectId,
             ownerOrganizationId: "owner-org",
-            counterpartOrganizationId: options.params.counterpartOrganizationId,
+            counterpartOrganizationId: options.params.counterpartOrganizationId ?? "owner-org",
             chatAvailability: {
               canSendMessage: true,
               lockReasonCode: null,
@@ -925,7 +926,8 @@ test("project communication routes forward thread, message list, send, and read 
 
   const thread = await service.getProjectCommunicationThread(
     "project-1",
-    "owner-org",
+    undefined,
+    "thread-1",
     {},
   );
   assert.equal(thread.threadId, "thread-1");
@@ -959,17 +961,34 @@ test("project communication routes forward thread, message list, send, and read 
       threadId: "thread-1",
       projectId: "project-1",
       lastReadMessageId: "message-2",
+      reader: { source: "project_communication", routeTargetState: "available" },
     },
     {},
   );
   assert.equal(cursor.lastReadMessageId, "message-2");
+  await assert.rejects(
+    () =>
+      service.markProjectCommunicationReadCursor(
+        {
+          threadId: "thread-1",
+          projectId: "project-1",
+        },
+        {},
+      ),
+    (error) => {
+      assert.equal(error.getStatus(), 400);
+      assert.equal(error.getResponse().code, "PROJECT_COMMUNICATION_INVALID");
+      return true;
+    },
+  );
   assert.deepEqual(calls, [
     {
       method: "GET",
       pathName: "/server/project-communication/thread",
       params: {
         projectId: "project-1",
-        counterpartOrganizationId: "owner-org",
+        counterpartOrganizationId: undefined,
+        threadId: "thread-1",
       },
     },
     {
@@ -999,6 +1018,7 @@ test("project communication routes forward thread, message list, send, and read 
         threadId: "thread-1",
         projectId: "project-1",
         lastReadMessageId: "message-2",
+        reader: { source: "project_communication", routeTargetState: "available" },
       },
     },
   ]);

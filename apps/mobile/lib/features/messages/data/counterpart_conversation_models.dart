@@ -82,6 +82,7 @@ final class CounterpartConversationBusinessCardView {
 final class CounterpartConversationProjectGroupView {
   const CounterpartConversationProjectGroupView({
     required this.projectId,
+    required this.threadId,
     required this.projectDisplayTitle,
     required this.titleVisibility,
     required this.projectRelation,
@@ -99,6 +100,7 @@ final class CounterpartConversationProjectGroupView {
   });
 
   final String projectId;
+  final String threadId;
   final String projectDisplayTitle;
   final String titleVisibility;
   final String projectRelation;

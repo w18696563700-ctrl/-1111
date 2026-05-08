@@ -497,6 +497,25 @@ module ContractsGeneration
     message_kinds = schemas.fetch('ProjectCommunicationMessageKind').fetch('enum')
     delivery_states = schemas.fetch('ProjectCommunicationMessageDeliveryState').fetch('enum')
     read_states = schemas.fetch('ProjectCommunicationMessageReadState').fetch('enum')
+    notification_types = schemas.fetch('AppNotificationType').fetch('enum')
+    notification_sources = schemas.fetch('AppNotificationSource').fetch('enum')
+    notification_source_lanes = schemas.fetch('AppNotificationSourceLane').fetch('enum')
+    notification_canonical_paths = schemas.fetch('AppNotificationRouteTarget')
+      .fetch('properties')
+      .fetch('canonicalPath')
+      .fetch('enum')
+    route_target_availability_states = schemas.fetch('AppNotificationRouteTargetAvailability')
+      .fetch('properties')
+      .fetch('state')
+      .fetch('enum')
+    route_target_fallback_actions = schemas.fetch('AppNotificationRouteTargetAvailability')
+      .fetch('properties')
+      .fetch('fallbackAction')
+      .fetch('enum')
+    mark_read_completions = schemas.fetch('AppNotificationMarkReadContext')
+      .fetch('properties')
+      .fetch('completion')
+      .fetch('enum')
 
     <<~TS
       export const PROJECT_COMMUNICATION_MESSAGE_KINDS = #{json_array(message_kinds)} as const;
@@ -559,6 +578,96 @@ module ContractsGeneration
         lastReadMessageId: string | null;
         lastReadAt: string;
         updatedAt: string;
+      }
+
+      export const APP_NOTIFICATION_TYPES = #{json_array(notification_types)} as const;
+      export type AppNotificationType = (typeof APP_NOTIFICATION_TYPES)[number];
+
+      export const APP_NOTIFICATION_SOURCES = #{json_array(notification_sources)} as const;
+      export type AppNotificationSource = (typeof APP_NOTIFICATION_SOURCES)[number];
+
+      export const APP_NOTIFICATION_SOURCE_LANES = #{json_array(notification_source_lanes)} as const;
+      export type AppNotificationSourceLane = (typeof APP_NOTIFICATION_SOURCE_LANES)[number];
+
+      export const APP_NOTIFICATION_ROUTE_TARGET_CANONICAL_PATHS =
+        #{json_array(notification_canonical_paths)} as const;
+      export type AppNotificationRouteTargetCanonicalPath =
+        (typeof APP_NOTIFICATION_ROUTE_TARGET_CANONICAL_PATHS)[number];
+
+      export const APP_NOTIFICATION_ROUTE_TARGET_AVAILABILITY_STATES =
+        #{json_array(route_target_availability_states)} as const;
+      export type AppNotificationRouteTargetAvailabilityState =
+        (typeof APP_NOTIFICATION_ROUTE_TARGET_AVAILABILITY_STATES)[number];
+
+      export const APP_NOTIFICATION_ROUTE_TARGET_FALLBACK_ACTIONS =
+        #{json_array(route_target_fallback_actions)} as const;
+      export type AppNotificationRouteTargetFallbackAction =
+        (typeof APP_NOTIFICATION_ROUTE_TARGET_FALLBACK_ACTIONS)[number];
+
+      export const APP_NOTIFICATION_MARK_READ_COMPLETIONS =
+        #{json_array(mark_read_completions)} as const;
+      export type AppNotificationMarkReadCompletion =
+        (typeof APP_NOTIFICATION_MARK_READ_COMPLETIONS)[number];
+
+      export interface AppNotificationRouteTarget {
+        canonicalPath: AppNotificationRouteTargetCanonicalPath;
+        localEntryKey: string;
+        requiredParams: string[];
+        routeParams: Record<string, string>;
+        state: 'enabled' | 'unavailable';
+      }
+
+      export interface AppNotificationRouteTargetAvailability {
+        state: AppNotificationRouteTargetAvailabilityState;
+        reasonCode: string;
+        reasonText: string;
+        fallbackAction: AppNotificationRouteTargetFallbackAction;
+        fallbackRouteTarget?: AppNotificationRouteTarget | null;
+      }
+
+      export interface AppNotificationReadModel {
+        notificationId: string;
+        type: AppNotificationType;
+        source: AppNotificationSource;
+        title: string;
+        body?: string | null;
+        projectId?: string | null;
+        threadId?: string | null;
+        routeTarget?: AppNotificationRouteTarget | null;
+        createdAt: string;
+        readAt?: string | null;
+        unread: boolean;
+        routeTargetAvailability: AppNotificationRouteTargetAvailability;
+      }
+
+      export interface AppNotificationUnreadProjection {
+        total: number;
+        projectCommunication: number;
+        forumInteraction: number;
+        system: number;
+        businessTodo: number;
+        bidParticipationRequest: number;
+      }
+
+      export interface AppNotificationListResponse {
+        items: AppNotificationReadModel[];
+        page: Record<string, unknown>;
+        unread: AppNotificationUnreadProjection;
+      }
+
+      export interface AppNotificationMarkReadContext {
+        routeTargetAvailabilityState: 'available';
+        completion: AppNotificationMarkReadCompletion;
+      }
+
+      export interface AppNotificationReadRequest {
+        notificationIds: string[];
+        readContext: AppNotificationMarkReadContext;
+      }
+
+      export interface AppNotificationReadResponse {
+        readNotificationIds: string[];
+        unread: AppNotificationUnreadProjection;
       }
     TS
   end
@@ -1083,11 +1192,17 @@ module ContractsGeneration
         threadId: string;
         projectDisplayTitle: string;
         titleVisibility: string;
+        projectRelation: string | null;
         projectState: string;
+        projectPublishedAt: string | null;
+        projectUpdatedAt: string | null;
         latestActivityAt: string;
-        projectRelation?: string | null;
-        projectUnreadCount?: number;
-        hasProjectUnread?: boolean;
+        projectUnreadCount: number;
+        hasProjectUnread: boolean;
+        latestUnreadMessageAt: string | null;
+        pricingSummary?: Record<string, unknown> | null;
+        orderSummary: Record<string, unknown> | null;
+        ratingEntry: Record<string, unknown> | null;
         businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
         cards: Array<Record<string, unknown>>;
       }
@@ -1098,6 +1213,11 @@ module ContractsGeneration
         summary: Record<string, unknown>;
         focusProjectId: string;
         latestActivityAt: string;
+        conversationUnreadCount: number;
+        hasUnread: boolean;
+        latestUnreadMessageAt: string | null;
+        myPublishedUnreadCount: number;
+        myBidUnreadCount: number;
         projectGroups: CounterpartConversationProjectGroup[];
       }
 

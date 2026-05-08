@@ -1,11 +1,22 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { AxiosError } = require('axios');
 const { METHOD_METADATA, PATH_METADATA } = require('@nestjs/common/constants');
 const { RequestMethod } = require('@nestjs/common');
 
 const { ErrorNormalizerService } = require('../dist/apps/bff/src/core/errors/error-normalizer.service.js');
 const { AppNotificationController } = require('../dist/apps/bff/src/routes/notification/app-notification.controller.js');
 const { NotificationRouteService } = require('../dist/apps/bff/src/routes/notification/notification.service.js');
+
+function createAxiosResponseError(status, data, message = `Request failed with status code ${status}`) {
+  return new AxiosError(message, 'ERR_BAD_REQUEST', {}, null, {
+    status,
+    statusText: 'error',
+    headers: {},
+    config: {},
+    data,
+  });
+}
 
 function createService(onRequest) {
   return new NotificationRouteService(
@@ -126,7 +137,13 @@ test('notification routes forward to Server without owning unread truth', async 
   const headers = { authorization: 'Bearer app', 'x-organization-id': 'org-1' };
   const registered = await service.registerDeviceToken({ platform: 'ios', provider: 'apns', deviceToken: 'raw-token', appInstallationId: 'install-1' }, headers);
   const list = await service.listNotifications({ pageSize: '20', source: 'business_todo' }, headers);
-  const read = await service.markRead({ notificationIds: ['n-1'] }, headers);
+  const read = await service.markRead({
+    notificationIds: ['n-1'],
+    readContext: {
+      routeTargetAvailabilityState: 'available',
+      completion: 'navigated_to_available_target',
+    },
+  }, headers);
 
   assert.deepEqual(registered, { registered: true, tokenId: 'token-1', platform: 'ios', provider: 'apns' });
   assert.equal(list.items.length, 2);
@@ -188,6 +205,43 @@ test('notification read-model fails controlled on unsupported notification type'
     (error) => {
       assert.equal(error.getStatus(), 502);
       assert.equal(error.getResponse().code, 'NOTIFICATION_UNAVAILABLE');
+      return true;
+    },
+  );
+});
+
+test('notification mark-read preserves Server business errors', async () => {
+  const service = createService(async (method, path) => {
+    assert.equal(method, 'POST');
+    assert.equal(path, '/server/notifications/read');
+    throw createAxiosResponseError(503, {
+      statusCode: 503,
+      code: 'NOTIFICATION_UNAVAILABLE',
+      message: 'Notification projection is unavailable.',
+      source: 'server',
+    });
+  });
+
+  await assert.rejects(
+    () => service.markRead({
+      notificationIds: ['n-1'],
+      readContext: {
+        routeTargetAvailabilityState: 'available',
+        completion: 'navigated_to_available_target',
+      },
+    }, { authorization: 'Bearer app' }),
+    (error) => {
+      assert.equal(error.getStatus(), 503);
+      assert.deepEqual(error.getResponse(), {
+        statusCode: 503,
+        code: 'NOTIFICATION_UNAVAILABLE',
+        message: 'Notification projection is unavailable.',
+        details: {
+          transportCode: 'ERR_BAD_REQUEST',
+          upstreamMessage: 'Request failed with status code 503',
+        },
+        source: 'server',
+      });
       return true;
     },
   );

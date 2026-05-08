@@ -259,8 +259,6 @@ class _MessagesPageState extends State<MessagesPage> {
               selectedFilter: _selectedNotificationFilter,
               onSelectFilter: _selectNotificationFilter,
               onOpen: _openNotification,
-              onDismiss: _dismissUnavailableNotification,
-              onDismissMany: _dismissUnavailableNotifications,
               onRetry: () => _loadNotifications(),
               onLoadMore: _loadMoreNotifications,
             ),
@@ -592,54 +590,6 @@ class _MessagesPageState extends State<MessagesPage> {
         _syncShellMessagesUnreadCount(unread.total);
       }
     }
-  }
-
-  Future<void> _dismissUnavailableNotification(
-    AppNotificationItemView item,
-  ) async {
-    await _dismissUnavailableNotifications(<AppNotificationItemView>[item]);
-  }
-
-  Future<void> _dismissUnavailableNotifications(
-    List<AppNotificationItemView> items,
-  ) async {
-    final notificationIds = items
-        .where((item) => !item.routeTargetAvailability.isAvailable)
-        .where((item) => item.unread)
-        .map((item) => item.notificationId)
-        .where((notificationId) => notificationId.trim().isNotEmpty)
-        .toSet()
-        .toList(growable: false);
-    if (notificationIds.isEmpty) {
-      return;
-    }
-    final result = await MessagesConsumerLayer.instance.markNotificationsRead(
-      notificationIds,
-    );
-    if (!mounted) {
-      return;
-    }
-    if (result.state != AppPageState.content) {
-      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-        SnackBar(content: Text(result.message ?? '当前通知处理暂不可用，请稍后再试。')),
-      );
-      return;
-    }
-    final unread = result.unread;
-    if (unread != null) {
-      _syncShellMessagesUnreadCount(unread.total);
-    }
-    await _loadNotifications(showLoading: false);
-    if (!mounted) {
-      return;
-    }
-    await _reloadShellContextPreservingNotificationUnread();
-    if (!mounted) {
-      return;
-    }
-    ScaffoldMessenger.maybeOf(
-      context,
-    )?.showSnackBar(const SnackBar(content: Text('已清理失效提醒。')));
   }
 
   bool _isProjectCommunicationNotification(AppNotificationItemView item) {

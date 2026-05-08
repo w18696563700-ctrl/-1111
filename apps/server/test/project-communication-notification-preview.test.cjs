@@ -47,7 +47,17 @@ function createNotification(overrides = {}) {
     body: 'hello',
     projectId: 'project-1',
     threadId: 'thread-1',
-    routeTarget: { canonicalPath: '/api/app/message/project-communication/messages' },
+    routeTarget: {
+      canonicalPath: '/api/app/message/counterpart-conversation/detail',
+      localEntryKey: 'counterpart_conversation.open',
+      requiredParams: ['conversationId', 'projectId'],
+      routeParams: {
+        conversationId: 'sender-org',
+        projectId: 'project-1',
+        threadId: 'thread-1',
+      },
+      state: 'enabled',
+    },
     readAt: null,
     notificationState: 'active',
     createdAt: new Date('2026-05-01T08:00:00.000Z'),
@@ -229,7 +239,16 @@ test('notification mark read updates only actor-owned notifications and returns 
   };
   const service = new NotificationService(repository, {}, {}, createVerifier('recipient-org'), new NotificationPresenter());
 
-  const result = await service.markRead({ notificationIds: ['n-1'] }, createContext({ organizationId: 'recipient-org' }));
+  const result = await service.markRead(
+    {
+      notificationIds: ['n-1'],
+      readContext: {
+        routeTargetAvailabilityState: 'available',
+        completion: 'navigated_to_available_target',
+      },
+    },
+    createContext({ organizationId: 'recipient-org' }),
+  );
 
   assert.deepEqual(result.readNotificationIds, ['n-1']);
   assert.ok(notifications[0].readAt instanceof Date);
@@ -241,6 +260,104 @@ test('notification mark read updates only actor-owned notifications and returns 
     forumInteraction: 1,
     system: 0,
   });
+});
+
+test('notification list for user-only session does not read empty organization notifications', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const notifications = [
+    createNotification({
+      id: 'n-user',
+      userId: 'user-1',
+      organizationId: '',
+      source: 'system',
+      type: 'system',
+      routeTarget: { canonicalPath: '/api/app/profile/index', state: 'enabled' },
+      readAt: null,
+    }),
+    createNotification({
+      id: 'n-empty-org',
+      userId: 'other-user',
+      organizationId: '',
+      source: 'system',
+      type: 'system',
+      routeTarget: { canonicalPath: '/api/app/profile/index', state: 'enabled' },
+      readAt: null,
+    }),
+  ];
+  const queryCalls = [];
+  const queryBuilder = {
+    where(statement, params) { queryCalls.push({ method: 'where', statement, params }); return this; },
+    andWhere(statement, params) { queryCalls.push({ method: 'andWhere', statement, params }); return this; },
+    orderBy() { return this; },
+    addOrderBy() { return this; },
+    take() { return this; },
+    async getMany() { return [notifications[0]]; },
+  };
+  const repository = {
+    createQueryBuilder() { return queryBuilder; },
+    async find(options) {
+      assert.deepEqual(options.where, [
+        { userId: 'user-1', readAt: options.where[0].readAt, notificationState: 'active' },
+      ]);
+      return [notifications[0]];
+    },
+  };
+  const service = new NotificationService(repository, {}, {}, createVerifier(null), new NotificationPresenter());
+
+  const result = await service.listNotifications({}, createContext({ organizationId: '' }));
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].notificationId, 'n-user');
+  assert.equal(result.unread.total, 1);
+  assert.ok(queryCalls.some((call) =>
+    call.method === 'andWhere' &&
+    call.statement === 'n.user_id = :userId' &&
+    call.params.userId === 'user-1'
+  ));
+  assert.equal(queryCalls.some((call) => String(call.statement).includes('organization_id = :orgId')), false);
+});
+
+test('notification mark read rejects unavailable route targets with contract error code', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const notification = createNotification({
+    id: 'n-unavailable',
+    source: 'system',
+    type: 'system',
+    routeTarget: { canonicalPath: '/api/app/profile/index', state: 'unavailable' },
+  });
+  const queryBuilder = {
+    where() { return this; },
+    andWhere() { return this; },
+    async getMany() { return [notification]; },
+  };
+  const repository = {
+    createQueryBuilder() { return queryBuilder; },
+    async save() { throw new Error('unavailable route target should fail before save'); },
+    async find() { throw new Error('unavailable route target should fail before unread recount'); },
+  };
+  const service = new NotificationService(repository, {}, {}, createVerifier('recipient-org'), new NotificationPresenter());
+
+  await assert.rejects(
+    () => service.markRead(
+      {
+        notificationIds: ['n-unavailable'],
+        readContext: {
+          routeTargetAvailabilityState: 'available',
+          completion: 'navigated_to_available_target',
+        },
+      },
+      createContext({ organizationId: 'recipient-org' }),
+    ),
+    (error) => {
+      const response = error.getResponse();
+      assert.equal(response.code, 'NOTIFICATION_MARK_READ_TARGET_UNAVAILABLE');
+      assert.equal(response.details.notificationId, 'n-unavailable');
+      assert.equal(response.details.routeTargetAvailability.reasonCode, 'ROUTE_TARGET_UNAVAILABLE');
+      return true;
+    },
+  );
 });
 
 test('notification list supports source filter while unread projection stays global', async () => {

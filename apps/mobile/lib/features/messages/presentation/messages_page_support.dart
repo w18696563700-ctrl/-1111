@@ -166,8 +166,6 @@ class _MessagesNotificationPanel extends StatelessWidget {
     required this.selectedFilter,
     required this.onSelectFilter,
     required this.onOpen,
-    required this.onDismiss,
-    required this.onDismissMany,
     required this.onRetry,
     required this.onLoadMore,
   });
@@ -177,8 +175,6 @@ class _MessagesNotificationPanel extends StatelessWidget {
   final _MessagesNotificationFilter selectedFilter;
   final ValueChanged<_MessagesNotificationFilter> onSelectFilter;
   final ValueChanged<AppNotificationItemView> onOpen;
-  final ValueChanged<AppNotificationItemView> onDismiss;
-  final ValueChanged<List<AppNotificationItemView>> onDismissMany;
   final VoidCallback onRetry;
   final VoidCallback onLoadMore;
 
@@ -195,12 +191,10 @@ class _MessagesNotificationPanel extends StatelessWidget {
     final unreadCount = unread?.total ?? 0;
     final failed = _notificationFailed(result);
     final hasMore = data?.hasMore == true;
-    final unavailableUnreadItems = items
-        .where(
-          (item) => item.unread && !item.routeTargetAvailability.isAvailable,
-        )
-        .toList(growable: false);
-    final reservedHeight = unavailableUnreadItems.isNotEmpty ? 144.0 : 108.0;
+    final fallbackActionCount = items
+        .where((item) => item.routeTargetAvailability.canOpenFallback)
+        .length;
+    const reservedHeight = 108.0;
     final maxListHeight = (maxPanelHeight - reservedHeight).clamp(
       132.0,
       maxPanelHeight,
@@ -208,7 +202,7 @@ class _MessagesNotificationPanel extends StatelessWidget {
     final listHeight = _notificationPanelListHeight(
       itemCount: items.length,
       hasMore: hasMore,
-      actionItemCount: unavailableUnreadItems.length,
+      actionItemCount: fallbackActionCount,
       maxHeight: maxListHeight.toDouble(),
     );
     return ConstrainedBox(
@@ -265,28 +259,6 @@ class _MessagesNotificationPanel extends StatelessWidget {
                 ),
                 const SizedBox(height: 9),
               ],
-              if (unavailableUnreadItems.isNotEmpty &&
-                  !loading &&
-                  !failed) ...<Widget>[
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton.icon(
-                    onPressed: () => onDismissMany(unavailableUnreadItems),
-                    icon: const Icon(Icons.cleaning_services_rounded, size: 16),
-                    label: Text('清理失效提醒 ${unavailableUnreadItems.length}'),
-                    style: TextButton.styleFrom(
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                      visualDensity: VisualDensity.compact,
-                      minimumSize: const Size(0, 30),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-              ],
               if (loading)
                 const LinearProgressIndicator(minHeight: 5)
               else if (failed)
@@ -325,7 +297,6 @@ class _MessagesNotificationPanel extends StatelessWidget {
                       return _MessagesNotificationCard(
                         item: item,
                         onOpen: () => onOpen(item),
-                        onDismiss: () => onDismiss(item),
                       );
                     },
                   ),
@@ -742,15 +713,10 @@ String _notificationFailureMessage(String? message) {
 }
 
 class _MessagesNotificationCard extends StatelessWidget {
-  const _MessagesNotificationCard({
-    required this.item,
-    required this.onOpen,
-    required this.onDismiss,
-  });
+  const _MessagesNotificationCard({required this.item, required this.onOpen});
 
   final AppNotificationItemView item;
   final VoidCallback onOpen;
-  final VoidCallback onDismiss;
 
   @override
   Widget build(BuildContext context) {
@@ -767,7 +733,6 @@ class _MessagesNotificationCard extends StatelessWidget {
         : _notificationFailureMessage(availability.reasonText);
     final showFallbackAction =
         !availability.isAvailable && availability.canOpenFallback;
-    final showDismissAction = !availability.isAvailable && item.unread;
     return Material(
       color: item.unread ? const Color(0xFFFFFBF6) : theme.colorScheme.surface,
       shape: RoundedRectangleBorder(
@@ -898,28 +863,18 @@ class _MessagesNotificationCard extends StatelessWidget {
                   ),
                 ],
               ),
-              if (showFallbackAction || showDismissAction) ...<Widget>[
+              if (showFallbackAction) ...<Widget>[
                 const SizedBox(height: 7),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   mainAxisSize: MainAxisSize.min,
                   children: <Widget>[
-                    if (showFallbackAction)
-                      TextButton.icon(
-                        onPressed: onOpen,
-                        icon: const Icon(Icons.list_alt_rounded, size: 16),
-                        label: const Text('从主体列表进入'),
-                        style: _notificationActionButtonStyle(context),
-                      ),
-                    if (showFallbackAction && showDismissAction)
-                      const SizedBox(width: 6),
-                    if (showDismissAction)
-                      TextButton.icon(
-                        onPressed: onDismiss,
-                        icon: const Icon(Icons.done_rounded, size: 16),
-                        label: const Text('忽略此提醒'),
-                        style: _notificationActionButtonStyle(context),
-                      ),
+                    TextButton.icon(
+                      onPressed: onOpen,
+                      icon: const Icon(Icons.list_alt_rounded, size: 16),
+                      label: const Text('从主体列表进入'),
+                      style: _notificationActionButtonStyle(context),
+                    ),
                   ],
                 ),
               ],

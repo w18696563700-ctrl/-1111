@@ -1,4 +1,5 @@
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/app_notification_models.dart';
 import 'package:mobile/features/messages/data/messages_interaction_parser.dart';
 import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
@@ -76,8 +77,10 @@ parseAppNotificationRouteTargetAvailability(
       fallbackRouteTarget: null,
     );
   }
-  final fallbackRouteTarget = parseAppNotificationRouteTarget(
+  final fallbackAction = _nullableString(map['fallbackAction']) ?? 'none';
+  final fallbackRouteTarget = _parseFallbackRouteTarget(
     map['fallbackRouteTarget'],
+    fallbackAction: fallbackAction,
   );
   return AppNotificationRouteTargetAvailabilityView(
     state: _nullableString(map['state']) ?? 'missing_context',
@@ -86,7 +89,7 @@ parseAppNotificationRouteTargetAvailability(
         'ROUTE_TARGET_AVAILABILITY_UNKNOWN',
     reasonText:
         _nullableString(map['reasonText']) ?? '当前通知暂时无法定位，请稍后重试或从对应入口进入。',
-    fallbackAction: _nullableString(map['fallbackAction']) ?? 'none',
+    fallbackAction: fallbackAction,
     fallbackRouteTarget: fallbackRouteTarget,
   );
 }
@@ -130,6 +133,43 @@ AppNotificationRouteTargetView? _legacyProjectCommunicationFallback({
         'conversationId': conversationId,
         'projectId': projectId,
       },
+    ),
+  );
+}
+
+AppNotificationRouteTargetView? _parseFallbackRouteTarget(
+  Object? payload, {
+  required String fallbackAction,
+}) {
+  final parsed = parseAppNotificationRouteTarget(payload);
+  if (parsed?.routeLocation != null || fallbackAction != 'open_subject_list') {
+    return parsed;
+  }
+  final map = _optionalMap(payload);
+  if (map == null || map.isEmpty) {
+    return parsed;
+  }
+  final canonicalPath = _nullableString(map['canonicalPath']);
+  if (canonicalPath != '/api/app/message/counterpart-conversation/detail') {
+    return parsed;
+  }
+  final localEntryKey = _nullableString(map['localEntryKey']);
+  final params = _parseParams(map['routeParams'] ?? map['params']);
+  final conversationId = params['conversationId']?.trim();
+  final projectId = params['projectId']?.trim();
+  if (conversationId == null ||
+      conversationId.isEmpty ||
+      projectId == null ||
+      projectId.isEmpty) {
+    return parsed;
+  }
+  return AppNotificationRouteTargetView(
+    canonicalPath: canonicalPath!,
+    localEntryKey: localEntryKey,
+    params: params,
+    routeLocation: ExhibitionRoutes.counterpartConversationWithIds(
+      conversationId: conversationId,
+      projectId: projectId,
     ),
   );
 }

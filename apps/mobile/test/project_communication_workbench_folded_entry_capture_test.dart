@@ -205,6 +205,7 @@ Map<String, Object?> _detailPayload() {
     'projectGroups': <Object?>[
       <String, Object?>{
         'projectId': 'project-1',
+        'threadId': 'thread-1',
         'projectDisplayTitle': 'POPAY会员赛事受控测试-day10a-flagship',
         'titleVisibility': 'visible',
         'projectRelation': 'my_bid',

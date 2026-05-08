@@ -76,6 +76,10 @@ void main() {
         'POST /api/app/notifications/read': (request) async {
           expect(request.body, <String, Object?>{
             'notificationIds': <String>['notice-1'],
+            'readContext': const <String, Object?>{
+              'routeTargetAvailabilityState': 'available',
+              'completion': 'navigated_to_available_target',
+            },
           });
           return AppApiResponse(
             statusCode: 200,
@@ -315,6 +319,7 @@ void main() {
                       'requiredParams': <Object?>[
                         'conversationId',
                         'projectId',
+                        'threadId',
                       ],
                     },
                     'routeTargetAvailability': <String, Object?>{
@@ -471,6 +476,7 @@ void main() {
                       'requiredParams': <Object?>[
                         'conversationId',
                         'projectId',
+                        'threadId',
                       ],
                     },
                     'routeTargetAvailability': <String, Object?>{
@@ -550,8 +556,8 @@ void main() {
       expect(find.text('入口已失效'), findsOneWidget);
       expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsOneWidget);
       expect(find.text('从主体列表进入'), findsOneWidget);
-      expect(find.text('忽略此提醒'), findsOneWidget);
-      expect(find.text('清理失效提醒 1'), findsOneWidget);
+      expect(find.text('忽略此提醒'), findsNothing);
+      expect(find.text('清理失效提醒 1'), findsNothing);
 
       await tester.tap(find.textContaining('有新的项目沟通消息'));
       await tester.pumpAndSettle();
@@ -570,12 +576,9 @@ void main() {
       expect(readRequests, 0);
 
       await _openNotificationPanel(tester);
-      await tester.tap(find.text('清理失效提醒 1'));
-      await tester.pumpAndSettle();
-
-      expect(readRequests, 1);
-      expect(find.text('未读 0'), findsOneWidget);
-      expect(find.text('全部当前为空'), findsOneWidget);
+      expect(readRequests, 0);
+      expect(find.text('未读 1'), findsOneWidget);
+      expect(find.text('入口已失效，可从主体项目列表重新进入。'), findsWidgets);
     },
   );
 
@@ -783,6 +786,10 @@ void main() {
           'POST /api/app/notifications/read': (request) async {
             expect(request.body, <String, Object?>{
               'notificationIds': <String>['notice-bpr-1'],
+              'readContext': const <String, Object?>{
+                'routeTargetAvailabilityState': 'available',
+                'completion': 'navigated_to_available_target',
+              },
             });
             return AppApiResponse(
               statusCode: 200,
@@ -913,6 +920,7 @@ void main() {
                   'params': const <String, Object?>{
                     'conversationId': 'org-1',
                     'projectId': 'project-1',
+                    'threadId': 'thread-1',
                   },
                 },
               },
@@ -964,7 +972,11 @@ void main() {
           },
           'canonicalPath': '/api/app/message/counterpart-conversation/detail',
           'localEntryKey': 'counterpart_conversation.open',
-          'requiredParams': <Object?>['conversationId', 'projectId'],
+          'requiredParams': <Object?>[
+            'conversationId',
+            'projectId',
+            'threadId',
+          ],
         },
         'createdAt': '2026-05-01T08:00:00Z',
         'readAt': null,

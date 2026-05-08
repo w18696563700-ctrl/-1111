@@ -864,7 +864,101 @@ test('counterpart conversation project title uses concrete project title when vi
   assert.equal(result.myBidUnreadCount, 0);
 });
 
-test('counterpart conversation list badge includes pending business todos', async () => {
+test('counterpart conversation includes project name access source in the card catalog', async () => {
+  const {
+    CounterpartConversationProjectionService,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
+  const now = '2026-04-24T08:05:00.000Z';
+  const project = {
+    id: 'project-name-access',
+    organizationId: 'org-owner',
+    creatorUserId: 'user-owner',
+    title: '名称申请项目',
+    exhibitionName: '名称申请展',
+    brandName: '品牌',
+    state: 'published',
+    publishedAt: new Date('2026-04-20T02:30:00.000Z'),
+    updatedAt: new Date('2026-04-21T03:40:00.000Z'),
+  };
+  const emptySource = {
+    async buildSeeds() {
+      return [];
+    },
+  };
+  const projectNameAccessSource = {
+    async buildSeeds(viewerOrganizationId) {
+      assert.equal(viewerOrganizationId, 'org-owner');
+      return [
+        {
+          counterpartOrganizationId: 'org-counterpart',
+          counterpartDisplayName: '申请查看方',
+          counterpartAvatarUrl: null,
+          projectId: 'project-name-access',
+          updatedAt: now,
+          card: {
+            cardId: 'project-name-access:req-1',
+            cardType: 'project_name_access_request',
+            title: '项目名称查看申请',
+            summary: '申请查看方 申请查看项目名称。',
+            status: 'pending',
+            updatedAt: now,
+            truthAnchor: {
+              truthType: 'project_name_access_request',
+              projectId: 'project-name-access',
+              requestId: 'req-1',
+            },
+            detailRouteTarget: null,
+            decisionAvailability: {
+              canApprove: true,
+              canReject: true,
+            },
+          },
+        },
+      ];
+    },
+  };
+  const service = new CounterpartConversationProjectionService(
+    {
+      async findBy() {
+        return [project];
+      },
+      async query() {
+        return [];
+      },
+    },
+    {
+      async buildPublicProjectionMap() {
+        return new Map([
+          [
+            'project-name-access',
+            {
+              displayTitle: '名称申请项目',
+              nameAccess: {
+                status: 'visible',
+                canRequest: false,
+                requestId: null,
+              },
+            },
+          ],
+        ]);
+      },
+    },
+    emptySource,
+    emptySource,
+    emptySource,
+    undefined,
+    undefined,
+    projectNameAccessSource,
+  );
+
+  const [result] = await service.listConversations('org-owner');
+
+  assert.equal(result.conversationId, 'org-counterpart');
+  assert.equal(result.summary.latestCardType, 'project_name_access_request');
+  assert.equal(result.summary.title, '项目名称查看申请');
+});
+
+test('counterpart conversation ordinary unread does not mix pending business todos', async () => {
   const {
     CounterpartConversationProjectionService,
   } = require('../dist/modules/message_interaction/counterpart-conversation.projection.service.js');
@@ -986,8 +1080,8 @@ test('counterpart conversation list badge includes pending business todos', asyn
 
   const [result] = await service.listConversations('org-owner');
 
-  assert.equal(result.conversationUnreadCount, 1);
-  assert.equal(result.hasUnread, true);
+  assert.equal(result.conversationUnreadCount, 0);
+  assert.equal(result.hasUnread, false);
 });
 
 test('project communication unread query counts counterpart unread messages', async () => {
@@ -1224,6 +1318,39 @@ test('project communication mark read rejects message outside project thread', a
           lastReadMessageId: 'message-other-thread',
         },
         createContext('project-communication-mark-read-cross-thread'),
+      ),
+    /lastReadMessageId/,
+  );
+});
+
+test('project communication mark read requires lastReadMessageId for new cursor writes', async () => {
+  const {
+    ProjectCommunicationMessageService,
+  } = require('../dist/modules/project_communication/project-communication-message.service.js');
+  const {
+    ProjectCommunicationPresenter,
+  } = require('../dist/modules/project_communication/project-communication.presenter.js');
+  const service = new ProjectCommunicationMessageService(
+    {},
+    {
+      async transaction() {
+        throw new Error('mark read should reject before transaction');
+      },
+    },
+    {},
+    {},
+    new ProjectCommunicationPresenter(),
+    {},
+  );
+
+  await assert.rejects(
+    () =>
+      service.markRead(
+        {
+          projectId: 'project-1',
+          threadId: 'thread-1',
+        },
+        createContext('project-communication-mark-read-requires-message-id'),
       ),
     /lastReadMessageId/,
   );

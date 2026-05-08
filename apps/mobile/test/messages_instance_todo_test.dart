@@ -119,6 +119,7 @@ Map<String, Object?> _messageInteractionItem({
       'params': <String, String>{
         'conversationId': 'org-$interactionId',
         'projectId': projectId,
+        'threadId': 'thread-$interactionId',
       },
     },
   };

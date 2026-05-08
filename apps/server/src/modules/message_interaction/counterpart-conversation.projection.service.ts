@@ -16,6 +16,7 @@ import { messageInteractionUnavailable } from './message-interaction.errors';
 import { CounterpartConversationBidParticipationSource } from './counterpart-conversation.bid-participation-source';
 import { CounterpartConversationBidThreadSource } from './counterpart-conversation.bid-thread-source';
 import { CounterpartConversationClarificationSource } from './counterpart-conversation.clarification-source';
+import { CounterpartConversationProjectNameAccessSource } from './counterpart-conversation.project-name-access-source';
 import {
   CounterpartConversationCardSeed,
   CounterpartConversationCardSource,
@@ -80,11 +81,14 @@ export class CounterpartConversationProjectionService {
     private readonly unreadQueryService?: ProjectCommunicationUnreadQueryService,
     @Optional()
     private readonly businessStateService?: ProjectCommunicationBusinessStateService,
+    @Optional()
+    projectNameAccessSource?: CounterpartConversationProjectNameAccessSource,
   ) {
     this.cardSources = [
       bidThreadSource,
       bidParticipationSource,
       clarificationSource,
+      ...(projectNameAccessSource ? [projectNameAccessSource] : []),
     ];
   }
 
@@ -424,19 +428,17 @@ export class CounterpartConversationProjectionService {
   ) {
     return projectGroups.reduce(
       (summary, group) => {
-        const businessTodoCount =
-          group.businessTodoSummary?.totalPendingCount ?? 0;
-        const badgeCount = group.projectUnreadCount + businessTodoCount;
-        summary.conversationUnreadCount += badgeCount;
+        const unreadCount = group.projectUnreadCount;
+        summary.conversationUnreadCount += unreadCount;
         summary.latestUnreadMessageAt = this.maxIso(
           summary.latestUnreadMessageAt,
           group.latestUnreadMessageAt,
         );
         if (group.projectRelation === 'my_published') {
-          summary.myPublishedUnreadCount += badgeCount;
+          summary.myPublishedUnreadCount += unreadCount;
         }
         if (group.projectRelation === 'my_bid') {
-          summary.myBidUnreadCount += badgeCount;
+          summary.myBidUnreadCount += unreadCount;
         }
         return summary;
       },

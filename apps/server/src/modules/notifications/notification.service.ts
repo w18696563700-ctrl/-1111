@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
@@ -13,7 +13,12 @@ import { ApnsPushProviderAdapter } from './apns-push-provider.adapter';
 import { AppNotificationEntity } from './entities/app-notification.entity';
 import { DevicePushTokenEntity } from './entities/device-push-token.entity';
 import { PushDeliveryAttemptEntity } from './entities/push-delivery-attempt.entity';
-import { notificationForbidden, notificationInvalid, pushTokenInvalid } from './notification.errors';
+import {
+  notificationForbidden,
+  notificationInvalid,
+  notificationMarkReadTargetUnavailable,
+  pushTokenInvalid
+} from './notification.errors';
 import {
   NotificationListItemProjection,
   NotificationPresenter,
@@ -91,17 +96,14 @@ export class NotificationService {
     const limit = this.readPageSize(query.pageSize);
     const cursor = this.readOptionalDate(query.cursor);
     const sourceFilter = this.readSourceFilter(query.source ?? query.lane);
-    const orgId = session.organizationId ?? '';
+    const orgId = this.normalizeSessionOrganizationId(session.organizationId);
     const builder = this.notificationRepository
       .createQueryBuilder('n')
       .where('n.notification_state = :state', { state: 'active' })
-      .andWhere('(n.user_id = :userId OR n.organization_id = :orgId)', {
-        userId: session.userId,
-        orgId
-      })
       .orderBy('n.created_at', 'DESC')
       .addOrderBy('n.id', 'DESC')
       .take(limit + 1);
+    this.applyActorNotificationScope(builder, session.userId, orgId);
     if (cursor) {
       builder.andWhere('n.created_at < :cursor', { cursor });
     }
@@ -118,21 +120,20 @@ export class NotificationService {
 
   async markRead(payload: Record<string, unknown>, context: RequestContext) {
     const notificationIds = this.readNotificationIds(payload.notificationIds);
+    this.readMarkReadContext(payload.readContext);
     const session = await requireVerifiedCurrentSessionContext(context, this.sessionVerifier);
-    const orgId = session.organizationId ?? '';
+    const orgId = this.normalizeSessionOrganizationId(session.organizationId);
     const readAt = new Date();
-    const items = await this.notificationRepository
+    const builder = this.notificationRepository
       .createQueryBuilder('n')
       .where('n.id IN (:...ids)', { ids: notificationIds })
-      .andWhere('n.notification_state = :state', { state: 'active' })
-      .andWhere('(n.user_id = :userId OR n.organization_id = :orgId)', {
-        userId: session.userId,
-        orgId
-      })
-      .getMany();
+      .andWhere('n.notification_state = :state', { state: 'active' });
+    this.applyActorNotificationScope(builder, session.userId, orgId);
+    const items = await builder.getMany();
     if (items.length !== notificationIds.length) {
       throw notificationForbidden('Current actor cannot mark one or more notifications as read.');
     }
+    await this.assertRouteTargetsAvailableForRead(items, orgId);
     for (const item of items) {
       item.readAt = item.readAt ?? readAt;
     }
@@ -236,11 +237,14 @@ export class NotificationService {
   }
 
   private async countUnread(userId: string, organizationId: string) {
+    const where: FindOptionsWhere<AppNotificationEntity>[] = [
+      { userId, readAt: IsNull(), notificationState: 'active' }
+    ];
+    if (organizationId) {
+      where.push({ organizationId, readAt: IsNull(), notificationState: 'active' });
+    }
     const items = await this.notificationRepository.find({
-      where: [
-        { userId, readAt: IsNull(), notificationState: 'active' },
-        { organizationId, readAt: IsNull(), notificationState: 'active' }
-      ]
+      where
     });
     const unread = this.presenter.emptyUnread();
     for (const item of items) {
@@ -320,6 +324,38 @@ export class NotificationService {
         routeTargetAvailability: await this.resolveRouteTargetAvailability(item, organizationId)
       }))
     );
+  }
+
+  private applyActorNotificationScope(
+    builder: { andWhere(statement: string, params?: Record<string, unknown>): unknown },
+    userId: string,
+    organizationId: string
+  ) {
+    if (organizationId) {
+      builder.andWhere('(n.user_id = :userId OR n.organization_id = :orgId)', {
+        userId,
+        orgId: organizationId
+      });
+      return;
+    }
+    builder.andWhere('n.user_id = :userId', { userId });
+  }
+
+  private async assertRouteTargetsAvailableForRead(
+    items: AppNotificationEntity[],
+    organizationId: string
+  ) {
+    const projections = await this.withRouteTargetAvailability(items, organizationId);
+    const blocked = projections.find(
+      (projection) => projection.routeTargetAvailability.state !== 'available'
+    );
+    if (!blocked) {
+      return;
+    }
+    throw notificationMarkReadTargetUnavailable('Current notification route target is unavailable for mark-read.', {
+      notificationId: blocked.item.id,
+      routeTargetAvailability: blocked.routeTargetAvailability
+    });
   }
 
   private async resolveRouteTargetAvailability(
@@ -409,7 +445,7 @@ export class NotificationService {
     return {
       canonicalPath: '/api/app/message/counterpart-conversation/detail',
       localEntryKey: 'counterpart_conversation.open',
-      requiredParams: ['conversationId', 'projectId'],
+      requiredParams: ['conversationId', 'projectId', 'threadId'],
       routeParams: { conversationId, projectId, threadId },
       state: 'enabled'
     };
@@ -475,6 +511,11 @@ export class NotificationService {
     return typeof value === 'string' && value.trim() ? value.trim() : null;
   }
 
+  private normalizeSessionOrganizationId(value: string | null | undefined) {
+    const normalized = value?.trim() ?? '';
+    return normalized || '';
+  }
+
   private bidParticipationRequestRouteTarget(projectId: string, requestId: string) {
     return {
       canonicalPath: '/api/app/project/bid-participation/thread/detail',
@@ -530,6 +571,28 @@ export class NotificationService {
       throw notificationInvalid('Field `notificationIds` must not contain duplicates.');
     }
     return ids;
+  }
+
+  private readMarkReadContext(value: unknown) {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      throw notificationInvalid('Field `readContext` is required.');
+    }
+    const record = value as Record<string, unknown>;
+    const availabilityState = this.readNotificationString(
+      record.routeTargetAvailabilityState,
+      'readContext.routeTargetAvailabilityState',
+      32
+    );
+    if (availabilityState !== 'available') {
+      throw notificationMarkReadTargetUnavailable(
+        'Notification mark-read requires an available route target context.',
+        { routeTargetAvailabilityState: availabilityState }
+      );
+    }
+    const completion = this.readNotificationString(record.completion, 'readContext.completion', 64);
+    if (completion !== 'navigated_to_available_target') {
+      throw notificationInvalid('Field `readContext.completion` must be navigated_to_available_target.');
+    }
   }
 
   private readPageSize(value: unknown) {

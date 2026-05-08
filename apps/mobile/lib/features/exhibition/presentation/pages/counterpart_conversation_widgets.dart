@@ -1385,7 +1385,7 @@ class _BusinessTodoBadge extends StatelessWidget {
           vertical: compact ? 2 : 4,
         ),
         child: Text(
-          label,
+          '待办 $label',
           style: theme.textTheme.labelSmall?.copyWith(
             color: theme.colorScheme.onError,
             fontWeight: FontWeight.w900,

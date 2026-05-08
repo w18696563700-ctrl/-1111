@@ -3,11 +3,21 @@ import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
+import { requireErrorCode } from '../../shared/contracts';
 import {
   readAppNotificationListReadModel,
   readAppNotificationReadResultReadModel,
   readDevicePushTokenRegisterReadModel
 } from './notification.read-model';
+
+const NOTIFICATION_ERROR_CODES = {
+  authSessionInvalid: requireErrorCode('AUTH_SESSION_INVALID'),
+  unavailable: requireErrorCode('NOTIFICATION_UNAVAILABLE'),
+  forbidden: requireErrorCode('NOTIFICATION_FORBIDDEN'),
+  readInvalid: requireErrorCode('NOTIFICATION_READ_INVALID'),
+  pushTokenInvalid: requireErrorCode('PUSH_TOKEN_INVALID'),
+  pushTokenUnavailable: requireErrorCode('PUSH_TOKEN_UNAVAILABLE')
+} as const;
 
 @Injectable()
 export class NotificationRouteService {
@@ -25,7 +35,12 @@ export class NotificationRouteService {
       });
       return readDevicePushTokenRegisterReadModel(result);
     } catch (error) {
-      throw this.normalizeNotificationError(error, 'PUSH_TOKEN_UNAVAILABLE', '当前设备通知注册暂不可用，请稍后再试。');
+      throw this.normalizeNotificationError(
+        error,
+        NOTIFICATION_ERROR_CODES.pushTokenUnavailable,
+        '当前设备通知注册暂不可用，请稍后再试。',
+        { 400: NOTIFICATION_ERROR_CODES.pushTokenInvalid }
+      );
     }
   }
 
@@ -51,7 +66,11 @@ export class NotificationRouteService {
       });
       return readAppNotificationListReadModel(result);
     } catch (error) {
-      throw this.normalizeNotificationError(error, 'NOTIFICATION_UNAVAILABLE', '当前通知中心暂不可用，请稍后再试。');
+      throw this.normalizeNotificationError(
+        error,
+        NOTIFICATION_ERROR_CODES.unavailable,
+        '当前通知中心暂不可用，请稍后再试。'
+      );
     }
   }
 
@@ -63,17 +82,39 @@ export class NotificationRouteService {
       });
       return readAppNotificationReadResultReadModel(result);
     } catch (error) {
-      throw this.normalizeNotificationError(error, 'NOTIFICATION_READ_INVALID', '当前通知已读操作暂不可用，请稍后再试。');
+      throw this.normalizeNotificationReadError(error);
     }
   }
 
-  private normalizeNotificationError(error: unknown, fallbackCode: string, fallbackMessage: string) {
+  private normalizeNotificationError(
+    error: unknown,
+    fallbackCode: string,
+    fallbackMessage: string,
+    statusCodeMap: Partial<Record<number, string>> = {}
+  ) {
     return this.errors.toHttpException(error, fallbackCode, fallbackMessage, {
       400: fallbackCode,
-      401: 'AUTH_SESSION_INVALID',
-      403: 'NOTIFICATION_FORBIDDEN',
-      404: 'NOTIFICATION_UNAVAILABLE'
+      401: NOTIFICATION_ERROR_CODES.authSessionInvalid,
+      403: NOTIFICATION_ERROR_CODES.forbidden,
+      404: NOTIFICATION_ERROR_CODES.unavailable,
+      503: NOTIFICATION_ERROR_CODES.unavailable,
+      ...statusCodeMap
     });
+  }
+
+  private normalizeNotificationReadError(error: unknown) {
+    return this.errors.toHttpException(
+      error,
+      NOTIFICATION_ERROR_CODES.unavailable,
+      '当前通知已读操作暂不可用，请稍后再试。',
+      {
+        400: NOTIFICATION_ERROR_CODES.readInvalid,
+        401: NOTIFICATION_ERROR_CODES.authSessionInvalid,
+        403: NOTIFICATION_ERROR_CODES.forbidden,
+        404: NOTIFICATION_ERROR_CODES.unavailable,
+        503: NOTIFICATION_ERROR_CODES.unavailable
+      }
+    );
   }
 
   private buildScopedHeaders(headers: IncomingHttpHeaders) {

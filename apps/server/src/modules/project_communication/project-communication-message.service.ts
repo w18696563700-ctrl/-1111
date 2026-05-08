@@ -30,7 +30,7 @@ type SendMessageCommand = {
 type MarkReadCommand = {
   threadId: string;
   projectId: string;
-  lastReadMessageId: string | null;
+  lastReadMessageId: string;
 };
 
 const MESSAGE_LIMIT_DEFAULT = 50;
@@ -218,6 +218,11 @@ export class ProjectCommunicationMessageService {
           aggregateType: 'project_communication_message',
           aggregateId: message.id,
           eventType: 'ProjectCommunicationMessageSent',
+          verifiedActor: {
+            actorId: actor.currentSession.actorId,
+            userId: actor.currentSession.userId,
+            organizationId: actor.organizationId
+          },
           payload: {
             threadId: thread.id,
             projectId: thread.projectId,
@@ -362,13 +367,10 @@ export class ProjectCommunicationMessageService {
   }
 
   private async ensureReadMessageBelongsToThread(
-    messageId: string | null,
+    messageId: string,
     thread: ProjectCommunicationThreadEntity,
     manager = this.dataSource.manager
   ) {
-    if (!messageId) {
-      return;
-    }
     const message = await manager.getRepository(ProjectCommunicationMessageEntity).findOneBy({
       id: messageId,
       threadId: thread.id,
@@ -534,7 +536,7 @@ export class ProjectCommunicationMessageService {
     return {
       threadId: this.readRequiredString(source.threadId, 'threadId'),
       projectId: this.readRequiredString(source.projectId, 'projectId'),
-      lastReadMessageId: this.readOptionalString(source.lastReadMessageId)
+      lastReadMessageId: this.readRequiredString(source.lastReadMessageId, 'lastReadMessageId')
     } satisfies MarkReadCommand;
   }
 

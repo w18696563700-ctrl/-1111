@@ -3,6 +3,7 @@ import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
 import { ServerClientService } from '../../core/http/server-client.service';
+import { requireErrorCode } from '../../shared/contracts';
 import { readCounterpartConversationDetailReadModel } from './counterpart-conversation.read-model';
 import { readMessageInteractionListReadModel } from './message-interaction.read-model';
 import {
@@ -21,6 +22,12 @@ const PROJECT_COMMUNICATION_MESSAGE_KINDS = new Set<ProjectCommunicationMessageK
   'file',
   'confirmation_card'
 ]);
+const PROJECT_COMMUNICATION_ERROR_CODES = {
+  invalid: 'PROJECT_COMMUNICATION_INVALID',
+  unavailable: 'PROJECT_COMMUNICATION_UNAVAILABLE',
+  forbidden: 'PROJECT_COMMUNICATION_FORBIDDEN',
+  authSessionInvalid: requireErrorCode('AUTH_SESSION_INVALID')
+} as const;
 
 @Injectable()
 export class MessageInteractionService {
@@ -91,16 +98,18 @@ export class MessageInteractionService {
   async getProjectCommunicationThread(
     projectId: string | undefined,
     counterpartOrganizationId: string | undefined,
+    threadId: string | undefined,
     headers: IncomingHttpHeaders
   ) {
     const path = '/server/project-communication/thread';
     try {
       const result = await this.serverClient.get<unknown>(path, {
         headers: this.buildScopedHeaders(headers),
-        params: {
-          projectId: this.readRequiredProjectCommunicationParam(projectId),
-          counterpartOrganizationId: this.readOptionalParam(counterpartOrganizationId)
-        }
+        params: this.toProjectCommunicationThreadParams(
+          projectId,
+          counterpartOrganizationId,
+          threadId
+        )
       });
       return readProjectCommunicationThreadReadModel(result);
     } catch (error) {
@@ -309,11 +318,18 @@ export class MessageInteractionService {
 
   private toProjectCommunicationReadCursorPayload(payload: Record<string, unknown>) {
     const source = this.requireBodyRecord(payload);
-    return {
+    const result: Record<string, unknown> = {
       threadId: this.readRequiredProjectCommunicationField(source.threadId, 'threadId'),
       projectId: this.readRequiredProjectCommunicationField(source.projectId, 'projectId'),
-      lastReadMessageId: this.readOptionalPayloadString(source.lastReadMessageId)
+      lastReadMessageId: this.readRequiredProjectCommunicationField(
+        source.lastReadMessageId,
+        'lastReadMessageId'
+      )
     };
+    if (Object.prototype.hasOwnProperty.call(source, 'reader')) {
+      result.reader = source.reader;
+    }
+    return result;
   }
 
   private requireBodyRecord(value: unknown) {
@@ -375,6 +391,24 @@ export class MessageInteractionService {
     throw this.badProjectCommunicationRequest('Project communication query params are invalid.');
   }
 
+  private toProjectCommunicationThreadParams(
+    projectId: string | undefined,
+    counterpartOrganizationId: string | undefined,
+    threadId: string | undefined
+  ) {
+    const params = {
+      projectId: this.readRequiredProjectCommunicationParam(projectId),
+      counterpartOrganizationId: this.readOptionalParam(counterpartOrganizationId),
+      threadId: this.readOptionalParam(threadId)
+    };
+    if (!params.counterpartOrganizationId && !params.threadId) {
+      throw this.badProjectCommunicationRequest(
+        'Project communication thread query requires counterpartOrganizationId or threadId.'
+      );
+    }
+    return params;
+  }
+
   private readOptionalParam(value: string | undefined) {
     const normalized = value?.trim() ?? '';
     return normalized ? normalized : undefined;
@@ -406,7 +440,7 @@ export class MessageInteractionService {
   private badProjectCommunicationRequest(message: string) {
     return new BadRequestException({
       statusCode: 400,
-      code: 'PROJECT_COMMUNICATION_INVALID',
+      code: PROJECT_COMMUNICATION_ERROR_CODES.invalid,
       message,
       source: 'bff'
     });
@@ -415,13 +449,13 @@ export class MessageInteractionService {
   private normalizeProjectCommunicationError(error: unknown) {
     return this.errors.toHttpException(
       error,
-      'PROJECT_COMMUNICATION_UNAVAILABLE',
+      PROJECT_COMMUNICATION_ERROR_CODES.unavailable,
       '当前项目沟通消息暂不可用，请稍后再试。',
       {
-        400: 'PROJECT_COMMUNICATION_INVALID',
-        401: 'AUTH_SESSION_INVALID',
-        403: 'PROJECT_COMMUNICATION_FORBIDDEN',
-        404: 'PROJECT_COMMUNICATION_UNAVAILABLE'
+        400: PROJECT_COMMUNICATION_ERROR_CODES.invalid,
+        401: PROJECT_COMMUNICATION_ERROR_CODES.authSessionInvalid,
+        403: PROJECT_COMMUNICATION_ERROR_CODES.forbidden,
+        404: PROJECT_COMMUNICATION_ERROR_CODES.unavailable
       }
     );
   }
@@ -439,7 +473,7 @@ export class MessageInteractionService {
     return new HttpException(
       {
         statusCode: error.getStatus(),
-        code: 'PROJECT_COMMUNICATION_UNAVAILABLE',
+        code: PROJECT_COMMUNICATION_ERROR_CODES.unavailable,
         message: '当前项目沟通消息暂不可用，请稍后再试。',
         source: payload.source === 'bff' ? 'bff' : 'server'
       },

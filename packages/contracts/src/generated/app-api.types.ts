@@ -6,28 +6,28 @@ export type AppApiPath = (typeof APP_API_PATHS)[number];
 export const INSTANCE_TODO_MESSAGE_TYPES = ["instance_todo"] as const;
 export type InstanceTodoMessageType = (typeof INSTANCE_TODO_MESSAGE_TYPES)[number];
 
-export const REGISTERED_ENTRY_OBJECT_TYPES = ["inspection","dispute","project_clarification","bid_thread"] as const;
+export const REGISTERED_ENTRY_OBJECT_TYPES = ["inspection","dispute","project_clarification","counterpart_conversation","bid_thread"] as const;
 export type RegisteredEntryObjectType = (typeof REGISTERED_ENTRY_OBJECT_TYPES)[number];
 
-export const REGISTERED_ENTRY_ACTION_KEYS = ["inspection.submit","dispute.open","project_clarification.open","bid_thread.open"] as const;
+export const REGISTERED_ENTRY_ACTION_KEYS = ["inspection.submit","dispute.open","project_clarification.open","counterpart_conversation.open","bid_thread.open"] as const;
 export type RegisteredEntryActionKey = (typeof REGISTERED_ENTRY_ACTION_KEYS)[number];
 
-export const REGISTERED_ENTRY_CANONICAL_PATHS = ["/api/app/inspection/detail","/api/app/order/detail","/api/app/project/clarification/list","/api/app/bid/thread/detail"] as const;
+export const REGISTERED_ENTRY_CANONICAL_PATHS = ["/api/app/inspection/detail","/api/app/order/detail","/api/app/project/clarification/list","/api/app/message/counterpart-conversation/detail","/api/app/bid/thread/detail"] as const;
 export type RegisteredEntryCanonicalPath = (typeof REGISTERED_ENTRY_CANONICAL_PATHS)[number];
 
-export const REGISTERED_ENTRY_REQUIRED_PARAMS = ["orderId","milestoneId","projectId","bidId"] as const;
+export const REGISTERED_ENTRY_REQUIRED_PARAMS = ["orderId","milestoneId","projectId","conversationId","threadId","bidId"] as const;
 export type RegisteredEntryRequiredParam = (typeof REGISTERED_ENTRY_REQUIRED_PARAMS)[number];
 
-export const REGISTERED_ENTRY_LOCAL_KEYS = ["registered.inspection.submit","registered.dispute.open","registered.project_clarification.open","registered.bid_thread.open"] as const;
+export const REGISTERED_ENTRY_LOCAL_KEYS = ["registered.inspection.submit","registered.dispute.open","registered.project_clarification.open","registered.counterpart_conversation.open","registered.bid_thread.open"] as const;
 export type RegisteredEntryLocalKey = (typeof REGISTERED_ENTRY_LOCAL_KEYS)[number];
 
-export const REGISTERED_ENTRY_KEYS = ["inspection_submit_entry","dispute_open_entry","project_clarification_open_entry","bid_thread_open_entry"] as const;
+export const REGISTERED_ENTRY_KEYS = ["inspection_submit_entry","dispute_open_entry","project_clarification_open_entry","counterpart_conversation_open_entry","bid_thread_open_entry"] as const;
 export type RegisteredEntryKey = (typeof REGISTERED_ENTRY_KEYS)[number];
 
 export const REGISTERED_ENTRY_BUILDINGS = ["messages"] as const;
 export type RegisteredEntryBuilding = (typeof REGISTERED_ENTRY_BUILDINGS)[number];
 
-export const REGISTERED_ENTRY_STATES = ["enabled"] as const;
+export const REGISTERED_ENTRY_STATES = ["enabled","carrier_only"] as const;
 export type RegisteredEntryState = (typeof REGISTERED_ENTRY_STATES)[number];
 
 export const INSTANCE_TODO_ITEM_STATES = ["pending"] as const;
@@ -110,6 +110,20 @@ export const REGISTERED_INSTANCE_ENTRY_REGISTRY =
       "state": "enabled"
     },
     {
+      "entryKey": "counterpart_conversation_open_entry",
+      "objectType": "counterpart_conversation",
+      "actionKey": "counterpart_conversation.open",
+      "canonicalPath": "/api/app/message/counterpart-conversation/detail",
+      "requiredParams": [
+        "conversationId",
+        "projectId",
+        "threadId"
+      ],
+      "consumerBuilding": "messages",
+      "localEntryKey": "registered.counterpart_conversation.open",
+      "state": "enabled"
+    },
+    {
       "entryKey": "bid_thread_open_entry",
       "objectType": "bid_thread",
       "actionKey": "bid_thread.open",
@@ -120,7 +134,7 @@ export const REGISTERED_INSTANCE_ENTRY_REGISTRY =
       ],
       "consumerBuilding": "messages",
       "localEntryKey": "registered.bid_thread.open",
-      "state": "enabled"
+      "state": "carrier_only"
     }
   ] as const satisfies readonly RegisteredInstanceEntryItem[];
 
@@ -504,6 +518,96 @@ export interface ProjectCommunicationReadCursorResponse {
   updatedAt: string;
 }
 
+export const APP_NOTIFICATION_TYPES = ["project_communication_message","project_clarification","project_key_reminder","forum_interaction","system_reminder","bid_participation_request"] as const;
+export type AppNotificationType = (typeof APP_NOTIFICATION_TYPES)[number];
+
+export const APP_NOTIFICATION_SOURCES = ["project_communication","forum_interaction","system","business_todo","bid_participation_request"] as const;
+export type AppNotificationSource = (typeof APP_NOTIFICATION_SOURCES)[number];
+
+export const APP_NOTIFICATION_SOURCE_LANES = ["all","project_communication","forum_interaction","business_todo","system"] as const;
+export type AppNotificationSourceLane = (typeof APP_NOTIFICATION_SOURCE_LANES)[number];
+
+export const APP_NOTIFICATION_ROUTE_TARGET_CANONICAL_PATHS =
+  ["/api/app/message/project-communication/messages","/api/app/message/project-communication/thread","/api/app/forum/interaction/inbox","/api/app/project/clarification/list","/api/app/confirmation/softlink/detail","/api/app/message/counterpart-conversation/detail","/api/app/project/bid-participation/thread/detail"] as const;
+export type AppNotificationRouteTargetCanonicalPath =
+  (typeof APP_NOTIFICATION_ROUTE_TARGET_CANONICAL_PATHS)[number];
+
+export const APP_NOTIFICATION_ROUTE_TARGET_AVAILABILITY_STATES =
+  ["available","unavailable","expired","forbidden","missing_context"] as const;
+export type AppNotificationRouteTargetAvailabilityState =
+  (typeof APP_NOTIFICATION_ROUTE_TARGET_AVAILABILITY_STATES)[number];
+
+export const APP_NOTIFICATION_ROUTE_TARGET_FALLBACK_ACTIONS =
+  ["none","open_subject_list"] as const;
+export type AppNotificationRouteTargetFallbackAction =
+  (typeof APP_NOTIFICATION_ROUTE_TARGET_FALLBACK_ACTIONS)[number];
+
+export const APP_NOTIFICATION_MARK_READ_COMPLETIONS =
+  ["navigated_to_available_target"] as const;
+export type AppNotificationMarkReadCompletion =
+  (typeof APP_NOTIFICATION_MARK_READ_COMPLETIONS)[number];
+
+export interface AppNotificationRouteTarget {
+  canonicalPath: AppNotificationRouteTargetCanonicalPath;
+  localEntryKey: string;
+  requiredParams: string[];
+  routeParams: Record<string, string>;
+  state: 'enabled' | 'unavailable';
+}
+
+export interface AppNotificationRouteTargetAvailability {
+  state: AppNotificationRouteTargetAvailabilityState;
+  reasonCode: string;
+  reasonText: string;
+  fallbackAction: AppNotificationRouteTargetFallbackAction;
+  fallbackRouteTarget?: AppNotificationRouteTarget | null;
+}
+
+export interface AppNotificationReadModel {
+  notificationId: string;
+  type: AppNotificationType;
+  source: AppNotificationSource;
+  title: string;
+  body?: string | null;
+  projectId?: string | null;
+  threadId?: string | null;
+  routeTarget?: AppNotificationRouteTarget | null;
+  createdAt: string;
+  readAt?: string | null;
+  unread: boolean;
+  routeTargetAvailability: AppNotificationRouteTargetAvailability;
+}
+
+export interface AppNotificationUnreadProjection {
+  total: number;
+  projectCommunication: number;
+  forumInteraction: number;
+  system: number;
+  businessTodo: number;
+  bidParticipationRequest: number;
+}
+
+export interface AppNotificationListResponse {
+  items: AppNotificationReadModel[];
+  page: Record<string, unknown>;
+  unread: AppNotificationUnreadProjection;
+}
+
+export interface AppNotificationMarkReadContext {
+  routeTargetAvailabilityState: 'available';
+  completion: AppNotificationMarkReadCompletion;
+}
+
+export interface AppNotificationReadRequest {
+  notificationIds: string[];
+  readContext: AppNotificationMarkReadContext;
+}
+
+export interface AppNotificationReadResponse {
+  readNotificationIds: string[];
+  unread: AppNotificationUnreadProjection;
+}
+
 
 export const CONTRACT_CONFIRM_STATES = ["active"] as const;
 export type ContractConfirmState = (typeof CONTRACT_CONFIRM_STATES)[number];
@@ -790,11 +894,17 @@ export interface CounterpartConversationProjectGroup {
   threadId: string;
   projectDisplayTitle: string;
   titleVisibility: string;
+  projectRelation: string | null;
   projectState: string;
+  projectPublishedAt: string | null;
+  projectUpdatedAt: string | null;
   latestActivityAt: string;
-  projectRelation?: string | null;
-  projectUnreadCount?: number;
-  hasProjectUnread?: boolean;
+  projectUnreadCount: number;
+  hasProjectUnread: boolean;
+  latestUnreadMessageAt: string | null;
+  pricingSummary?: Record<string, unknown> | null;
+  orderSummary: Record<string, unknown> | null;
+  ratingEntry: Record<string, unknown> | null;
   businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
   cards: Array<Record<string, unknown>>;
 }
@@ -805,6 +915,11 @@ export interface CounterpartConversationDetailResponse {
   summary: Record<string, unknown>;
   focusProjectId: string;
   latestActivityAt: string;
+  conversationUnreadCount: number;
+  hasUnread: boolean;
+  latestUnreadMessageAt: string | null;
+  myPublishedUnreadCount: number;
+  myBidUnreadCount: number;
   projectGroups: CounterpartConversationProjectGroup[];
 }
 

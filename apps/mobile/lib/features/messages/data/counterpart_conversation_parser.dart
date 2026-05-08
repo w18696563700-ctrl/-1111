@@ -593,6 +593,7 @@ CounterpartConversationProjectGroupView _parseProjectGroup(Object? payload) {
   final rawCards = _requiredList(map, 'cards');
   return CounterpartConversationProjectGroupView(
     projectId: _requiredString(map, 'projectId'),
+    threadId: _requiredString(map, 'threadId'),
     projectDisplayTitle: _requiredString(map, 'projectDisplayTitle'),
     titleVisibility: _enumValue(
       _requiredString(map, 'titleVisibility'),
