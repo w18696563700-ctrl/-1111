@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  ForbiddenException,
+  NotFoundException
+} from '@nestjs/common';
 
 export function bidSubmitInvalid(message: string) {
   return new BadRequestException({
@@ -19,6 +24,22 @@ export function bidDuplicateSubmission(
 ) {
   return new ConflictException({
     code: 'BID_DUPLICATE_SUBMISSION',
+    message
+  });
+}
+
+export function bidPermissionDenied(message = 'Current actor cannot update this bid.') {
+  return new ForbiddenException({
+    code: 'AUTH_PERMISSION_INSUFFICIENT',
+    message
+  });
+}
+
+export function bidSupplementConflict(
+  message = 'Current bid supplement request is not writable.'
+) {
+  return new ConflictException({
+    code: 'BID_SUBMISSION_SUPPLEMENT_CONFLICT',
     message
   });
 }

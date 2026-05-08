@@ -6,6 +6,7 @@ import { AuthModule } from '../auth/auth.module';
 import { BidParticipationRequestModule } from '../bid_participation_request/bid-participation-request.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectCommunicationMaterialReviewEntity } from '../project_communication/entities/project-communication-material-review.entity';
 import { ProjectCommunicationModule } from '../project_communication/project-communication.module';
 import { TradingImModule } from '../trading_im/trading-im.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
@@ -26,6 +27,7 @@ import { BidSeatEntity } from './entities/bid-seat.entity';
       BidEntity,
       BidSeatEntity,
       ProjectEntity,
+      ProjectCommunicationMaterialReviewEntity,
       IdentityAuditLogEntity,
       FileAssetEntity,
     ]),

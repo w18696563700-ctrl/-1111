@@ -190,6 +190,41 @@ export class ProjectCommunicationBusinessEventService {
     return emitted;
   }
 
+  async emitBidMaterialSupplementSubmitted(input: {
+    manager: EntityManager;
+    project: Pick<ProjectEntity, 'id' | 'organizationId'>;
+    bid: BidEntity;
+    review: ProjectCommunicationMaterialReviewEntity;
+    actorUserId: string;
+    actorId?: string | null;
+  }) {
+    const definition = projectCommunicationWorkbenchEntryDefinitions.find(
+      (item) => item.entryKey === input.review.entryKey && item.group === 'bid_materials'
+    );
+    const bidderOrganizationId = input.bid.bidderOrganizationId || input.bid.organizationId;
+    return this.emitProjectCommunicationBusinessEvent({
+      manager: input.manager,
+      project: input.project,
+      counterpartOrganizationId: bidderOrganizationId,
+      senderOrganizationId: bidderOrganizationId,
+      senderUserId: input.actorUserId,
+      senderActorId: input.actorId,
+      body: `${definition?.label ?? '竞标资料'}已补充，请发布方重新确认。`,
+      sourceType: 'bid_material_supplement',
+      sourceId: `${input.review.id}:${input.review.sourceVersionToken}`,
+      eventType: 'bid_material_supplement_submitted',
+      payload: {
+        bidId: input.bid.id,
+        entryKey: input.review.entryKey,
+        group: 'bid_materials',
+        reviewState: 'pending_review',
+        materialReviewId: input.review.id,
+        bidMaterialSlot: input.review.bidMaterialSlot,
+        requiredNextAction: 'confirm_bid_materials'
+      }
+    });
+  }
+
   async emitBidMaterialConfirmationCompleted(input: {
     manager: EntityManager;
     entry: ProjectCommunicationWorkbenchEntryProjection;
