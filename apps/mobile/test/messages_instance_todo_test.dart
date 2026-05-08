@@ -39,6 +39,7 @@ Widget _buildApp({
   required FakeAppApiTransport forumTransport,
   FakeAppApiTransport? messageTransport,
   ValueListenable<int>? refreshSignal,
+  RouteFactory? onGenerateRoute,
 }) {
   ForumConsumerLayer.install(
     ForumConsumerLayer(
@@ -65,6 +66,7 @@ Widget _buildApp({
     ),
   );
   return MaterialApp(
+    onGenerateRoute: onGenerateRoute,
     home: Scaffold(body: MessagesPage(refreshSignal: refreshSignal)),
   );
 }
@@ -494,6 +496,101 @@ void main() {
       expect(find.text('第二次项目沟通会话'), findsNothing);
       await _openProjectCommunication(tester);
       expect(find.text('第二次项目沟通会话'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'project communication subject card opens counterpart project list route',
+    (WidgetTester tester) async {
+      final pushedRoutes = <String>[];
+      final subjectItem = _messageInteractionItem(
+        interactionId: 'interaction-subject',
+        projectId: 'project-1',
+        bidId: 'bid-1',
+        counterpartName: '江北嘴嘴帅',
+        summary: '江北嘴嘴帅有项目沟通。',
+        lastMessageText: '最新沟通待查看。',
+      );
+      final forumTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/interaction/inbox':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'page': <String, Object?>{
+                          'nextCursor': null,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+      final messageTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[subjectItem],
+                      },
+                    );
+                  },
+              'GET /api/app/notifications/list': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'items': <Object?>[],
+                    'page': <String, Object?>{
+                      'hasMore': false,
+                      'nextCursor': null,
+                    },
+                    'unread': <String, Object?>{
+                      'total': 0,
+                      'projectCommunication': 0,
+                      'forumInteraction': 0,
+                      'businessTodo': 0,
+                      'system': 0,
+                    },
+                  },
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          forumTransport: forumTransport,
+          messageTransport: messageTransport,
+          onGenerateRoute: (RouteSettings settings) {
+            pushedRoutes.add(settings.name ?? '');
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const Scaffold(body: Text('主体项目列表路由')),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('江北嘴嘴帅').first);
+      await tester.pumpAndSettle();
+
+      expect(pushedRoutes, isNotEmpty);
+      expect(
+        pushedRoutes.last,
+        '/exhibition/messages/counterpart-conversation?conversationId=org-interaction-subject&projectId=project-1',
+      );
+      expect(pushedRoutes.last, isNot(contains('threadId=')));
     },
   );
 

@@ -545,7 +545,14 @@ class _MessagesPageState extends State<MessagesPage> {
       );
       return;
     }
-    await Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
+    final routeLocation = Uri(
+      path: ExhibitionRoutes.counterpartConversation,
+      queryParameters: <String, String>{
+        'conversationId': item.conversationId.trim(),
+        'projectId': item.projectId.trim(),
+      },
+    ).toString();
+    await Navigator.of(context).pushNamed(routeLocation);
     if (!mounted) {
       return;
     }
@@ -554,12 +561,7 @@ class _MessagesPageState extends State<MessagesPage> {
   }
 
   bool _canOpenProjectCommunication(MessageInteractionItemView item) {
-    final params = item.routeTarget.params;
-    return _nonEmpty(item.conversationId) &&
-        _nonEmpty(item.projectId) &&
-        _nonEmpty(params['conversationId']) &&
-        _nonEmpty(params['projectId']) &&
-        _nonEmpty(item.routeTarget.routeLocation);
+    return _nonEmpty(item.conversationId) && _nonEmpty(item.projectId);
   }
 
   bool _nonEmpty(String? value) => value != null && value.trim().isNotEmpty;
