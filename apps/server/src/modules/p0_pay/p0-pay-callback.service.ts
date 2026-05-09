@@ -25,6 +25,7 @@ type CallbackCommand = {
   eventType: string;
   eventStatus: string;
   amount: string | null;
+  currency: string | null;
   payloadSnapshot: Record<string, unknown>;
 };
 
@@ -96,6 +97,12 @@ export class P0PayCallbackService {
     if (!this.amountMatches(order.amount, command.amount)) {
       callback.applyStatus = 'apply_failed';
       callback.rejectedReasonCode = 'payment_amount_mismatch';
+      await manager.getRepository(PaymentCallbackEventEntity).save(callback);
+      return;
+    }
+    if (!this.currencyMatches(order.currency, command.currency)) {
+      callback.applyStatus = 'apply_failed';
+      callback.rejectedReasonCode = 'payment_currency_mismatch';
       await manager.getRepository(PaymentCallbackEventEntity).save(callback);
       return;
     }
@@ -473,6 +480,7 @@ export class P0PayCallbackService {
       eventType,
       eventStatus,
       amount: this.readOptionalString(this.readFirst(payload.amount, payload.total_amount, payload.receipt_amount, payload.refund_fee)),
+      currency: this.readOptionalString(this.readFirst(payload.currency, 'CNY')),
       payloadSnapshot: this.toSnapshot(payload)
     } satisfies CallbackCommand;
   }
@@ -530,13 +538,17 @@ export class P0PayCallbackService {
 
   private amountMatches(expected: string | number, actual: string | null) {
     if (actual === null) {
-      return true;
+      return false;
     }
     const expectedNumber = Number(expected);
     const actualNumber = Number(actual);
     return Number.isFinite(expectedNumber) &&
       Number.isFinite(actualNumber) &&
       expectedNumber.toFixed(2) === actualNumber.toFixed(2);
+  }
+
+  private currencyMatches(expected: string | null | undefined, actual: string | null) {
+    return (actual ?? 'CNY').toUpperCase() === (expected || 'CNY').toUpperCase();
   }
 
   private toSnapshot(payload: Record<string, unknown>) {
