@@ -5,6 +5,7 @@ import { DataSource, LessThan, Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { NotificationService } from '../notifications/notification.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { ForumAuthorFollowEntity } from './entities/forum-author-follow.entity';
 import { ForumCommentEntity } from './entities/forum-comment.entity';
@@ -43,7 +44,8 @@ export class ForumCommentService {
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly authorProjectionService: ForumAuthorProjectionService,
-    private readonly presenter: ForumPresenter
+    private readonly presenter: ForumPresenter,
+    private readonly notificationService: NotificationService
   ) {}
 
   async getPostComments(postId?: string, cursor?: string, pageSize?: string) {
@@ -103,13 +105,14 @@ export class ForumCommentService {
     if (!post) {
       throw forumPostUnavailable('Forum post is unavailable for interaction.');
     }
+    let parentComment: ForumCommentEntity | null = null;
     if (command.parentCommentId) {
-      const parent = await this.commentRepository.findOneBy({
+      parentComment = await this.commentRepository.findOneBy({
         id: command.parentCommentId,
         postId: command.postId,
         state: 'published'
       });
-      if (!parent) {
+      if (!parentComment) {
         throw forumCommentInvalidState('parentCommentId is unavailable for forum comment submit.');
       }
     }
@@ -130,6 +133,18 @@ export class ForumCommentService {
     await this.dataSource.transaction(async (manager) => {
       await manager.getRepository(ForumCommentEntity).save(comment);
       await manager.getRepository(ForumPostEntity).increment({ id: post.id }, 'commentCount', 1);
+      await this.notificationService.createForumInteractionNotification(
+        {
+          tab: 'replies',
+          title: '有新的论坛回复',
+          body: parentComment ? '有人回复了你的评论。' : '有人评论了你的帖子。',
+          recipientUserId: parentComment?.authorUserId ?? post.authorUserId,
+          recipientOrganizationId: parentComment?.organizationId ?? post.organizationId,
+          actorUserId: currentSession.userId,
+          targetId: post.id
+        },
+        manager
+      );
     });
 
     return this.presenter.toCommentAcceptedResponse(comment);
@@ -140,26 +155,41 @@ export class ForumCommentService {
     const postId = this.normalizeRequiredPostId(source.postId, 'forum post like');
     const shouldLike = this.readToggleAction(source.action, 'like', 'unlike', 'forum post like');
     const actor = await this.requireAuthenticatedInteraction(context, 'forum post like');
-    await this.requirePublishedPost(postId, 'Forum post is unavailable for like interaction.');
+    const post = await this.requirePublishedPost(postId, 'Forum post is unavailable for like interaction.');
 
-    const existing = await this.likeRepository.findOneBy({
-      postId,
-      userId: actor.userId
+    await this.dataSource.transaction(async (manager) => {
+      const likeRepository = manager.getRepository(ForumPostLikeEntity);
+      const existing = await likeRepository.findOneBy({
+        postId,
+        userId: actor.userId
+      });
+      if (shouldLike && !existing) {
+        await likeRepository.save(
+          likeRepository.create({
+            id: randomUUID(),
+            postId,
+            userId: actor.userId,
+            actorId: actor.actorId,
+            organizationId: actor.organizationId
+          })
+        );
+        await this.notificationService.createForumInteractionNotification(
+          {
+            tab: 'likes',
+            title: '有新的论坛点赞',
+            body: '有人点赞了你的帖子。',
+            recipientUserId: post.authorUserId,
+            recipientOrganizationId: post.organizationId,
+            actorUserId: actor.userId,
+            targetId: post.id
+          },
+          manager
+        );
+      }
+      if (!shouldLike && existing) {
+        await likeRepository.delete({ id: existing.id });
+      }
     });
-    if (shouldLike && !existing) {
-      await this.likeRepository.save(
-        this.likeRepository.create({
-          id: randomUUID(),
-          postId,
-          userId: actor.userId,
-          actorId: actor.actorId,
-          organizationId: actor.organizationId
-        })
-      );
-    }
-    if (!shouldLike && existing) {
-      await this.likeRepository.delete({ id: existing.id });
-    }
 
     return this.presenter.toPostLikeToggleResponse({
       postId,
@@ -216,25 +246,40 @@ export class ForumCommentService {
       throw forumAuthorUnavailable('Forum public author is unavailable for follow.');
     }
 
-    const existing = await this.authorFollowRepository.findOneBy({
-      followerUserId: actor.userId,
-      targetAuthorUserId: targetAuthorId
+    await this.dataSource.transaction(async (manager) => {
+      const authorFollowRepository = manager.getRepository(ForumAuthorFollowEntity);
+      const existing = await authorFollowRepository.findOneBy({
+        followerUserId: actor.userId,
+        targetAuthorUserId: targetAuthorId
+      });
+      if (shouldFollow && !existing) {
+        await authorFollowRepository.save(
+          authorFollowRepository.create({
+            id: randomUUID(),
+            followerUserId: actor.userId,
+            followerActorId: actor.actorId,
+            followerOrganizationId: actor.organizationId,
+            targetAuthorUserId: targetAuthorId,
+            targetOrganizationId: latestPost.organizationId
+          })
+        );
+        await this.notificationService.createForumInteractionNotification(
+          {
+            tab: 'follows',
+            title: '有新的论坛关注',
+            body: '有人关注了你。',
+            recipientUserId: targetAuthorId,
+            recipientOrganizationId: latestPost.organizationId,
+            actorUserId: actor.userId,
+            targetId: targetAuthorId
+          },
+          manager
+        );
+      }
+      if (!shouldFollow && existing) {
+        await authorFollowRepository.delete({ id: existing.id });
+      }
     });
-    if (shouldFollow && !existing) {
-      await this.authorFollowRepository.save(
-        this.authorFollowRepository.create({
-          id: randomUUID(),
-          followerUserId: actor.userId,
-          followerActorId: actor.actorId,
-          followerOrganizationId: actor.organizationId,
-          targetAuthorUserId: targetAuthorId,
-          targetOrganizationId: latestPost.organizationId
-        })
-      );
-    }
-    if (!shouldFollow && existing) {
-      await this.authorFollowRepository.delete({ id: existing.id });
-    }
 
     return this.presenter.toAuthorFollowToggleResponse({
       authorId: targetAuthorId,
