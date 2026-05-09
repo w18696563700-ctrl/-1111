@@ -3,6 +3,8 @@ import { requireVerifiedCurrentSessionContext } from '../../shared/current-sessi
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { MembershipQueryService } from '../membership/membership.query.service';
+import { CounterpartConversationProjectionService } from '../message_interaction/counterpart-conversation.projection.service';
+import { NotificationService } from '../notifications/notification.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { PrivateOperatingSystemReorganizationService } from '../private_operating_system_reorganization/private-operating-system-reorganization.service';
 import { ProjectCommunicationUnreadQueryService } from '../project_communication/project-communication-unread.query.service';
@@ -19,7 +21,11 @@ export class ShellQueryService {
     private readonly avatarUrlService: UploadPublicUrlService,
     private readonly presenter: ShellPresenter,
     @Optional()
-    private readonly projectCommunicationUnreadQueryService?: ProjectCommunicationUnreadQueryService
+    private readonly projectCommunicationUnreadQueryService?: ProjectCommunicationUnreadQueryService,
+    @Optional()
+    private readonly counterpartConversationProjectionService?: CounterpartConversationProjectionService,
+    @Optional()
+    private readonly notificationService?: NotificationService
   ) {}
 
   async getContext(context: RequestContext) {
@@ -31,9 +37,10 @@ export class ShellQueryService {
     const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
     const membershipSummary = await this.loadMembershipSummary(scope?.organization.id ?? null);
     const myBuildingProjection = this.privateOperatingSystemService.getShellContextProjection();
-    const messagesUnreadCount = await this.countMessagesUnread(
-      scope?.organization.id ?? null
-    );
+    const messagesUnreadCount = await this.countMessagesUnread({
+      userId: user.id,
+      organizationId: scope?.organization.id ?? null
+    });
     return this.presenter.toContext({
       userId: user.id,
       displayName: this.toDisplayName(user),
@@ -64,11 +71,44 @@ export class ShellQueryService {
     });
   }
 
-  private async countMessagesUnread(organizationId: string | null) {
+  private async countMessagesUnread(input: {
+    userId: string;
+    organizationId: string | null;
+  }) {
+    const organizationId = input.organizationId;
+    const bidParticipationNotificationUnread =
+      await this.countBidParticipationNotificationUnread(
+        input.userId,
+        organizationId
+      );
+    if (this.counterpartConversationProjectionService && organizationId) {
+      const conversations =
+        await this.counterpartConversationProjectionService.listConversations(
+          organizationId
+        );
+      return bidParticipationNotificationUnread + conversations.reduce(
+        (total, conversation) => total + conversation.conversationUnreadCount,
+        0
+      );
+    }
     if (!this.projectCommunicationUnreadQueryService) {
+      return bidParticipationNotificationUnread;
+    }
+    return (
+      bidParticipationNotificationUnread +
+      await this.projectCommunicationUnreadQueryService.countUnreadForShell(organizationId)
+    );
+  }
+
+  private async countBidParticipationNotificationUnread(
+    userId: string,
+    organizationId: string | null
+  ) {
+    if (!this.notificationService || !organizationId) {
       return 0;
     }
-    return this.projectCommunicationUnreadQueryService.countUnreadForShell(
+    return this.notificationService.countBidParticipationRequestUnreadForShell(
+      userId,
       organizationId
     );
   }

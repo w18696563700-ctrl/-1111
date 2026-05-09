@@ -5,11 +5,15 @@ class CounterpartConversationPage extends StatefulWidget {
     super.key,
     this.conversationId,
     this.projectId,
+    this.threadId,
+    this.projectListSearchToggleSignal,
     this.onChatWindowActiveChanged,
   });
 
   final String? conversationId;
   final String? projectId;
+  final String? threadId;
+  final ValueListenable<int>? projectListSearchToggleSignal;
   final ValueChanged<bool>? onChatWindowActiveChanged;
 
   @override
@@ -20,6 +24,9 @@ class CounterpartConversationPage extends StatefulWidget {
 class _CounterpartConversationPageState
     extends State<CounterpartConversationPage>
     with WidgetsBindingObserver {
+  static const String _missingProjectContextMessage =
+      '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
+
   static const List<Duration> _reconnectDelays = <Duration>[
     Duration(seconds: 2),
     Duration(seconds: 5),
@@ -61,6 +68,14 @@ class _CounterpartConversationPageState
   @override
   void initState() {
     super.initState();
+    final initialProjectId = widget.projectId?.trim();
+    final initialThreadId = widget.threadId?.trim();
+    if (initialProjectId != null &&
+        initialProjectId.isNotEmpty &&
+        initialThreadId != null &&
+        initialThreadId.isNotEmpty) {
+      _selectedProjectId = initialProjectId;
+    }
     WidgetsBinding.instance.addObserver(this);
     _load();
   }
@@ -124,14 +139,17 @@ class _CounterpartConversationPageState
     if (result.state == AppPageState.content &&
         result.data != null &&
         selectedProjectId != null) {
+      _notifyChatWindowActive(true);
       final selectedGroup = _selectedProjectGroup(result.data!);
       if (selectedGroup != null) {
         setState(() {
           _workbenchResult = null;
           _loadingWorkbench = true;
         });
+        await _loadThreadAndMessages(result.data!, group: selectedGroup);
+      } else {
+        _notifyChatWindowActive(false);
       }
-      await _loadThreadAndMessages(result.data!, projectId: selectedProjectId);
     }
   }
 
@@ -145,7 +163,7 @@ class _CounterpartConversationPageState
 
   Future<void> _loadThreadAndMessages(
     CounterpartConversationDetailView data, {
-    required String projectId,
+    required CounterpartConversationProjectGroupView group,
   }) async {
     setState(() {
       _loadingThread = true;
@@ -153,7 +171,8 @@ class _CounterpartConversationPageState
     });
     final threadResult = await CounterpartConversationConsumerLayer.instance
         .loadProjectCommunicationThread(
-          projectId: projectId,
+          projectId: group.projectId,
+          threadId: group.threadId,
           counterpartOrganizationId: data.counterpart.organizationId,
         );
     if (!mounted) {
@@ -165,10 +184,7 @@ class _CounterpartConversationPageState
     });
     if (threadResult.state == AppPageState.content &&
         threadResult.data != null) {
-      final selectedGroup = _selectedProjectGroup(data);
-      if (selectedGroup != null) {
-        unawaited(_loadProjectWorkbench(selectedGroup, threadResult.data!));
-      }
+      unawaited(_loadProjectWorkbench(group, threadResult.data!));
       await _loadMessages(threadResult.data!);
       await _connectRealtime(threadResult.data!, data.counterpart);
     } else if (mounted) {
@@ -444,13 +460,13 @@ class _CounterpartConversationPageState
       return;
     }
     _lastMarkedReadMessageId = lastReadMessageId;
-    _reloadShellContextAfterRead();
+    await _reloadShellContextAfterRead();
     await _refreshConversationDetailAfterRead();
   }
 
-  void _reloadShellContextAfterRead() {
+  Future<void> _reloadShellContextAfterRead() async {
     try {
-      unawaited(AppShellScope.read(context).reloadShellContext());
+      await AppShellScope.read(context).reloadShellContext();
     } catch (_) {
       // Tests may mount this page without the full shell scope.
     }
@@ -480,6 +496,146 @@ class _CounterpartConversationPageState
     });
   }
 
+  bool _canSendProjectCommunication() {
+    return _threadResult?.data?.chatAvailability.canSendMessage == true;
+  }
+
+  String? _composerRequiredNextAction(
+    CounterpartConversationProjectGroupView? group,
+  ) {
+    final action = _threadResult?.data?.chatAvailability.requiredNextAction;
+    if (action == 'complete_service_fee_authorization' &&
+        (group == null || _firstServiceFeeAuthorizationCard(group) == null)) {
+      return null;
+    }
+    return action;
+  }
+
+  String _chatLockMessage([ProjectCommunicationThreadView? thread]) {
+    final availability =
+        thread?.chatAvailability ?? _threadResult?.data?.chatAvailability;
+    final text = availability?.lockReasonText?.trim();
+    if (text != null && text.isNotEmpty) {
+      return text;
+    }
+    return '当前项目沟通暂不可发送消息，请先完成业务待办。';
+  }
+
+  void _openChatRequiredAction() {
+    final action = _threadResult?.data?.chatAvailability.requiredNextAction;
+    final data = _result?.data;
+    final group = data == null ? null : _selectedProjectGroup(data);
+    if (action == null || action == 'none') {
+      _showSnack('当前没有需要处理的业务待办。');
+      return;
+    }
+    if (group == null) {
+      _showSnack('无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。');
+      return;
+    }
+    switch (action) {
+      case 'review_bid_participation':
+        final card = _firstBusinessCard(group, 'bid_participation_request');
+        if (card == null) {
+          _showSnack('当前没有可处理的参与竞标申请。');
+          return;
+        }
+        _openBusinessCard(card);
+        return;
+      case 'confirm_publisher_materials':
+        _openWorkbenchEntryList(<String>{
+          'publisher_materials',
+        }, title: '发布方资料确认');
+        return;
+      case 'submit_bid_materials':
+        unawaited(_openBidSubmitAndRefresh(group.projectId));
+        return;
+      case 'confirm_bid_materials':
+        _openWorkbenchEntryList(<String>{'bid_materials'}, title: '竞标资料确认');
+        return;
+      case 'complete_service_fee_authorization':
+        final card = _firstServiceFeeAuthorizationCard(group);
+        if (card == null) {
+          _showSnack('预授权入口暂不可用，请刷新后重试。');
+          return;
+        }
+        _openBusinessCard(card);
+        return;
+      case 'open_deal_confirmation':
+        _openFirstPendingWorkbenchEntry(<String>{'deal_confirmation'});
+        return;
+      default:
+        _showSnack(_chatLockMessage());
+    }
+  }
+
+  void _openFirstPendingWorkbenchEntry(Set<String> groups) {
+    final entries = _workbenchResult?.data?.entries;
+    final wantsDealConfirmation = groups.contains('deal_confirmation');
+    if (entries == null) {
+      _showSnack(
+        wantsDealConfirmation ? '后续承接状态暂不可读，请稍后重试。' : '资料确认单状态暂不可读，请稍后重试。',
+      );
+      return;
+    }
+    ProjectCommunicationWorkbenchEntryView? entry;
+    for (final item in entries) {
+      if (!groups.contains(item.group)) {
+        continue;
+      }
+      if (item.badgeCount > 0 ||
+          item.reviewState == 'pending_review' ||
+          item.actionState == 'enabled') {
+        entry = item;
+        break;
+      }
+    }
+    if (entry == null) {
+      _showSnack(wantsDealConfirmation ? '当前没有可处理的成交确认项。' : '当前没有可处理的资料确认项。');
+      return;
+    }
+    _openWorkbenchEntry(entry);
+  }
+
+  void _openWorkbenchEntryList(Set<String> groups, {required String title}) {
+    _showProjectCommunicationWorkbenchEntryListSheet(
+      context: context,
+      result: _workbenchResult,
+      groups: groups,
+      title: title,
+      onUnavailable: _showSnack,
+      onOpenEntry: (entry) {
+        if (mounted) {
+          _openWorkbenchEntry(entry);
+        }
+      },
+    );
+  }
+
+  Future<void> _openBidSubmitAndRefresh(
+    String projectId, {
+    String? mode,
+    String? bidId,
+    String? focusEntryKey,
+    String? focusSlot,
+    String? sourceVersionToken,
+  }) async {
+    await Navigator.of(context).pushNamed(
+      ExhibitionRoutes.bidSubmitWithProjectId(
+        projectId,
+        mode: mode,
+        bidId: bidId,
+        focusEntryKey: focusEntryKey,
+        focusSlot: focusSlot,
+        sourceVersionToken: sourceVersionToken,
+      ),
+    );
+    if (!mounted) {
+      return;
+    }
+    await _load();
+  }
+
   Future<void> _sendCurrentMessage() async {
     final body = _messageController.text.trim();
     final thread = _threadResult?.data;
@@ -487,6 +643,10 @@ class _CounterpartConversationPageState
       if (body.isEmpty) {
         _showSnack('请输入要发送的文字。');
       }
+      return;
+    }
+    if (!thread.chatAvailability.canSendMessage) {
+      _showSnack(_chatLockMessage(thread));
       return;
     }
     if (_shouldShowContactSoftPrompt(body)) {
@@ -512,6 +672,10 @@ class _CounterpartConversationPageState
   Future<void> _sendAttachmentMessage({required bool imageOnly}) async {
     final thread = _threadResult?.data;
     if (thread == null || _sending) {
+      return;
+    }
+    if (!thread.chatAvailability.canSendMessage) {
+      _showSnack(_chatLockMessage(thread));
       return;
     }
     final outcome = await _pickAndUploadProjectCommunicationAttachment(
@@ -544,6 +708,10 @@ class _CounterpartConversationPageState
   }
 
   Future<void> _retryDraft(_DraftProjectCommunicationMessage draft) {
+    if (!_canSendProjectCommunication()) {
+      _showSnack(_chatLockMessage());
+      return Future<void>.value();
+    }
     return _sendDraft(
       draft.copyWith(state: _DraftProjectCommunicationState.sending),
     );
@@ -552,6 +720,16 @@ class _CounterpartConversationPageState
   Future<void> _sendDraft(_DraftProjectCommunicationMessage draft) async {
     final thread = _threadResult?.data;
     if (thread == null || _sending) {
+      return;
+    }
+    if (!thread.chatAvailability.canSendMessage) {
+      _showSnack(_chatLockMessage(thread));
+      _replaceDraft(
+        draft.copyWith(
+          state: _DraftProjectCommunicationState.failed,
+          errorMessage: _chatLockMessage(thread),
+        ),
+      );
       return;
     }
     _replaceDraft(draft);
@@ -833,6 +1011,14 @@ class _CounterpartConversationPageState
   Future<void> _openProjectCommunication(
     CounterpartConversationProjectGroupView group,
   ) async {
+    final data = _result?.data;
+    if (group.projectId.trim().isEmpty ||
+        group.threadId.trim().isEmpty ||
+        data == null ||
+        data.counterpart.organizationId.trim().isEmpty) {
+      _showSnack(_missingProjectContextMessage);
+      return;
+    }
     await _stopRealtime();
     if (!mounted) {
       return;
@@ -851,9 +1037,21 @@ class _CounterpartConversationPageState
     });
     _notifyChatWindowActive(true);
     _scheduleScrollToTop();
-    final data = _result?.data;
-    if (data != null) {
-      await _loadThreadAndMessages(data, projectId: group.projectId);
+    await _loadThreadAndMessages(data, group: group);
+    if (!mounted) {
+      return;
+    }
+    if (_selectedProjectId == group.projectId &&
+        _threadResult?.state != AppPageState.content) {
+      final message = _threadResult?.message ?? _missingProjectContextMessage;
+      await _backToProjectList();
+      if (mounted) {
+        _showSnack(
+          message.contains('threadId')
+              ? _missingProjectContextMessage
+              : message,
+        );
+      }
     }
   }
 
@@ -883,6 +1081,10 @@ class _CounterpartConversationPageState
     final result = _result;
     final data = result?.data;
     final thread = _threadResult?.data;
+    final selectedGroup = data == null ? null : _selectedProjectGroup(data);
+    final selectedOrderId = selectedGroup == null
+        ? null
+        : _orderIdFromConversationGroup(selectedGroup);
     return PopScope(
       canPop: _selectedProjectId == null,
       onPopInvokedWithResult: (didPop, _) {
@@ -915,15 +1117,42 @@ class _CounterpartConversationPageState
               ),
             ),
             if (data != null && result?.state == AppPageState.content)
-              if (_selectedProjectId != null && thread != null)
+              if (_selectedProjectId != null &&
+                  thread != null &&
+                  selectedGroup != null) ...<Widget>[
+                _SelectedProjectBusinessEntrypoints(
+                  group: selectedGroup,
+                  participationCard: _firstBusinessCard(
+                    selectedGroup,
+                    'bid_participation_request',
+                  ),
+                  orderId: selectedOrderId,
+                  loadingWorkbench: _loadingWorkbench,
+                  workbenchResult: _workbenchResult,
+                  onOpenNameAccess: _openBusinessCard,
+                  onOpenContinuation: () =>
+                      _openContinuationPanel(selectedGroup),
+                  onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
+                  onOpenMaterialConfirmation: () => _openWorkbenchEntryList(
+                    <String>{'publisher_materials', 'bid_materials'},
+                    title: '资料确认单',
+                  ),
+                ),
                 _ProjectCommunicationComposer(
                   controller: _messageController,
                   enabled: !_loadingThread,
+                  canSendMessage: _canSendProjectCommunication(),
                   sending: _sending,
+                  lockReasonText: _chatLockMessage(),
+                  requiredNextAction: _composerRequiredNextAction(
+                    selectedGroup,
+                  ),
+                  onOpenRequiredAction: _openChatRequiredAction,
                   onSend: _sendCurrentMessage,
                   onAttachFile: () => _sendAttachmentMessage(imageOnly: false),
                   onAttachImage: () => _sendAttachmentMessage(imageOnly: true),
                 ),
+              ],
           ],
         ),
       ),
@@ -938,16 +1167,12 @@ class _CounterpartConversationPageState
     final selectedGroup = _selectedProjectGroup(data);
     if (_selectedProjectId == null || selectedGroup == null) {
       return <Widget>[
-        _CounterpartConversationHeader(
-          data: data,
-          onOpenSubjectCard: () => _openSubjectCard(data),
-          canOpenSubjectCard: _canOpenSubjectCard(data),
-          title: '当前沟通对象',
-        ),
-        const SizedBox(height: 16),
         _CounterpartProjectEntryList(
           data: data,
           groups: groups,
+          searchToggleSignal: widget.projectListSearchToggleSignal,
+          onOpenSubjectCard: () => _openSubjectCard(data),
+          canOpenSubjectCard: _canOpenSubjectCard(data),
           onOpenProjectCommunication: _openProjectCommunication,
         ),
       ];
@@ -965,27 +1190,10 @@ class _CounterpartConversationPageState
         currentOrganizationId: _currentOrganizationId(context),
         currentDisplayName: _currentDisplayName(context),
         currentAvatarUrl: _currentAvatarUrl(context),
+        onBackToProjectList: _backToProjectList,
         onOpenSubjectCard: () => _openSubjectCard(data),
         canOpenSubjectCard: _canOpenSubjectCard(data),
       ),
-      const SizedBox(height: 16),
-      _SelectedProjectBusinessEntrypoints(
-        group: selectedGroup,
-        participationCard: _firstBusinessCard(
-          selectedGroup,
-          'bid_participation_request',
-        ),
-        orderId: selectedOrderId,
-        loadingWorkbench: _loadingWorkbench,
-        workbenchResult: _workbenchResult,
-        onBackToProjectList: _backToProjectList,
-        onOpenNameAccess: _openBusinessCard,
-        onOpenOrder: () => _openOrderDetail(selectedGroup),
-        onOpenProjectAlbum: () => _openProjectAlbum(selectedGroup),
-        onOpenWorkbenchEntry: _openWorkbenchEntry,
-      ),
-      const SizedBox(height: 12),
-      const _ConversationGuidanceBanner(),
       if (exitGovernanceSnapshot != null) ...<Widget>[
         const SizedBox(height: 16),
         _ProjectExitGovernanceStatusCard(
@@ -1018,6 +1226,7 @@ class _CounterpartConversationPageState
               : () => _loadMessages(thread),
           onPreviewAttachment: _openAttachmentPreview,
           onOpenConfirmationSoftLink: _openConfirmationSoftLink,
+          onOpenBusinessAction: _openMessageBusinessAction,
         ),
       ),
     ];
@@ -1026,6 +1235,26 @@ class _CounterpartConversationPageState
   Widget _buildFailureCard(
     CounterpartConversationResult<CounterpartConversationDetailView>? result,
   ) {
+    if (_isStaleCounterpartContainerFailure(result)) {
+      return _ActionCard(
+        title: '项目沟通入口已失效',
+        children: <Widget>[
+          const _StateMessage(title: '受控提示', body: '入口已失效，可从主体项目列表重新进入。'),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: <Widget>[
+              FilledButton.tonal(
+                onPressed: _returnToPreviousEntry,
+                child: const Text('返回消息列表'),
+              ),
+              OutlinedButton(onPressed: _load, child: const Text('重试')),
+            ],
+          ),
+        ],
+      );
+    }
     return _ActionCard(
       title: result?.message ?? '当前对方沟通容器暂不可用',
       children: <Widget>[
@@ -1039,6 +1268,27 @@ class _CounterpartConversationPageState
     );
   }
 
+  bool _isStaleCounterpartContainerFailure(
+    CounterpartConversationResult<CounterpartConversationDetailView>? result,
+  ) {
+    final errorCode = result?.errorCode ?? '';
+    final message = result?.message ?? '';
+    return errorCode.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+        message.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+        message.contains('当前对方沟通容器暂不可用');
+  }
+
+  void _returnToPreviousEntry() {
+    final navigator = Navigator.of(context);
+    if (navigator.canPop()) {
+      navigator.pop();
+      return;
+    }
+    ScaffoldMessenger.maybeOf(
+      context,
+    )?.showSnackBar(const SnackBar(content: Text('请从消息页主体项目列表重新进入。')));
+  }
+
   void _openBusinessCard(CounterpartConversationBusinessCardView card) {
     final target = card.detailRouteTarget ?? _fallbackRouteTarget(card);
     if (target == null) {
@@ -1046,6 +1296,25 @@ class _CounterpartConversationPageState
       return;
     }
     Navigator.of(context).pushNamed(target.routeLocation);
+  }
+
+  void _openMessageBusinessAction(ProjectCommunicationMessageView message) {
+    final target = message.routeTarget;
+    if (target != null) {
+      Navigator.of(context).pushNamed(target.routeLocation);
+      return;
+    }
+    if (message.requiredNextAction == 'complete_service_fee_authorization') {
+      _openChatRequiredAction();
+      return;
+    }
+    if (message.requiredNextAction == 're_review_material') {
+      _openWorkbenchEntryList(<String>{
+        'publisher_materials',
+      }, title: '发布方资料确认');
+      return;
+    }
+    _showSnack('当前系统提醒暂时没有可打开的业务入口。');
   }
 
   void _openOrderDetail(CounterpartConversationProjectGroupView group) {
@@ -1059,10 +1328,132 @@ class _CounterpartConversationPageState
     Navigator.of(context).pushNamed(orderTarget.routeLocation);
   }
 
+  void _openContinuationPanel(CounterpartConversationProjectGroupView group) {
+    final entries =
+        _workbenchResult?.data?.entries
+            .where(_isDealWorkbenchEntry)
+            .toList(growable: false) ??
+        const <ProjectCommunicationWorkbenchEntryView>[];
+    final amountEntry = entries
+        .where(
+          (entry) => entry.entryKey == 'final_confirmed_amount_confirmation',
+        )
+        .firstOrNull;
+    final contractEntry = entries
+        .where((entry) => entry.entryKey == 'contract_confirmation')
+        .firstOrNull;
+    final orderCard = _firstBusinessCard(group, 'project_order');
+    final orderTarget =
+        orderCard?.detailRouteTarget ?? _fallbackOrderTarget(group);
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Text(
+                    '后续承接',
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '订单种子、合同文件、最终成交金额分层承接；最终金额只以双方确认后的 Server finalConfirmedAmount 为准。',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: theme.colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  _ContinuationActionTile(
+                    icon: Icons.price_check_outlined,
+                    title: '最终成交金额确认',
+                    summary: amountEntry == null
+                        ? '当前暂无可处理的最终成交确认入口。'
+                        : '双方确认完成后才形成正式合同金额。',
+                    badgeCount:
+                        amountEntry?.badgeCount ??
+                        group.businessTodoSummary.dealConfirmationPendingCount,
+                    enabled: amountEntry != null,
+                    disabledReason: amountEntry?.disabledReason,
+                    onTap: amountEntry == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(_openDealConfirmationEntry(amountEntry));
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  _ContinuationActionTile(
+                    icon: Icons.description_outlined,
+                    title: '合同文件',
+                    summary: contractEntry == null
+                        ? '合同文件入口暂未开放，不能替代最终金额确认。'
+                        : '合同文件是成交确认依据之一。',
+                    badgeCount: contractEntry?.badgeCount ?? 0,
+                    enabled: contractEntry != null,
+                    disabledReason: contractEntry?.disabledReason,
+                    onTap: contractEntry == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            unawaited(
+                              _openDealConfirmationEntry(contractEntry),
+                            );
+                          },
+                  ),
+                  const SizedBox(height: 10),
+                  _ContinuationActionTile(
+                    icon: Icons.receipt_long_outlined,
+                    title: '订单种子',
+                    summary: orderTarget == null
+                        ? '当前暂无订单种子，不能当作正式成交。'
+                        : '订单种子金额只是中标报价参考，不是最终合同金额。',
+                    enabled: orderTarget != null,
+                    onTap: orderTarget == null
+                        ? null
+                        : () {
+                            Navigator.of(context).pop();
+                            Navigator.of(
+                              context,
+                            ).pushNamed(orderTarget.routeLocation);
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
   void _openProjectAlbum(CounterpartConversationProjectGroupView group) {
-    Navigator.of(
-      context,
-    ).pushNamed(ExhibitionRoutes.projectAlbumWithProjectId(group.projectId));
+    final threadId = _threadResult?.data?.threadId.trim();
+    if (threadId == null || threadId.isEmpty) {
+      _showSnack('无法进入项目相册，缺少项目沟通上下文，请返回项目列表重新进入。');
+      return;
+    }
+    final base = Uri.parse(
+      ExhibitionRoutes.projectAlbumWithProjectId(group.projectId),
+    );
+    final location = base
+        .replace(
+          queryParameters: <String, String>{
+            ...base.queryParameters,
+            'threadId': threadId,
+          },
+        )
+        .toString();
+    Navigator.of(context).pushNamed(location);
   }
 
   void _preloadImageAttachmentPreviews(
@@ -1261,8 +1652,16 @@ class _CounterpartConversationPageState
   }
 
   void _openWorkbenchEntry(ProjectCommunicationWorkbenchEntryView entry) {
+    if (!_hasWorkbenchEntryContext(entry)) {
+      _showSnack('无法进入资料确认单，缺少项目沟通上下文，请返回项目列表重新进入。');
+      return;
+    }
     if (entry.group == 'deal_confirmation') {
-      _showSnack('合同确认和最终成交金额确认暂不触发扣费，待后续门禁开启。');
+      _openDealConfirmationEntry(entry);
+      return;
+    }
+    if (!_hasMaterialReviewRouteTarget(entry)) {
+      _showSnack('资料确认入口暂不可用，请刷新后重试。');
       return;
     }
     Navigator.of(context).push(
@@ -1271,8 +1670,152 @@ class _CounterpartConversationPageState
           entry: entry,
           onConfirm: _submitWorkbenchConfirm,
           onFeedback: _submitWorkbenchFeedback,
+          onOpenPublisherSupplement: _openPublisherSupplementPage,
+          onOpenBidMaterialSupplement: _openBidMaterialSupplementPage,
         ),
       ),
+    );
+  }
+
+  void _openPublisherSupplementPage(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final projectId = entry.projectId.trim();
+    if (projectId.isEmpty) {
+      _showSnack('无法进入补充资料页，缺少项目上下文。');
+      return;
+    }
+    Navigator.of(context).pushNamed(
+      ExhibitionRoutes.myProjectDetailWithProjectId(
+        projectId,
+        stage: 'published',
+        focus: 'attachments',
+      ),
+    );
+  }
+
+  Future<void> _openBidMaterialSupplementPage(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) async {
+    final projectId = entry.projectId.trim();
+    if (projectId.isEmpty) {
+      _showSnack('无法进入补充竞标资料页，缺少项目上下文。');
+      return;
+    }
+    final bidId = (entry.bidId ?? entry.truthAnchor.bidId)?.trim();
+    if (bidId == null || bidId.isEmpty) {
+      _showSnack('无法进入补充竞标资料页，缺少竞标上下文。');
+      return;
+    }
+    final sourceVersionToken = entry.truthAnchor.sourceVersionToken?.trim();
+    if (sourceVersionToken == null || sourceVersionToken.isEmpty) {
+      _showSnack('无法进入补充竞标资料页，资料版本已变化，请刷新后重试。');
+      return;
+    }
+    await _openBidSubmitAndRefresh(
+      projectId,
+      mode: 'supplement',
+      bidId: bidId,
+      focusEntryKey: entry.entryKey,
+      focusSlot: entry.truthAnchor.bidMaterialSlot,
+      sourceVersionToken: sourceVersionToken,
+    );
+  }
+
+  bool _hasWorkbenchEntryContext(ProjectCommunicationWorkbenchEntryView entry) {
+    return entry.projectId.trim().isNotEmpty &&
+        entry.threadId.trim().isNotEmpty &&
+        entry.truthAnchor.projectId.trim().isNotEmpty &&
+        entry.truthAnchor.threadId.trim().isNotEmpty;
+  }
+
+  bool _hasMaterialReviewRouteTarget(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final routeTarget = entry.routeTarget;
+    if (routeTarget == null ||
+        routeTarget.actionKey != 'project_communication_material_review.open' ||
+        routeTarget.canonicalPath.trim().isEmpty) {
+      return false;
+    }
+    final projectId = routeTarget.params['projectId']?.trim();
+    final threadId = routeTarget.params['threadId']?.trim();
+    final entryKey = routeTarget.params['entryKey']?.trim();
+    final bidId = routeTarget.params['bidId']?.trim();
+    if (projectId == null ||
+        projectId.isEmpty ||
+        threadId == null ||
+        threadId.isEmpty ||
+        entryKey == null ||
+        entryKey.isEmpty) {
+      return false;
+    }
+    if (entry.group == 'bid_materials' &&
+        entry.bidId?.trim().isNotEmpty == true &&
+        (bidId == null || bidId.isEmpty)) {
+      return false;
+    }
+    return true;
+  }
+
+  Future<void> _openDealConfirmationEntry(
+    ProjectCommunicationWorkbenchEntryView entry,
+  ) {
+    final canonicalPath =
+        entry.routeTarget?.canonicalPath ??
+        ExhibitionCanonicalPaths.projectDealConfirmations(entry.projectId);
+    return showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (context) {
+        final theme = Theme.of(context);
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Text(
+                    entry.label,
+                    style: theme.textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    '请上传合同文件并填写最终成交价；双方确认完成后，Server 才会持久化 finalConfirmedAmount。',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    '当前入口只承接 deal-confirmations，不触发支付、服务费扣费或 /contract/confirm。',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: theme.colorScheme.error,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _InfoBand(
+                    icon: Icons.verified_outlined,
+                    text: '唯一路径：$canonicalPath',
+                  ),
+                  const SizedBox(height: 16),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(context).pop(),
+                      child: const Text('知道了'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -1315,24 +1858,39 @@ class _CounterpartConversationPageState
       return false;
     }
     final response = result.data!;
+    final previousWorkbench = _workbenchResult?.data;
+    if (previousWorkbench == null) {
+      _showSnack('当前资料确认状态暂不可读，请刷新后重试。');
+      return false;
+    }
     setState(() {
-      _workbenchResult = CounterpartConversationResult<
-        ProjectCommunicationWorkbenchView
-      >(
-        state: AppPageState.content,
-        method: result.method,
-        path: result.path,
-        data: ProjectCommunicationWorkbenchView(
-          projectId: response.projectId,
-          threadId: response.threadId,
-          viewerRole: response.viewerRole,
-          entries:
-              response.entries ??
-              _replaceWorkbenchEntry(response.entry),
-          generatedAt: response.updatedAt,
-        ),
-      );
+      _workbenchResult =
+          CounterpartConversationResult<ProjectCommunicationWorkbenchView>(
+            state: AppPageState.content,
+            method: result.method,
+            path: result.path,
+            data: ProjectCommunicationWorkbenchView(
+              projectId: response.projectId,
+              threadId: response.threadId,
+              viewerRole: response.viewerRole,
+              businessTodoSummary: previousWorkbench.businessTodoSummary,
+              chatAvailability: previousWorkbench.chatAvailability,
+              entries:
+                  response.entries ?? _replaceWorkbenchEntry(response.entry),
+              generatedAt: response.updatedAt,
+            ),
+          );
     });
+    final currentDetail = _result?.data;
+    final currentThread = _threadResult?.data;
+    final selectedGroup = currentDetail == null
+        ? null
+        : _selectedProjectGroup(currentDetail);
+    if (currentDetail != null && selectedGroup != null) {
+      await _loadThreadAndMessages(currentDetail, group: selectedGroup);
+    } else if (currentThread != null && selectedGroup != null) {
+      await _loadProjectWorkbench(selectedGroup, currentThread);
+    }
     _showSnack(reviewAction == 'confirm' ? '已确认。' : '反馈已提交。');
     return true;
   }
@@ -1359,7 +1917,6 @@ class _CounterpartConversationPageState
       context,
       data: data,
       projectGroup: group,
-      bidId: _firstBidId(group),
       onRatingSubmitted: _load,
     );
   }
@@ -1390,6 +1947,7 @@ class _CounterpartConversationPageState
         .map(
           (group) => CounterpartConversationProjectGroupView(
             projectId: group.projectId,
+            threadId: group.threadId,
             projectDisplayTitle: group.projectDisplayTitle,
             titleVisibility: group.titleVisibility,
             projectRelation: group.projectRelation,
@@ -1400,6 +1958,7 @@ class _CounterpartConversationPageState
             latestUnreadMessageAt: group.latestUnreadMessageAt,
             projectUnreadCount: group.projectUnreadCount,
             hasProjectUnread: group.hasProjectUnread,
+            businessTodoSummary: group.businessTodoSummary,
             orderSummary: group.orderSummary,
             ratingEntry: group.ratingEntry,
             cards: _sortedBusinessCards(group.cards),
@@ -1486,6 +2045,20 @@ class _CounterpartConversationPageState
   ) {
     for (final card in group.cards) {
       if (card.cardType == cardType) {
+        return card;
+      }
+    }
+    return null;
+  }
+
+  CounterpartConversationBusinessCardView? _firstServiceFeeAuthorizationCard(
+    CounterpartConversationProjectGroupView group,
+  ) {
+    for (final card in group.cards) {
+      final routeAction = card.detailRouteTarget?.actionKey;
+      if (routeAction == 'bid_service_fee_authorization.open' ||
+          card.cardType == 'bid_service_fee_authorization' ||
+          card.truthAnchor.truthType == 'bid_service_fee_authorization') {
         return card;
       }
     }

@@ -7,6 +7,8 @@ import { BidParticipationRequestEntity } from '../bid_participation_request/enti
 import { BidEntity } from '../bid/entities/bid.entity';
 import { OrganizationModule } from '../organization/organization.module';
 import { NotificationModule } from '../notifications/notification.module';
+import { ContractConfirmationEntity } from '../p0_pay/entities/contract-confirmation.entity';
+import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
 import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectAttachmentEntity } from '../project/entities/project-attachment.entity';
 import { ProjectNameAccessRequestEntity } from '../project_name_access/entities/project-name-access-request.entity';
@@ -21,6 +23,8 @@ import { ProjectCommunicationReadCursorEntity } from './entities/project-communi
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import { ProjectAlbumPhotoService } from './project-album-photo.service';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
+import { ProjectCommunicationBusinessEventService } from './project-communication-business-event.service';
+import { ProjectCommunicationBusinessStateService } from './project-communication-business-state.service';
 import { ProjectCommunicationController } from './project-communication.controller';
 import { ProjectCommunicationFilePreviewService } from './project-communication-file-preview.service';
 import { ProjectCommunicationMessageService } from './project-communication-message.service';
@@ -48,6 +52,8 @@ import { ProjectCommunicationWorkbenchService } from './project-communication-wo
       ProjectCommunicationReadCursorEntity,
       ProjectCommunicationMaterialReviewEntity,
       ProjectAlbumPhotoEntity,
+      ContractConfirmationEntity,
+      PlatformServiceFeeAuthorizationEntity,
       FileAssetEntity
     ]),
     AuthModule,
@@ -64,6 +70,8 @@ import { ProjectCommunicationWorkbenchService } from './project-communication-wo
   ],
   providers: [
     ProjectCommunicationAccessService,
+    ProjectCommunicationBusinessEventService,
+    ProjectCommunicationBusinessStateService,
     ProjectCommunicationFilePreviewService,
     ProjectCommunicationPresenter,
     ProjectCommunicationWorkbenchPresenter,
@@ -75,6 +83,9 @@ import { ProjectCommunicationWorkbenchService } from './project-communication-wo
     ProjectAlbumPhotoService
   ],
   exports: [
+    ProjectCommunicationBusinessStateService,
+    ProjectCommunicationBusinessEventService,
+    ProjectCommunicationWorkbenchService,
     ProjectCommunicationMessageService,
     ProjectCommunicationSoftLinkService,
     ProjectCommunicationUnreadQueryService,

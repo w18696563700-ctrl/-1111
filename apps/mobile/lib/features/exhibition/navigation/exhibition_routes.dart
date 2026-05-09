@@ -113,9 +113,19 @@ final class ExhibitionRoutes {
     return _withQuery(projectEdit, <String, String>{'projectId': projectId});
   }
 
-  static String myProjectDetailWithProjectId(String projectId) {
+  static String myProjectDetailWithProjectId(
+    String projectId, {
+    String? stage,
+    String? focus,
+  }) {
+    final normalizedStage = stage?.trim();
+    final normalizedFocus = focus?.trim();
     return _withQuery(myProjectDetail, <String, String>{
       'projectId': projectId,
+      if (normalizedStage != null && normalizedStage.isNotEmpty)
+        'stage': normalizedStage,
+      if (normalizedFocus != null && normalizedFocus.isNotEmpty)
+        'focus': normalizedFocus,
     });
   }
 
@@ -156,11 +166,17 @@ final class ExhibitionRoutes {
   static String counterpartConversationWithIds({
     required String conversationId,
     required String projectId,
+    String? threadId,
   }) {
-    return _withQuery(counterpartConversation, <String, String>{
+    final queryParameters = <String, String>{
       'conversationId': conversationId,
       'projectId': projectId,
-    });
+    };
+    final normalizedThreadId = threadId?.trim();
+    if (normalizedThreadId != null && normalizedThreadId.isNotEmpty) {
+      queryParameters['threadId'] = normalizedThreadId;
+    }
+    return _withQuery(counterpartConversation, queryParameters);
   }
 
   static String bidThreadWithIds({
@@ -181,8 +197,13 @@ final class ExhibitionRoutes {
     return _withQuery(forumSquare, <String, String>{'topicId': topicId});
   }
 
-  static String forumPostWithPostId(String postId) {
-    return '$forumPosts/${Uri.encodeComponent(postId)}';
+  static String forumPostWithPostId(String postId, {String? title}) {
+    final path = '$forumPosts/${Uri.encodeComponent(postId)}';
+    final normalizedTitle = title?.trim();
+    if (normalizedTitle == null || normalizedTitle.isEmpty) {
+      return path;
+    }
+    return _withQuery(path, <String, String>{'title': normalizedTitle});
   }
 
   static String forumAuthorWithAuthorId(String authorId) {
@@ -344,6 +365,10 @@ final class ExhibitionRoutes {
     String projectId, {
     String? mode,
     String? bidParticipationRequestId,
+    String? bidId,
+    String? focusEntryKey,
+    String? focusSlot,
+    String? sourceVersionToken,
   }) {
     return _withQuery(bidSubmit, <String, String>{
       'projectId': projectId,
@@ -351,6 +376,13 @@ final class ExhibitionRoutes {
       if (bidParticipationRequestId != null &&
           bidParticipationRequestId.trim().isNotEmpty)
         'bidParticipationRequestId': bidParticipationRequestId,
+      if (bidId != null && bidId.trim().isNotEmpty) 'bidId': bidId,
+      if (focusEntryKey != null && focusEntryKey.trim().isNotEmpty)
+        'focusEntryKey': focusEntryKey,
+      if (focusSlot != null && focusSlot.trim().isNotEmpty)
+        'focusSlot': focusSlot,
+      if (sourceVersionToken != null && sourceVersionToken.trim().isNotEmpty)
+        'sourceVersionToken': sourceVersionToken,
     });
   }
 

@@ -17,6 +17,8 @@ class _ProjectCommunicationMaterialReviewDetailPage extends StatefulWidget {
     required this.entry,
     required this.onConfirm,
     required this.onFeedback,
+    this.onOpenPublisherSupplement,
+    this.onOpenBidMaterialSupplement,
   });
 
   final ProjectCommunicationWorkbenchEntryView entry;
@@ -27,6 +29,10 @@ class _ProjectCommunicationMaterialReviewDetailPage extends StatefulWidget {
     String feedbackText,
   )
   onFeedback;
+  final ValueChanged<ProjectCommunicationWorkbenchEntryView>?
+  onOpenPublisherSupplement;
+  final ValueChanged<ProjectCommunicationWorkbenchEntryView>?
+  onOpenBidMaterialSupplement;
 
   @override
   State<_ProjectCommunicationMaterialReviewDetailPage> createState() =>
@@ -43,6 +49,7 @@ class _ProjectCommunicationMaterialReviewDetailPageState
   final Map<String, ProjectCommunicationFilePreviewAccessView> _previewCache =
       <String, ProjectCommunicationFilePreviewAccessView>{};
   final Set<String> _loadingPreviewFileIds = <String>{};
+  final Set<String> _previewedFileIds = <String>{};
 
   @override
   void initState() {
@@ -133,7 +140,7 @@ class _ProjectCommunicationMaterialReviewDetailPageState
     }
     setState(() {
       _loadingFiles = false;
-      _fileMessage = '成交确认入口暂不触发扣费，待后续门禁开启。';
+      _fileMessage = '合同与最终金额确认入口暂不触发扣费，待后续门禁开启。';
     });
   }
 
@@ -155,12 +162,54 @@ class _ProjectCommunicationMaterialReviewDetailPageState
               text: '最近反馈：${entry.latestFeedbackText}',
               isError: true,
             ),
-          if (entry.canSubmitReview) ...<Widget>[
+          if (_shouldShowPublisherSupplementAction) ...<Widget>[
             const SizedBox(height: 16),
+            const _InfoBand(
+              icon: Icons.lock_outline,
+              text: '当前项目沟通仍处于锁定状态，请从真实项目资料页补充对应资料；补充成功后系统会通知竞标方重新确认。',
+            ),
+            const SizedBox(height: 12),
             FilledButton.icon(
-              onPressed: _submitting ? null : _confirm,
+              onPressed: () =>
+                  widget.onOpenPublisherSupplement?.call(widget.entry),
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('去补充该资料'),
+            ),
+          ],
+          if (_shouldShowBidMaterialSupplementAction) ...<Widget>[
+            const SizedBox(height: 16),
+            const _InfoBand(
+              icon: Icons.lock_outline,
+              text: '当前项目沟通仍处于锁定状态，请回到竞标提交页补充项目理解、报价表或进度安排；补充成功后发布方可重新确认。',
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () =>
+                  widget.onOpenBidMaterialSupplement?.call(widget.entry),
+              icon: const Icon(Icons.upload_file_outlined),
+              label: const Text('去补充竞标资料'),
+            ),
+          ],
+          if (_canSubmitCurrentReview) ...<Widget>[
+            const SizedBox(height: 16),
+            if (!_allFilesPreviewed)
+              const Padding(
+                padding: EdgeInsets.only(bottom: 12),
+                child: _InfoBand(
+                  icon: Icons.visibility_outlined,
+                  text: '请先预览当前资料，确认内容无误后再提交确认。',
+                ),
+              ),
+            FilledButton.icon(
+              onPressed: _submitting || !_allFilesPreviewed ? null : _confirm,
               icon: const Icon(Icons.check_circle_outline),
-              label: Text(_submitting ? '提交中...' : '确认无误'),
+              label: Text(
+                _submitting
+                    ? '提交中...'
+                    : _allFilesPreviewed
+                    ? '确认无误'
+                    : '预览后确认',
+              ),
             ),
             const SizedBox(height: 12),
             TextField(
@@ -181,16 +230,47 @@ class _ProjectCommunicationMaterialReviewDetailPageState
             ),
           ] else ...<Widget>[
             const SizedBox(height: 16),
-            _InfoBand(
-              icon: Icons.lock_outline,
-              text: entry.availabilityState == 'unsubmitted'
-                  ? '当前资料尚未提交，不能确认。'
-                  : '当前账号只能查看该资料审阅结果。',
-            ),
+            _InfoBand(icon: Icons.lock_outline, text: _readonlyReviewMessage),
           ],
         ],
       ),
     );
+  }
+
+  String get _readonlyReviewMessage {
+    final entry = widget.entry;
+    if (entry.availabilityState == 'unsubmitted') {
+      return '当前资料尚未提交，不能确认。';
+    }
+    if (_shouldShowBidMaterialSupplementAction) {
+      return '请先补充竞标资料，补充成功后等待发布方重新确认。';
+    }
+    if (_shouldShowPublisherSupplementAction) {
+      return '请先补充该资料，补充成功后等待对方重新确认。';
+    }
+    return '当前账号只能查看该资料审阅结果。';
+  }
+
+  bool get _canSubmitCurrentReview {
+    return widget.entry.canSubmitReview &&
+        !_shouldShowPublisherSupplementAction &&
+        !_shouldShowBidMaterialSupplementAction;
+  }
+
+  bool get _shouldShowPublisherSupplementAction {
+    return widget.entry.group == 'publisher_materials' &&
+        widget.entry.viewerRole == 'publisher' &&
+        widget.entry.subjectOwnerRole == 'publisher' &&
+        widget.entry.reviewState == 'needs_supplement' &&
+        widget.onOpenPublisherSupplement != null;
+  }
+
+  bool get _shouldShowBidMaterialSupplementAction {
+    return widget.entry.group == 'bid_materials' &&
+        widget.entry.viewerRole == 'bidder' &&
+        widget.entry.subjectOwnerRole == 'bidder' &&
+        widget.entry.reviewState == 'needs_supplement' &&
+        widget.onOpenBidMaterialSupplement != null;
   }
 
   Widget _sourceSection(BuildContext context) {
@@ -208,34 +288,31 @@ class _ProjectCommunicationMaterialReviewDetailPageState
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Text(
-          '资料文件',
+          _sourceSectionTitle,
           style: theme.textTheme.titleMedium?.copyWith(
             fontWeight: FontWeight.w900,
           ),
         ),
         const SizedBox(height: 8),
-        for (final file in _files)
-          ListTile(
-            contentPadding: EdgeInsets.zero,
-            leading: const Icon(Icons.insert_drive_file_outlined),
-            title: Text(file.title),
-            subtitle: Text(file.subtitle),
-            trailing: _loadingPreviewFileIds.contains(file.fileAssetId)
-                ? const SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : TextButton(
-                    onPressed: () => _openFilePreview(file),
-                    child: const Text('预览'),
-                  ),
-            onTap: _loadingPreviewFileIds.contains(file.fileAssetId)
-                ? null
-                : () => _openFilePreview(file),
+        for (var index = 0; index < _files.length; index += 1) ...<Widget>[
+          if (index > 0) const SizedBox(height: 10),
+          _WorkbenchSourceFileCard(
+            file: _files[index],
+            previewed: _previewedFileIds.contains(_files[index].fileAssetId),
+            loading: _loadingPreviewFileIds.contains(_files[index].fileAssetId),
+            onPreview: () => _openFilePreview(_files[index]),
           ),
+        ],
       ],
     );
+  }
+
+  String get _sourceSectionTitle {
+    return switch (widget.entry.group) {
+      'publisher_materials' => '发布方上传资料',
+      'bid_materials' => '竞标方提交资料',
+      _ => '资料文件',
+    };
   }
 
   Future<void> _openFilePreview(_WorkbenchSourceFile file) async {
@@ -259,77 +336,90 @@ class _ProjectCommunicationMaterialReviewDetailPageState
       }
       _previewCache[file.fileAssetId] = access;
     }
-
     final accessUrl = access.accessUrl?.trim();
+    var previewSucceeded = false;
     if (access.canPreview &&
         access.previewType == 'image' &&
         accessUrl != null &&
         accessUrl.isNotEmpty) {
-      await _showProjectAttachmentNetworkImagePreviewDialog(
+      setState(() => _loadingPreviewFileIds.add(file.fileAssetId));
+      final imageBytes = await _loadProjectAttachmentRemoteImageBytes(
+        accessUrl,
+      );
+      if (!mounted) return;
+      setState(() => _loadingPreviewFileIds.remove(file.fileAssetId));
+      if (imageBytes == null || imageBytes.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('当前图片资料暂时无法预览，请稍后再试。')));
+        return;
+      }
+      final decodable = await _canDecodeProjectAttachmentImagePreviewBytes(
+        imageBytes,
+      );
+      if (!mounted) return;
+      if (!decodable) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('当前图片资料暂时无法解析，请联系对方重新上传。')),
+        );
+        return;
+      }
+      await _showProjectAttachmentLocalImagePreviewDialog(
         context,
         fileName: access.fileName ?? file.title,
-        imageUrl: accessUrl,
+        bytes: imageBytes,
       );
-      return;
+      previewSucceeded = true;
+    } else {
+      if (accessUrl == null || accessUrl.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('当前资料暂时没有可用预览链接，请刷新后重试。')));
+        return;
+      }
+      if (access.previewType == 'pdf') {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('PDF 内嵌预览能力暂未接入，当前不能确认该资料。')),
+        );
+        return;
+      }
+      setState(() => _loadingPreviewFileIds.add(file.fileAssetId));
+      final bytes = await _loadProjectAttachmentRemoteBytes(
+        accessUrl,
+        maxBytes: _projectAttachmentRemoteFilePreviewMaxBytes,
+      );
+      if (!mounted) return;
+      setState(() => _loadingPreviewFileIds.remove(file.fileAssetId));
+      if (bytes == null || bytes.isEmpty) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('当前资料暂时无法载入，请稍后再试。')));
+        return;
+      }
+      previewSucceeded = await _showProjectCommunicationInAppFilePreviewDialog(
+        context,
+        preview: access,
+        bytes: bytes,
+      );
+      if (!mounted) return;
+      if (!previewSucceeded) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('当前资料暂无法在 App 内预览，不能提交确认。')),
+        );
+      }
     }
-    await _showWorkbenchFilePreviewDialog(access);
+
+    if (!mounted) return;
+    if (previewSucceeded && !_previewedFileIds.contains(file.fileAssetId)) {
+      setState(() => _previewedFileIds.add(file.fileAssetId));
+    }
   }
 
-  Future<void> _showWorkbenchFilePreviewDialog(
-    ProjectCommunicationFilePreviewAccessView preview,
-  ) {
-    return showDialog<void>(
-      context: context,
-      builder: (context) {
-        final theme = Theme.of(context);
-        final accessUrl = preview.accessUrl?.trim();
-        final canOpen =
-            preview.canPreview && accessUrl != null && accessUrl.isNotEmpty;
-        return AlertDialog(
-          title: const Text('资料预览'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                preview.fileName ?? preview.fileAssetId,
-                style: theme.textTheme.titleSmall?.copyWith(
-                  fontWeight: FontWeight.w900,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                canOpen
-                    ? '${_previewTypeLabel(preview.previewType)}预览链接已就绪。'
-                    : preview.fallbackReason ?? '当前资料暂不支持在线预览。',
-              ),
-              if (preview.mimeType != null) ...<Widget>[
-                const SizedBox(height: 6),
-                Text(
-                  preview.mimeType!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ],
-          ),
-          actions: <Widget>[
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('关闭'),
-            ),
-            if (canOpen)
-              FilledButton(
-                onPressed: () {
-                  unawaited(_openProjectAttachmentUrl(accessUrl));
-                },
-                child: const Text('打开预览'),
-              ),
-          ],
-        );
-      },
-    );
+  bool get _allFilesPreviewed {
+    if (_files.isEmpty) {
+      return false;
+    }
+    return _files.every((file) => _previewedFileIds.contains(file.fileAssetId));
   }
 
   Future<void> _confirm() async {
@@ -353,23 +443,6 @@ class _ProjectCommunicationMaterialReviewDetailPageState
     if (!mounted) return;
     setState(() => _submitting = false);
     if (ok) Navigator.of(context).pop();
-  }
-}
-
-class _WorkbenchStatusHeader extends StatelessWidget {
-  const _WorkbenchStatusHeader({required this.entry});
-
-  final ProjectCommunicationWorkbenchEntryView entry;
-
-  @override
-  Widget build(BuildContext context) {
-    return _InfoBand(
-      icon: entry.reviewState == 'needs_supplement'
-          ? Icons.error_outline
-          : Icons.assignment_turned_in_outlined,
-      text: '${entry.label} · ${entry.reviewState ?? entry.availabilityState}',
-      isError: entry.reviewState == 'needs_supplement',
-    );
   }
 }
 

@@ -7,6 +7,9 @@ import {
 
 type PricingErrorCode =
   | 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED'
+  | 'PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE'
+  | 'PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_INVALID'
+  | 'PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED'
   | 'PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED'
   | 'PROJECT_AUTHENTICITY_SINCERITY_ORDER_NOT_FOUND'
   | 'PROJECT_AUTHENTICITY_SINCERITY_PAY_INIT_REJECTED'
@@ -77,6 +80,24 @@ export function projectAuthenticitySincerityRequired(
   return pricingStateConflict('PROJECT_AUTHENTICITY_SINCERITY_REQUIRED', message);
 }
 
+export function projectAuthenticitySincerityInternalTestPolicyUnavailable(
+  message = 'Project authenticity sincerity green-channel conditions are not satisfied.'
+) {
+  return pricingStateConflict('PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE', message);
+}
+
+export function projectAuthenticitySincerityFreezeFeedbackInvalid(
+  message = 'Project authenticity sincerity freeze feedback choice is invalid.'
+) {
+  return pricingInvalid('PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_INVALID', message);
+}
+
+export function projectAuthenticitySincerityFreezeFeedbackRejected(
+  message = 'Project authenticity sincerity freeze feedback cannot be submitted.'
+) {
+  return pricingStateConflict('PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED', message);
+}
+
 export function projectAuthenticitySincerityOrderCreateRejected(
   message = 'Project authenticity sincerity order cannot be created.'
 ) {
@@ -102,7 +123,7 @@ export function projectAuthenticitySincerityInvalidState(
 }
 
 export function bidServiceFeeAuthorizationRequired(
-  message = 'Bid service fee authorization freeze is required before bid submission.'
+  message = 'Bid service fee authorization freeze is required before project communication free-send opens.'
 ) {
   return pricingStateConflict('BID_SERVICE_FEE_AUTHORIZATION_REQUIRED', message);
 }

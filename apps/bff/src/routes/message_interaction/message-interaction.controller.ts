@@ -31,11 +31,13 @@ export class MessageInteractionController {
   getProjectCommunicationThread(
     @Query('projectId') projectId: string | undefined,
     @Query('counterpartOrganizationId') counterpartOrganizationId: string | undefined,
+    @Query('threadId') threadId: string | undefined,
     @Headers() headers: IncomingHttpHeaders
   ) {
     return this.service.getProjectCommunicationThread(
       projectId,
       counterpartOrganizationId,
+      threadId,
       headers
     );
   }

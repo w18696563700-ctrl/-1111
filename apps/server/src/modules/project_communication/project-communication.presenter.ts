@@ -3,6 +3,7 @@ import { ProjectAlbumPhotoEntity } from './entities/project-album-photo.entity';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
 import { ProjectCommunicationReadCursorEntity } from './entities/project-communication-read-cursor.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
+import type { ProjectCommunicationChatAvailability } from './project-communication-business-state.service';
 
 type ProjectCommunicationMessageReadProjection = {
   viewerOrganizationId?: string | null;
@@ -12,12 +13,16 @@ type ProjectCommunicationMessageReadProjection = {
 
 @Injectable()
 export class ProjectCommunicationPresenter {
-  toThread(thread: ProjectCommunicationThreadEntity) {
+  toThread(
+    thread: ProjectCommunicationThreadEntity,
+    chatAvailability?: ProjectCommunicationChatAvailability
+  ) {
     return {
       threadId: thread.id,
       projectId: thread.projectId,
       ownerOrganizationId: thread.ownerOrganizationId,
       counterpartOrganizationId: thread.counterpartOrganizationId,
+      ...(chatAvailability ? { chatAvailability, generatedAt: new Date().toISOString() } : {}),
       threadState: thread.threadState,
       lastMessageId: thread.lastMessageId,
       lastMessageAt: thread.lastMessageAt?.toISOString() ?? null,

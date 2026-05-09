@@ -385,6 +385,14 @@ void main() {
               expect(body['expectedAmount'], 4000);
               expect(body['expectedCurrency'], 'CNY');
               expect(body['ruleVersion'], 'platform_pricing_rules_master_v1');
+              expect(body.keys.toSet(), <String>{
+                'bidParticipationRequestId',
+                'expectedAmount',
+                'expectedCurrency',
+                'ruleVersion',
+                'ruleSnapshotHash',
+                'idempotencyKey',
+              });
               expect(body, isNot(contains('estimatedFeeAmount')));
               expect(body, contains('idempotencyKey'));
               return AppApiResponse(
@@ -395,7 +403,7 @@ void main() {
                   'authorizationStatus': 'pending_freeze',
                   'quotaAmount': '4000.00',
                   'currency': 'CNY',
-                  'channelCandidates': <Object?>['wechat_candidate'],
+                  'channelCandidates': <Object?>['other_candidate'],
                   'updatedAt': '2026-05-13T00:01:00Z',
                 },
               );
@@ -403,8 +411,13 @@ void main() {
         'POST ${ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit('project-1', 'auth-1')}':
             (AppApiRequest request) async {
               final body = _body(request);
-              expect(body['payChannel'], 'wechat_candidate');
+              expect(body['payChannel'], 'other_candidate');
               expect(body['clientPlatform'], 'flutter');
+              expect(body.keys.toSet(), <String>{
+                'payChannel',
+                'clientPlatform',
+                'idempotencyKey',
+              });
               expect(body, contains('idempotencyKey'));
               return AppApiResponse(
                 statusCode: 200,
@@ -429,7 +442,7 @@ void main() {
                   'quotaAmount': '4000.00',
                   'currency': 'CNY',
                   'channelSummary': <String, Object?>{
-                    'paymentChannel': 'wechat_candidate',
+                    'paymentChannel': 'other_candidate',
                     'status': 'frozen',
                   },
                   'updatedAt': '2026-05-13T00:03:00Z',
@@ -453,7 +466,7 @@ void main() {
         .initProjectBidServiceFeeAuthorizationFreeze(
           projectId: 'project-1',
           authorizationId: 'auth-1',
-          command: ProjectPricingPayInitCommand(payChannel: 'wechat_candidate'),
+          command: ProjectPricingPayInitCommand(payChannel: 'other_candidate'),
         );
     final statusResult = await consumer
         .loadProjectBidServiceFeeAuthorizationStatus(

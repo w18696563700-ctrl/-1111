@@ -6,6 +6,7 @@ import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { UserEntity } from '../identity/entities/user.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
+import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ProfileSafetySubmissionEntity } from './entities/profile-safety-submission.entity';
 
 @Injectable()
@@ -14,7 +15,8 @@ export class ProfileSafetyQueryService {
     @InjectRepository(ProfileSafetySubmissionEntity)
     private readonly submissionRepository: Repository<ProfileSafetySubmissionEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
-    private readonly eligibilityService: CurrentActorEligibilityService
+    private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly avatarUrlService: UploadPublicUrlService
   ) {}
 
   async getCurrentSafetyState(context: RequestContext) {
@@ -29,29 +31,29 @@ export class ProfileSafetyQueryService {
       take: 30
     });
     return {
-      currentApproved: this.toCurrentApproved(user),
-      submissions: submissions.map((item) => this.toSubmissionView(item))
+      currentApproved: await this.toCurrentApproved(user),
+      submissions: await Promise.all(submissions.map((item) => this.toSubmissionView(item)))
     };
   }
 
-  private toCurrentApproved(user: UserEntity) {
+  private async toCurrentApproved(user: UserEntity) {
     return {
       nickname: user.nickname,
-      avatarUrl: user.avatarUrl,
+      avatarUrl: await this.readAvatarUrl(user.avatarUrl),
       avatarFileAssetId: user.avatarFileAssetId,
       intro: user.profileIntro,
       status: 'current_approved'
     };
   }
 
-  private toSubmissionView(submission: ProfileSafetySubmissionEntity) {
+  private async toSubmissionView(submission: ProfileSafetySubmissionEntity) {
     return {
       submissionId: submission.id,
       fieldKey: submission.fieldKey,
       status: submission.status,
       proposedValue: submission.fieldKey === 'avatar' ? null : submission.proposedValue,
       fileAssetId: submission.proposedFileAssetId,
-      proposedAvatarUrl: submission.proposedAvatarUrl,
+      proposedAvatarUrl: await this.readAvatarUrl(submission.proposedAvatarUrl),
       rejectReasonCode: submission.rejectReasonCode,
       rejectReason: submission.rejectReason,
       matchedRuleIds: submission.matchedRuleIds,
@@ -61,5 +63,13 @@ export class ProfileSafetyQueryService {
       submittedAt: submission.createdAt.toISOString(),
       reviewedAt: submission.reviewedAt?.toISOString() ?? null
     };
+  }
+
+  private async readAvatarUrl(value: string | null) {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+      return null;
+    }
+    return (await this.avatarUrlService.buildAccessUrlFromObjectUrl(normalized)) ?? normalized;
   }
 }

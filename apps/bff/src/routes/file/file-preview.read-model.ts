@@ -2,6 +2,8 @@ export function readFilePreviewAccessReadModel(value: unknown) {
   const root = asRecord(value) ?? {};
   const accessUrl = readOptionalString(root.accessUrl);
   const canPreview = root.canPreview === true;
+  const downloadAvailable = root.downloadAvailable === true;
+  const canOpen = canPreview || downloadAvailable;
   return {
     fileAssetId: readOptionalString(root.fileAssetId) ?? '',
     projectId: readOptionalString(root.projectId) ?? '',
@@ -10,10 +12,10 @@ export function readFilePreviewAccessReadModel(value: unknown) {
     canPreview,
     fileName: readOptionalString(root.fileName),
     mimeType: readOptionalString(root.mimeType),
-    accessUrl: canPreview ? accessUrl : null,
-    expiresAt: canPreview ? readOptionalString(root.expiresAt) : null,
+    accessUrl: canOpen ? accessUrl : null,
+    expiresAt: canOpen ? readOptionalString(root.expiresAt) : null,
     contentLengthBytes: readOptionalNumber(root.contentLengthBytes),
-    downloadAvailable: root.downloadAvailable === true,
+    downloadAvailable,
     fallbackReason: readOptionalString(root.fallbackReason)
   };
 }

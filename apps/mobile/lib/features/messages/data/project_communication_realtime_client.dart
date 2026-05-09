@@ -6,6 +6,8 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/auth/auth_consumer_layer.dart';
 import 'package:mobile/features/messages/data/counterpart_conversation_models.dart';
+import 'package:mobile/features/messages/data/messages_interaction_models.dart';
+import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
 
 typedef ProjectCommunicationWebSocketConnector =
     Future<WebSocket> Function(Uri uri, Map<String, String> headers);
@@ -43,6 +45,11 @@ final class ProjectCommunicationMessageCreatedEvent {
     required this.createdAt,
     this.attachment,
     this.confirmation,
+    this.eventType,
+    this.sourceType,
+    this.sourceId,
+    this.requiredNextAction,
+    this.routeTarget,
   });
 
   final String eventId;
@@ -54,6 +61,11 @@ final class ProjectCommunicationMessageCreatedEvent {
   final String body;
   final ProjectCommunicationAttachmentView? attachment;
   final ProjectCommunicationConfirmationView? confirmation;
+  final String? eventType;
+  final String? sourceType;
+  final String? sourceId;
+  final String? requiredNextAction;
+  final MessageInteractionRouteTarget? routeTarget;
   final String? clientMessageId;
   final String createdAt;
 
@@ -69,6 +81,11 @@ final class ProjectCommunicationMessageCreatedEvent {
       body: body,
       attachment: attachment,
       confirmation: confirmation,
+      eventType: eventType,
+      sourceType: sourceType,
+      sourceId: sourceId,
+      requiredNextAction: requiredNextAction,
+      routeTarget: routeTarget,
       clientMessageId: clientMessageId,
       messageState: 'active',
       deliveryState: 'persisted',
@@ -174,8 +191,71 @@ ProjectCommunicationMessageCreatedEvent? _parseMessageCreatedEvent(
     body: _bodyString(map, 'body'),
     attachment: _parseAttachment(map['payload']),
     confirmation: _parseConfirmation(map['payload']),
+    eventType: _payloadString(map['payload'], 'eventType'),
+    sourceType: _payloadString(map['payload'], 'sourceType'),
+    sourceId: _payloadString(map['payload'], 'sourceId'),
+    requiredNextAction: _payloadRequiredNextAction(map['payload']),
+    routeTarget: _parseRouteTargetFromPayload(map['payload']),
     clientMessageId: _nullableString(map['clientMessageId']),
     createdAt: _requiredString(map, 'createdAt'),
+  );
+}
+
+String? _payloadString(Object? payload, String field) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload);
+  return _nullableString(map[field]);
+}
+
+String? _payloadRequiredNextAction(Object? payload) {
+  final value = _payloadString(payload, 'requiredNextAction');
+  if (value == null) {
+    return null;
+  }
+  if (value == 'complete_service_fee_authorization' ||
+      value == 'review_bid_participation' ||
+      value == 'confirm_publisher_materials' ||
+      value == 'submit_bid_materials' ||
+      value == 'confirm_bid_materials' ||
+      value == 'open_deal_confirmation' ||
+      value == 'none') {
+    return value;
+  }
+  throw const FormatException('unsupported project communication action');
+}
+
+MessageInteractionRouteTarget? _parseRouteTargetFromPayload(Object? payload) {
+  if (payload == null) {
+    return null;
+  }
+  final map = _requiredMap(payload);
+  final routeTarget = map['routeTarget'];
+  if (routeTarget == null) {
+    return null;
+  }
+  final targetMap = _requiredMap(routeTarget);
+  final actionKey = _requiredString(targetMap, 'actionKey');
+  final objectType = _requiredString(targetMap, 'objectType');
+  final canonicalPath = _requiredString(targetMap, 'canonicalPath');
+  final params = _stringMap(targetMap['params']);
+  final definition = messagesRegisteredEntryByActionKey[actionKey];
+  if (definition == null ||
+      definition.objectType != objectType ||
+      definition.canonicalPath != canonicalPath) {
+    throw const FormatException('project communication routeTarget mismatch');
+  }
+  final routeLocation = definition.buildRouteLocation(params);
+  if (routeLocation == null || routeLocation.startsWith('routeTarget.')) {
+    throw const FormatException('project communication routeTarget invalid');
+  }
+  return MessageInteractionRouteTarget(
+    objectType: objectType,
+    actionKey: actionKey,
+    canonicalPath: canonicalPath,
+    params: params,
+    routeLocation: routeLocation,
   );
 }
 
@@ -262,4 +342,17 @@ String? _nullableString(Object? value) {
   }
   final normalized = value.trim();
   return normalized.isEmpty ? null : normalized;
+}
+
+Map<String, String> _stringMap(Object? payload) {
+  final map = _requiredMap(payload);
+  final result = <String, String>{};
+  for (final entry in map.entries) {
+    final value = entry.value;
+    if (value is! String || value.trim().isEmpty) {
+      throw const FormatException('project communication route params invalid');
+    }
+    result[entry.key] = value.trim();
+  }
+  return result;
 }

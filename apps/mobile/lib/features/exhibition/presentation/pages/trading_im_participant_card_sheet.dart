@@ -70,13 +70,7 @@ class _TradingImParticipantCardSheetState
       _showMessage('当前合作方缺少可搜索的主体名称。');
       return;
     }
-    final url = Uri.https('www.qcc.com', '/web/search', <String, String>{
-      'key': keyword,
-    }).toString();
-    final opened = await launchUrlString(
-      url,
-      mode: LaunchMode.externalApplication,
-    );
+    final opened = await _launchQichachaByKeyword(keyword);
     if (!mounted || opened) {
       return;
     }
@@ -318,10 +312,7 @@ String _participantCardStatusLabel(String value) {
 String _participantCardLocationText(String provinceName, String cityName) {
   final province = _participantCardNormalizeText(provinceName);
   final city = _participantCardNormalizeText(cityName);
-  final parts = <String>[
-    if (province != null) province,
-    if (city != null && city != province) city,
-  ];
+  final parts = <String>[?province, if (city != null && city != province) city];
   return parts.isEmpty ? '未提供' : parts.join(' / ');
 }
 
@@ -341,6 +332,48 @@ String? _participantCardNormalizeText(String? value) {
     return null;
   }
   return normalized;
+}
+
+Future<bool> _launchQichachaByKeyword(String keyword) async {
+  for (final url in _qichachaLaunchCandidates(keyword)) {
+    try {
+      final opened = await launchUrlString(
+        url,
+        mode: LaunchMode.externalApplication,
+      );
+      if (opened) {
+        return true;
+      }
+    } catch (_) {
+      // Try the next candidate and finally fall back to the public web URL.
+    }
+  }
+  return false;
+}
+
+List<String> _qichachaLaunchCandidates(String keyword) {
+  return <String>[
+    Uri(
+      scheme: 'qcc',
+      host: 'web',
+      path: '/search',
+      queryParameters: <String, String>{'key': keyword},
+    ).toString(),
+    Uri(
+      scheme: 'qcc',
+      host: 'search',
+      queryParameters: <String, String>{'key': keyword},
+    ).toString(),
+    Uri(
+      scheme: 'qichacha',
+      host: 'web',
+      path: '/search',
+      queryParameters: <String, String>{'key': keyword},
+    ).toString(),
+    Uri.https('www.qcc.com', '/web/search', <String, String>{
+      'key': keyword,
+    }).toString(),
+  ];
 }
 
 class _ParticipantAdviceText extends StatelessWidget {

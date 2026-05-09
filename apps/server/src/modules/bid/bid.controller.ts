@@ -23,4 +23,20 @@ export class BidController {
       })
     );
   }
+
+  @Post('submission/supplement')
+  @HttpCode(202)
+  supplementBidSubmission(
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag,
+    @Req() request: Request
+  ) {
+    return this.writeService.supplementBidSubmission(
+      body,
+      resolveRequestContext(headers, {
+        userAgent: request.get('user-agent') ?? '',
+        remoteIp: request.ip
+      })
+    );
+  }
 }

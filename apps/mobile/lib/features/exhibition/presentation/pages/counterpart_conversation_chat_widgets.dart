@@ -65,6 +65,7 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
     required this.onRefreshMessages,
     required this.onPreviewAttachment,
     required this.onOpenConfirmationSoftLink,
+    required this.onOpenBusinessAction,
   });
 
   final bool loadingThread;
@@ -87,72 +88,112 @@ class _ProjectCommunicationTimeline extends StatelessWidget {
   final ValueChanged<ProjectCommunicationMessageView> onPreviewAttachment;
   final ValueChanged<ProjectCommunicationMessageView>
   onOpenConfirmationSoftLink;
+  final ValueChanged<ProjectCommunicationMessageView> onOpenBusinessAction;
 
   @override
   Widget build(BuildContext context) {
-    final messages =
+    final thread = threadResult?.data;
+    final rawMessages =
         messageResult?.data?.items ?? const <ProjectCommunicationMessageView>[];
-    return _ActionCard(
-      title: '项目沟通记录',
-      summary: '消息与附件继续锚定当前项目，关键资料确认请在项目工作入口处理。',
-      children: <Widget>[
-        if (loadingThread || loadingMessages)
-          const _StateMessage(title: '正在同步沟通记录', body: '正在读取项目沟通消息。')
-        else if (threadResult != null &&
-            threadResult!.state != AppPageState.content)
-          _StateMessage(
-            title: '聊天暂不可用',
-            body: threadResult!.message ?? threadResult!.state.contractName,
-          )
-        else if (messageResult != null &&
-            messageResult!.state != AppPageState.content)
-          _StateMessage(
-            title: '消息读取失败',
-            body: messageResult!.message ?? messageResult!.state.contractName,
-          )
-        else if (messages.isEmpty && drafts.isEmpty)
-          const _StateMessage(title: '还没有项目沟通记录', body: '可以从底部输入框发送第一条项目沟通消息。')
-        else ...<Widget>[
-          for (final message in messages)
-            _ProjectCommunicationMessageBubble(
-              message: message,
-              isMine: _isMine(message.senderOrganizationId),
-              senderName: _senderName(message.senderOrganizationId),
-              roleLabel: _roleLabel(message.senderOrganizationId),
-              avatarUrl: _avatarUrl(message.senderOrganizationId),
-              attachmentPreview: attachmentPreviewForMessage(message),
-              attachmentPreviewLoading: attachmentPreviewLoadingForMessage(
-                message,
+    final messages = thread == null
+        ? rawMessages
+        : rawMessages
+              .where(
+                (message) =>
+                    message.threadId == thread.threadId &&
+                    message.projectId == thread.projectId,
+              )
+              .toList(growable: false);
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFBFAF8),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: theme.colorScheme.outlineVariant),
+      ),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 280),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: Text(
+                      '项目沟通',
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w900,
+                      ),
+                    ),
+                  ),
+                  if (onRefreshMessages != null)
+                    IconButton(
+                      onPressed: onRefreshMessages,
+                      tooltip: '手动同步',
+                      visualDensity: VisualDensity.compact,
+                      icon: const Icon(Icons.sync_rounded, size: 18),
+                    ),
+                ],
               ),
-              onPreviewAttachment: () => onPreviewAttachment(message),
-              onOpenConfirmationSoftLink: () =>
-                  onOpenConfirmationSoftLink(message),
-            ),
-          for (final draft in drafts)
-            _DraftProjectCommunicationMessageBubble(
-              draft: draft,
-              senderName: _fallbackCurrentName,
-              roleLabel: '我方',
-              avatarUrl: currentAvatarUrl,
-              onRetry: () => onRetryDraft(draft),
-            ),
-        ],
-        if (onRefreshMessages != null) ...<Widget>[
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.center,
-            child: TextButton.icon(
-              onPressed: onRefreshMessages,
-              style: TextButton.styleFrom(
-                visualDensity: VisualDensity.compact,
-                foregroundColor: Theme.of(context).colorScheme.onSurfaceVariant,
-              ),
-              icon: const Icon(Icons.sync_rounded, size: 16),
-              label: const Text('手动同步'),
-            ),
+              const SizedBox(height: 6),
+              if (loadingThread || loadingMessages)
+                const _StateMessage(title: '正在同步沟通记录', body: '正在读取项目沟通消息。')
+              else if (threadResult != null &&
+                  threadResult!.state != AppPageState.content)
+                _StateMessage(
+                  title: '聊天暂不可用',
+                  body:
+                      threadResult!.message ?? threadResult!.state.contractName,
+                )
+              else if (messageResult != null &&
+                  messageResult!.state != AppPageState.content)
+                _StateMessage(
+                  title: '消息读取失败',
+                  body:
+                      messageResult!.message ??
+                      messageResult!.state.contractName,
+                )
+              else if (messages.isEmpty && drafts.isEmpty)
+                const SizedBox(
+                  height: 190,
+                  child: Center(
+                    child: _StateMessage(
+                      title: '还没有项目沟通记录',
+                      body: '可以从底部输入框发送第一条项目沟通消息。',
+                    ),
+                  ),
+                )
+              else ...<Widget>[
+                for (final message in messages)
+                  _ProjectCommunicationMessageBubble(
+                    message: message,
+                    isMine: _isMine(message.senderOrganizationId),
+                    senderName: _senderName(message.senderOrganizationId),
+                    roleLabel: _roleLabel(message.senderOrganizationId),
+                    avatarUrl: _avatarUrl(message.senderOrganizationId),
+                    attachmentPreview: attachmentPreviewForMessage(message),
+                    attachmentPreviewLoading:
+                        attachmentPreviewLoadingForMessage(message),
+                    onPreviewAttachment: () => onPreviewAttachment(message),
+                    onOpenConfirmationSoftLink: () =>
+                        onOpenConfirmationSoftLink(message),
+                    onOpenBusinessAction: () => onOpenBusinessAction(message),
+                  ),
+                for (final draft in drafts)
+                  _DraftProjectCommunicationMessageBubble(
+                    draft: draft,
+                    senderName: _fallbackCurrentName,
+                    roleLabel: '我方',
+                    avatarUrl: currentAvatarUrl,
+                    onRetry: () => onRetryDraft(draft),
+                  ),
+              ],
+            ],
           ),
-        ],
-      ],
+        ),
+      ),
     );
   }
 
@@ -218,6 +259,7 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
     required this.attachmentPreviewLoading,
     required this.onPreviewAttachment,
     required this.onOpenConfirmationSoftLink,
+    required this.onOpenBusinessAction,
   });
 
   final ProjectCommunicationMessageView message;
@@ -229,6 +271,7 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
   final bool attachmentPreviewLoading;
   final VoidCallback onPreviewAttachment;
   final VoidCallback onOpenConfirmationSoftLink;
+  final VoidCallback onOpenBusinessAction;
 
   @override
   Widget build(BuildContext context) {
@@ -238,6 +281,7 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
       body: message.body,
       attachment: message.attachment,
       confirmation: message.confirmation,
+      businessActionLabel: _businessActionLabel(message),
       meta: statusLabel == null ? sentAtLabel : '$sentAtLabel · $statusLabel',
       isMine: isMine,
       senderName: senderName,
@@ -251,7 +295,20 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
       onOpenConfirmationSoftLink: message.confirmation == null
           ? null
           : onOpenConfirmationSoftLink,
+      onOpenBusinessAction: message.hasBusinessActionPrompt
+          ? onOpenBusinessAction
+          : null,
     );
+  }
+
+  String? _businessActionLabel(ProjectCommunicationMessageView message) {
+    if (message.isServiceFeeAuthorizationPrompt) {
+      return '去完成预授权';
+    }
+    if (message.isPublisherMaterialReReviewPrompt) {
+      return '重新确认资料';
+    }
+    return null;
   }
 
   String? _messageStatusLabel(
@@ -324,6 +381,8 @@ class _ChatBubble extends StatelessWidget {
     this.trailing,
     this.onPreviewAttachment,
     this.onOpenConfirmationSoftLink,
+    this.businessActionLabel,
+    this.onOpenBusinessAction,
   });
 
   final String body;
@@ -334,11 +393,13 @@ class _ChatBubble extends StatelessWidget {
   final String? avatarUrl;
   final ProjectCommunicationAttachmentView? attachment;
   final ProjectCommunicationConfirmationView? confirmation;
+  final String? businessActionLabel;
   final ProjectCommunicationFilePreviewAccessView? attachmentPreview;
   final bool attachmentPreviewLoading;
   final Widget? trailing;
   final VoidCallback? onPreviewAttachment;
   final VoidCallback? onOpenConfirmationSoftLink;
+  final VoidCallback? onOpenBusinessAction;
 
   @override
   Widget build(BuildContext context) {
@@ -393,6 +454,12 @@ class _ChatBubble extends StatelessWidget {
               _ConversationConfirmationCard(
                 confirmation: confirmation!,
                 onOpenSoftLink: onOpenConfirmationSoftLink,
+              )
+            else if (businessActionLabel != null)
+              _ConversationBusinessActionCard(
+                body: body,
+                actionLabel: businessActionLabel!,
+                onPressed: onOpenBusinessAction,
               )
             else if (attachment != null)
               _ConversationAttachmentCard(
@@ -469,15 +536,7 @@ class _ConversationAvatar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final normalized = avatarUrl?.trim();
-    return CircleAvatar(
-      radius: 18,
-      backgroundImage: normalized == null || normalized.isEmpty
-          ? null
-          : NetworkImage(normalized),
-      child: normalized == null || normalized.isEmpty
-          ? Text(label.trim().isEmpty ? '?' : label.characters.first)
-          : null,
-    );
+    return SafeRemoteAvatar(radius: 18, imageUrl: normalized, label: label);
   }
 }
 
@@ -742,6 +801,89 @@ class _ConversationImageAttachmentCard extends StatelessWidget {
   }
 }
 
+class _ConversationBusinessActionCard extends StatelessWidget {
+  const _ConversationBusinessActionCard({
+    required this.body,
+    required this.actionLabel,
+    this.onPressed,
+  });
+
+  final String body;
+  final String actionLabel;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: const Color(0xFFEAF7EE),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: const Color(0xFF8AC79D)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Row(
+              children: <Widget>[
+                const Icon(Icons.lock_open_rounded, color: Color(0xFF227A3A)),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '资料确认已通过',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: const Color(0xFF166534),
+                      fontWeight: FontWeight.w900,
+                    ),
+                  ),
+                ),
+                const _ConversationPill(
+                  label: '待预授权',
+                  foregroundColor: Color(0xFF166534),
+                  backgroundColor: Color(0xFFD7F3DF),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              body,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurface,
+                height: 1.45,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '预授权不是扣款；完成后项目级自由发送将开启。',
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: const Color(0xFF227A3A),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 10),
+            Align(
+              alignment: Alignment.centerRight,
+              child: FilledButton.icon(
+                onPressed: onPressed,
+                icon: const Icon(Icons.payments_outlined, size: 16),
+                label: Text(actionLabel),
+                style: FilledButton.styleFrom(
+                  backgroundColor: const Color(0xFF227A3A),
+                  foregroundColor: Colors.white,
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _ConversationConfirmationCard extends StatelessWidget {
   const _ConversationConfirmationCard({
     required this.confirmation,
@@ -823,7 +965,11 @@ class _ProjectCommunicationComposer extends StatelessWidget {
   const _ProjectCommunicationComposer({
     required this.controller,
     required this.enabled,
+    required this.canSendMessage,
     required this.sending,
+    required this.lockReasonText,
+    required this.requiredNextAction,
+    required this.onOpenRequiredAction,
     required this.onSend,
     required this.onAttachFile,
     required this.onAttachImage,
@@ -831,7 +977,11 @@ class _ProjectCommunicationComposer extends StatelessWidget {
 
   final TextEditingController controller;
   final bool enabled;
+  final bool canSendMessage;
   final bool sending;
+  final String? lockReasonText;
+  final String? requiredNextAction;
+  final VoidCallback? onOpenRequiredAction;
   final VoidCallback onSend;
   final VoidCallback onAttachFile;
   final VoidCallback onAttachImage;
@@ -840,6 +990,9 @@ class _ProjectCommunicationComposer extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
+    final actionLabel = _requiredActionLabel;
+    final showLock = enabled && !canSendMessage && lockReasonText != null;
+    final canInteract = enabled && !sending;
     return AnimatedPadding(
       duration: const Duration(milliseconds: 160),
       curve: Curves.easeOut,
@@ -858,18 +1011,55 @@ class _ProjectCommunicationComposer extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: <Widget>[
+                if (showLock) ...<Widget>[
+                  Row(
+                    children: <Widget>[
+                      Icon(
+                        Icons.lock_outline_rounded,
+                        size: 16,
+                        color: theme.colorScheme.error,
+                      ),
+                      const SizedBox(width: 6),
+                      Expanded(
+                        child: Text(
+                          lockReasonText!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.error,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (actionLabel != null &&
+                      onOpenRequiredAction != null) ...<Widget>[
+                    const SizedBox(height: 6),
+                    Align(
+                      alignment: Alignment.centerRight,
+                      child: TextButton.icon(
+                        onPressed: onOpenRequiredAction,
+                        icon: const Icon(Icons.open_in_new_rounded, size: 16),
+                        label: Text(actionLabel),
+                        style: TextButton.styleFrom(
+                          visualDensity: VisualDensity.compact,
+                        ),
+                      ),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                ],
                 Row(
                   children: <Widget>[
                     _ComposerActionButton(
                       icon: Icons.attach_file_rounded,
                       label: '附件',
-                      enabled: enabled && !sending,
+                      enabled: canInteract,
                       onPressed: onAttachFile,
                     ),
                     _ComposerActionButton(
                       icon: Icons.image_outlined,
                       label: '图片',
-                      enabled: enabled && !sending,
+                      enabled: canInteract,
                       onPressed: onAttachImage,
                     ),
                   ],
@@ -881,14 +1071,17 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                     Expanded(
                       child: TextField(
                         controller: controller,
-                        enabled: enabled && !sending,
+                        enabled: canInteract,
                         minLines: 1,
                         maxLines: 4,
                         textInputAction: TextInputAction.send,
-                        onSubmitted: (_) =>
-                            enabled && !sending ? onSend() : null,
+                        onSubmitted: (_) => canInteract ? onSend() : null,
                         decoration: InputDecoration(
-                          hintText: enabled ? '围绕当前项目说点什么...' : '沟通暂不可用',
+                          hintText: enabled
+                              ? canSendMessage
+                                    ? '围绕当前项目说点什么...'
+                                    : '可先输入草稿，业务节点完成后再发送'
+                              : '业务节点完成后可继续沟通',
                           filled: true,
                           isDense: true,
                           border: OutlineInputBorder(
@@ -900,7 +1093,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
                     ),
                     const SizedBox(width: 10),
                     IconButton.filled(
-                      onPressed: enabled && !sending ? onSend : null,
+                      onPressed: canInteract ? onSend : null,
                       icon: sending
                           ? const SizedBox(
                               width: 18,
@@ -917,6 +1110,18 @@ class _ProjectCommunicationComposer extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String? get _requiredActionLabel {
+    return switch (requiredNextAction) {
+      'review_bid_participation' => '去处理申请',
+      'confirm_publisher_materials' => '打开资料确认单',
+      'submit_bid_materials' => '去提交竞标资料',
+      'confirm_bid_materials' => '打开资料确认单',
+      'complete_service_fee_authorization' => '去完成预授权',
+      'open_deal_confirmation' => '打开成交确认',
+      _ => null,
+    };
   }
 }
 

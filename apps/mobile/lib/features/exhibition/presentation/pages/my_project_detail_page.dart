@@ -1,9 +1,10 @@
 part of '../exhibition_trade_pages.dart';
 
 class MyProjectDetailPage extends StatefulWidget {
-  const MyProjectDetailPage({super.key, this.projectId});
+  const MyProjectDetailPage({super.key, this.projectId, this.initialFocus});
 
   final String? projectId;
+  final String? initialFocus;
 
   @override
   State<MyProjectDetailPage> createState() => _MyProjectDetailPageState();
@@ -24,6 +25,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       );
 
   final GlobalKey _attachmentSectionKey = GlobalKey();
+  final GlobalKey _sinceritySectionKey = GlobalKey();
   ExhibitionStageLoadSnapshot? _snapshot;
   bool _loading = true;
   bool _deletingProject = false;
@@ -33,6 +35,9 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
   String? _submittingSincerityFeedbackChoice;
   _MyProjectLifecycleActionKind? _submittingLifecycleAction;
   ExhibitionLoadResult? _pricingSummaryResult;
+  ExhibitionLoadResult? _quoteBasisAttachmentResult;
+  bool _quoteBasisAttachmentsLoading = false;
+  bool _initialFocusHandled = false;
 
   @override
   void initState() {
@@ -61,7 +66,9 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final projectId =
         _normalizeId(publicProject?['projectId'] as String?) ??
         _normalizeId(widget.projectId);
-    if (_shouldReadProjectPricingSummary(state) && projectId != null) {
+    final shouldReadPricing =
+        _shouldReadProjectPricingSummary(state) && projectId != null;
+    if (shouldReadPricing) {
       await _loadProjectPricingSummary(projectId, forceRefresh: forceRefresh);
     } else if (mounted) {
       setState(() {
@@ -69,6 +76,31 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         _pricingSummaryLoading = false;
       });
     }
+    if (!mounted) {
+      return;
+    }
+    if (projectId != null && _myProjectCanOpenAttachmentStage(state)) {
+      await _loadQuoteBasisAttachments(projectId, forceRefresh: forceRefresh);
+      _scheduleInitialFocus();
+    } else if (mounted) {
+      setState(() {
+        _quoteBasisAttachmentResult = null;
+        _quoteBasisAttachmentsLoading = false;
+      });
+    }
+  }
+
+  void _scheduleInitialFocus() {
+    if (_initialFocusHandled || widget.initialFocus != 'attachments') {
+      return;
+    }
+    _initialFocusHandled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      unawaited(_scrollToAttachments());
+    });
   }
 
   String? _myProjectDetailHeaderState(Object? payload) {
@@ -84,8 +116,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final result = snapshot?.result;
 
     return _LoadPageFrame(
-      title: '我的项目详情（预发布补资料并发布页）',
-      summary: '按预发布要求补齐关键资料，确认无误后再走真实发布流程。',
+      title: '预发布补资料并发布页',
+      summary: '先补齐必传报价依据资料，再完成诚意金绿色通道表态并确认发布。',
       loading: _loading,
       result: result,
       onRetry: () => _load(forceRefresh: true),
@@ -151,14 +183,36 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             _projectAuthenticitySinceritySnapshotFromPayload(
               _pricingSummaryResult?.payload,
             );
-        final publishProgressStep = _projectPublishProgressStepForState(
+        final quoteBasisProgress = _quoteBasisProgress();
+        final basePublishProgressStep = _projectPublishProgressStepForState(
           state: state,
           sincerity: sinceritySnapshot,
         );
-        final showSincerityCard =
+        final showPrepublishTodo =
             isOwnerSurface &&
             projectId != null &&
             stage.value == _MyProjectStageBucket.submitted;
+        final publishProgressStep = showPrepublishTodo
+            ? !quoteBasisProgress.allRequiredKindsPresent
+                  ? _ProjectPublishProgressStep.quoteBasis
+                  : !_sincerityGreenChannelChoiceCompleted(sinceritySnapshot)
+                  ? _ProjectPublishProgressStep.sincerity
+                  : _ProjectPublishProgressStep.confirmation
+            : basePublishProgressStep;
+        final pendingSummary = _myProjectPrepublishPendingSummary(
+          stage: stage,
+          sincerity: sinceritySnapshot,
+          pricingLoading: _pricingSummaryLoading,
+          quoteBasis: quoteBasisProgress,
+        );
+        final bottomPlan = _myProjectBottomPublishCtaPlan(
+          projectId: projectId,
+          state: state,
+          sincerity: sinceritySnapshot,
+          pricingLoading: _pricingSummaryLoading,
+          quoteBasis: quoteBasisProgress,
+          canRunLifecycleActions: canRunLifecycleActions,
+        );
 
         return <Widget>[
           const SizedBox(height: 16),
@@ -171,6 +225,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             summaryHeading: summaryHeading,
             stage: stage,
             privateMap: privateMap,
+            pendingSummary: pendingSummary,
             showContinueAttachmentAction: showContinueAttachmentAction,
             onContinueAttachmentAction: showContinueAttachmentAction
                 ? _scrollToAttachments
@@ -179,39 +234,9 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
           const SizedBox(height: 16),
           _ProjectPublishProgressCard(
             currentStep: publishProgressStep,
-            sincerity: sinceritySnapshot,
-          ),
-          if (showSincerityCard) ...<Widget>[
-            const SizedBox(height: 16),
-            _ProjectSincerityStatusCard(
-              snapshot: sinceritySnapshot,
-              loading: _pricingSummaryLoading,
-              continuing: _continuingSincerityPayment,
-              onRefresh: () =>
-                  _loadProjectPricingSummary(projectId, forceRefresh: true),
-              onContinuePayment: sinceritySnapshot?.canContinuePayment == true
-                  ? () => _continueProjectAuthenticitySincerityPayment(
-                      projectId,
-                      _pricingSummaryResult?.payload,
-                    )
-                  : null,
-              submittingFeedbackChoice: _submittingSincerityFeedbackChoice,
-              onFeedbackChoice: (String choice) =>
-                  _submitProjectAuthenticitySincerityFreezeFeedback(
-                    projectId,
-                    choice,
-                  ),
-            ),
-          ],
-          const SizedBox(height: 16),
-          _buildStageActionCard(
-            context,
-            projectId: projectId,
-            stage: stage,
-            state: state,
-            isOwnerSurface: isOwnerSurface,
-            canRunLifecycleActions: canRunLifecycleActions,
-            canManageAttachments: canManageAttachments,
+            sincerity: showPrepublishTodo ? null : sinceritySnapshot,
+            compact: showPrepublishTodo,
+            showStepNotice: !showPrepublishTodo,
           ),
           if (canManageAttachments && projectId != null) ...<Widget>[
             const SizedBox(height: 16),
@@ -221,14 +246,76 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
                 key: ValueKey<String>('my-project-attachment-$projectId'),
                 projectId: projectId,
                 title: '报价依据资料',
-                summary: '请补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单、服务清单，作为接单方报价依据。',
+                summary: '必传：效果图、尺寸图 / 施工图、材质图 / 材料样板；设备物料清单、服务清单建议补充。',
                 // Keep the detail surface compact: no duplicated technical
                 // upload-chain explanation above the attachment controls.
                 showIntroCopy: false,
                 compactKindHints: true,
-                emptyMessage: '当前还没有补充报价依据资料。',
+                showKindHint: false,
+                showIdleUploadState: false,
+                workbenchMode: true,
+                autoUploadOnSelect: true,
+                emptyMessage: '请至少补充一类资料，方便接单方准确报价。',
+                onListResultChanged: _handleQuoteBasisAttachmentResult,
               ),
             ),
+          ],
+          if (showPrepublishTodo) ...<Widget>[
+            const SizedBox(height: 16),
+            KeyedSubtree(
+              key: _sinceritySectionKey,
+              child: _MyProjectPrepublishTodoCard(
+                sincerity: sinceritySnapshot,
+                pricingLoading: _pricingSummaryLoading,
+                quoteBasis: quoteBasisProgress,
+                bottomPlan: bottomPlan,
+                continuingSincerity: _continuingSincerityPayment,
+                onContinueSincerity: () =>
+                    _continueSincerityFromTodo(projectId),
+                onRefreshSincerity: () =>
+                    _loadProjectPricingSummary(projectId, forceRefresh: true),
+                onAddAttachments: _scrollToAttachments,
+                onPublish:
+                    bottomPlan.kind == _MyProjectBottomPublishCtaKind.publish
+                    ? () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.publish,
+                        projectId: projectId,
+                      )
+                    : null,
+                onWithdraw: _myProjectCanWithdraw(state)
+                    ? () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.withdraw,
+                        projectId: projectId,
+                      )
+                    : null,
+                onDiscard: _myProjectCanDiscardSubmitted(state)
+                    ? () => _runLifecycleAction(
+                        _MyProjectLifecycleActionKind.discardSubmitted,
+                        projectId: projectId,
+                      )
+                    : null,
+                submittingLifecycleAction: _submittingLifecycleAction,
+                submittingFeedbackChoice: _submittingSincerityFeedbackChoice,
+                onFeedbackChoice: (String choice) =>
+                    _submitProjectAuthenticitySincerityFreezeFeedback(
+                      projectId,
+                      choice,
+                    ),
+              ),
+            ),
+          ] else ...<Widget>[
+            const SizedBox(height: 16),
+            _buildStageActionCard(
+              context,
+              projectId: projectId,
+              stage: stage,
+              state: state,
+              isOwnerSurface: isOwnerSurface,
+              canRunLifecycleActions: canRunLifecycleActions,
+              canManageAttachments: canManageAttachments,
+            ),
+          ],
+          if (canManageAttachments && projectId != null) ...<Widget>[
             const SizedBox(height: 16),
             _ProjectPublicResourceSection(
               key: ValueKey<String>('my-project-public-resource-$projectId'),
@@ -242,86 +329,8 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     );
   }
 
-  Widget? _buildBottomPublishCta(ExhibitionLoadResult result) {
-    if (result.state != AppPageState.content) {
-      return null;
-    }
-    final payload = _payloadMap(result.payload);
-    final publicProject = _payloadMap(payload?['publicProject']);
-    if (publicProject == null) {
-      return null;
-    }
-    final projectId =
-        _normalizeId(publicProject['projectId'] as String?) ??
-        _normalizeId(widget.projectId);
-    final state = _normalizeId(publicProject['state'] as String?);
-    final viewerProjectRelation = _normalizeId(
-      publicProject['viewerProjectRelation'] as String?,
-    );
-    final canSubmit =
-        projectId != null &&
-        viewerProjectRelation == 'owner' &&
-        _snapshot?.isDemo != true &&
-        _myProjectStageBucketFromState(state) ==
-            _MyProjectStageBucket.submitted &&
-        _myProjectCanPublish(state);
-    if (!canSubmit) {
-      return null;
-    }
-
-    final submitting =
-        _submittingLifecycleAction == _MyProjectLifecycleActionKind.publish;
-    final theme = Theme.of(context);
-    final colorScheme = theme.colorScheme;
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.18)),
-        boxShadow: <BoxShadow>[
-          BoxShadow(
-            color: colorScheme.shadow.withValues(alpha: 0.12),
-            blurRadius: 22,
-            offset: const Offset(0, 8),
-          ),
-        ],
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _submittingLifecycleAction == null
-                    ? () => _runLifecycleAction(
-                        _MyProjectLifecycleActionKind.publish,
-                        projectId: projectId,
-                      )
-                    : null,
-                style: FilledButton.styleFrom(
-                  minimumSize: const Size.fromHeight(48),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                  ),
-                ),
-                child: Text(submitting ? '发布中...' : '资料已补齐，提交发布'),
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '提交后按平台发布规则处理，结果以云端项目状态为准。',
-              textAlign: TextAlign.center,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-                height: 1.35,
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+  Widget? _buildBottomPublishCta(ExhibitionLoadResult _) {
+    return null;
   }
 
   Widget _buildSavedSummaryCard({
@@ -333,14 +342,19 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     required String? summaryHeading,
     required _MyProjectStageOption stage,
     required Map<String, Object?> privateMap,
+    required String pendingSummary,
     required bool showContinueAttachmentAction,
     required VoidCallback? onContinueAttachmentAction,
   }) {
     final children = <Widget>[
-      _DetailLine(label: '项目名称', value: title ?? '未提供'),
-      _DetailLine(label: '项目编号', value: projectNo ?? '未提供'),
-      _DetailLine(label: '当前阶段', value: stage.label, highlight: true),
+      _ProjectSummaryWorkbenchHeader(
+        title: title ?? '未提供',
+        projectNo: projectNo ?? '未提供',
+        stageLabel: stage.label,
+        pendingSummary: pendingSummary,
+      ),
       if (_summaryExpanded) ...<Widget>[
+        const SizedBox(height: 14),
         _DetailLine(label: '项目类型', value: _buildingTypeLabel(buildingType)),
         _DetailLine(
           label: '预算金额',
@@ -367,7 +381,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
             highlight: true,
           ),
       ],
-      const SizedBox(height: 8),
+      const SizedBox(height: 14),
       Align(
         alignment: Alignment.centerRight,
         child: Wrap(
@@ -429,7 +443,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
         const _StateMessage(
           title: '发布前确认',
           body:
-              '预发布阶段已开放报价依据资料，请先补充效果图、尺寸图 / 施工图、材质图 / 材料样板、设备物料清单和服务清单。确认无误后再点击“检查无误，确定发布”。',
+              '预发布阶段已开放报价依据资料，请先补充效果图、尺寸图 / 施工图、材质图 / 材料样板；设备物料清单和服务清单建议继续补齐。确认无误后再发布。',
         ),
       ],
       const SizedBox(height: 12),
@@ -630,7 +644,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
       return;
     }
     if (kind == _MyProjectLifecycleActionKind.publish &&
-        !await _ensureRequiredEffectImageBeforePublish(projectId)) {
+        !await _ensureRequiredQuoteBasisBeforePublish(projectId)) {
       return;
     }
 
@@ -646,12 +660,12 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
 
     setState(() => _submittingLifecycleAction = kind);
     if (kind == _MyProjectLifecycleActionKind.publish) {
-      final pricingGateSatisfied =
-          await _ensureProjectAuthenticitySincerityBeforePublish(projectId);
+      final greenChannelChoiceReady =
+          await _ensureSincerityGreenChannelChoiceBeforePublish(projectId);
       if (!mounted) {
         return;
       }
-      if (!pricingGateSatisfied) {
+      if (!greenChannelChoiceReady) {
         setState(() => _submittingLifecycleAction = null);
         return;
       }
@@ -699,6 +713,28 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     }
 
     ExhibitionConsumerLayer.instance.invalidateMyProjectList();
+    if (kind == _MyProjectLifecycleActionKind.withdraw) {
+      final editResult = await ExhibitionConsumerLayer.instance
+          .loadProjectEditDetail(projectId: projectId, forceRefresh: true);
+      if (!mounted) {
+        return;
+      }
+      if (editResult.state != AppPageState.content ||
+          _stateFromPayload(editResult.payload) != 'draft') {
+        await _load(forceRefresh: true);
+        if (!mounted) {
+          return;
+        }
+        _showPageMessage('项目已提交撤回请求；草稿编辑页尚未回读到草稿状态，请稍后刷新。');
+        return;
+      }
+      _showPageMessage(action.successMessage);
+      Navigator.of(context).pushReplacementNamed(
+        ExhibitionRoutes.projectEditWithProjectId(projectId),
+      );
+      return;
+    }
+
     await _load(forceRefresh: true);
     if (!mounted) {
       return;
@@ -825,8 +861,11 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     if (!mounted) {
       return false;
     }
-    if (pollResult.isSuccess ||
-        _projectAuthenticitySinceritySatisfied(pollResult.result.payload)) {
+    final pollSatisfied =
+        pollResult.isSuccess ||
+        _projectAuthenticitySinceritySatisfied(pollResult.result.payload);
+    if (pollSatisfied) {
+      setState(() => _pricingSummaryResult = pollResult.result);
       return true;
     }
 
@@ -838,6 +877,23 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
           : '暂未取得可打开的支付链接；当前诚意金仍未完成，请刷新状态或稍后再试。',
     );
     return false;
+  }
+
+  Future<void> _continueSincerityFromTodo(String projectId) async {
+    final satisfied = await _ensureProjectAuthenticitySincerityBeforePublish(
+      projectId,
+    );
+    if (!mounted) {
+      return;
+    }
+    if (satisfied) {
+      _showPageMessage('项目真实性诚意金已满足，可以继续发布确认。');
+      return;
+    }
+    await _loadProjectPricingSummary(projectId, forceRefresh: true);
+    if (!mounted) {
+      return;
+    }
   }
 
   Future<void> _submitProjectAuthenticitySincerityFreezeFeedback(
@@ -874,7 +930,7 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     return _openPaymentChannelPayload(payload);
   }
 
-  Future<bool> _ensureRequiredEffectImageBeforePublish(String projectId) async {
+  Future<bool> _ensureRequiredQuoteBasisBeforePublish(String projectId) async {
     final result = await ExhibitionConsumerLayer.instance
         .loadProjectAttachments(projectId: projectId, forceRefresh: true);
     if (!mounted) {
@@ -888,16 +944,50 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final attachments =
         _projectAttachmentListFromPayload(result.payload)?.attachments ??
         const <ProjectAttachmentReadModel>[];
-    final hasEffectImage = attachments.any(
-      (ProjectAttachmentReadModel item) =>
-          item.attachmentKind == _projectAttachmentKindEffectImage,
-    );
-    if (!hasEffectImage) {
-      _showPageMessage('请先上传必传效果图，再进行正式发布确认。');
+    final counts = <String, int>{
+      for (final String kind in _projectRequiredQuoteBasisAttachmentKinds)
+        kind: 0,
+    };
+    for (final attachment in attachments) {
+      final current = counts[attachment.attachmentKind];
+      if (current != null) {
+        counts[attachment.attachmentKind] = current + 1;
+      }
+    }
+    final missingLabels = _projectRequiredQuoteBasisAttachmentKinds
+        .where((String kind) => (counts[kind] ?? 0) <= 0)
+        .map(_projectAttachmentKindLabel)
+        .toList(growable: false);
+    if (missingLabels.isNotEmpty) {
+      _showPageMessage('请先补齐必传资料：${missingLabels.join('、')}。');
       await _scrollToAttachments();
       return false;
     }
     return true;
+  }
+
+  Future<bool> _ensureSincerityGreenChannelChoiceBeforePublish(
+    String projectId,
+  ) async {
+    final summary = await ExhibitionConsumerLayer.instance
+        .loadProjectPricingSummary(projectId: projectId, forceRefresh: true);
+    if (!mounted) {
+      return false;
+    }
+    if (summary.state != AppPageState.content) {
+      _showPageMessage(_userFacingLoadFailureMessage(summary));
+      return false;
+    }
+    final snapshot = _projectAuthenticitySinceritySnapshotFromPayload(
+      summary.payload,
+    );
+    setState(() => _pricingSummaryResult = summary);
+    if (_sincerityGreenChannelChoiceCompleted(snapshot)) {
+      return true;
+    }
+    _showPageMessage('请先选择是否支持项目真实性诚意金机制；选择暂不支持也可继续发布。');
+    await _scrollToSincerity();
+    return false;
   }
 
   bool _projectAuthenticitySinceritySatisfied(Object? payload) {
@@ -998,6 +1088,51 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     });
   }
 
+  Future<void> _loadQuoteBasisAttachments(
+    String projectId, {
+    bool forceRefresh = false,
+  }) async {
+    setState(() => _quoteBasisAttachmentsLoading = true);
+    final result = await ExhibitionConsumerLayer.instance
+        .loadProjectAttachments(
+          projectId: projectId,
+          forceRefresh: forceRefresh,
+        );
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _quoteBasisAttachmentResult = result;
+      _quoteBasisAttachmentsLoading = false;
+    });
+  }
+
+  void _handleQuoteBasisAttachmentResult(ExhibitionLoadResult? result) {
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _quoteBasisAttachmentResult = result;
+      _quoteBasisAttachmentsLoading = false;
+    });
+  }
+
+  _QuoteBasisChecklistProgress _quoteBasisProgress() {
+    final result = _quoteBasisAttachmentResult;
+    final attachments = _projectAttachmentListFromPayload(
+      result?.payload,
+    )?.attachments;
+    final unavailable =
+        result != null &&
+        result.state != AppPageState.content &&
+        result.state != AppPageState.empty;
+    return _quoteBasisChecklistProgressFromAttachments(
+      attachments: attachments,
+      loading: _quoteBasisAttachmentsLoading,
+      unavailable: unavailable,
+    );
+  }
+
   String _projectAuthenticitySincerityPendingMessage(
     P0PayPaymentPollResult result,
   ) {
@@ -1029,6 +1164,21 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
 
     await Scrollable.ensureVisible(
       attachmentContext,
+      duration: const Duration(milliseconds: 240),
+      curve: Curves.easeOutCubic,
+      alignment: 0.12,
+    );
+  }
+
+  Future<void> _scrollToSincerity() async {
+    final sincerityContext = _sinceritySectionKey.currentContext;
+    if (sincerityContext == null) {
+      _showPageMessage('当前还没有可处理的诚意金绿色通道。');
+      return;
+    }
+
+    await Scrollable.ensureVisible(
+      sincerityContext,
       duration: const Duration(milliseconds: 240),
       curve: Curves.easeOutCubic,
       alignment: 0.12,
@@ -1135,5 +1285,160 @@ class _MyProjectDetailPageState extends State<MyProjectDetailPage> {
     final messenger = ScaffoldMessenger.maybeOf(context);
     messenger?.hideCurrentSnackBar();
     messenger?.showSnackBar(SnackBar(content: Text(message)));
+  }
+}
+
+class _ProjectSummaryWorkbenchHeader extends StatelessWidget {
+  const _ProjectSummaryWorkbenchHeader({
+    required this.title,
+    required this.projectNo,
+    required this.stageLabel,
+    required this.pendingSummary,
+  });
+
+  final String title;
+  final String projectNo;
+  final String stageLabel;
+  final String pendingSummary;
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerLowest,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.primary.withValues(alpha: 0.12)),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            final showIllustration = constraints.maxWidth >= 310;
+            return Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      _ProjectSummaryLine(label: '项目名称', value: title),
+                      const SizedBox(height: 8),
+                      _ProjectSummaryLine(label: '项目编号', value: projectNo),
+                      const SizedBox(height: 8),
+                      _ProjectSummaryLine(
+                        label: '当前阶段',
+                        value: stageLabel,
+                        highlighted: true,
+                      ),
+                      const SizedBox(height: 8),
+                      _ProjectSummaryLine(
+                        label: '待处理事项',
+                        value: pendingSummary,
+                        highlighted: true,
+                        maxLines: 3,
+                      ),
+                    ],
+                  ),
+                ),
+                if (showIllustration) ...<Widget>[
+                  const SizedBox(width: 14),
+                  const _ProjectSummaryIllustration(),
+                ],
+              ],
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+class _ProjectSummaryLine extends StatelessWidget {
+  const _ProjectSummaryLine({
+    required this.label,
+    required this.value,
+    this.highlighted = false,
+    this.maxLines = 2,
+  });
+
+  final String label;
+  final String value;
+  final bool highlighted;
+  final int maxLines;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            maxLines: maxLines,
+            overflow: TextOverflow.ellipsis,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: highlighted ? colorScheme.onSurface : null,
+              fontWeight: highlighted ? FontWeight.w900 : FontWeight.w700,
+              height: 1.35,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ProjectSummaryIllustration extends StatelessWidget {
+  const _ProjectSummaryIllustration();
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: colorScheme.primaryContainer.withValues(alpha: 0.42),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: SizedBox(
+        width: 72,
+        height: 72,
+        child: Stack(
+          alignment: Alignment.center,
+          children: <Widget>[
+            Positioned(
+              right: 12,
+              top: 12,
+              child: Icon(
+                Icons.description_outlined,
+                size: 36,
+                color: colorScheme.primary.withValues(alpha: 0.55),
+              ),
+            ),
+            Positioned(
+              left: 14,
+              bottom: 15,
+              child: Icon(
+                Icons.fact_check_outlined,
+                size: 30,
+                color: colorScheme.primary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

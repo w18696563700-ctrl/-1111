@@ -1,13 +1,21 @@
 part of '../exhibition_trade_pages.dart';
 
 class ProjectAlbumPage extends StatelessWidget {
-  const ProjectAlbumPage({super.key, this.projectId});
+  const ProjectAlbumPage({super.key, this.projectId, this.threadId});
 
   final String? projectId;
+  final String? threadId;
 
   @override
   Widget build(BuildContext context) {
     final normalizedProjectId = projectId?.trim();
+    final routeName = ModalRoute.of(context)?.settings.name;
+    final routeThreadId = routeName == null
+        ? null
+        : Uri.tryParse(routeName)?.queryParameters['threadId'];
+    final normalizedThreadId = (threadId?.trim().isNotEmpty ?? false)
+        ? threadId!.trim()
+        : routeThreadId?.trim();
     if (normalizedProjectId == null || normalizedProjectId.isEmpty) {
       return const _ProjectAlbumPageFrame(
         child: _ActionCard(
@@ -19,7 +27,12 @@ class ProjectAlbumPage extends StatelessWidget {
       );
     }
     return _ProjectAlbumPageFrame(
-      child: _ProjectAlbumSection(projectId: normalizedProjectId),
+      child: _ProjectAlbumSection(
+        projectId: normalizedProjectId,
+        threadId: normalizedThreadId?.isEmpty ?? true
+            ? null
+            : normalizedThreadId,
+      ),
     );
   }
 }

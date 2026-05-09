@@ -78,6 +78,7 @@ export type CounterpartConversationBusinessCardProjection = {
 
 export type CounterpartConversationProjectGroupProjection = {
   projectId: string;
+  threadId: string;
   projectDisplayTitle: string;
   titleVisibility: 'masked' | 'visible';
   projectRelation: 'my_published' | 'my_bid' | 'unknown';
@@ -88,6 +89,13 @@ export type CounterpartConversationProjectGroupProjection = {
   projectUnreadCount: number;
   hasProjectUnread: boolean;
   latestUnreadMessageAt: string | null;
+  businessTodoSummary: {
+    bidParticipationReviewPendingCount: number;
+    publisherMaterialReviewPendingCount: number;
+    bidMaterialReviewPendingCount: number;
+    dealConfirmationPendingCount: number;
+    totalPendingCount: number;
+  };
   pricingSummary?: Record<string, unknown>;
   ratingEntry: CounterpartConversationRatingEntryProjection | null;
   cards: CounterpartConversationBusinessCardProjection[];

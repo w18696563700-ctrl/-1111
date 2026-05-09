@@ -60,6 +60,7 @@ export type MyProjectPrivateProgressSummaryReadModel =
 export type MyProjectPrivateProgressReadModel = MyProjectPrivateProgressBase;
 
 export type MyProjectListItemReadModel = {
+  projectCreatedAt: string | null;
   publicProject: ProjectShowcaseListItemReadModel;
   privateSummary: MyProjectPrivateProgressSummaryReadModel;
 };

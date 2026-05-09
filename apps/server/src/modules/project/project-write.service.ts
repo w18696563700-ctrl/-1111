@@ -1,18 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, Repository } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { ProjectPublishAuditService } from '../audit/project-publish-audit.service';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { authPermissionInsufficient } from '../organization/organization-auth.errors';
-import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
-import { projectAuthenticitySincerityRequired } from '../p0_pay/p0-pay.errors';
-import {
-  PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
-  PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
-  projectAuthenticitySincerityInternalTestNoFreezeEnabled,
-} from '../p0_pay/p0-pay-internal-test-no-freeze.policy';
 import { VerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { ProjectEntity } from './entities/project.entity';
@@ -24,6 +17,7 @@ import {
   projectSubmitInvalid,
   projectUnavailable,
 } from './project.errors';
+import { ProjectPublishGateService } from './project-publish-gate.service';
 import { ProjectPresenter } from './project.presenter';
 
 const PROJECT_DRAFT_STATE = 'draft';
@@ -69,7 +63,8 @@ export class ProjectWriteService {
     private readonly presenter: ProjectPresenter,
     private readonly auditService: ProjectPublishAuditService,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
-    private readonly eligibilityService: CurrentActorEligibilityService
+    private readonly eligibilityService: CurrentActorEligibilityService,
+    private readonly publishGateService: ProjectPublishGateService
   ) {}
 
   async createProject(payload: Record<string, unknown>, context: RequestContext) {
@@ -223,7 +218,31 @@ export class ProjectWriteService {
       if (project.state !== PROJECT_SUBMITTED_STATE) {
         throw projectInvalidState('Only submitted projects may be published.');
       }
-      const pricingGate = await this.requirePaidPricingGate(manager, project, auditContext);
+      const pricingGate = await this.publishGateService.requireProjectPublishGate(
+        manager,
+        project,
+        currentSession
+      );
+      if (pricingGate.authenticitySincerityGateResult !== 'paid') {
+        await this.auditService.record(
+          {
+            aggregateType: 'project',
+            aggregateId: project.id,
+            eventType: 'project_publish_pricing_gate_green_channel_feedback',
+            payload: {
+              pricingGateApplied: true,
+              authenticitySincerityRequired: true,
+              authenticitySincerityStatus: pricingGate.authenticitySincerityStatus,
+              authenticitySincerityGateResult: pricingGate.authenticitySincerityGateResult,
+              authenticitySincerityOrderId: pricingGate.orderId,
+              freezeFeedbackChoice: pricingGate.freezeFeedbackChoice,
+              requiredAttachmentKinds: pricingGate.requiredAttachmentKinds,
+            },
+          },
+          auditContext,
+          manager
+        );
+      }
 
       project.state = PROJECT_PUBLISHED_STATE;
       project.summary = this.buildProjectSummary(PROJECT_PUBLISHED_STATE);
@@ -242,6 +261,8 @@ export class ProjectWriteService {
             authenticitySincerityStatus: pricingGate.authenticitySincerityStatus,
             authenticitySincerityGateResult: pricingGate.authenticitySincerityGateResult,
             authenticitySincerityOrderId: pricingGate.orderId,
+            freezeFeedbackChoice: pricingGate.freezeFeedbackChoice,
+            requiredAttachmentKinds: pricingGate.requiredAttachmentKinds,
           },
         },
         auditContext,
@@ -250,80 +271,6 @@ export class ProjectWriteService {
 
       return this.presenter.toAcceptedResponse(project.id, project.state);
     });
-  }
-
-  private async requirePaidPricingGate(
-    manager: EntityManager,
-    project: ProjectEntity,
-    auditContext: RequestContext
-  ) {
-    const order = await manager.getRepository(InquiryQuoteDepositEntity).findOne({
-      where: {
-        taskId: project.id,
-        publisherOrganizationId: project.organizationId,
-        status: 'paid',
-      },
-      order: { updatedAt: 'DESC' },
-    });
-    if (order) {
-      return {
-        orderId: order.id,
-        authenticitySincerityStatus: 'paid',
-        authenticitySincerityGateResult: 'paid',
-      };
-    }
-
-    const latestOrder = await manager.getRepository(InquiryQuoteDepositEntity).findOne({
-      where: {
-        taskId: project.id,
-        publisherOrganizationId: project.organizationId,
-      },
-      order: { updatedAt: 'DESC' },
-    });
-    if (
-      projectAuthenticitySincerityInternalTestNoFreezeEnabled() &&
-      latestOrder?.paymentOrderId
-    ) {
-      await this.auditService.record(
-        {
-          aggregateType: 'project',
-          aggregateId: project.id,
-          eventType: 'project_publish_pricing_gate_internal_test_no_freeze',
-          payload: {
-            pricingGateApplied: true,
-            authenticitySincerityRequired: true,
-            authenticitySincerityStatus: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
-            authenticitySincerityGateResult: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
-            authenticitySincerityOrderId: latestOrder.id,
-          },
-        },
-        auditContext,
-        manager
-      );
-      return {
-        orderId: latestOrder.id,
-        authenticitySincerityStatus: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_STATUS,
-        authenticitySincerityGateResult: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_GATE_STATUS,
-      };
-    }
-
-    await this.auditService.record(
-      {
-        aggregateType: 'project',
-        aggregateId: project.id,
-        eventType: 'project_publish_blocked_by_pricing_gate',
-        payload: {
-          pricingGateApplied: true,
-          authenticitySincerityRequired: true,
-          requiredOrderStatus: 'paid',
-          actualOrderStatus: 'missing_or_unpaid',
-          pricingErrorCode: 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED',
-        },
-      },
-      auditContext,
-      manager
-    );
-    throw projectAuthenticitySincerityRequired();
   }
 
   async deleteProject(projectId: string, context: RequestContext) {

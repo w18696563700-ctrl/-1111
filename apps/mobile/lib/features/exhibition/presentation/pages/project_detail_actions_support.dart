@@ -264,8 +264,8 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
                 bidId: currentViewerBidId,
               ),
             ),
-            icon: const Icon(Icons.handshake_rounded),
-            label: const Text('沟通与投标'),
+            icon: const Icon(Icons.article_outlined),
+            label: const Text('查看我的竞标'),
           )
         else if (canContinueBid && participationApproved)
           FilledButton(
@@ -275,7 +275,7 @@ extension _ProjectDetailActionsSupport on _ProjectDetailPageState {
                 projectMap,
               ),
             ),
-            child: const Text('立即参与竞标'),
+            child: const Text('继续参与竞标'),
           )
         else if (canContinueBid && canRequestParticipation)
           FilledButton(

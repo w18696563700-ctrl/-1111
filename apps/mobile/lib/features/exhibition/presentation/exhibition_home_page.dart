@@ -12,9 +12,11 @@ import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.da
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_location_context_store.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
-import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/exhibition/presentation/enterprise_hub_board_surface.dart';
+import 'package:mobile/features/exhibition/presentation/forum/forum_shared_components.dart';
 import 'package:mobile/features/profile/navigation/profile_identity_routes.dart';
+import 'package:mobile/shared/widgets/app_page_state_view.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 
 part 'exhibition_home_page_sections.dart';
@@ -24,6 +26,7 @@ part 'exhibition_home_module_deck.dart';
 part 'exhibition_home_module_panels.dart';
 part 'exhibition_home_channel_rails.dart';
 part 'exhibition_home_channel_support.dart';
+part 'exhibition_home_forum_panel.dart';
 part 'exhibition_home_project_forum_panels.dart';
 part 'exhibition_home_enterprise_panels.dart';
 part 'exhibition_home_location_options.dart';
@@ -178,72 +181,77 @@ class _ExhibitionHomePageState extends State<ExhibitionHomePage> {
       color: ExhibitionHomeVisualTokens.pageBackground,
       child: Stack(
         children: <Widget>[
-          ListView(
-            controller: _scrollController,
-            padding: EdgeInsets.fromLTRB(
-              ExhibitionHomeVisualTokens.spacingPage,
-              14,
-              ExhibitionHomeVisualTokens.spacingPage,
-              bottomClearance,
+          RefreshIndicator(
+            onRefresh: () => _refreshWholePage(useRefreshPath: true),
+            child: ListView(
+              controller: _scrollController,
+              physics: const AlwaysScrollableScrollPhysics(),
+              padding: EdgeInsets.fromLTRB(
+                ExhibitionHomeVisualTokens.spacingPage,
+                14,
+                ExhibitionHomeVisualTokens.spacingPage,
+                bottomClearance,
+              ),
+              children: <Widget>[
+                const _HomeHeroHeader(),
+                const SizedBox(height: 14),
+                _HomeWeatherCard(
+                  expanded: _weatherExpanded,
+                  refreshing: _refreshing,
+                  locating: _locating,
+                  locationSnapshot: _locationSnapshot,
+                  manualLocationSelection: _manualLocationSelection,
+                  homeResult: _homeResult,
+                  weatherProjection: weatherProjection,
+                  onToggleExpanded: () {
+                    setState(() {
+                      _weatherExpanded = !_weatherExpanded;
+                    });
+                  },
+                  onRefreshPressed: () =>
+                      _refreshWholePage(useRefreshPath: true),
+                  onRelocatePressed: () => _refreshWholePage(
+                    useRefreshPath: true,
+                    forceDeviceRelocation: true,
+                  ),
+                  onManualSelectionPressed: _openManualLocationSelect,
+                ),
+                const SizedBox(height: 10),
+                const _HomeSectionHeader(eyebrow: '公开入口', title: '推荐频道'),
+                const SizedBox(height: 6),
+                _HomeModuleDeck(
+                  selectedTab: _selectedModuleTab,
+                  onTabSelected: (_HomeModuleTab tab) {
+                    setState(() {
+                      _selectedModuleTab = tab;
+                    });
+                  },
+                  loading: _refreshing,
+                  locationSnapshot: _locationSnapshot,
+                  projectResult: _projectResult,
+                  projectItems: projectItems,
+                  onRefreshHome: () => _refreshWholePage(useRefreshPath: true),
+                  onRelocateHome: () => _refreshWholePage(
+                    useRefreshPath: true,
+                    forceDeviceRelocation: true,
+                  ),
+                  onOpenProjectList: _openShowcase,
+                  onOpenProjectCreate: _openProjectCreate,
+                  onOpenProjectDetail: _openProjectDetail,
+                  onOpenForum: _openForum,
+                  onOpenForumPublish: _openForumPublish,
+                  onOpenForumPost: _openForumPost,
+                  onOpenCompanyBoard: () =>
+                      _openEnterpriseBoard(EnterpriseBoardType.company),
+                  onOpenFactoryBoard: () =>
+                      _openEnterpriseBoard(EnterpriseBoardType.factory),
+                  onOpenSupplierBoard: () =>
+                      _openEnterpriseBoard(EnterpriseBoardType.supplier),
+                  onOpenEnterpriseItem: _openEnterpriseListItem,
+                  onOpenTeamExplanation: _openTeamPlaceholderExplanation,
+                ),
+              ],
             ),
-            children: <Widget>[
-              const _HomeHeroHeader(),
-              const SizedBox(height: 14),
-              _HomeWeatherCard(
-                expanded: _weatherExpanded,
-                refreshing: _refreshing,
-                locating: _locating,
-                locationSnapshot: _locationSnapshot,
-                manualLocationSelection: _manualLocationSelection,
-                homeResult: _homeResult,
-                weatherProjection: weatherProjection,
-                onToggleExpanded: () {
-                  setState(() {
-                    _weatherExpanded = !_weatherExpanded;
-                  });
-                },
-                onRefreshPressed: () => _refreshWholePage(useRefreshPath: true),
-                onRelocatePressed: () => _refreshWholePage(
-                  useRefreshPath: true,
-                  forceDeviceRelocation: true,
-                ),
-                onManualSelectionPressed: _openManualLocationSelect,
-              ),
-              const SizedBox(height: 10),
-              const _HomeSectionHeader(eyebrow: '公开入口', title: '推荐频道'),
-              const SizedBox(height: 6),
-              _HomeModuleDeck(
-                selectedTab: _selectedModuleTab,
-                onTabSelected: (_HomeModuleTab tab) {
-                  setState(() {
-                    _selectedModuleTab = tab;
-                  });
-                },
-                loading: _refreshing,
-                locationSnapshot: _locationSnapshot,
-                projectResult: _projectResult,
-                projectItems: projectItems,
-                onRefreshHome: () => _refreshWholePage(useRefreshPath: true),
-                onRelocateHome: () => _refreshWholePage(
-                  useRefreshPath: true,
-                  forceDeviceRelocation: true,
-                ),
-                onOpenProjectList: _openShowcase,
-                onOpenProjectCreate: _openProjectCreate,
-                onOpenProjectDetail: _openProjectDetail,
-                onOpenForum: _openForum,
-                onOpenForumPublish: _openForumPublish,
-                onOpenForumPost: _openForumPost,
-                onOpenCompanyBoard: () =>
-                    _openEnterpriseBoard(EnterpriseBoardType.company),
-                onOpenFactoryBoard: () =>
-                    _openEnterpriseBoard(EnterpriseBoardType.factory),
-                onOpenSupplierBoard: () =>
-                    _openEnterpriseBoard(EnterpriseBoardType.supplier),
-                onOpenEnterpriseItem: _openEnterpriseListItem,
-                onOpenTeamExplanation: _openTeamPlaceholderExplanation,
-              ),
-            ],
           ),
           Positioned(
             right: 20,

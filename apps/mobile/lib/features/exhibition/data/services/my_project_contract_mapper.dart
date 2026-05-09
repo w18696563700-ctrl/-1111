@@ -60,6 +60,7 @@ List<Map<String, Object?>>? _sanitizeMyProjectItemList(Object? rawList) {
 
 Map<String, Object?> _sanitizeMyProjectListItem(Map<String, Object?> payload) {
   return _compactMap(<String, Object?>{
+    'projectCreatedAt': _sanitizeNullableText(payload['projectCreatedAt']),
     'publicProject': _sanitizeMyProjectPublicProject(payload['publicProject']),
     'privateSummary': _sanitizeMyProjectPrivateProgressObject(
       payload['privateSummary'],

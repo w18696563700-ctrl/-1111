@@ -53,6 +53,15 @@ export class AppBidController {
     return this.bidService.submitBid(payload, headers);
   }
 
+  @Post('submission/supplement')
+  @HttpCode(HttpStatus.ACCEPTED)
+  supplementBidSubmission(
+    @Body() payload: Record<string, unknown>,
+    @Headers() headers: IncomingHttpHeaders,
+  ) {
+    return this.bidService.supplementBidSubmission(payload, headers);
+  }
+
   @Get('submission/snapshot')
   getBidSubmissionSnapshot(
     @Query('projectId') projectId: string | undefined,

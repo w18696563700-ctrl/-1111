@@ -24,11 +24,11 @@ It is not a demo, not a pure frontend prototype, and not a one-off script reposi
 - Server / backend: deployed on Alibaba Cloud.
 - Cloud active runtime takes precedence over local inference for any runtime claim.
 - Do not assume local `apps/bff` or local `apps/server` is the active runtime.
-- Default local tunnel to cloud:
-  - `ssh -N -L 8080:127.0.0.1:80 root@47.108.180.198`
-- Default local integration base URL:
+- Default cloud tunnel access must come from an approved private runtime runbook or from explicit user-provided task instructions for the current task.
+- Do not hard-code cloud host, IP, username, private key path, production tunnel command, or privileged access method in root `AGENTS.md`.
+- Default local integration base URL, only when an approved tunnel is active:
   - `http://127.0.0.1:8080`
-- Default read-only health checks:
+- Default read-only health checks, only when an approved tunnel is active:
   - `curl -i http://127.0.0.1:8080/health/bff/live`
   - `curl -i http://127.0.0.1:8080/health/server/live`
 
@@ -214,9 +214,12 @@ Output:
 No-Go conditions:
 
 - Tunnel unavailable and runtime is required
-- Endpoint returns 401 / 404 / 5xx and task requires availability
+- Endpoint smoke result is inconsistent with the expected route behavior.
+- For unauthenticated app-facing route existence checks, `401` can be `PASS` when the expected behavior is authentication required.
+- `404`, unexpected `5xx`, empty-success masking, or a status inconsistent with the expected smoke result is `NO-GO` when route availability is required.
 - Cloud artifact cannot be verified but conclusion depends on deployment
 - Any validation would require unsafe business writes without explicit approval
+- Local tests or local source code cannot be used to claim cloud runtime pass.
 
 ## 7. Layer Responsibilities
 
@@ -420,6 +423,10 @@ Do not run these unless the user explicitly authorizes the exact operation and t
 
 ## 12. Security And Sensitive Information
 
+Sensitive value rule:
+
+Never print, paste, log, store, or expose secret values.
+
 Never output, write into docs, or paste into chat:
 
 - real passwords
@@ -436,6 +443,17 @@ Never output, write into docs, or paste into chat:
 If sensitive information is encountered, only write: `发现敏感配置风险`.
 
 Do not print secret values while reading env files, cloud configs, process environments, logs, or deployment scripts.
+
+Forbidden-file rule:
+
+- Do not read, modify, stage, commit, overwrite, or merge explicitly forbidden files unless the user explicitly approves the exact file, purpose, and operation.
+- Seeing a forbidden path in `git status --short` is not permission to inspect its contents.
+
+Runtime inspection rule:
+
+- Read-only runtime inspection is allowed only when explicitly required by the task, when the current gate permits it, and only if it does not expose secrets or mutate cloud state.
+- If secret or sensitive configuration is encountered, report only: `发现敏感配置风险`.
+- Do not quote, summarize, transform, or partially expose secret values.
 
 ## 13. File Length And Responsibility Gate
 
@@ -533,7 +551,9 @@ Hard distinctions:
 ### Runtime Tasks
 
 - Required by default: read-only health checks.
-- Endpoint smoke must report method, path, status, and whether it is read-only.
+- Endpoint smoke must report method, path, status, whether it is read-only, and the expected status or expected error family.
+- Endpoint smoke must compare the actual status against the expected smoke result.
+- For unauthenticated app-facing route existence checks, `401` can be `PASS` when the expected behavior is authentication required.
 - Any write-smoke requires explicit approval and a rollback-aware plan.
 
 ## 17. Decision Standard
@@ -563,7 +583,19 @@ For simple tasks, keep the same information compressed, but do not omit real ris
 - `apps/bff`: BFF Agent; app-facing aggregation only, no business truth
 - `apps/server`: Server Agent; business truth, permissions, state machines, audit, governance
 - `docs/**`: Codex control-led truth and contract work
-- `packages/contracts/**`: contract tooling projection; do not hand-edit generated files unless explicitly targeted
+- `packages/contracts/**`: contract tooling projection; generated contract files should be updated through the approved generator when available.
+
+Generated contract files should be updated through the approved generator when available.
+
+Do not hand-edit generated files unless:
+
+- the user explicitly approves it,
+- the generator is unavailable or out of scope,
+- the final report marks the manual edit as a temporary exception.
+
+If OpenAPI changes but generated types are not updated, mark contract closure as incomplete.
+
+If generated types change without OpenAPI or SSOT justification, mark it as contract drift.
 
 ## 20. Default Execution Strategy
 
@@ -594,4 +626,406 @@ Default deferrals:
 
 The more stable option is to freeze truth and verify runtime before implementation. The lower-cost option is to update root rules before changing subdirectory rules. The current-stage option is to protect boundaries and close existing drift before expanding features. The highest-risk option is to continue adding product surfaces while docs, contracts, local source, and cloud runtime are not clearly aligned.
 
-Root AGENTS.md only stores durable repo-wide rules. Detailed layer-specific rules should be moved to the closest subdirectory AGENTS.md when repeated mistakes appear.
+Root `AGENTS.md` stores durable repo-wide rules only.
+
+Detailed layer-specific rules should live in the closest subdirectory `AGENTS.md` when repeated mistakes appear.
+
+Recommended split:
+
+- `apps/mobile/AGENTS.md` for Flutter-specific rules.
+- `apps/admin/AGENTS.md` for Admin-specific rules.
+- `apps/bff/AGENTS.md` for BFF route, transport, and aggregation rules.
+- `apps/server/AGENTS.md` for Server domain truth, migrations, permissions, audit, and state-machine rules.
+- `docs/AGENTS.md` for SSOT freeze and documentation rules.
+- `packages/contracts/AGENTS.md` for OpenAPI and generated contract rules.
+- `infra/AGENTS.md` for runtime, deployment, and cloud safety rules.
+
+Root rules remain binding across the repository.
+
+Do not weaken root rules in subdirectory `AGENTS.md`.
+
+## 21. Audit-First Workflow Addendum
+
+### Working Mode
+
+For architecture, product, module-boundary, workflow, contract, and platform-planning tasks, default to audit-first mode.
+
+Do not modify code before producing an evidence-based read-only report unless:
+
+- the user explicitly asks for implementation
+- the relevant stage gates have passed
+- the change scope is bounded
+
+For large audits, propose parallel subagent decomposition only when the user explicitly authorizes it. The main thread must consolidate findings, risks, boundaries, and final decisions.
+
+### Subagent Rule
+
+Subagents are read-only by default.
+
+For audits, planning, merge checks, risk analysis, and codebase exploration, subagents may inspect files, collect evidence, and propose actions, but must not modify files.
+
+For implementation tasks, parallel subagent writes are forbidden unless the user explicitly approves parallel writes.
+
+The main agent must consolidate subagent findings and own the final patch, final diff review, and final receipt.
+
+Subagents must have bounded tasks and clear return formats.
+
+Do not spawn subagents unless the user explicitly requests them or the task scope clearly justifies proposing them for approval.
+
+### Product Architecture Review Standard
+
+When reviewing any module or product surface, classify findings into:
+
+1. Current minimum viable closed loop
+2. Reserved but not enabled yet
+3. Future extension slots
+
+The review must explicitly state:
+
+- which option is more stable
+- which option is lower cost
+- which option fits the current stage
+- which option carries higher risk
+
+### Evidence Standard
+
+Every conclusion, risk, boundary decision, and implementation recommendation must cite concrete evidence, such as:
+
+- file paths
+- functions
+- components
+- API names
+- schema names
+- OpenAPI paths
+- generated types
+- tests
+- logs
+- runtime smoke evidence
+
+Do not use local code existence as proof of cloud runtime availability.
+
+### Risk Standard
+
+Classify issues as:
+
+- `P0`: core flow broken, data corruption, permission leak, build failure, runtime unavailable
+- `P1`: functional inconsistency, unstable API, state mismatch, broken navigation, contract drift
+- `P2`: UX issue, naming issue, structure issue, test gap, extensibility risk
+
+If a required truth source, contract, or runtime proof is missing, mark it as `NO-GO` or `Gate Blocker` instead of treating it as a normal `P2` risk.
+
+### Boundary Standard
+
+Reviews and implementations must prevent:
+
+- over-heavy architecture
+- module boundary pollution
+- hidden cross-module coupling
+- BFF becoming business truth owner
+- Flutter or Admin inventing business state
+- message module becoming a business execution center
+- reserved buildings being exposed before formal unlock
+- mock, fake transport, or visual demo being treated as runtime evidence
+
+## 22. Merge And Delivery Gates
+
+### Current-State Fidelity
+
+All implementation, review, merge, and delivery work must preserve the current functional baseline of `main`.
+
+Merges must be based on the current features that already exist on `main`, not on future ideal-state designs.
+
+Only approved gate-scoped fixes may be merged.
+
+Allowed in a merge:
+
+- Fix confirmed issues within the approved gate scope.
+- Align SSOT, OpenAPI, generated contracts, Server, BFF, Flutter, and tests.
+- Improve stability, permission safety, error handling, and contract consistency.
+- Preserve existing user paths, page entries, interface semantics, and data flow unless explicitly approved.
+
+Not allowed in a merge:
+
+- Introducing new product lines.
+- Introducing new architecture without approval.
+- Replacing existing usable flows with future-state designs.
+- Expanding scope beyond the approved gate.
+- Adding new IM, AI workflow message, push, email aggregation, rule engine, or platform-level messaging capability unless explicitly approved.
+- Changing existing user paths, interface semantics, data meaning, or page entries without listing the risk and receiving approval.
+- Introducing future ideal-state replacements during a merge.
+
+If a change may alter any of the following, stop and ask for approval before modifying or merging:
+
+- Existing user path
+- Existing page entry
+- Existing API semantics
+- Existing data contract
+- Existing read/unread meaning
+- Existing notification behavior
+- Existing permission boundary
+- Existing cloud/runtime behavior
+
+### Branch And Merge Rules
+
+Never work directly on `main` unless the user explicitly approves the exact operation.
+
+Never force-push `main`.
+
+Never push `main` directly unless the user explicitly approves the exact operation.
+
+Prefer PR-based merge or owner-approved squash merge for feature branches.
+
+### Standard Mainline Merge Flow
+
+For any branch that may be merged into `main`, use this standard flow unless the user explicitly approves a narrower process.
+
+`latest main` means the current remote `origin/main` after fetch unless the repository owner explicitly names another baseline.
+
+1. Current branch worktree self-check:
+   - run `git status --short`
+   - explain staged, unstaged, untracked, and forbidden-file items
+   - stop if the worktree is dirty
+2. Fetch and review the latest `main` baseline before branch comparison.
+3. Review all commits on the current branch against latest `main`.
+4. Review the final branch diff against latest `main`.
+5. Review current `main` functional behavior that the branch must preserve.
+6. Sync latest `main` into the current branch before final merge recommendation.
+7. Use owner-approved merge or rebase only:
+   - prefer merge for shared or already-pushed branches
+   - use rebase only when the owner explicitly approves history rewriting for that branch
+8. Resolve conflicts without weakening SSOT, OpenAPI, generated types, Server, BFF, Flutter, security, runtime, or current-state fidelity rules.
+9. Run targeted tests, typecheck, analyze, contract checks, or smoke checks for the affected layers.
+10. Create a PR or enter owner-approved merge review.
+11. Merge into `main` only through PR, owner-approved squash merge, or an explicitly approved repository workflow.
+12. Do not directly push `main` unless the user explicitly approves the exact operation.
+13. After merge, perform smoke or regression validation on the updated `main`.
+14. Record the merge commit or squash commit, validation evidence, unresolved risks, and rollback point.
+
+This flow must preserve current-state fidelity:
+
+- Mainline merge uses the current functional behavior of latest `main` as the baseline.
+- Do not reinterpret, replace, or redesign existing working flows during merge unless explicitly approved.
+- Do not use future ideal-state architecture to override current usable functionality.
+- Only approved gate-scoped fixes may be merged.
+- Local tests on a merged `main` are not cloud runtime proof; cloud runtime claims still require approved runtime evidence.
+
+Before merging, always perform:
+
+1. Worktree audit.
+2. Latest `main` fetch and baseline audit.
+3. Commit audit against latest `main`.
+4. Final diff audit against latest `main`.
+5. Main sync audit after merge or approved rebase.
+6. Contract consistency audit.
+7. Targeted tests / typecheck / analyze.
+8. Forbidden-file audit.
+9. Merge simulation or conflict precheck.
+10. Post-merge validation.
+11. Rollback point identification.
+
+Do not merge if:
+
+- Worktree is dirty.
+- Forbidden files are modified or staged.
+- SSOT / OpenAPI / generated are inconsistent.
+- Server / BFF / Flutter semantics drift.
+- Existing main functionality regresses.
+- P0 or unresolved P1 issues remain.
+- Tests fail due to this branch.
+- The change expands beyond the approved gate.
+- Latest `main` has not been fetched and reviewed.
+- Latest `main` has not been synced into the branch before final merge recommendation.
+- Merge or conflict resolution would weaken current-state fidelity.
+- Rollback point is missing or unclear.
+
+### Forbidden Files And Cloud Safety
+
+Never read, modify, stage, commit, overwrite, or merge sensitive environment or cloud configuration files unless explicitly approved.
+
+Forbidden by default:
+
+- `infra/env/formal_cloud_target.env`
+- secret files
+- credential files
+- deployment configuration
+- cloud runtime configuration
+- production environment files
+
+Cloud operations are forbidden unless explicitly approved:
+
+- no deployment
+- no cloud write operation
+- no production smoke write
+- no remote environment mutation
+
+Sensitive value rule:
+
+- Never print, paste, log, store, or expose secret values.
+
+Forbidden-file rule:
+
+- Do not read, modify, stage, commit, overwrite, or merge explicitly forbidden files unless the user explicitly approves the exact file, purpose, and operation.
+- Seeing a forbidden path in `git status --short` is not permission to inspect its contents.
+
+Runtime inspection rule:
+
+- Read-only runtime inspection is allowed only when explicitly required by the task, when the current gate permits it, and only if it does not expose secrets or mutate cloud state.
+- If secret or sensitive configuration is encountered, report only: `发现敏感配置风险`.
+- Do not quote, summarize, transform, or partially expose secret values.
+
+### Gate-Based Execution
+
+For product, architecture, module, workflow, contract, or merge tasks, use gate-based execution.
+
+Default gates:
+
+- Gate 0: audit only
+- Gate 1: minimum closed-loop stability fix
+- Gate 2: functional completion without scope expansion
+- Gate 3: platform extension slots
+
+Do not skip gates.
+
+Before entering an implementation gate, produce a clear construction plan and wait for approval when requested.
+
+### Scope Control
+
+Always classify work into:
+
+1. Current minimum closed loop
+2. Reserved but not enabled
+3. Future extension slot
+
+Do not convert a minimum closed-loop fix into a platform rebuild.
+
+For message-building / message-center work, the module should only handle:
+
+- receiving frozen projections
+- displaying list/detail/status
+- routeTarget navigation
+- unread/read handling
+- notification display
+- controlled empty/error/stale states
+
+It must not become:
+
+- generic IM
+- private messaging
+- group chat
+- AI workflow center
+- approval decision center
+- payment/order/fulfillment center
+- rule engine
+- multi-channel notification platform
+- unified messages database
+
+### Pre-Merge Review Output
+
+Before any merge, output a merge review report with:
+
+1. Summary decision:
+   - merge allowed / not allowed
+   - whether main sync is required
+   - whether latest `main` was fetched and reviewed
+   - whether P0/P1 blockers exist
+   - whether forbidden files were touched
+   - rollback point
+
+2. Worktree status:
+   - include `git status --short`
+   - explain every item
+   - distinguish staged, unstaged, untracked, and forbidden-file items
+
+3. Commit review:
+   - each commit
+   - purpose
+   - touched modules
+   - whether it fits the approved scope
+   - risk
+
+4. Final diff review:
+   - files changed
+   - what changed
+   - why it is in scope
+   - risk
+
+5. Main baseline review:
+   - latest main state
+   - related main changes
+   - possible conflict with this branch
+   - current main functionality that must be preserved
+
+6. Main sync and conflict review:
+   - merge or approved rebase method
+   - conflict files
+   - conflict resolution summary
+   - current-state fidelity risk
+
+7. Contract consistency review:
+   - SSOT
+   - OpenAPI
+   - generated
+   - Server
+   - BFF
+   - Flutter
+   - error codes
+
+8. Test and validation review:
+   - command
+   - result
+   - whether failure is blocking
+   - whether failure is from this branch or pre-existing main
+   - whether local validation is being separated from cloud runtime proof
+
+9. Forbidden-file audit:
+   - files checked
+   - forbidden files touched or not touched
+   - sensitive values exposed or not exposed
+
+10. Final recommendation:
+   - can merge
+   - cannot merge
+   - needs fixes
+   - needs owner approval
+   - rollback recommendation
+
+## 23. Approval Matrix
+
+Use role names when concrete owner names are not formally configured. Role approval does not imply that repository enforcement such as `CODEOWNERS` already exists.
+
+- SSOT product/business truth changes require Product / Architecture Owner approval.
+- OpenAPI endpoint, schema, enum, state, or error-code changes require Contract Owner and Server Owner approval.
+- Generated contract changes require Contract Owner approval or approved generator execution.
+- Server business truth, state machine, permission, audit, risk, governance, migration, or persistence changes require Server Owner approval.
+- BFF app-facing aggregation changes require BFF Owner approval and must not create business truth.
+- Flutter user path, page entry, shell visibility, or critical UI state changes require Frontend Owner approval.
+- Admin governance, review, membership, audit, or operations changes require Admin Owner and Server Owner alignment.
+- Database migration requires Server Owner and Runtime Owner approval.
+- Cloud deploy, runtime restart, Nginx change, service mutation, or production smoke write requires Runtime Owner approval.
+- Payment, wallet, balance, coins, deposit, settlement, refund, invoice, credit-impacting, or money-like semantics require explicit separate freeze and owner approval.
+- Main merge requires Repo Owner approval or the repository's approved PR workflow.
+
+## 24. Repository Governance Expectations
+
+`AGENTS.md` defines Codex behavior and project rules, but it is not a replacement for repository enforcement.
+
+For production-grade closure, prefer:
+
+- `CODEOWNERS` for ownership and review routing.
+- PR template for merge evidence and risk disclosure.
+- Branch protection for `main`.
+- Required CI checks for contracts, generated drift, typecheck, targeted tests, and forbidden-file checks.
+- Deployment approval for cloud rollout.
+- Rollback runbook for runtime recovery.
+
+If these mechanisms are missing, do not invent that they exist. Mark them as governance gaps or follow-up recommendations.
+
+## 25. Rollback And Incident Rules
+
+- Every merge must identify a rollback point.
+- Prefer `git revert` for `main` rollback.
+- Never use reset or force-push on `main` as a normal rollback method.
+- If post-merge runtime smoke fails, mark delivery as blocked and do not claim runtime closure.
+- If a P0 data, permission, security, payment-like, or runtime availability issue appears, stop implementation and produce an incident receipt.
+- Incident receipt must include impact, suspected change, affected layer, rollback recommendation, and verification status.
+- Do not continue feature expansion while a P0 incident is unresolved.

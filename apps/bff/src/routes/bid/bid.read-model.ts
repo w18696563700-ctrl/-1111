@@ -20,6 +20,16 @@ export function readBidSubmitAcceptedResponse(value: unknown) {
   return threadSeed ? { bidId, threadSeed } : { bidId };
 }
 
+export function readBidSubmissionSupplementAcceptedResponse(value: unknown) {
+  const record = requireRecord(value, 'Bid supplement accepted response must be an object.');
+  return {
+    bidId: readRequiredString(record.bidId, 'bidId'),
+    projectId: readRequiredString(record.projectId, 'projectId'),
+    entryKey: readRequiredString(record.entryKey, 'entryKey'),
+    reviewState: readRequiredString(record.reviewState, 'reviewState'),
+  };
+}
+
 export function readBidAwardAcceptedResponse(value: unknown): BidAwardAcceptedResponse {
   const record = requireRecord(value, 'Bid award accepted response must be an object.');
   const bidAwardId = readRequiredString(record.bidAwardId, 'bidAwardId');

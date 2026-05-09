@@ -136,9 +136,14 @@ class _ForumTopicDetailPageState extends State<ForumTopicDetailPage> {
 }
 
 class ForumPostDetailPage extends StatefulWidget {
-  const ForumPostDetailPage({super.key, required this.postId});
+  const ForumPostDetailPage({
+    super.key,
+    required this.postId,
+    this.initialTitle,
+  });
 
   final String? postId;
+  final String? initialTitle;
 
   @override
   State<ForumPostDetailPage> createState() => _ForumPostDetailPageState();
@@ -160,6 +165,10 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
   bool _inlineCommentSubmitting = false;
   bool _commentsLoadingMore = false;
   final Set<String> _openingAttachmentAssetIds = <String>{};
+  final Map<String, ForumFileAccessView> _imageAccessByAssetId =
+      <String, ForumFileAccessView>{};
+  final Set<String> _imageAccessLoadingAssetIds = <String>{};
+  final Set<String> _imageAccessFailedAssetIds = <String>{};
 
   @override
   void initState() {
@@ -186,6 +195,8 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     if (!mounted) {
       return;
     }
+    final loadedDetail =
+        (results[0] as ForumReadResult<ForumPostDetailView>).data;
     setState(() {
       _detailResult = results[0] as ForumReadResult<ForumPostDetailView>;
       _commentResult =
@@ -202,6 +213,7 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
       }
       _loading = false;
     });
+    _primeImageAccesses(loadedDetail?.attachmentRefs ?? const []);
   }
 
   Future<void> _reloadDetailAfterInteraction({
@@ -289,6 +301,7 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
         else if (detail != null) ...<Widget>[
           _ForumDetailHero(
             topicLabel: topicTitle,
+            title: _displayTitle(widget.initialTitle, fallback: topicTitle),
             author: detail.author,
             publishedAt: _compactPublishedAt(detail.publishedAt),
             viewerFollowsTopic: detail.viewerFollowsTopic == true,
@@ -318,23 +331,16 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
           ],
           if (detail.attachmentRefs.isNotEmpty) ...<Widget>[
             const SizedBox(height: 22),
-            const _ForumDetailSectionHeading(
-              title: '附件',
-              summary: '点击图片或视频可预览，文档文件可下载。',
-            ),
-            const SizedBox(height: 12),
-            ...detail.attachmentRefs.map(
-              (ForumAttachmentRefView item) => Padding(
-                padding: const EdgeInsets.only(bottom: 10),
-                child: _ForumDetailAttachmentRow(
-                  item: item,
-                  actionLabel: _attachmentActionLabel(item.mimeType),
-                  loading: _openingAttachmentAssetIds.contains(
-                    item.fileAssetId,
-                  ),
-                  onTap: () => _openAttachment(item),
-                ),
-              ),
+            _ForumDetailMediaSection(
+              attachments: detail.attachmentRefs,
+              imageAccessByAssetId: _imageAccessByAssetId,
+              imageAccessLoadingAssetIds: _imageAccessLoadingAssetIds,
+              imageAccessFailedAssetIds: _imageAccessFailedAssetIds,
+              openingAttachmentAssetIds: _openingAttachmentAssetIds,
+              onOpenAttachment: _openAttachment,
+              onRetryImageAccess: (ForumAttachmentRefView item) {
+                unawaited(_loadImageAccess(item, showError: true));
+              },
             ),
           ],
           const SizedBox(height: 24),
@@ -363,33 +369,18 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
           ),
           if (_inlineCommentVisible) ...<Widget>[
             const SizedBox(height: 14),
-            ForumSectionCard(
-              eyebrow: '评论输入',
-              title: '写评论',
-              summary: '输入后直接发送，不再跳转新页面。',
-              children: <Widget>[
-                TextField(
-                  controller: _inlineCommentController,
-                  focusNode: _inlineCommentFocusNode,
-                  minLines: 2,
-                  maxLines: 4,
-                  decoration: const InputDecoration(
-                    hintText: '说说你的看法（支持中文）',
-                    border: OutlineInputBorder(),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: FilledButton.icon(
-                    onPressed: _inlineCommentSubmitting
-                        ? null
-                        : () => _submitInlineComment(detail.postId),
-                    icon: const Icon(Icons.send_rounded),
-                    label: Text(_inlineCommentSubmitting ? '发送中' : '发送'),
-                  ),
-                ),
-              ],
+            Text(
+              '写评论',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w900),
+            ),
+            const SizedBox(height: 8),
+            ForumCommentInputBar(
+              controller: _inlineCommentController,
+              focusNode: _inlineCommentFocusNode,
+              submitting: _inlineCommentSubmitting,
+              onSubmit: () => _submitInlineComment(detail.postId),
             ),
           ],
           const SizedBox(height: 24),
@@ -510,6 +501,19 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
   }
 
   Future<void> _openAttachment(ForumAttachmentRefView item) async {
+    if (_isImageAttachment(item.mimeType)) {
+      final cachedAccess = _imageAccessByAssetId[item.fileAssetId];
+      if (cachedAccess != null) {
+        await _openImagePreview(access: cachedAccess, attachment: item);
+        return;
+      }
+      final access = await _loadImageAccess(item, showError: true);
+      if (access != null) {
+        await _openImagePreview(access: access, attachment: item);
+      }
+      return;
+    }
+
     if (_openingAttachmentAssetIds.contains(item.fileAssetId)) {
       return;
     }
@@ -529,25 +533,64 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     }
 
     final access = accessResult.data!;
-    if (_isImageAttachment(item.mimeType)) {
-      setState(() => _openingAttachmentAssetIds.remove(item.fileAssetId));
-      await _openImagePreview(access: access, attachment: item);
-      return;
+    setState(() => _openingAttachmentAssetIds.remove(item.fileAssetId));
+    await _showAttachmentAccessSheet(attachment: item, access: access);
+  }
+
+  void _primeImageAccesses(List<ForumAttachmentRefView> attachments) {
+    final visibleImageAttachments = attachments
+        .where((ForumAttachmentRefView item) => _isImageAttachment(item.mimeType))
+        .take(9);
+    for (final item in visibleImageAttachments) {
+      if (_imageAccessByAssetId.containsKey(item.fileAssetId) ||
+          _imageAccessLoadingAssetIds.contains(item.fileAssetId)) {
+        continue;
+      }
+      unawaited(_loadImageAccess(item));
+    }
+  }
+
+  Future<ForumFileAccessView?> _loadImageAccess(
+    ForumAttachmentRefView item, {
+    bool showError = false,
+  }) async {
+    final cachedAccess = _imageAccessByAssetId[item.fileAssetId];
+    if (cachedAccess != null) {
+      return cachedAccess;
+    }
+    if (_imageAccessLoadingAssetIds.contains(item.fileAssetId)) {
+      return null;
     }
 
-    setState(() => _openingAttachmentAssetIds.remove(item.fileAssetId));
-    final opened = await _openExternalAccessUrl(access.accessUrl);
+    setState(() {
+      _imageAccessLoadingAssetIds.add(item.fileAssetId);
+      _imageAccessFailedAssetIds.remove(item.fileAssetId);
+    });
+    final accessResult = await ForumConsumerLayer.instance.requestFileAccess(
+      fileAssetId: item.fileAssetId,
+      mode: 'preview',
+    );
     if (!mounted) {
-      return;
+      return null;
     }
-    if (opened) {
-      _showActionMessage(
-        context,
-        _isVideoAttachment(item.mimeType) ? '已打开视频预览' : '已交给系统处理下载',
-      );
-      return;
+    if (!accessResult.isSuccess || accessResult.data == null) {
+      setState(() {
+        _imageAccessLoadingAssetIds.remove(item.fileAssetId);
+        _imageAccessFailedAssetIds.add(item.fileAssetId);
+      });
+      if (showError) {
+        _showActionMessage(context, accessResult.message);
+      }
+      return null;
     }
-    await _showAttachmentAccessSheet(attachment: item, access: access);
+
+    final access = accessResult.data!;
+    setState(() {
+      _imageAccessByAssetId[item.fileAssetId] = access;
+      _imageAccessLoadingAssetIds.remove(item.fileAssetId);
+      _imageAccessFailedAssetIds.remove(item.fileAssetId);
+    });
+    return access;
   }
 
   Future<void> _openImagePreview({
@@ -650,8 +693,12 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     required ForumFileAccessView access,
   }) async {
     final isVideo = _isVideoAttachment(attachment.mimeType);
-    final actionLabel = isVideo ? '视频预览' : '文件下载';
-    final primaryActionLabel = isVideo ? '在系统中打开预览' : '在系统中下载文件';
+    final typeLabel = _forumAttachmentDisplayTypeLabel(attachment.mimeType);
+    final actionLabel = isVideo ? '视频预览' : '文件预览';
+    final primaryActionLabel = isVideo ? '调用设备播放器' : '调用设备打开';
+    final sizeLabel = access.contentLengthBytes == null
+        ? '大小待确认'
+        : _forumMediaSizeLabel(access.contentLengthBytes!);
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -664,22 +711,65 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                Text(
-                  '$actionLabel链接',
-                  style: theme.textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.w900,
-                  ),
+                Row(
+                  children: <Widget>[
+                    Icon(
+                      _forumAttachmentDisplayIcon(attachment.mimeType),
+                      color: theme.colorScheme.primary,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        actionLabel,
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  '当前设备暂不能直接打开，已为你准备好真实访问链接。',
+                  attachment.fileName,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.bodyLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '$typeLabel · $sizeLabel · 访问凭证有效期至 ${forumDisplayTimeLabel(access.expiresAt)}',
                   style: theme.textTheme.bodyMedium?.copyWith(height: 1.45),
                 ),
-                const SizedBox(height: 10),
-                SelectableText(
-                  access.accessUrl,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: theme.colorScheme.onSurfaceVariant,
+                const SizedBox(height: 12),
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: theme.colorScheme.surfaceContainerLowest,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: theme.colorScheme.outlineVariant),
+                  ),
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        Icon(
+                          Icons.open_in_new_rounded,
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'App 已取得真实附件访问地址。当前版本不内置 $typeLabel 渲染器，点击下方按钮调用设备能力查看，失败时可复制链接。',
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: theme.colorScheme.onSurfaceVariant,
+                              height: 1.45,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -706,12 +796,12 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
                         if (opened) {
                           _showActionMessage(
                             context,
-                            isVideo ? '已打开视频预览' : '已交给系统处理下载',
+                            isVideo ? '已调用设备播放器' : '已调用设备打开附件',
                           );
                         } else {
                           _showActionMessage(
                             context,
-                            '$actionLabel链接已准备好，可复制后在系统浏览器打开',
+                            '$actionLabel已准备好，可复制链接后在系统浏览器打开',
                           );
                         }
                       },
@@ -751,6 +841,13 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     }
 
     try {
+      final launched = await launchUrlString(
+        uri.toString(),
+        mode: LaunchMode.externalApplication,
+      );
+      if (launched) {
+        return true;
+      }
       if (Platform.isMacOS) {
         final result = await Process.run('open', <String>[uri.toString()]);
         return result.exitCode == 0;
@@ -778,16 +875,6 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
     return _isImageAttachment(mimeType) || _isVideoAttachment(mimeType)
         ? 'preview'
         : 'download';
-  }
-
-  String _attachmentActionLabel(String mimeType) {
-    if (_isImageAttachment(mimeType)) {
-      return '预览';
-    }
-    if (_isVideoAttachment(mimeType)) {
-      return '预览';
-    }
-    return '下载';
   }
 
   bool _isImageAttachment(String mimeType) => mimeType.startsWith('image/');

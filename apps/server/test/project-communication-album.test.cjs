@@ -187,6 +187,87 @@ test('project communication send publishes bounded realtime message event', asyn
   assert.match(events[0].eventId, /^[0-9a-f-]{36}$/);
 });
 
+test('project communication send is blocked by server chat availability truth', async () => {
+  const {
+    ProjectCommunicationMessageService,
+  } = require('../dist/modules/project_communication/project-communication-message.service.js');
+  const thread = {
+    id: 'thread-1',
+    projectId: 'project-1',
+    ownerOrganizationId: 'owner-org',
+    counterpartOrganizationId: 'counterpart-org',
+    lastMessageId: null,
+    lastMessageAt: null,
+  };
+  const manager = {
+    getRepository() {
+      return {
+        async findOneBy() {
+          return null;
+        },
+      };
+    },
+  };
+  const service = new ProjectCommunicationMessageService(
+    {},
+    {
+      async transaction(callback) {
+        return callback(manager);
+      },
+    },
+    {},
+    {},
+    createPresenter(),
+    { publishMessageCreated() {} },
+    {
+      async buildForThread() {
+        return {
+          businessTodoSummary: {
+            bidParticipationReviewPendingCount: 0,
+            publisherMaterialReviewPendingCount: 1,
+            bidMaterialReviewPendingCount: 0,
+            dealConfirmationPendingCount: 0,
+            totalPendingCount: 1,
+          },
+          chatAvailability: {
+            canSendMessage: false,
+            lockReasonCode: 'publisher_material_confirmation_pending',
+            lockReasonText: '请先确认发布方提供的报价依据资料。',
+            requiredNextAction: 'confirm_publisher_materials',
+          },
+        };
+      },
+    },
+  );
+  service.requireThreadParticipant = async () => ({
+    actor: {
+      currentSession: {
+        userId: 'user-1',
+        actorId: 'actor-1',
+      },
+      organizationId: 'counterpart-org',
+    },
+    thread,
+  });
+
+  await assert.rejects(
+    () =>
+      service.sendMessage(
+        {
+          threadId: 'thread-1',
+          projectId: 'project-1',
+          body: 'should be locked',
+        },
+        createContext(),
+      ),
+    (error) => {
+      assert.equal(error?.response?.code, 'PROJECT_COMMUNICATION_INVALID');
+      assert.equal(error?.response?.message, '请先确认发布方提供的报价依据资料。');
+      return true;
+    },
+  );
+});
+
 test('project communication image message stores dedicated FileAsset payload', async () => {
   const {
     ProjectCommunicationMessageService,

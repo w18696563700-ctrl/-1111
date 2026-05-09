@@ -112,6 +112,8 @@ _SuccessContractValidation _sanitizeAndValidateSuccessPayload(
       canonicalPath,
       payload,
     ),
+    ExhibitionCanonicalPaths.bidSubmissionSupplement =>
+      _validateBidSubmissionSupplementPayload(canonicalPath, payload),
     ExhibitionCanonicalPaths.bidResult => _validateBidResultPayload(
       canonicalPath,
       payload,
@@ -239,6 +241,16 @@ _SuccessContractValidation _validateBidSubmitPayload(
   payload,
   field: 'bidId',
   sanitizedPayload: _sanitizeBidSubmitPayload(payload),
+);
+
+_SuccessContractValidation _validateBidSubmissionSupplementPayload(
+  String canonicalPath,
+  Object? payload,
+) => _validateRequiredFieldsPayload(
+  canonicalPath,
+  payload,
+  fields: const <String>['bidId', 'projectId', 'entryKey', 'reviewState'],
+  sanitizedPayload: _sanitizeBidSubmissionSupplementPayload(payload),
 );
 
 _SuccessContractValidation _validateBidAwardAcceptedPayload(

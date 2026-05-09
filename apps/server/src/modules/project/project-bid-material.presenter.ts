@@ -16,10 +16,15 @@ export class ProjectBidMaterialPresenter {
     };
   }
 
-  toListResponse(projectId: string, attachments: ProjectAttachmentEntity[]) {
+  toListResponse(
+    projectId: string,
+    attachments: ProjectAttachmentEntity[],
+    materialReview: Record<string, unknown> | null = null
+  ) {
     return {
       projectId,
-      attachments: attachments.map((attachment) => this.toReadModel(attachment))
+      attachments: attachments.map((attachment) => this.toReadModel(attachment)),
+      materialReview
     };
   }
 }

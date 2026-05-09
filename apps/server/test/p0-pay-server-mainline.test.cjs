@@ -185,6 +185,15 @@ test('P0-Pay server exposes BFF-forwarded trade task routes and controlled state
   assert.match(stateActions, /released/);
   assert.match(stateActions, /bidServiceFeeAuthorizationReleased/);
   assert.match(stateActions, /breach_hold/);
+
+  const projectPricingController = fs.readFileSync(
+    path.join(__dirname, '../src/modules/p0_pay/p0-pay-project-pricing.controller.ts'),
+    'utf8',
+  );
+  assert.ok(projectPricingController.includes("Controller('server/projects/:projectId')"));
+  assert.match(projectPricingController, /createBidServiceFeeAuthorization/);
+  assert.match(projectPricingController, /initBidServiceFeeAuthorizationFreeze/);
+  assert.match(projectPricingController, /getBidServiceFeeAuthorization/);
 });
 
 test('P0-Pay fixed-price bid submission seeds the approved message interaction carrier', () => {

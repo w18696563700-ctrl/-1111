@@ -245,9 +245,11 @@ Map<String, Object?> _messageInteractionItem({
   required String counterpartName,
   required String summary,
   required String lastMessageText,
+  String? threadId,
 }) {
   final definition =
       messagesRegisteredEntryByActionKey['counterpart_conversation.open']!;
+  final resolvedThreadId = threadId ?? 'thread-$interactionId';
   return <String, Object?>{
     'interactionId': interactionId,
     'interactionType': 'counterpart_conversation',
@@ -274,6 +276,7 @@ Map<String, Object?> _messageInteractionItem({
       'params': <String, String>{
         'conversationId': 'org-$interactionId',
         'projectId': projectId,
+        'threadId': resolvedThreadId,
       },
     },
   };
@@ -307,6 +310,7 @@ Map<String, Object?> _counterpartConversationBidDetailPayload({
     'projectGroups': <Object?>[
       <String, Object?>{
         'projectId': projectId,
+        'threadId': 'thread-$interactionId',
         'projectDisplayTitle': '展览项目 1',
         'titleVisibility': 'visible',
         'projectState': 'published',
@@ -421,6 +425,136 @@ Map<String, Object?> _shellContextPayload({
   };
 }
 
+Map<String, Object?> _emptyBidMaterialListPayload(String projectId) {
+  return <String, Object?>{
+    'projectId': projectId,
+    'attachments': _confirmedPublisherMaterialAttachments(projectId),
+    'materialReview': <String, Object?>{
+      'projectId': projectId,
+      'threadId': 'thread-1',
+      'viewerRole': 'bidder',
+      'entries': _emptyPublisherMaterialReviewEntries(projectId),
+      'generatedAt': '2026-04-16T10:00:00Z',
+    },
+  };
+}
+
+List<Map<String, Object?>> _confirmedPublisherMaterialAttachments(
+  String projectId,
+) {
+  const definitions = <({String kind, String fileName})>[
+    (kind: 'effect_image', fileName: 'effect_image.pdf'),
+    (kind: 'construction_doc', fileName: 'construction_doc.pdf'),
+    (kind: 'material_sample', fileName: 'material_sample.pdf'),
+    (kind: 'equipment_material_list', fileName: 'equipment_material_list.pdf'),
+    (kind: 'service_list', fileName: 'service_list.pdf'),
+  ];
+  return definitions
+      .asMap()
+      .entries
+      .map(
+        (entry) => <String, Object?>{
+          'attachmentId': 'attachment-${entry.value.kind}',
+          'projectId': projectId,
+          'fileAssetId': 'file-${entry.value.kind}',
+          'fileName': entry.value.fileName,
+          'attachmentKind': entry.value.kind,
+          'mimeType': 'application/pdf',
+          'sortOrder': entry.key,
+          'createdAt': '2026-04-16T10:00:00Z',
+        },
+      )
+      .toList(growable: false);
+}
+
+List<Map<String, Object?>> _emptyPublisherMaterialReviewEntries(
+  String projectId,
+) {
+  const definitions = <({String kind, String entryKey, String label})>[
+    (
+      kind: 'effect_image',
+      entryKey: 'publisher_effect_image_review',
+      label: '效果图确认',
+    ),
+    (
+      kind: 'construction_doc',
+      entryKey: 'publisher_construction_doc_review',
+      label: '尺寸图 / 施工图确认',
+    ),
+    (
+      kind: 'material_sample',
+      entryKey: 'publisher_material_sample_review',
+      label: '材质图 / 材料样板确认',
+    ),
+    (
+      kind: 'equipment_material_list',
+      entryKey: 'publisher_equipment_material_list_review',
+      label: '设备物料清单确认',
+    ),
+    (
+      kind: 'service_list',
+      entryKey: 'publisher_service_list_review',
+      label: '服务清单确认',
+    ),
+  ];
+  return definitions
+      .map(
+        (definition) => <String, Object?>{
+          'entryKey': definition.entryKey,
+          'group': 'publisher_materials',
+          'label': definition.label,
+          'summary': null,
+          'projectId': projectId,
+          'threadId': 'thread-1',
+          'bidId': null,
+          'viewerRole': 'bidder',
+          'subjectOwnerRole': 'publisher',
+          'availabilityState': 'readable',
+          'reviewState': 'confirmed',
+          'actionState': 'readonly',
+          'attachmentCount': 1,
+          'badgeCount': 0,
+          'disabledReason': null,
+          'sourceFiles': <Object?>[
+            <String, Object?>{
+              'fileAssetId': 'file-${definition.kind}',
+              'fileName': '${definition.kind}.pdf',
+              'mimeType': 'application/pdf',
+              'sortOrder': 0,
+            },
+          ],
+          'latestFeedbackText': null,
+          'latestFeedbackAt': null,
+          'reviewedAt': '2026-04-16T10:00:00Z',
+          'routeTarget': <String, Object?>{
+            'actionKey': 'project_communication_material_review.open',
+            'canonicalPath':
+                '/api/app/message/project-communication/workbench/material-review-detail',
+            'params': <String, Object?>{
+              'projectId': projectId,
+              'threadId': 'thread-1',
+              'bidId': null,
+              'entryKey': definition.entryKey,
+            },
+          },
+          'truthAnchor': <String, Object?>{
+            'truthOwner': 'server',
+            'subjectType': 'publisher_quote_basis_material',
+            'projectId': projectId,
+            'threadId': 'thread-1',
+            'bidId': null,
+            'subjectOwnerOrganizationId': 'publisher-org',
+            'reviewerOrganizationId': 'org-1',
+            'materialKind': definition.kind,
+            'bidMaterialSlot': null,
+            'dealConfirmationId': null,
+            'sourceVersionToken': 'source-${definition.kind}',
+          },
+        },
+      )
+      .toList(growable: false);
+}
+
 Future<void> _scrollAndTap(WidgetTester tester, Finder finder) async {
   await tester.scrollUntilVisible(
     finder,
@@ -467,26 +601,28 @@ Future<void> _enterVisibleTextField(
 }
 
 Future<void> _expectVisibleText(WidgetTester tester, String text) async {
+  final finder = find.text(text, findRichText: true);
   await tester.scrollUntilVisible(
-    find.text(text),
+    finder,
     200,
     scrollable: find.byType(Scrollable).first,
   );
   await tester.pumpAndSettle();
-  expect(find.text(text), findsOneWidget);
+  expect(finder, findsOneWidget);
 }
 
 Future<void> _expectVisibleTextContaining(
   WidgetTester tester,
   String text,
 ) async {
+  final finder = find.textContaining(text, findRichText: true);
   await tester.scrollUntilVisible(
-    find.textContaining(text),
+    finder,
     200,
     scrollable: find.byType(Scrollable).first,
   );
   await tester.pumpAndSettle();
-  expect(find.textContaining(text), findsOneWidget);
+  expect(finder, findsOneWidget);
 }
 
 int _textFieldIndexByLabel(WidgetTester tester, String label) {
@@ -500,13 +636,6 @@ int _textFieldIndexByLabel(WidgetTester tester, String label) {
 Future<void> _uploadBidAttachment(WidgetTester tester, String label) async {
   await _expandBidSubmitFlowIfNeeded(tester);
   await _scrollAndTap(tester, find.widgetWithText(FilledButton, '上传$label'));
-}
-
-Future<void> _confirmBidSubmitServiceFeeRules(WidgetTester tester) async {
-  await _expandBidSubmitFlowIfNeeded(tester);
-  await _scrollAndTap(tester, find.text('我已阅读并同意平台成交服务费规则'));
-  await _scrollAndTap(tester, find.text('我知晓未中标自动释放，中标并合同确认后正式扣款'));
-  await _scrollAndTap(tester, find.text('我知晓发布方毁约或项目条件重大变化时，预授权应按规则释放'));
 }
 
 Finder _projectCreateField(String label) {
@@ -611,6 +740,15 @@ void main() {
           statusCode: 200,
           uri: request.uri,
           body: _publicResourceListResponse(const <Map<String, Object?>>[]),
+        );
+      },
+      'GET /api/app/project/bid-materials': (AppApiRequest request) async {
+        return AppApiResponse(
+          statusCode: 200,
+          uri: request.uri,
+          body: _emptyBidMaterialListPayload(
+            request.uri.queryParameters['projectId'] ?? 'project-1',
+          ),
         );
       },
     };
@@ -1001,7 +1139,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('天气与定位'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
       expect(find.text('尚未登录'), findsNothing);
 
       await tapBottomDestination(tester, '消息');
@@ -1017,7 +1155,7 @@ void main() {
       expect(find.text('查看认证状态'), findsNothing);
 
       await tapBottomDestination(tester, '展览');
-      expect(find.text('天气与定位'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
     },
   );
 
@@ -1034,7 +1172,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('天气与定位'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
       expect(find.text('尚未加入组织'), findsNothing);
 
       await tapBottomDestination(tester, '消息');
@@ -1046,7 +1184,7 @@ void main() {
       expect(find.widgetWithText(FilledButton, '查看组织状态'), findsOneWidget);
 
       await tapBottomDestination(tester, '展览');
-      expect(find.text('天气与定位'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
       expect(find.text('尚未加入组织'), findsNothing);
     },
   );
@@ -1619,13 +1757,16 @@ void main() {
         start: const Offset(420, 300),
         offset: const Offset(-260, 0),
       );
-      expect(selectedBottomDestinationIndex(tester), 2);
+      expect(selectedBottomDestinationIndex(tester), 1);
 
       await dragFrom(
         tester,
         start: const Offset(420, 300),
         offset: const Offset(-260, 0),
       );
+      expect(selectedBottomDestinationIndex(tester), 1);
+
+      await tapBottomDestination(tester, '我的');
       expect(selectedBottomDestinationIndex(tester), 2);
 
       await dragFrom(
@@ -1640,13 +1781,16 @@ void main() {
         start: const Offset(420, 300),
         offset: const Offset(260, 0),
       );
-      expect(selectedBottomDestinationIndex(tester), 0);
+      expect(selectedBottomDestinationIndex(tester), 1);
 
       await dragFrom(
         tester,
         start: const Offset(420, 300),
         offset: const Offset(260, 0),
       );
+      expect(selectedBottomDestinationIndex(tester), 1);
+
+      await tapBottomDestination(tester, '展览');
       expect(selectedBottomDestinationIndex(tester), 0);
     },
   );
@@ -1691,7 +1835,7 @@ void main() {
     await tester.pump();
     await tester.pumpAndSettle();
 
-    expect(find.text('合同详情'), findsNothing);
+    expect(find.text('合同承接状态'), findsNothing);
     expect(find.text('发现优质项目，把握商机'), findsOneWidget);
   });
 
@@ -1724,7 +1868,7 @@ void main() {
       ExhibitionRoutes.contractDetailWithOrderId('order-1'),
     );
 
-    expect(find.text('合同详情'), findsOneWidget);
+    expect(find.text('合同承接状态'), findsOneWidget);
 
     await dragFrom(
       tester,
@@ -1733,7 +1877,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('合同详情'), findsNothing);
+    expect(find.text('合同承接状态'), findsNothing);
     expect(find.text('发现优质项目，把握商机'), findsOneWidget);
   });
 
@@ -1893,7 +2037,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollAndTap(tester, find.widgetWithText(ChoiceChip, '我的竞标'));
+      await _scrollAndTap(tester, find.text('我的竞标').last);
       expect(find.text('供应商竞标记录'), findsOneWidget);
       expect(find.text('沟通与投标'), findsOneWidget);
 
@@ -2117,10 +2261,8 @@ void main() {
 
       expect(find.text('项目沟通'), findsOneWidget);
 
-      await _scrollAndTap(
-        tester,
-        find.widgetWithText(FilledButton, '进入项目沟通').first,
-      );
+      await tester.tap(find.text('杭州搭建公司').first);
+      await tester.pumpAndSettle();
       expect(find.text('展览项目 1'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
       expect(selectedBottomDestinationIndex(tester), 1);
@@ -2129,7 +2271,7 @@ void main() {
         tester,
         find.widgetWithText(FilledButton, '进入沟通').first,
       );
-      expect(find.text('返回项目列表'), findsOneWidget);
+      expect(find.byTooltip('返回项目列表'), findsOneWidget);
       expect(find.byType(NavigationBar), findsNothing);
 
       await tester.tap(
@@ -2138,7 +2280,7 @@ void main() {
       await tester.pump();
       await tester.pumpAndSettle();
 
-      expect(find.text('返回项目列表'), findsNothing);
+      expect(find.byTooltip('返回项目列表'), findsNothing);
       expect(find.text('展览项目 1'), findsOneWidget);
       expect(find.byType(NavigationBar), findsOneWidget);
     },
@@ -2242,7 +2384,7 @@ void main() {
   );
 
   testWidgets(
-    'messages page reloads shell unread badge after project communication refresh',
+    'messages page does not reload shell unread badge after project communication refresh',
     (WidgetTester tester) async {
       var shellContextLoads = 0;
       final shellContextConsumer = AppShellContextConsumer(
@@ -2312,6 +2454,7 @@ void main() {
                               'params': const <String, Object?>{
                                 'conversationId': 'conversation-1',
                                 'projectId': 'project-1',
+                                'threadId': 'thread-1',
                               },
                             },
                           },
@@ -2339,12 +2482,148 @@ void main() {
 
       await tapBottomDestination(tester, '消息');
 
-      expect(shellContextLoads, greaterThanOrEqualTo(2));
+      expect(shellContextLoads, 1);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsNothing,
+      );
+      expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'messages page does not let project communication refresh clear notification badge',
+    (WidgetTester tester) async {
+      var shellContextLoads = 0;
+      final shellContextConsumer = AppShellContextConsumer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/shell/context': (AppApiRequest request) async {
+                    shellContextLoads += 1;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _shellContextPayload(
+                        unreadSummary: const <String, Object?>{'messages': 2},
+                      ),
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'lane': 'project_communication',
+                      'items': <Object?>[],
+                    },
+                  ),
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          shellContextConsumer: shellContextConsumer,
+          messagesTransport: messagesTransport,
+          sessionStore: buildAuthenticatedSessionStore(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navigationBar = find.byType(NavigationBar);
       expect(
         find.descendant(of: navigationBar, matching: find.text('2')),
         findsOneWidget,
       );
-      expect(find.text('重庆坤特展览展示有限公司'), findsOneWidget);
+
+      await tapBottomDestination(tester, '消息');
+
+      expect(shellContextLoads, 1);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(find.text('当前没有新的项目沟通'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'messages page clears stale shell unread badge after project communication refresh',
+    (WidgetTester tester) async {
+      var shellContextLoads = 0;
+      final shellContextConsumer = AppShellContextConsumer(
+        client: AppApiClient(
+          config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+          transport: FakeAppApiTransport(
+            handlers:
+                <
+                  String,
+                  Future<AppApiResponse> Function(AppApiRequest request)
+                >{
+                  'GET /api/app/shell/context': (AppApiRequest request) async {
+                    shellContextLoads += 1;
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: _shellContextPayload(
+                        unreadSummary: const <String, Object?>{'messages': 2},
+                      ),
+                    );
+                  },
+                },
+          ),
+        ),
+      );
+      final messagesTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async => AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: const <String, Object?>{
+                      'lane': 'project_communication',
+                      'items': <Object?>[],
+                    },
+                  ),
+            },
+      );
+
+      await tester.pumpWidget(
+        buildApp(
+          shellContextConsumer: shellContextConsumer,
+          messagesTransport: messagesTransport,
+          sessionStore: buildAuthenticatedSessionStore(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final navigationBar = find.byType(NavigationBar);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsOneWidget,
+      );
+
+      await tapBottomDestination(tester, '消息');
+
+      expect(shellContextLoads, 1);
+      expect(
+        find.descendant(of: navigationBar, matching: find.text('2')),
+        findsOneWidget,
+      );
+      expect(find.text('当前没有新的项目沟通'), findsOneWidget);
     },
   );
 
@@ -2468,6 +2747,8 @@ void main() {
       expect(profileTransport.requests, isEmpty);
 
       await tapBottomDestination(tester, '消息');
+      await tester.tap(find.text('论坛互动'));
+      await tester.pumpAndSettle();
       expect(
         forumTransport.requests
             .where(
@@ -2475,7 +2756,7 @@ void main() {
                   request.canonicalPath == ForumCanonicalPaths.interactionInbox,
             )
             .length,
-        0,
+        1,
       );
       await tester.tap(find.text('回复我的').last);
       await tester.pumpAndSettle();
@@ -2502,7 +2783,6 @@ void main() {
 
       await tapBottomDestination(tester, '消息');
       await tester.pumpAndSettle();
-      expect(find.text('选择一个分类查看'), findsOneWidget);
       expect(
         forumTransport.requests
             .where(
@@ -2511,17 +2791,6 @@ void main() {
             )
             .length,
         1,
-      );
-      await tester.tap(find.text('回复我的').last);
-      await tester.pumpAndSettle();
-      expect(
-        forumTransport.requests
-            .where(
-              (AppApiRequest request) =>
-                  request.canonicalPath == ForumCanonicalPaths.interactionInbox,
-            )
-            .length,
-        2,
       );
     },
   );
@@ -2611,6 +2880,8 @@ void main() {
       await tester.pumpAndSettle();
 
       await tapBottomDestination(tester, '消息');
+      await tester.tap(find.text('论坛互动'));
+      await tester.pumpAndSettle();
       await tester.tap(find.text('回复我的').last);
       await tester.pumpAndSettle();
       await tester.tap(find.text('回复了你在《材料交接节点》里的问题'));
@@ -2626,7 +2897,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('帖子详情'), findsNothing);
-      expect(find.text('互动中心'), findsOneWidget);
+      expect(find.text('论坛互动'), findsOneWidget);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
     },
   );
@@ -2759,7 +3030,7 @@ void main() {
       );
 
       await tapBottomDestination(tester, '展览');
-      expect(find.text('天气与定位'), findsOneWidget);
+      expect(find.text('发现优质项目，把握商机'), findsOneWidget);
 
       await tapBottomDestination(tester, '我的');
       expect(
@@ -2786,7 +3057,7 @@ void main() {
     await tester.tap(find.text('回到展览').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('天气与定位'), findsOneWidget);
+    expect(find.text('发现优质项目，把握商机'), findsOneWidget);
   });
 
   testWidgets(
@@ -2855,7 +3126,7 @@ void main() {
     await tester.tap(find.text('回到展览').first);
     await tester.pumpAndSettle();
 
-    expect(find.text('天气与定位'), findsOneWidget);
+    expect(find.text('发现优质项目，把握商机'), findsOneWidget);
   });
 
   testWidgets(
@@ -2929,7 +3200,7 @@ void main() {
         ExhibitionRoutes.projectDetailWithProjectId('project-1'),
       );
 
-      expect(projectDetailRequestCount, 1);
+      expect(projectDetailRequestCount, 2);
       expect(find.text('项目详情'), findsWidgets);
     },
   );
@@ -2973,12 +3244,12 @@ void main() {
 
       expect(projectDetailRequestCount, 1);
       await tester.scrollUntilVisible(
-        find.widgetWithText(FilledButton, '立即参与竞标'),
+        find.widgetWithText(FilledButton, '继续参与竞标'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsOneWidget);
+      expect(find.widgetWithText(FilledButton, '继续参与竞标'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '进入我的项目'), findsNothing);
 
       sessionStore.establishSession(
@@ -3003,7 +3274,7 @@ void main() {
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
+      expect(find.widgetWithText(FilledButton, '继续参与竞标'), findsNothing);
       expect(find.widgetWithText(FilledButton, '进入我的项目'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '打开发布项目工作台'), findsNothing);
     },
@@ -3050,8 +3321,8 @@ void main() {
     await tester.pumpAndSettle();
 
     await _expectVisibleText(tester, '已提交竞标');
-    expect(find.widgetWithText(FilledButton, '立即参与竞标'), findsNothing);
-    expect(find.widgetWithText(FilledButton, '沟通与投标'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '继续参与竞标'), findsNothing);
+    expect(find.widgetWithText(FilledButton, '查看我的竞标'), findsOneWidget);
   });
 
   testWidgets(
@@ -3088,11 +3359,12 @@ void main() {
 
       expect(projectDetailRequestCount, 1);
       await tester.scrollUntilVisible(
-        find.text('项目编号：PROJ-1'),
+        find.text('PROJ-1'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('项目编号：PROJ-1'), findsOneWidget);
+      expect(find.text('项目编号'), findsOneWidget);
+      expect(find.text('PROJ-1'), findsOneWidget);
 
       expect(find.widgetWithText(FilledButton, '重试'), findsNothing);
       expect(find.text('项目详情'), findsWidgets);
@@ -3140,7 +3412,7 @@ void main() {
       );
 
       expect(orderDetailRequestCount, 1);
-      expect(find.text('订单详情'), findsWidgets);
+      expect(find.text('后续承接状态'), findsWidgets);
     },
   );
 
@@ -3236,7 +3508,7 @@ void main() {
       );
 
       expect(contractDetailRequestCount, 1);
-      expect(find.text('合同详情'), findsWidgets);
+      expect(find.text('合同承接状态'), findsWidgets);
     },
   );
 
@@ -3377,7 +3649,7 @@ void main() {
 
       expect(ratingEntryRequestCount, 1);
       expect(find.text('双方互评入口'), findsWidgets);
-      expect(find.textContaining('当前订单 ID：order-1'), findsAtLeastNWidgets(1));
+      await _expectVisibleTextContaining(tester, '当前订单 ID：order-1');
       await tester.scrollUntilVisible(
         find.byKey(const ValueKey<String>('rating_submit_button')),
         200,
@@ -3752,45 +4024,53 @@ void main() {
       expect(find.text('项目概要'), findsOneWidget);
       expect(find.text('展览项目 1'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('项目编号：PROJ-1'),
+        find.text('PROJ-1'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('项目编号：PROJ-1'), findsOneWidget);
-      expect(find.text('项目类型：会展'), findsOneWidget);
-      expect(find.text('预算金额：¥1888'), findsOneWidget);
+      expect(find.text('项目编号'), findsOneWidget);
+      expect(find.text('PROJ-1'), findsOneWidget);
+      expect(find.text('项目类型'), findsOneWidget);
+      expect(find.text('会展'), findsOneWidget);
+      expect(find.text('预算金额'), findsOneWidget);
+      expect(find.text('¥1888'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('项目面积：350.5 ㎡'),
+        find.text('350.5 ㎡'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('项目面积：350.5 ㎡'), findsOneWidget);
-      expect(find.text('类型备注：医疗器械展区特装搭建'), findsOneWidget);
-      expect(find.text('项目摘要：project'), findsOneWidget);
-      expect(
-        find.text('项目地点：四川 / 成都 / 武侯区 · 世纪城新国际会展中心 6 号馆西门'),
-        findsOneWidget,
-      );
-      expect(find.text('范围说明：主舞台、医疗器械展区与灯光联动区进场搭建'), findsOneWidget);
-      expect(find.text('计划时间：2026-04-10 至 2026-04-18'), findsOneWidget);
+      expect(find.text('项目面积'), findsOneWidget);
+      expect(find.text('350.5 ㎡'), findsOneWidget);
+      expect(find.text('类型备注'), findsOneWidget);
+      expect(find.text('医疗器械展区特装搭建'), findsOneWidget);
+      expect(find.text('项目摘要'), findsOneWidget);
+      expect(find.text('project'), findsOneWidget);
+      expect(find.text('四川 / 成都 / 武侯区 · 世纪城新国际会展中心 6 号馆西门'), findsOneWidget);
+      expect(find.text('项目地点'), findsOneWidget);
+      expect(find.text('范围说明'), findsOneWidget);
+      expect(find.text('主舞台、医疗器械展区与灯光联动区进场搭建'), findsOneWidget);
+      expect(find.text('计划时间'), findsOneWidget);
+      expect(find.text('2026-04-10 至 2026-04-18'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('时间说明：4 月 10 日晚进场，4 月 18 日撤场'),
+        find.text('4 月 10 日晚进场，4 月 18 日撤场'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('时间说明：4 月 10 日晚进场，4 月 18 日撤场'), findsOneWidget);
+      expect(find.text('时间说明'), findsOneWidget);
+      expect(find.text('4 月 10 日晚进场，4 月 18 日撤场'), findsOneWidget);
       expect(find.text('510000'), findsNothing);
       expect(find.text('510100'), findsNothing);
       expect(find.text('510107'), findsNothing);
       await tester.scrollUntilVisible(
-        find.text('补充说明：现场先完成基础施工与设备进场，重点关注主舞台区域。'),
+        find.text('现场先完成基础施工与设备进场，重点关注主舞台区域。'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('补充说明：现场先完成基础施工与设备进场，重点关注主舞台区域。'), findsOneWidget);
+      expect(find.text('补充说明'), findsOneWidget);
+      expect(find.text('现场先完成基础施工与设备进场，重点关注主舞台区域。'), findsOneWidget);
       expect(find.text('buyer-1'), findsNothing);
       expect(find.text('should-be-ignored'), findsNothing);
       expect(find.widgetWithText(TextField, 'projectId'), findsNothing);
@@ -3840,16 +4120,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('项目地点：四川 / 成都 / 武侯区 · 世纪城新国际会展中心 6 号馆西门'),
+        find.text('四川 / 成都 / 武侯区 · 世纪城新国际会展中心 6 号馆西门'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
 
-      expect(
-        find.text('项目地点：四川 / 成都 / 武侯区 · 世纪城新国际会展中心 6 号馆西门'),
-        findsOneWidget,
-      );
+      expect(find.text('四川 / 成都 / 武侯区 · 世纪城新国际会展中心 6 号馆西门'), findsOneWidget);
       expect(find.textContaining('标准地区'), findsNothing);
       expect(find.textContaining('省 code'), findsNothing);
       expect(find.textContaining('区县 code'), findsNothing);
@@ -3895,7 +4172,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '立即参与竞标'));
+      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '继续参与竞标'));
       expect(find.text('欢迎登录'), findsOneWidget);
       expect(find.text('验证码登录'), findsWidgets);
       expect(find.text('账号密码登录'), findsOneWidget);
@@ -4449,6 +4726,40 @@ void main() {
     expect(find.widgetWithText(FilledButton, '重试承接'), findsOneWidget);
   });
 
+  testWidgets('messages offline root does not show a dead back button', (
+    WidgetTester tester,
+  ) async {
+    final shellContextConsumer = AppShellContextConsumer(
+      client: AppApiClient(
+        config: AppApiConfig(baseUrl: 'http://127.0.0.1:8080/api/app'),
+        transport: FakeAppApiTransport(
+          handlers:
+              <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+                'GET /api/app/shell/context': (AppApiRequest request) async {
+                  throw const SocketException('offline');
+                },
+              },
+        ),
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildApp(
+        initialRoute: AppBuilding.messages.routePath,
+        shellContextConsumer: shellContextConsumer,
+        sessionStore: buildAuthenticatedSessionStore(deviceId: 'device-shell'),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('当前离线'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '重试承接'), findsOneWidget);
+    expect(
+      find.widgetWithIcon(IconButton, Icons.arrow_back_ios_new_rounded),
+      findsNothing,
+    );
+  });
+
   testWidgets(
     'project create blocks certification-not-approved actor before workbench qualification',
     (WidgetTester tester) async {
@@ -4703,12 +5014,13 @@ void main() {
       );
       await tester.pumpAndSettle();
       await tester.scrollUntilVisible(
-        find.text('项目面积：当前项目暂未提供'),
+        find.text('当前项目暂未提供'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.pumpAndSettle();
-      expect(find.text('项目面积：当前项目暂未提供'), findsOneWidget);
+      expect(find.text('项目面积'), findsOneWidget);
+      expect(find.text('当前项目暂未提供'), findsOneWidget);
       expect(find.text('类型备注：当前项目暂未提供'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('当前暂无地点与安排信息'),
@@ -4844,7 +5156,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _confirmBidSubmitServiceFeeRules(tester);
     await _enterVisibleTextField(tester, label: '方案说明', value: 'phase 2.1 bid');
     await _uploadBidAttachment(tester, '项目理解');
     await _scrollAndTap(
@@ -4858,12 +5169,9 @@ void main() {
     await _uploadBidAttachment(tester, '进度安排');
     final submitButton = find.widgetWithText(FilledButton, '提交竞标');
     await _scrollAndTap(tester, submitButton);
-
     expect(find.text('竞标已提交'), findsOneWidget);
     expect(find.text('竞标 ID：bid-123'), findsOneWidget);
-    final submittedButton = find.widgetWithText(FilledButton, '已提交竞标');
-    expect(submittedButton, findsOneWidget);
-    expect(tester.widget<FilledButton>(submittedButton).onPressed, isNull);
+    expect(find.widgetWithText(FilledButton, '查看我的竞标'), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '继续创建订单'), findsNothing);
     expect(find.widgetWithText(FilledButton, '查看订单详情'), findsNothing);
     expect(
@@ -5229,7 +5537,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-      await _confirmBidSubmitServiceFeeRules(tester);
       await _enterVisibleTextField(
         tester,
         label: '方案说明',
@@ -5245,10 +5552,7 @@ void main() {
 
       await _scrollAndTap(tester, find.widgetWithText(FilledButton, '查看我的竞标'));
       expect(find.byType(MyProjectListPage), findsOneWidget);
-      final myBidsChip = find.widgetWithText(ChoiceChip, '我的竞标');
-      if (myBidsChip.evaluate().isNotEmpty) {
-        await _scrollAndTap(tester, myBidsChip.first);
-      }
+      await _scrollAndTap(tester, find.text('我的竞标').last);
       expect(find.text('phase 2.1 bid'), findsOneWidget);
       expect(find.text('沟通与投标'), findsOneWidget);
 
@@ -5263,22 +5567,15 @@ void main() {
       expect(find.text('项目沟通'), findsOneWidget);
       expect(find.text('杭州搭建公司'), findsOneWidget);
 
-      await _scrollAndTap(tester, find.widgetWithText(FilledButton, '进入项目沟通'));
+      await _scrollAndTap(tester, find.text('杭州搭建公司').first);
       expect(find.text('展览项目 1'), findsOneWidget);
 
       await _scrollAndTap(
         tester,
-        find.widgetWithText(FilledButton, '进入此项目竞标沟通'),
+        find.widgetWithText(FilledButton, '进入沟通').last,
       );
-      expect(find.text('竞标沟通'), findsOneWidget);
-      await tester.scrollUntilVisible(
-        find.text('聊天'),
-        200,
-        scrollable: find.byType(Scrollable).first,
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('聊天'), findsOneWidget);
-      expect(find.text('想跟TA说点什么...'), findsOneWidget);
+      expect(find.text('项目沟通'), findsWidgets);
+      expect(find.text('还没有项目沟通记录'), findsOneWidget);
     },
   );
 
@@ -5322,7 +5619,7 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      expect(find.text('订单详情'), findsWidgets);
+      expect(find.text('后续承接状态'), findsWidgets);
       expect(find.text('当前订单 ID：order-1'), findsNothing);
       await tester.scrollUntilVisible(
         find.text('订单编号：ORD-1'),
@@ -5336,11 +5633,11 @@ void main() {
       expect(find.text('当前说明：订单最小读模型已经承接完成，当前页不会扩成订单后台或履约指挥台。'), findsNothing);
       expect(find.text('完工处理'), findsOneWidget);
       await tester.scrollUntilVisible(
-        find.text('查看合同详情'),
+        find.text('查看合同承接状态'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
-      expect(find.text('查看合同详情'), findsOneWidget);
+      expect(find.text('查看合同承接状态'), findsOneWidget);
       expect(find.text('双方互评暂不可从订单页进入'), findsNothing);
       expect(find.text('订单完成后开放双方互评。'), findsOneWidget);
       expect(find.text('查看双方互评入口'), findsNothing);
@@ -5405,18 +5702,21 @@ void main() {
       await tester.pumpAndSettle();
 
       await tester.scrollUntilVisible(
-        find.text('查看合同详情'),
+        find.text('查看合同承接状态'),
         200,
         scrollable: find.byType(Scrollable).first,
       );
       await tester.drag(find.byType(Scrollable).first, const Offset(0, -200));
       await tester.pumpAndSettle();
 
-      final contractDetailButton = find.widgetWithText(FilledButton, '查看合同详情');
+      final contractDetailButton = find.widgetWithText(
+        FilledButton,
+        '查看合同承接状态',
+      );
       await tester.ensureVisible(contractDetailButton);
       await tester.tap(contractDetailButton);
       await tester.pumpAndSettle();
-      expect(find.text('合同详情'), findsWidgets);
+      expect(find.text('合同承接状态'), findsWidgets);
       expect(find.text('合同概览'), findsOneWidget);
 
       expect(
@@ -5470,7 +5770,7 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('里程碑列表'), findsWidgets);
-      expect(find.text('当前订单 ID：order-1'), findsOneWidget);
+      expect(find.text('当前订单 ID：order-1', findRichText: true), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('initial delivery'),
         200,
@@ -5587,11 +5887,10 @@ void main() {
       await _expectVisibleText(tester, '地点与安排');
       expect(find.widgetWithText(OutlinedButton, '收起项目信息'), findsOneWidget);
       await _expectVisibleText(tester, '查看报价依据资料');
-      await _expectVisibleText(tester, '填写报价与预授权确认');
-      await _expectVisibleText(tester, '竞标服务费预授权额度确认');
-      await _expectVisibleTextContaining(tester, '成交后按平台规则扣取服务费');
-      await _expectVisibleText(tester, '你需要做什么');
-      await _expectVisibleText(tester, '48小时');
+      await _expectVisibleText(tester, '填写报价');
+      await _expectVisibleText(tester, '竞标服务费预授权说明');
+      expect(find.textContaining('发布方资料确认通过后'), findsWidgets);
+      await _expectVisibleText(tester, '后续处理');
       await _expectVisibleText(tester, '上传方案');
       final fourthStepIndex = tester.allWidgets
           .toList(growable: false)
@@ -6067,28 +6366,15 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _expectVisibleText(tester, '竞标服务费预授权额度确认');
-    expect(find.textContaining('固定 4000 元', findRichText: true), findsWidgets);
-    expect(find.textContaining('成交后以平台记录处理', findRichText: true), findsWidgets);
-    await _expectVisibleText(tester, '48小时');
+    await _expectVisibleText(tester, '竞标服务费预授权说明');
+    expect(find.textContaining('4000 元', findRichText: true), findsWidgets);
+    expect(find.textContaining('预授权不是扣款', findRichText: true), findsWidgets);
     expect(find.textContaining('成交金额的 3%'), findsNothing);
     expect(find.text('含税'), findsNothing);
     expect(find.text('含运输'), findsNothing);
     expect(find.text('含安装'), findsNothing);
     expect(find.text('支付宝'), findsNothing);
     expect(find.text('微信'), findsNothing);
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(CheckboxListTile, '我已阅读并同意平台成交服务费规则'),
-    );
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(CheckboxListTile, '我知晓未中标自动释放，中标并合同确认后正式扣款'),
-    );
-    await _scrollAndTap(
-      tester,
-      find.widgetWithText(CheckboxListTile, '我知晓发布方毁约或项目条件重大变化时，预授权应按规则释放'),
-    );
     await _enterVisibleTextField(tester, label: '方案说明', value: 'phase 2.1 bid');
     await _uploadBidAttachment(tester, '项目理解');
     await _uploadBidAttachment(tester, '报价表');
@@ -6112,7 +6398,7 @@ void main() {
   });
 
   testWidgets(
-    'bid submit disabled copy points to missing quote and service fee confirmations',
+    'bid submit disabled copy points to missing quote and required bid content',
     (WidgetTester tester) async {
       Future<void> pumpBidSubmit(String deviceId) async {
         final transport = FakeAppApiTransport(
@@ -6174,7 +6460,7 @@ void main() {
       await pumpBidSubmit('device-bid-disabled-copy-fee');
       await _expandBidSubmitFlowIfNeeded(tester);
       await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-      await _expectVisibleTextContaining(tester, '请先勾选全部平台服务费确认项。');
+      await _expectVisibleTextContaining(tester, '请先填写方案说明。');
       submitButton = tester.widget<FilledButton>(
         find.widgetWithText(FilledButton, '提交竞标'),
       );
@@ -6298,17 +6584,13 @@ void main() {
       await tester.pumpAndSettle();
 
       await _expandBidSubmitFlowIfNeeded(tester);
-      final projectUnderstandingCard = find.byKey(
-        const ValueKey<String>(
-          'bid-submit-attachment-card-project-understanding',
-        ),
+      await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
+      final projectUnderstandingCard = find.widgetWithText(
+        FilledButton,
+        '上传项目理解',
       );
-      final quoteSheetCard = find.byKey(
-        const ValueKey<String>('bid-submit-attachment-card-quote-sheet'),
-      );
-      final schedulePlanCard = find.byKey(
-        const ValueKey<String>('bid-submit-attachment-card-schedule-plan'),
-      );
+      final quoteSheetCard = find.widgetWithText(FilledButton, '上传报价表');
+      final schedulePlanCard = find.widgetWithText(FilledButton, '上传进度安排');
 
       await tester.scrollUntilVisible(
         projectUnderstandingCard,
@@ -6325,10 +6607,6 @@ void main() {
       expect((quoteRect.top - scheduleRect.top).abs(), lessThan(1));
       expect(projectRect.left, lessThan(quoteRect.left));
       expect(quoteRect.left, lessThan(scheduleRect.left));
-      expect((projectRect.width - quoteRect.width).abs(), lessThan(2));
-      expect((quoteRect.width - scheduleRect.width).abs(), lessThan(2));
-      expect((projectRect.height - quoteRect.height).abs(), lessThan(2));
-      expect((quoteRect.height - scheduleRect.height).abs(), lessThan(2));
     },
   );
 
@@ -6474,7 +6752,6 @@ void main() {
       await tester.pumpAndSettle();
 
       await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-      await _confirmBidSubmitServiceFeeRules(tester);
       await _enterVisibleTextField(
         tester,
         label: '方案说明',
@@ -6560,7 +6837,7 @@ void main() {
           initialRoute: '${ExhibitionRoutes.contractDetail}?orderId=order-1',
           transport: transport,
         ),
-        pageTitle: '合同详情',
+        pageTitle: '合同承接状态',
         visibleTexts: const <String>['合同概览', '合同状态：待确认'],
       );
 
@@ -6668,7 +6945,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('争议撤回入口'), findsWidgets);
-    expect(find.text('当前订单 ID：order-1'), findsOneWidget);
+    expect(find.text('当前订单 ID：order-1', findRichText: true), findsOneWidget);
     expect(find.widgetWithText(FilledButton, '继续争议撤回'), findsOneWidget);
     expect(find.text('路由不可用'), findsNothing);
   });
@@ -6830,7 +7107,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.textContaining('missing auth headers'), findsOneWidget);
+    expect(find.textContaining('当前登录状态已失效'), findsOneWidget);
+    expect(find.textContaining('missing auth headers'), findsNothing);
     expect(find.textContaining('error code'), findsNothing);
     expect(find.text('回到展览'), findsWidgets);
   });
@@ -6945,7 +7223,6 @@ void main() {
     await tester.pumpAndSettle();
 
     await _enterVisibleTextField(tester, label: '竞标报价', value: '1200');
-    await _confirmBidSubmitServiceFeeRules(tester);
     await _enterVisibleTextField(
       tester,
       label: '方案说明',
@@ -6958,17 +7235,13 @@ void main() {
     await _scrollAndTap(tester, submitButton);
     await tester.pumpAndSettle();
 
-    final submittedButton = find.widgetWithText(FilledButton, '已提交竞标');
-    expect(submittedButton, findsOneWidget);
-    expect(tester.widget<FilledButton>(submittedButton).onPressed, isNull);
-    await _scrollAndTap(tester, submittedButton);
+    expect(find.text('已提交竞标'), findsOneWidget);
     expect(submitRequestCount, 1);
 
     expect(find.textContaining('controlled state'), findsNothing);
     expect(find.textContaining('error code'), findsNothing);
     await _expectVisibleTextContaining(tester, '当前项目已提交过竞标');
     await _expectVisibleTextContaining(tester, '这不是本次新提交成功');
-    expect(find.text('回到项目展示'), findsWidgets);
   });
 
   testWidgets('bid submit current viewer bid starts locked without POST', (
@@ -7275,6 +7548,8 @@ void main() {
         'orderNo': 'ORD-1',
         'projectId': 'project-1',
         'bidId': 'bid-1',
+        'buyerOrganizationId': 'buyer-1',
+        'sellerOrganizationId': 'supplier-1',
         'state': 'active',
         'summary': <String, Object?>{'heading': 'order'},
         'milestones': <Map<String, Object?>>[

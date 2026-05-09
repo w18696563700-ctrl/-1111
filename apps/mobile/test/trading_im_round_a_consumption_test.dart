@@ -432,6 +432,9 @@ void main() {
     expect(find.text('平台收费只读状态'), findsOneWidget);
     expect(find.textContaining('竞标服务费预授权：已冻结'), findsOneWidget);
     expect(find.textContaining('预授权额度：4000.00'), findsOneWidget);
+    expect(find.text('资金说明已折叠'), findsOneWidget);
+    await tester.tap(find.widgetWithText(TextButton, '展开'));
+    await tester.pumpAndSettle();
     expect(find.textContaining('合同确认：待处理'), findsOneWidget);
     expect(find.textContaining('不在这里裁定扣费'), findsOneWidget);
     expect(find.textContaining('后续入口'), findsOneWidget);
@@ -616,7 +619,7 @@ void main() {
 
       expect(find.text('竞标摘要'), findsOneWidget);
       expect(find.text('杭州搭建公司'), findsOneWidget);
-      expect(find.textContaining('报价金额：¥8800'), findsOneWidget);
+      expect(find.textContaining('竞标报价：¥8800'), findsOneWidget);
       expect(find.textContaining('附件摘要：已确认 3 份附件'), findsOneWidget);
       await tester.scrollUntilVisible(
         find.text('项目理解'),

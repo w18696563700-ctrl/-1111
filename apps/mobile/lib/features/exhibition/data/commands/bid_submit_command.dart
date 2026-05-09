@@ -26,3 +26,33 @@ class BidSubmitCommand {
     'schedulePlanFileAssetId': schedulePlanFileAssetId,
   };
 }
+
+class BidSubmissionSupplementCommand extends BidSubmitCommand {
+  const BidSubmissionSupplementCommand({
+    required super.projectId,
+    required this.bidId,
+    required this.entryKey,
+    required this.sourceVersionToken,
+    required super.quoteAmount,
+    required super.proposalSummary,
+    required super.projectUnderstandingFileAssetId,
+    required super.quoteSheetFileAssetId,
+    required super.schedulePlanFileAssetId,
+    this.bidMaterialSlot,
+  });
+
+  final String bidId;
+  final String entryKey;
+  final String sourceVersionToken;
+  final String? bidMaterialSlot;
+
+  @override
+  Map<String, Object?> toJson() => <String, Object?>{
+    ...super.toJson(),
+    'bidId': bidId,
+    'entryKey': entryKey,
+    'sourceVersionToken': sourceVersionToken,
+    if (bidMaterialSlot != null && bidMaterialSlot!.trim().isNotEmpty)
+      'bidMaterialSlot': bidMaterialSlot,
+  };
+}

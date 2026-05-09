@@ -9,6 +9,7 @@ import 'package:mobile/core/boot/app_shell_context_consumer.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/config/config_manifest.dart';
 import 'package:mobile/core/location/device_location_service.dart';
+import 'package:mobile/core/notifications/app_notification_bootstrap.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';
 import 'package:mobile/features/exhibition/data/project_name_access_consumer_layer.dart';
@@ -89,6 +90,7 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
   );
 
   final AppRouter _router = const AppRouter();
+  bool _notificationBootstrapStarted = false;
 
   @override
   void initState() {
@@ -143,10 +145,12 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
     ProfileIdentityConsumerLayer.install(
       widget.profileIdentityConsumerLayer ?? ProfileIdentityConsumerLayer(),
     );
+    AppSessionStore.instance.addListener(_maybeBootstrapNotifications);
     if (AppSessionStore.instance.persistsSession && !hasBootstrapSession) {
       unawaited(_restorePersistedSessionAndInitializeShell());
     } else {
       _controller.initialize();
+      _maybeBootstrapNotifications();
     }
   }
 
@@ -156,10 +160,23 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
       return;
     }
     _controller.initialize();
+    _maybeBootstrapNotifications();
+  }
+
+  void _maybeBootstrapNotifications() {
+    if (_notificationBootstrapStarted) {
+      return;
+    }
+    if (!AppSessionStore.instance.snapshot.hasAccessToken) {
+      return;
+    }
+    _notificationBootstrapStarted = true;
+    unawaited(AppNotificationBootstrapService().initialize());
   }
 
   @override
   void dispose() {
+    AppSessionStore.instance.removeListener(_maybeBootstrapNotifications);
     AppSessionStore.reset();
     AuthConsumerLayer.reset();
     ExhibitionConsumerLayer.reset();

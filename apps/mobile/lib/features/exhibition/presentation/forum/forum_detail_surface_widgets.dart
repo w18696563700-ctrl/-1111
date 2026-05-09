@@ -3,6 +3,7 @@ part of 'forum_pages.dart';
 class _ForumDetailHero extends StatelessWidget {
   const _ForumDetailHero({
     required this.topicLabel,
+    required this.title,
     required this.author,
     required this.publishedAt,
     required this.viewerFollowsTopic,
@@ -10,6 +11,7 @@ class _ForumDetailHero extends StatelessWidget {
   });
 
   final String topicLabel;
+  final String title;
   final ForumAuthorSummaryView author;
   final String publishedAt;
   final bool viewerFollowsTopic;
@@ -23,10 +25,10 @@ class _ForumDetailHero extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        ForumInfoPill(label: '# $topicLabel', highlighted: true),
+        ForumCategoryBadge(label: topicLabel),
         const SizedBox(height: 14),
         Text(
-          topicLabel,
+          title,
           style: theme.textTheme.headlineMedium?.copyWith(
             fontWeight: FontWeight.w900,
             height: 1.15,
@@ -37,10 +39,10 @@ class _ForumDetailHero extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
             Expanded(
-              child: _ForumAuthorAnchorRow(
+              child: ForumAuthorRow(
                 author: author,
                 publishedAt: publishedAt,
-                onOpenAuthor: onOpenAuthor,
+                onTap: onOpenAuthor,
               ),
             ),
             if (viewerFollowsTopic)
@@ -176,69 +178,17 @@ class _ForumDetailActionBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(color: theme.colorScheme.outlineVariant),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: _ForumDetailActionButton(
-                icon: likePending
-                    ? Icons.hourglass_top_rounded
-                    : viewerHasLiked
-                    ? Icons.thumb_up_rounded
-                    : Icons.thumb_up_alt_outlined,
-                label: likePending
-                    ? '处理中'
-                    : viewerHasLiked
-                    ? '已点赞 $likeCount'
-                    : '点赞 $likeCount',
-                onPressed: likePending ? null : onLike,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ForumDetailActionButton(
-                icon: Icons.mode_comment_outlined,
-                label: replyCount > 0 ? '评论 $replyCount' : '暂无评论',
-                emphasized: true,
-                onPressed: onReply,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ForumDetailActionButton(
-                icon: bookmarkPending
-                    ? Icons.hourglass_top_rounded
-                    : viewerHasBookmarked
-                    ? Icons.bookmark_rounded
-                    : Icons.bookmark_border_rounded,
-                label: bookmarkPending
-                    ? '处理中'
-                    : viewerHasBookmarked
-                    ? '已收藏'
-                    : '收藏',
-                onPressed: bookmarkPending ? null : onBookmark,
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: _ForumDetailActionButton(
-                icon: Icons.flag_outlined,
-                label: '举报',
-                onPressed: onReport,
-              ),
-            ),
-          ],
-        ),
-      ),
+    return ForumActionBar(
+      viewerHasLiked: viewerHasLiked,
+      viewerHasBookmarked: viewerHasBookmarked,
+      likeCount: likeCount,
+      replyCount: replyCount,
+      likePending: likePending,
+      bookmarkPending: bookmarkPending,
+      onLike: likePending ? null : onLike,
+      onBookmark: bookmarkPending ? null : onBookmark,
+      onReply: onReply,
+      onReport: onReport,
     );
   }
 }
@@ -273,94 +223,6 @@ class _ForumDetailSectionHeading extends StatelessWidget {
           ),
         ],
       ],
-    );
-  }
-}
-
-class _ForumDetailAttachmentRow extends StatelessWidget {
-  const _ForumDetailAttachmentRow({
-    required this.item,
-    required this.actionLabel,
-    required this.loading,
-    required this.onTap,
-  });
-
-  final ForumAttachmentRefView item;
-  final String actionLabel;
-  final bool loading;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(18),
-        onTap: loading ? null : onTap,
-        child: Ink(
-          decoration: BoxDecoration(
-            color: theme.colorScheme.surfaceContainerLowest,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: theme.colorScheme.outlineVariant),
-          ),
-          child: Padding(
-            padding: const EdgeInsets.all(14),
-            child: Row(
-              children: <Widget>[
-                Icon(
-                  _forumAttachmentDisplayIcon(item.mimeType),
-                  color: theme.colorScheme.onSurfaceVariant,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        item.fileName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      const SizedBox(height: 2),
-                      Text(
-                        _forumAttachmentDisplayTypeLabel(item.mimeType),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                if (loading)
-                  SizedBox(
-                    width: 18,
-                    height: 18,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: theme.colorScheme.primary,
-                    ),
-                  )
-                else
-                  Text(
-                    actionLabel,
-                    style: theme.textTheme.labelLarge?.copyWith(
-                      color: theme.colorScheme.primary,
-                      fontWeight: FontWeight.w800,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

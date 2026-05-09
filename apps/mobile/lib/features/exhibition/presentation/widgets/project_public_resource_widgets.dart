@@ -23,6 +23,7 @@ class _ProjectPublicResourceSectionState
   ExhibitionLoadResult? _listResult;
   bool _loadingList = false;
   String? _downloadingResourceId;
+  bool _expanded = false;
 
   @override
   void initState() {
@@ -119,23 +120,79 @@ class _ProjectPublicResourceSectionState
       title: widget.title,
       summary: widget.summary,
       children: <Widget>[
-        _ProjectPublicResourceCategoryPicker(
-          selectedValue: _selectedCategory,
+        _ProjectPublicResourceSummaryBar(
           categoryCounts: categoryCounts,
-          onChanged: (String value) {
-            setState(() => _selectedCategory = value);
+          expanded: _expanded,
+          onToggle: () {
+            setState(() => _expanded = !_expanded);
           },
         ),
-        _ProjectPublicResourceCategoryMarker(option: selectedOption),
-        const SizedBox(height: 16),
-        _ProjectPublicResourceListPanel(
-          loading: _loadingList,
-          result: _listResult,
-          resources: filteredResources,
-          hasAnyResource: allResources.isNotEmpty,
-          downloadingResourceId: _downloadingResourceId,
-          onRetry: () => _loadResources(forceRefresh: true),
-          onDownload: _downloadResource,
+        if (_expanded) ...<Widget>[
+          const SizedBox(height: 14),
+          _ProjectPublicResourceCategoryPicker(
+            selectedValue: _selectedCategory,
+            categoryCounts: categoryCounts,
+            onChanged: (String value) {
+              setState(() => _selectedCategory = value);
+            },
+          ),
+          _ProjectPublicResourceCategoryMarker(option: selectedOption),
+          const SizedBox(height: 16),
+          _ProjectPublicResourceListPanel(
+            loading: _loadingList,
+            result: _listResult,
+            resources: filteredResources,
+            hasAnyResource: allResources.isNotEmpty,
+            downloadingResourceId: _downloadingResourceId,
+            onRetry: () => _loadResources(forceRefresh: true),
+            onDownload: _downloadResource,
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+class _ProjectPublicResourceSummaryBar extends StatelessWidget {
+  const _ProjectPublicResourceSummaryBar({
+    required this.categoryCounts,
+    required this.expanded,
+    required this.onToggle,
+  });
+
+  final Map<String, int> categoryCounts;
+  final bool expanded;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: _projectPublicResourceCategoryOptions.map((
+            _ProjectPublicResourceCategoryOption item,
+          ) {
+            return _StatusPill(
+              label: '${item.label} ${categoryCounts[item.value] ?? 0}',
+              tone: _ActionCardTone.muted,
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.centerRight,
+          child: OutlinedButton.icon(
+            onPressed: onToggle,
+            icon: Icon(
+              expanded
+                  ? Icons.expand_less_rounded
+                  : Icons.chevron_right_rounded,
+            ),
+            label: Text(expanded ? '收起下载资料' : '展开下载资料'),
+          ),
         ),
       ],
     );

@@ -117,6 +117,15 @@ class _ExhibitionActionService {
     return _submit(ExhibitionCanonicalPaths.bidSubmit, body: command.toJson());
   }
 
+  Future<ExhibitionActionResult> supplementBidSubmission(
+    BidSubmissionSupplementCommand command,
+  ) {
+    return _submit(
+      ExhibitionCanonicalPaths.bidSubmissionSupplement,
+      body: command.toJson(),
+    );
+  }
+
   Future<ExhibitionActionResult> lockBidSeat({
     required String projectId,
     required String bidId,

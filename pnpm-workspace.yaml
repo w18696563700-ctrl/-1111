@@ -1,5 +1,6 @@
 packages:
   - apps/admin
+  - apps/website
   - apps/bff
   - apps/server
   - packages/*

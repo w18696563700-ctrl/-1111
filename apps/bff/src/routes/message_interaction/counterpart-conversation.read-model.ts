@@ -27,6 +27,7 @@ export type CounterpartConversationDetailReadModel = {
   myBidUnreadCount: number;
   projectGroups: Array<{
     projectId: string;
+    threadId: string;
     projectDisplayTitle: string;
     titleVisibility: "masked" | "visible";
     projectRelation: "my_published" | "my_bid" | "unknown";
@@ -37,6 +38,13 @@ export type CounterpartConversationDetailReadModel = {
     projectUnreadCount: number;
     hasProjectUnread: boolean;
     latestUnreadMessageAt: string | null;
+    businessTodoSummary: {
+      bidParticipationReviewPendingCount: number;
+      publisherMaterialReviewPendingCount: number;
+      bidMaterialReviewPendingCount: number;
+      dealConfirmationPendingCount: number;
+      totalPendingCount: number;
+    };
     pricingSummary?: Record<string, unknown>;
     orderSummary: {
       orderId: string;
@@ -193,6 +201,7 @@ function readProjectGroup(value: unknown) {
   const pricingSummary = readOptionalPricingSummary(record.pricingSummary);
   return {
     projectId,
+    threadId: readRequiredString(record.threadId, "projectGroup.threadId"),
     projectDisplayTitle: readRequiredString(
       record.projectDisplayTitle,
       "projectGroup.projectDisplayTitle",
@@ -212,10 +221,40 @@ function readProjectGroup(value: unknown) {
       "projectGroup.hasProjectUnread",
     ),
     latestUnreadMessageAt: readNullableString(record.latestUnreadMessageAt),
+    businessTodoSummary: readBusinessTodoSummary(record.businessTodoSummary),
     ...(pricingSummary ? { pricingSummary } : {}),
     orderSummary,
     ratingEntry: readRatingEntry(record.ratingEntry),
     cards: withOrderBusinessCard(cards, orderSummary, latestActivityAt),
+  };
+}
+
+function readBusinessTodoSummary(value: unknown) {
+  const record = requireRecord(
+    value,
+    "Counterpart conversation businessTodoSummary must be an object.",
+  );
+  return {
+    bidParticipationReviewPendingCount: readRequiredNonNegativeNumber(
+      record.bidParticipationReviewPendingCount,
+      "businessTodoSummary.bidParticipationReviewPendingCount",
+    ),
+    publisherMaterialReviewPendingCount: readRequiredNonNegativeNumber(
+      record.publisherMaterialReviewPendingCount,
+      "businessTodoSummary.publisherMaterialReviewPendingCount",
+    ),
+    bidMaterialReviewPendingCount: readRequiredNonNegativeNumber(
+      record.bidMaterialReviewPendingCount,
+      "businessTodoSummary.bidMaterialReviewPendingCount",
+    ),
+    dealConfirmationPendingCount: readRequiredNonNegativeNumber(
+      record.dealConfirmationPendingCount,
+      "businessTodoSummary.dealConfirmationPendingCount",
+    ),
+    totalPendingCount: readRequiredNonNegativeNumber(
+      record.totalPendingCount,
+      "businessTodoSummary.totalPendingCount",
+    ),
   };
 }
 
@@ -388,7 +427,7 @@ function normalizePricingGateRouteTarget(input: {
     input.cardType === "bid_participation_request" &&
     input.status === "approved" &&
     input.detailRouteTarget?.actionKey === "bid_submit.open" &&
-    input.pricingGateRequired !== false;
+    input.pricingGateRequired === true;
   if (!shouldGate) {
     return input.detailRouteTarget;
   }
@@ -476,6 +515,23 @@ function validateDetailRouteTarget(input: {
   canonicalPath: string;
   params: Record<string, unknown>;
 }) {
+  if (input.actionKey === "bid_service_fee_authorization.open") {
+    if (
+      input.objectType !== "bid_service_fee_authorization" ||
+      input.canonicalPath !== "/api/app/project/{projectId}/bid-service-fee-authorizations" ||
+      typeof input.params.projectId !== "string" ||
+      typeof input.params.bidParticipationRequestId !== "string" ||
+      (
+        input.params.bidId != null &&
+        typeof input.params.bidId !== "string"
+      )
+    ) {
+      throw new Error(
+        "Counterpart conversation bid service fee authorization routeTarget must include the frozen object, canonical template path, projectId, and bidParticipationRequestId.",
+      );
+    }
+    return;
+  }
   if (input.actionKey !== "order_detail.open") {
     return;
   }
@@ -693,6 +749,16 @@ function readOptionalNonNegativeNumber(
   if (value == null) {
     return fallback;
   }
+  const parsed = readRequiredNumber(value, fieldName);
+  if (parsed < 0) {
+    throw new Error(
+      `Counterpart conversation response returned a negative \`${fieldName}\`.`,
+    );
+  }
+  return parsed;
+}
+
+function readRequiredNonNegativeNumber(value: unknown, fieldName: string) {
   const parsed = readRequiredNumber(value, fieldName);
   if (parsed < 0) {
     throw new Error(

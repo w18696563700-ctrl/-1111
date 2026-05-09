@@ -49,12 +49,59 @@ function createAxiosError(status, code, message) {
   };
 }
 
-function createMyProjectService() {
+function createMyProjectService({ onGet } = {}) {
   return new MyProjectService(
-    { async get() { throw new Error('not used'); } },
-    { buildForwardHeaders() { return {}; } },
-    { toHttpException(error) { return error; } },
+    {
+      async get(path, options) {
+        if (onGet) return onGet(path, options);
+        throw new Error('not used');
+      },
+    },
+    {
+      buildForwardHeaders() {
+        return {};
+      },
+    },
+    {
+      toHttpException(error) {
+        return error;
+      },
+    },
   );
+}
+
+function createMyProjectListItem({ projectId, projectCreatedAt }) {
+  return {
+    projectCreatedAt,
+    publicProject: {
+      projectId,
+      projectNo: `PJT-${projectId}`,
+      title: '春季品牌展项目',
+      exhibitionName: '中国建博会',
+      brandName: '品牌A',
+      buildingType: 'exhibition',
+      budgetAmount: 120000,
+      areaSqm: 36,
+      provinceCode: '310000',
+      provinceName: '上海市',
+      cityCode: '310100',
+      cityName: '上海市',
+      plannedStartAt: '2026-05-01',
+      plannedEndAt: '2026-05-03',
+      state: 'draft',
+      summary: { heading: '项目已保存', stateLabel: '草稿' },
+    },
+    privateSummary: {
+      hasAcceptedOrder: false,
+      orderStatus: null,
+      contractStatus: null,
+      fulfillmentStatus: null,
+      acceptanceStatus: null,
+      afterSalesOrDisputeStatus: null,
+      formalCompletionStatus: 'not_formally_completed',
+      evaluationStatus: 'not_eligible',
+    },
+  };
 }
 
 test('rating/entry forwards canonical orderId query and passes through entry carrier', async () => {
@@ -231,4 +278,30 @@ test('rating fallout keeps my-project read-side carrier aligned', () => {
     },
   });
   assert.equal(myProjectDetail.privateProgress.evaluationStatus, 'submitted');
+});
+
+test('my-project list carries projectCreatedAt and does not synthesize missing upstream time', async () => {
+  const myProjectService = createMyProjectService({
+    async onGet(path) {
+      assert.equal(path, '/server/my/projects');
+      return {
+        ongoingProjects: [
+          createMyProjectListItem({
+            projectId: 'project-with-created-at',
+            projectCreatedAt: '2026-05-03T08:30:00.000Z',
+          }),
+          createMyProjectListItem({
+            projectId: 'project-without-created-at',
+            projectCreatedAt: undefined,
+          }),
+        ],
+        historicalProjects: [],
+      };
+    },
+  });
+
+  const result = await myProjectService.getMyProjects({});
+
+  assert.equal(result.ongoingProjects[0].projectCreatedAt, '2026-05-03T08:30:00.000Z');
+  assert.equal(result.ongoingProjects[1].projectCreatedAt, null);
 });

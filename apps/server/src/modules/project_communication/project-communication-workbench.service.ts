@@ -8,6 +8,8 @@ import { ProjectAttachmentEntity } from '../project/entities/project-attachment.
 import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
+import { ProjectCommunicationBusinessEventService } from './project-communication-business-event.service';
+import { ProjectCommunicationBusinessStateService } from './project-communication-business-state.service';
 import {
   projectCommunicationForbidden,
   projectCommunicationInvalid,
@@ -28,6 +30,7 @@ import {
   ProjectCommunicationWorkbenchSourceFileProjection
 } from './project-communication-workbench.presenter';
 import {
+  PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
   ProjectBidMaterialSlot,
   ProjectCommunicationWorkbenchEntryDefinition,
   ProjectCommunicationWorkbenchViewerRole,
@@ -41,6 +44,8 @@ type WorkbenchScope = {
   bid: BidEntity | null;
   viewerOrganizationId: string;
   viewerRole: ProjectCommunicationWorkbenchViewerRole;
+  actorUserId: string;
+  actorId: string;
 };
 
 type MaterialSource = {
@@ -49,13 +54,7 @@ type MaterialSource = {
   sourceFiles: ProjectCommunicationWorkbenchSourceFileProjection[];
 };
 
-const PUBLISHER_MATERIAL_KINDS: ProjectQuoteBasisMaterialKind[] = [
-  'effect_image',
-  'construction_doc',
-  'material_sample',
-  'equipment_material_list',
-  'service_list'
-];
+const PUBLISHER_MATERIAL_KINDS: ProjectQuoteBasisMaterialKind[] = ['effect_image', 'construction_doc', 'material_sample', 'equipment_material_list', 'service_list'];
 
 const BID_MATERIAL_SLOT_LABELS: Record<ProjectBidMaterialSlot, string> = {
   project_understanding: '项目理解',
@@ -76,16 +75,23 @@ export class ProjectCommunicationWorkbenchService {
     private readonly reviewRepository: Repository<ProjectCommunicationMaterialReviewEntity>,
     private readonly dataSource: DataSource,
     private readonly accessService: ProjectCommunicationAccessService,
-    private readonly presenter: ProjectCommunicationWorkbenchPresenter
+    private readonly presenter: ProjectCommunicationWorkbenchPresenter,
+    private readonly businessStateService: ProjectCommunicationBusinessStateService,
+    private readonly businessEventService?: ProjectCommunicationBusinessEventService
   ) {}
 
   async getWorkbench(query: Record<string, unknown>, context: RequestContext) {
     const scope = await this.resolveScope(query, context);
     const entries = await this.buildEntries(scope);
+    const businessState = await this.businessStateService.buildForThread({
+      thread: scope.thread, viewerOrganizationId: scope.viewerOrganizationId, bidId: scope.bid?.id ?? null
+    });
     return this.presenter.toWorkbench({
       projectId: scope.projectId,
       threadId: scope.thread.id,
       viewerRole: scope.viewerRole,
+      businessTodoSummary: businessState.businessTodoSummary,
+      chatAvailability: businessState.chatAvailability,
       entries
     });
   }
@@ -117,6 +123,13 @@ export class ProjectCommunicationWorkbenchService {
       }
       this.assertWritableReviewEntry(currentEntry, command, scope);
       const saved = await this.saveReview(currentEntry, command, context, manager.getRepository(ProjectCommunicationMaterialReviewEntity));
+      await this.businessEventService?.emitMaterialReviewResult({
+        manager,
+        entry: currentEntry,
+        review: saved,
+        actorUserId: scope.actorUserId,
+        actorId: scope.actorId
+      });
       const refreshedEntries = await this.buildEntries(
         scope,
         manager.getRepository(ProjectAttachmentEntity),
@@ -124,6 +137,14 @@ export class ProjectCommunicationWorkbenchService {
       );
       const updatedEntry =
         refreshedEntries.find((entry) => entry.definition.entryKey === saved.entryKey) ?? currentEntry;
+      if (this.shouldEmitBidMaterialConfirmationCompleted(saved, updatedEntry, refreshedEntries)) {
+        await this.businessEventService?.emitBidMaterialConfirmationCompleted({
+          manager,
+          entry: updatedEntry,
+          actorUserId: scope.actorUserId,
+          actorId: scope.actorId
+        });
+      }
       return this.presenter.toMaterialReviewResponse({
         entry: updatedEntry,
         entries: refreshedEntries,
@@ -153,7 +174,9 @@ export class ProjectCommunicationWorkbenchService {
       thread,
       bid,
       viewerOrganizationId: actor.organizationId,
-      viewerRole: actor.isOwner ? 'publisher' : 'bidder'
+      viewerRole: actor.isOwner ? 'publisher' : 'bidder',
+      actorUserId: actor.currentSession.userId,
+      actorId: actor.currentSession.actorId
     };
   }
 
@@ -189,8 +212,17 @@ export class ProjectCommunicationWorkbenchService {
   ) {
     const publisherSources = await this.publisherMaterialSources(scope.projectId, attachmentRepository);
     const reviews = scope.bid
-      ? await reviewRepository.findBy({ projectId: scope.projectId, bidId: scope.bid.id })
-      : [];
+      ? [
+          ...(await reviewRepository.findBy({ projectId: scope.projectId, bidId: scope.bid.id })),
+          ...(await reviewRepository.findBy({
+            projectId: scope.projectId,
+            bidId: PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID
+          }))
+        ]
+      : await reviewRepository.findBy({
+          projectId: scope.projectId,
+          bidId: PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID
+        });
     return projectCommunicationWorkbenchEntryDefinitions.map((definition) =>
       this.toEntryProjection(definition, scope, publisherSources, reviews)
     );
@@ -246,9 +278,7 @@ export class ProjectCommunicationWorkbenchService {
     const reviewerOrganizationId = definition.subjectOwnerRole === 'publisher'
       ? scope.bid ? this.bidderOrganizationId(scope.bid) : scope.thread.counterpartOrganizationId
       : scope.thread.ownerOrganizationId;
-    const review = scope.bid
-      ? reviews.find((item) => item.entryKey === definition.entryKey && item.reviewerOrganizationId === reviewerOrganizationId) ?? null
-      : null;
+    const review = this.selectMaterialReview(definition, reviews, reviewerOrganizationId, scope.bid?.id ?? null);
     const currentReview = review?.sourceVersionToken === source.sourceVersionToken ? review : null;
     const reviewState = source.attachmentCount === 0
       ? 'unsubmitted'
@@ -270,7 +300,9 @@ export class ProjectCommunicationWorkbenchService {
       subjectOwnerOrganizationId,
       reviewerOrganizationId,
       sourceVersionToken: source.sourceVersionToken,
-      sourceFiles: source.sourceFiles
+      sourceFiles: source.sourceFiles,
+      badgeCount: canAct && reviewState !== 'confirmed' ? 1 : 0,
+      disabledReason: source.attachmentCount > 0 ? null : '当前资料尚未提交。'
     };
   }
 
@@ -292,8 +324,32 @@ export class ProjectCommunicationWorkbenchService {
       subjectOwnerOrganizationId: null,
       reviewerOrganizationId: null,
       sourceVersionToken: null,
-      sourceFiles: []
+      sourceFiles: [],
+      badgeCount: 0,
+      disabledReason: '请先完成资料确认和报价确认后再进入最终确认。'
     };
+  }
+
+  private selectMaterialReview(
+    definition: ProjectCommunicationWorkbenchEntryDefinition,
+    reviews: ProjectCommunicationMaterialReviewEntity[],
+    reviewerOrganizationId: string | null,
+    bidId: string | null
+  ) {
+    const candidates = reviews.filter(
+      (item) => item.entryKey === definition.entryKey && item.reviewerOrganizationId === reviewerOrganizationId
+    );
+    if (definition.group === 'publisher_materials') {
+      return (
+        candidates.find((item) => bidId && item.bidId === bidId) ??
+        candidates.find((item) => item.bidId === PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID) ??
+        null
+      );
+    }
+    if (definition.group === 'bid_materials' && bidId) {
+      return candidates.find((item) => item.bidId === bidId) ?? null;
+    }
+    return null;
   }
 
   private resolveMaterialSource(
@@ -332,6 +388,9 @@ export class ProjectCommunicationWorkbenchService {
     command: ProjectCommunicationMaterialReviewCommand,
     scope: WorkbenchScope
   ) {
+    if (entry.definition.group === 'bid_materials' && !scope.bid) {
+      throw projectCommunicationInvalid('Field `bidId` is required for bid material review.');
+    }
     if (entry.availabilityState !== 'readable' || !entry.sourceVersionToken) {
       throw projectCommunicationWorkbenchInvalid(
         'PROJECT_COMMUNICATION_MATERIAL_UNSUBMITTED',
@@ -350,9 +409,6 @@ export class ProjectCommunicationWorkbenchService {
         'Current material source has changed.'
       );
     }
-    if (!scope.bid) {
-      throw projectCommunicationInvalid('Field `bidId` is required for material review.');
-    }
     if (command.reviewAction === 'request_supplement' && command.feedbackReasonCodes.length === 0 && !command.feedbackText) {
       throw projectCommunicationWorkbenchInvalid(
         'PROJECT_COMMUNICATION_MATERIAL_FEEDBACK_REQUIRED',
@@ -369,14 +425,14 @@ export class ProjectCommunicationWorkbenchService {
   ) {
     const existing = await repository.findOneBy({
       projectId: entry.projectId,
-      bidId: entry.bidId ?? '',
+      bidId: entry.bidId ?? PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
       reviewerOrganizationId: entry.reviewerOrganizationId ?? '',
       entryKey: command.entryKey
     });
     const review = existing ?? repository.create({ id: randomUUID() });
     review.projectId = entry.projectId;
     review.threadId = entry.threadId;
-    review.bidId = entry.bidId ?? '';
+    review.bidId = entry.bidId ?? PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID;
     review.entryKey = command.entryKey;
     review.subjectType = entry.definition.subjectType as ProjectCommunicationMaterialReviewEntity['subjectType'];
     review.materialKind = entry.definition.materialKind;
@@ -423,6 +479,21 @@ export class ProjectCommunicationWorkbenchService {
     review.feedbackAt = now;
     review.confirmedByUserId = null;
     review.confirmedAt = null;
+  }
+
+  private shouldEmitBidMaterialConfirmationCompleted(
+    review: ProjectCommunicationMaterialReviewEntity,
+    entry: ProjectCommunicationWorkbenchEntryProjection,
+    entries: ProjectCommunicationWorkbenchEntryProjection[]
+  ) {
+    if (review.reviewState !== 'confirmed' || entry.definition.group !== 'bid_materials' || !entry.bidId) {
+      return false;
+    }
+    const bidMaterialEntries = entries.filter((item) => item.definition.group === 'bid_materials');
+    return (
+      bidMaterialEntries.length > 0 &&
+      bidMaterialEntries.every((item) => item.bidId === entry.bidId && item.reviewState === 'confirmed')
+    );
   }
 
   private bidSlotFileAssetId(bid: BidEntity, slot: ProjectBidMaterialSlot) {

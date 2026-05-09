@@ -174,10 +174,12 @@ Future<void> _selectProjectType(
 Map<String, Object?> _draftMyProjectListBody({
   required String projectId,
   required String title,
+  String projectCreatedAt = '2026-05-03T10:20:00',
 }) {
   return <String, Object?>{
     'ongoingProjects': <Object?>[
       <String, Object?>{
+        'projectCreatedAt': projectCreatedAt,
         'publicProject': <String, Object?>{
           'projectId': projectId,
           'projectNo': 'EXH-2026-DRAFT',
@@ -612,13 +614,22 @@ void main() {
       submitAction.onPressed!();
       await tester.pumpAndSettle();
 
+      expect(createCalled, isFalse);
+      expect(find.text('确认保存基础信息'), findsOneWidget);
+      expect(
+        find.text('本次只保存项目基础信息，不会正式发布。保存后将在我的项目草稿箱继续补资料、核对信息并完成发布流程。'),
+        findsOneWidget,
+      );
+      await tester.tap(find.widgetWithText(FilledButton, '确认保存'));
+      await tester.pumpAndSettle();
+
       expect(createCalled, isTrue);
       expect(
         ExhibitionRoutes.myProjectDraftboxWithProjectId('round-a-created'),
         contains('stage=draft'),
       );
       expect(find.text('草稿项目'), findsOneWidget);
-      expect(find.text('刚刚保存到草稿箱'), findsOneWidget);
+      expect(find.text('创建时间：2026-05-03 10:20'), findsOneWidget);
       expect(find.text('预发布项目'), findsNothing);
     },
   );

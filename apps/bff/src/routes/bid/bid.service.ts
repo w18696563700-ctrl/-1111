@@ -17,6 +17,7 @@ import {
 import {
   readBidAwardAcceptedResponse,
   readBidSubmitAcceptedResponse,
+  readBidSubmissionSupplementAcceptedResponse,
   readBidResultReadModel,
 } from './bid.read-model';
 import { readBidSubmissionSnapshotReadModel } from '../my_bid/my-bid.read-model';
@@ -157,6 +158,24 @@ export class BidService {
     }
   }
 
+  async supplementBidSubmission(
+    payload: Record<string, unknown>,
+    headers: IncomingHttpHeaders,
+  ) {
+    try {
+      const result = await this.serverClient.post<Record<string, unknown>>(
+        '/server/bids/submission/supplement',
+        payload,
+        {
+          headers: this.buildScopedForwardHeaders(headers),
+        },
+      );
+      return readBidSubmissionSupplementAcceptedResponse(result);
+    } catch (error) {
+      throw this.normalizeSupplementError(error);
+    }
+  }
+
   async getBidSubmissionSnapshot(
     projectId: string | undefined,
     bidId: string | undefined,
@@ -251,6 +270,66 @@ export class BidService {
     );
   }
 
+  private normalizeSupplementError(error: unknown) {
+    const normalized = this.errors.toHttpException(
+      error,
+      'AUTH_RESOURCE_UNAVAILABLE',
+      '当前补充竞标资料入口暂不可用，请稍后再试。',
+      {
+        400: 'BID_SUBMIT_INVALID',
+        401: 'AUTH_SESSION_INVALID',
+        403: 'AUTH_PERMISSION_INSUFFICIENT',
+        404: 'AUTH_RESOURCE_UNAVAILABLE',
+        409: 'BID_SUBMISSION_SUPPLEMENT_CONFLICT',
+      },
+    );
+    const statusCode = normalized.getStatus();
+    const payload = this.asOptionalRecord(normalized.getResponse()) ?? {};
+    const code = this.asString(payload.code);
+    const message = this.asString(payload.message);
+    const rewrittenMessage = this.rewriteSupplementErrorMessage(
+      statusCode,
+      code,
+      message,
+    );
+    if (!rewrittenMessage || rewrittenMessage === message) {
+      return normalized;
+    }
+    return new HttpException(
+      {
+        ...payload,
+        statusCode,
+        code,
+        source: payload.source === 'server' ? 'server' : 'bff',
+        message: rewrittenMessage,
+      },
+      statusCode,
+    );
+  }
+
+  private rewriteSupplementErrorMessage(
+    statusCode: number,
+    code: string | undefined,
+    message: string | undefined,
+  ) {
+    if (statusCode === 401 && code === 'AUTH_SESSION_INVALID') {
+      return '当前登录态不可用，请重新登录后再试。';
+    }
+    if (statusCode === 403 && code === 'AUTH_PERMISSION_INSUFFICIENT') {
+      return '当前账号不能补充这份竞标资料，请确认已切换到对应竞标主体。';
+    }
+    if (statusCode === 404 && code === 'AUTH_RESOURCE_UNAVAILABLE') {
+      return '当前竞标资料补充资源不可用，请返回消息楼刷新后重试。';
+    }
+    if (statusCode === 409 && code === 'BID_SUBMISSION_SUPPLEMENT_CONFLICT') {
+      return '当前资料状态已变化，请返回消息楼刷新后再补充。';
+    }
+    if (statusCode === 400 && code === 'BID_SUBMIT_INVALID') {
+      return this.rewriteInvalidMessage(message);
+    }
+    return message;
+  }
+
   private rewriteSubmitErrorMessage(
     statusCode: number,
     code: string | undefined,
@@ -316,11 +395,11 @@ export class BidService {
     }
 
     if (statusCode === 409 && code === 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED') {
-      return '竞标申请已通过后需先冻结 4000 元竞标服务费预授权额度，冻结成功后才能提交竞标。';
+      return '资料确认通过后需先完成 4000 元竞标服务费预授权额度，完成后才能开启项目级自由发送。';
     }
 
     if (statusCode === 409 && code === 'BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE') {
-      return '当前竞标服务费预授权额度状态暂不允许提交竞标，请先完成冻结或刷新后重试。';
+      return '当前竞标服务费预授权额度状态暂不允许开启项目级自由发送，请先完成预授权或刷新后重试。';
     }
 
     if (statusCode === 400 && code === 'BID_SUBMIT_INVALID') {

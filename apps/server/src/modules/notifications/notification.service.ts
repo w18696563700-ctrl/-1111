@@ -1,17 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, EntityManager, IsNull, Repository } from 'typeorm';
+import { DataSource, EntityManager, FindOptionsWhere, IsNull, Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
+import { ProjectEntity } from '../project/entities/project.entity';
 import { ProjectCommunicationMessageEntity } from '../project_communication/entities/project-communication-message.entity';
 import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
+import { ApnsPushProviderAdapter } from './apns-push-provider.adapter';
 import { AppNotificationEntity } from './entities/app-notification.entity';
 import { DevicePushTokenEntity } from './entities/device-push-token.entity';
 import { PushDeliveryAttemptEntity } from './entities/push-delivery-attempt.entity';
-import { notificationForbidden, notificationInvalid, pushTokenInvalid } from './notification.errors';
-import { NotificationPresenter } from './notification.presenter';
+import {
+  notificationForbidden,
+  notificationInvalid,
+  notificationMarkReadTargetUnavailable,
+  pushTokenInvalid
+} from './notification.errors';
+import {
+  NotificationListItemProjection,
+  NotificationPresenter,
+  NotificationRouteTargetAvailability
+} from './notification.presenter';
 
 type RegisterDeviceTokenCommand = {
   platform: 'ios' | 'android';
@@ -26,6 +38,13 @@ const PAGE_SIZE_DEFAULT = 30;
 const PAGE_SIZE_MAX = 50;
 const DEVICE_PLATFORMS = new Set(['ios', 'android']);
 const PUSH_PROVIDERS = new Set(['apns', 'fcm']);
+const NOTIFICATION_SOURCE_FILTERS: Record<string, string[] | null> = {
+  all: null,
+  project_communication: ['project_communication'],
+  forum_interaction: ['forum_interaction'],
+  business_todo: ['business_todo', 'bid_participation_request'],
+  system: ['system']
+};
 
 @Injectable()
 export class NotificationService {
@@ -36,7 +55,10 @@ export class NotificationService {
     private readonly tokenRepository: Repository<DevicePushTokenEntity>,
     private readonly dataSource: DataSource,
     private readonly sessionVerifier: CurrentSessionVerificationService,
-    private readonly presenter: NotificationPresenter
+    private readonly presenter: NotificationPresenter,
+    @InjectRepository(ProjectCommunicationThreadEntity)
+    private readonly threadRepository?: Repository<ProjectCommunicationThreadEntity>,
+    private readonly pushProvider: ApnsPushProviderAdapter = new ApnsPushProviderAdapter()
   ) {}
 
   async registerDeviceToken(payload: Record<string, unknown>, context: RequestContext) {
@@ -73,44 +95,45 @@ export class NotificationService {
     const session = await requireVerifiedCurrentSessionContext(context, this.sessionVerifier);
     const limit = this.readPageSize(query.pageSize);
     const cursor = this.readOptionalDate(query.cursor);
-    const orgId = session.organizationId ?? '';
+    const sourceFilter = this.readSourceFilter(query.source ?? query.lane);
+    const orgId = this.normalizeSessionOrganizationId(session.organizationId);
     const builder = this.notificationRepository
       .createQueryBuilder('n')
       .where('n.notification_state = :state', { state: 'active' })
-      .andWhere('(n.user_id = :userId OR n.organization_id = :orgId)', {
-        userId: session.userId,
-        orgId
-      })
       .orderBy('n.created_at', 'DESC')
       .addOrderBy('n.id', 'DESC')
       .take(limit + 1);
+    this.applyActorNotificationScope(builder, session.userId, orgId);
     if (cursor) {
       builder.andWhere('n.created_at < :cursor', { cursor });
+    }
+    if (sourceFilter) {
+      builder.andWhere('n.source IN (:...sources)', { sources: sourceFilter });
     }
     const [items, unread] = await Promise.all([
       builder.getMany(),
       this.countUnread(session.userId, orgId)
     ]);
-    return this.presenter.toList(items, unread, limit);
+    const projectedItems = await this.withRouteTargetAvailability(items, orgId);
+    return this.presenter.toList(projectedItems, unread, limit);
   }
 
   async markRead(payload: Record<string, unknown>, context: RequestContext) {
     const notificationIds = this.readNotificationIds(payload.notificationIds);
+    this.readMarkReadContext(payload.readContext);
     const session = await requireVerifiedCurrentSessionContext(context, this.sessionVerifier);
-    const orgId = session.organizationId ?? '';
+    const orgId = this.normalizeSessionOrganizationId(session.organizationId);
     const readAt = new Date();
-    const items = await this.notificationRepository
+    const builder = this.notificationRepository
       .createQueryBuilder('n')
       .where('n.id IN (:...ids)', { ids: notificationIds })
-      .andWhere('n.notification_state = :state', { state: 'active' })
-      .andWhere('(n.user_id = :userId OR n.organization_id = :orgId)', {
-        userId: session.userId,
-        orgId
-      })
-      .getMany();
+      .andWhere('n.notification_state = :state', { state: 'active' });
+    this.applyActorNotificationScope(builder, session.userId, orgId);
+    const items = await builder.getMany();
     if (items.length !== notificationIds.length) {
       throw notificationForbidden('Current actor cannot mark one or more notifications as read.');
     }
+    await this.assertRouteTargetsAvailableForRead(items, orgId);
     for (const item of items) {
       item.readAt = item.readAt ?? readAt;
     }
@@ -154,18 +177,85 @@ export class NotificationService {
     return notification;
   }
 
+  async createBidParticipationRequestCreatedNotification(
+    request: BidParticipationRequestEntity,
+    project: ProjectEntity,
+    manager: EntityManager
+  ) {
+    const recipientOrganizationId = project.organizationId?.trim() ?? '';
+    if (!recipientOrganizationId || recipientOrganizationId === request.requesterOrganizationId) {
+      return null;
+    }
+    const notificationRepository = manager.getRepository(AppNotificationEntity);
+    const notification = notificationRepository.create({
+      id: randomUUID(),
+      userId: '',
+      organizationId: recipientOrganizationId,
+      type: 'bid_participation_request',
+      source: 'bid_participation_request',
+      title: '有新的参与竞标申请',
+      body: '有供应商提交了参与竞标申请，请进入审核线程处理。',
+      projectId: project.id,
+      threadId: request.id,
+      routeTarget: this.bidParticipationRequestRouteTarget(project.id, request.id),
+      readAt: null,
+      notificationState: 'active'
+    });
+    await notificationRepository.save(notification);
+    await this.recordDeliveryAttempts(notification, recipientOrganizationId, manager);
+    return notification;
+  }
+
+  async countBidParticipationRequestUnreadForShell(userId: string, organizationId: string) {
+    const normalizedUserId = userId.trim();
+    const normalizedOrganizationId = organizationId.trim();
+    if (!normalizedUserId && !normalizedOrganizationId) {
+      return 0;
+    }
+    const where = [];
+    if (normalizedUserId) {
+      where.push({
+        userId: normalizedUserId,
+        source: 'bid_participation_request',
+        readAt: IsNull(),
+        notificationState: 'active'
+      });
+    }
+    if (normalizedOrganizationId) {
+      where.push({
+        organizationId: normalizedOrganizationId,
+        source: 'bid_participation_request',
+        readAt: IsNull(),
+        notificationState: 'active'
+      });
+    }
+    if (!where.length) {
+      return 0;
+    }
+    const items = await this.notificationRepository.find({ where });
+    return new Set(items.map((item) => item.id)).size;
+  }
+
   private async countUnread(userId: string, organizationId: string) {
+    const where: FindOptionsWhere<AppNotificationEntity>[] = [
+      { userId, readAt: IsNull(), notificationState: 'active' }
+    ];
+    if (organizationId) {
+      where.push({ organizationId, readAt: IsNull(), notificationState: 'active' });
+    }
     const items = await this.notificationRepository.find({
-      where: [
-        { userId, readAt: IsNull(), notificationState: 'active' },
-        { organizationId, readAt: IsNull(), notificationState: 'active' }
-      ]
+      where
     });
     const unread = this.presenter.emptyUnread();
     for (const item of items) {
       unread.total += 1;
       if (item.source === 'project_communication') {
         unread.projectCommunication += 1;
+      } else if (item.source === 'business_todo') {
+        unread.businessTodo += 1;
+      } else if (item.source === 'bid_participation_request') {
+        unread.businessTodo += 1;
+        unread.bidParticipationRequest += 1;
       } else if (item.source === 'forum_interaction') {
         unread.forumInteraction += 1;
       } else if (item.source === 'system') {
@@ -201,28 +291,237 @@ export class NotificationService {
       );
       return;
     }
-    await attemptRepository.save(
-      tokens.map((token) =>
+    const attempts = [];
+    for (const token of tokens) {
+      const delivery = await this.pushProvider.deliver(token, notification);
+      if (delivery.attemptStatus === 'token_invalid') {
+        token.tokenState = 'inactive';
+        await tokenRepository.save(token);
+      }
+      attempts.push(
         attemptRepository.create({
           id: randomUUID(),
           notificationId: notification.id,
           deviceTokenId: token.id,
-          provider: token.provider,
-          attemptStatus: 'provider_unavailable',
-          errorCode: 'provider_credentials_unavailable',
-          errorMessage: 'APNs/FCM credentials are not configured for this degraded implementation path.',
+          provider: delivery.provider,
+          attemptStatus: delivery.attemptStatus,
+          errorCode: delivery.errorCode,
+          errorMessage: delivery.errorMessage,
           attemptedAt: new Date()
         })
-      )
+      );
+    }
+    await attemptRepository.save(attempts);
+  }
+
+  private async withRouteTargetAvailability(
+    items: AppNotificationEntity[],
+    organizationId: string
+  ): Promise<NotificationListItemProjection[]> {
+    return Promise.all(
+      items.map(async (item) => ({
+        item,
+        routeTargetAvailability: await this.resolveRouteTargetAvailability(item, organizationId)
+      }))
     );
+  }
+
+  private applyActorNotificationScope(
+    builder: { andWhere(statement: string, params?: Record<string, unknown>): unknown },
+    userId: string,
+    organizationId: string
+  ) {
+    if (organizationId) {
+      builder.andWhere('(n.user_id = :userId OR n.organization_id = :orgId)', {
+        userId,
+        orgId: organizationId
+      });
+      return;
+    }
+    builder.andWhere('n.user_id = :userId', { userId });
+  }
+
+  private async assertRouteTargetsAvailableForRead(
+    items: AppNotificationEntity[],
+    organizationId: string
+  ) {
+    const projections = await this.withRouteTargetAvailability(items, organizationId);
+    const blocked = projections.find(
+      (projection) => projection.routeTargetAvailability.state !== 'available'
+    );
+    if (!blocked) {
+      return;
+    }
+    throw notificationMarkReadTargetUnavailable('Current notification route target is unavailable for mark-read.', {
+      notificationId: blocked.item.id,
+      routeTargetAvailability: blocked.routeTargetAvailability
+    });
+  }
+
+  private async resolveRouteTargetAvailability(
+    item: AppNotificationEntity,
+    organizationId: string
+  ): Promise<NotificationRouteTargetAvailability> {
+    const routeTarget = this.toRouteTargetRecord(item.routeTarget);
+    if (!routeTarget) {
+      return this.unavailableRouteTarget(
+        'missing_context',
+        'ROUTE_TARGET_MISSING',
+        '当前通知暂时无法定位，请稍后重试或从对应入口进入。'
+      );
+    }
+    if (!this.isProjectCommunicationRouteTarget(item, routeTarget)) {
+      return this.genericRouteTargetAvailability(routeTarget);
+    }
+    const conversationId = this.routeParam(routeTarget, 'conversationId');
+    const projectId = this.routeParam(routeTarget, 'projectId') ?? this.normalizeRouteString(item.projectId);
+    const threadId = this.routeParam(routeTarget, 'threadId') ?? this.normalizeRouteString(item.threadId);
+    const fallbackRouteTarget =
+      conversationId && projectId ? this.projectCommunicationSubjectListRouteTarget(projectId, conversationId) : null;
+    if (!conversationId || !projectId || !threadId) {
+      return this.unavailableRouteTarget(
+        'missing_context',
+        'PROJECT_COMMUNICATION_CONTEXT_MISSING',
+        fallbackRouteTarget
+          ? '入口已失效，可从主体项目列表重新进入。'
+          : '当前通知暂时无法定位，请稍后重试或从对应入口进入。',
+        fallbackRouteTarget
+      );
+    }
+    if (!this.threadRepository) {
+      return this.availableRouteTarget();
+    }
+    const thread = await this.threadRepository.findOneBy({ id: threadId, projectId });
+    if (!thread) {
+      return this.unavailableRouteTarget(
+        'expired',
+        'PROJECT_COMMUNICATION_THREAD_NOT_FOUND',
+        '入口已失效，可从主体项目列表重新进入。',
+        fallbackRouteTarget
+      );
+    }
+    if (thread.threadState !== 'open') {
+      return this.unavailableRouteTarget(
+        'unavailable',
+        'PROJECT_COMMUNICATION_THREAD_NOT_OPEN',
+        '入口已失效，可从主体项目列表重新进入。',
+        fallbackRouteTarget
+      );
+    }
+    const belongsToThread =
+      organizationId === thread.ownerOrganizationId || organizationId === thread.counterpartOrganizationId;
+    if (!belongsToThread) {
+      return this.unavailableRouteTarget(
+        'forbidden',
+        'PROJECT_COMMUNICATION_THREAD_FORBIDDEN',
+        '当前账号暂无权限查看该项目沟通入口。'
+      );
+    }
+    const conversationBelongsToThread =
+      conversationId === thread.ownerOrganizationId || conversationId === thread.counterpartOrganizationId;
+    if (!conversationBelongsToThread) {
+      return this.unavailableRouteTarget(
+        'missing_context',
+        'PROJECT_COMMUNICATION_COUNTERPART_MISMATCH',
+        '入口已失效，可从主体项目列表重新进入。',
+        fallbackRouteTarget
+      );
+    }
+    return this.availableRouteTarget();
+  }
+
+  private genericRouteTargetAvailability(routeTarget: Record<string, unknown>): NotificationRouteTargetAvailability {
+    if (routeTarget.state !== 'enabled') {
+      return this.unavailableRouteTarget(
+        'unavailable',
+        'ROUTE_TARGET_UNAVAILABLE',
+        '当前通知入口暂不可用，请稍后重试或从对应入口进入。'
+      );
+    }
+    return this.availableRouteTarget();
   }
 
   private projectCommunicationRouteTarget(projectId: string, threadId: string, conversationId: string) {
     return {
       canonicalPath: '/api/app/message/counterpart-conversation/detail',
       localEntryKey: 'counterpart_conversation.open',
-      requiredParams: ['conversationId', 'projectId'],
+      requiredParams: ['conversationId', 'projectId', 'threadId'],
       routeParams: { conversationId, projectId, threadId },
+      state: 'enabled'
+    };
+  }
+
+  private projectCommunicationSubjectListRouteTarget(projectId: string, conversationId: string) {
+    return {
+      canonicalPath: '/api/app/message/counterpart-conversation/detail',
+      localEntryKey: 'counterpart_conversation.open',
+      requiredParams: ['conversationId', 'projectId'],
+      routeParams: { conversationId, projectId },
+      state: 'enabled'
+    };
+  }
+
+  private isProjectCommunicationRouteTarget(item: AppNotificationEntity, routeTarget: Record<string, unknown>) {
+    return (
+      item.source === 'project_communication' ||
+      item.type === 'project_communication_message' ||
+      routeTarget.canonicalPath === '/api/app/message/counterpart-conversation/detail'
+    );
+  }
+
+  private availableRouteTarget(): NotificationRouteTargetAvailability {
+    return {
+      state: 'available',
+      reasonCode: 'ROUTE_TARGET_AVAILABLE',
+      reasonText: '当前通知入口可用。',
+      fallbackAction: 'none',
+      fallbackRouteTarget: null
+    };
+  }
+
+  private unavailableRouteTarget(
+    state: Exclude<NotificationRouteTargetAvailability['state'], 'available'>,
+    reasonCode: string,
+    reasonText: string,
+    fallbackRouteTarget: Record<string, unknown> | null = null
+  ): NotificationRouteTargetAvailability {
+    return {
+      state,
+      reasonCode,
+      reasonText,
+      fallbackAction: fallbackRouteTarget ? 'open_subject_list' : 'none',
+      fallbackRouteTarget
+    };
+  }
+
+  private toRouteTargetRecord(value: unknown): Record<string, unknown> | null {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+    const record = value as Record<string, unknown>;
+    return Object.keys(record).length > 0 ? record : null;
+  }
+
+  private routeParam(routeTarget: Record<string, unknown>, key: string) {
+    const routeParams = this.toRouteTargetRecord(routeTarget.routeParams);
+    return this.normalizeRouteString(routeParams?.[key]);
+  }
+
+  private normalizeRouteString(value: unknown) {
+    return typeof value === 'string' && value.trim() ? value.trim() : null;
+  }
+
+  private normalizeSessionOrganizationId(value: string | null | undefined) {
+    const normalized = value?.trim() ?? '';
+    return normalized || '';
+  }
+
+  private bidParticipationRequestRouteTarget(projectId: string, requestId: string) {
+    return {
+      canonicalPath: '/api/app/project/bid-participation/thread/detail',
+      localEntryKey: 'bid_participation_request.open',
+      requiredParams: ['threadId', 'projectId', 'requestId'],
+      routeParams: { threadId: requestId, projectId, requestId },
       state: 'enabled'
     };
   }
@@ -274,6 +573,28 @@ export class NotificationService {
     return ids;
   }
 
+  private readMarkReadContext(value: unknown) {
+    if (!value || Array.isArray(value) || typeof value !== 'object') {
+      throw notificationInvalid('Field `readContext` is required.');
+    }
+    const record = value as Record<string, unknown>;
+    const availabilityState = this.readNotificationString(
+      record.routeTargetAvailabilityState,
+      'readContext.routeTargetAvailabilityState',
+      32
+    );
+    if (availabilityState !== 'available') {
+      throw notificationMarkReadTargetUnavailable(
+        'Notification mark-read requires an available route target context.',
+        { routeTargetAvailabilityState: availabilityState }
+      );
+    }
+    const completion = this.readNotificationString(record.completion, 'readContext.completion', 64);
+    if (completion !== 'navigated_to_available_target') {
+      throw notificationInvalid('Field `readContext.completion` must be navigated_to_available_target.');
+    }
+  }
+
   private readPageSize(value: unknown) {
     if (value === undefined || value === null || value === '') {
       return PAGE_SIZE_DEFAULT;
@@ -283,6 +604,18 @@ export class NotificationService {
       throw notificationInvalid('Field `pageSize` must be a positive integer.');
     }
     return Math.min(parsed, PAGE_SIZE_MAX);
+  }
+
+  private readSourceFilter(value: unknown) {
+    const normalized = this.readOptionalString(value);
+    if (!normalized) {
+      return null;
+    }
+    const filter = NOTIFICATION_SOURCE_FILTERS[normalized];
+    if (filter === undefined) {
+      throw notificationInvalid('Field `source` must be all, project_communication, forum_interaction, business_todo, or system.');
+    }
+    return filter;
   }
 
   private readOptionalDate(value: unknown) {

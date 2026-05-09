@@ -55,14 +55,20 @@ namespaces:
   - SECURITY
   - PROJECT
   - BID
+  - BID_PARTICIPATION
   - THREAD
   - ORDER
   - CONTRACT
   - MILESTONE
   - INSPECTION
   - RATING
+  - PROJECT_COUNTERPARTY_RATING
   - DISPUTE
   - FORUM
+  - MESSAGE_INTERACTION
+  - COUNTERPART_CONVERSATION
+  - PROJECT_COMMUNICATION
+  - PROJECT_ALBUM
   - ENTERPRISE_HUB
   - GOVERNANCE
   - FILE
@@ -249,7 +255,16 @@ codes:
     meaning: The current actor or organization scope is not allowed to view or create project public clarification under the targeted project.
   - code: PROJECT_AUTHENTICITY_SINCERITY_REQUIRED
     owner: Server
-    meaning: Project publish is blocked because the current project requires a bounded `200 元项目真实性诚意金` truth that is not yet in an admitted paid state.
+    meaning: Project publish is blocked because the current project requires a bounded `200 元项目真实性诚意金` truth that is not yet admitted under the current formal paid gate or internal-test green-channel gate.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE
+    owner: Server
+    meaning: Project publish is blocked because the current project has not satisfied internal-test green-channel publish conditions, such as required quote-basis materials or current-user feedback choice.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_INVALID
+    owner: Server
+    meaning: Project authenticity sincerity green-channel feedback choice is missing or outside `support_freeze / oppose_freeze`.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED
+    owner: Server
+    meaning: The current actor, organization, or project state cannot submit project authenticity sincerity green-channel feedback.
   - code: PROJECT_AUTHENTICITY_SINCERITY_ORDER_CREATE_REJECTED
     owner: Server
     meaning: The current `项目真实性诚意金` order-create request is missing required bounded fields, violates the frozen amount or currency rule, or cannot be admitted under the current project boundary.
@@ -262,15 +277,30 @@ codes:
   - code: PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE
     owner: Server
     meaning: The current project or targeted `项目真实性诚意金` order is not in a state that allows the requested publish gate, order-create, or pay-init transition.
+  - code: PROJECT_ALBUM_INVALID
+    owner: Server
+    meaning: Project album photo bind, list, or delete request is missing required anchors or violates the bounded project album input contract.
+  - code: PROJECT_ALBUM_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read or mutate the targeted project album photo boundary.
+  - code: PROJECT_ALBUM_LIMIT_EXCEEDED
+    owner: Server
+    meaning: Project album photo mutation is rejected because the current bounded album limit has already been reached.
+  - code: PROJECT_ALBUM_UNAVAILABLE
+    owner: Server
+    meaning: The targeted project album, project truth, or photo binding is unavailable, hidden, or not materialized under the current scope.
   - code: BID_SUBMIT_INVALID
     owner: Server
     meaning: Bid submit request is missing required fields or violates minimum constraints.
   - code: BID_DUPLICATE_SUBMISSION
     owner: Server
     meaning: The same bid command was submitted more than once.
+  - code: BID_SUBMISSION_SUPPLEMENT_CONFLICT
+    owner: Server
+    meaning: Bid submission supplement is rejected because the targeted material review, bid ownership, source version token, or supplement state conflicts with current Server truth.
   - code: BID_SERVICE_FEE_AUTHORIZATION_REQUIRED
     owner: Server
-    meaning: Bid submit is blocked because the current actor does not yet have an admitted `approved` participation truth plus a `frozen` bounded `4000 元竞标服务费预授权额度`.
+    meaning: Project-level free-send is blocked after publisher material confirmation because the current actor does not yet have a `frozen` bounded `4000 元竞标服务费预授权额度`; bid submit itself must not use this code solely for missing or unfinished authorization.
   - code: BID_SERVICE_FEE_AUTHORIZATION_CREATE_REJECTED
     owner: Server
     meaning: The current `竞标服务费预授权额度` create request is missing required bounded fields, violates the frozen amount or currency rule, or cannot be admitted under the current project-bidder boundary.
@@ -310,6 +340,36 @@ codes:
   - code: BID_THREAD_FORBIDDEN
     owner: Server
     meaning: The current actor or organization scope is not an admitted participant for the targeted project-bid private thread.
+  - code: BID_PARTICIPATION_INVALID
+    owner: Server
+    meaning: Bid participation request command is missing required project or requester fields or violates the bounded application input contract.
+  - code: BID_PARTICIPATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to create, review, read, or use the targeted bid participation request.
+  - code: BID_PARTICIPATION_UNAVAILABLE
+    owner: Server
+    meaning: The targeted project, bid participation request, or participation thread is unavailable, hidden, or not materialized under the current scope.
+  - code: BID_PARTICIPATION_CONFLICT
+    owner: Server
+    meaning: Bid participation request conflicts with an existing pending or approved participation truth and cannot create a competing request.
+  - code: BID_PARTICIPATION_INVALID_STATE
+    owner: Server
+    meaning: The targeted bid participation request is not in a state that allows the requested approve, reject, material read, or bid continuation transition.
+  - code: BID_PARTICIPATION_REQUIRED
+    owner: Server
+    meaning: The current bidder organization has not passed the required project bid participation request gate for the requested material read or bid action.
+  - code: PROJECT_COMMUNICATION_THREAD_INVALID
+    owner: Server
+    meaning: Project communication thread get-or-create request is missing required project/counterpart anchors, carries a threadId outside the submitted project, or violates the current actor boundary.
+  - code: PROJECT_COMMUNICATION_THREAD_UNAVAILABLE
+    owner: Server
+    meaning: The requested project communication thread cannot be resolved, created, or returned under the current project/counterpart boundary.
+  - code: PROJECT_COMMUNICATION_READ_CURSOR_INVALID
+    owner: Server
+    meaning: Project communication read-cursor write is missing required projectId, threadId, or lastReadMessageId, or the message anchor does not belong to the submitted project/thread.
+  - code: PROJECT_COMMUNICATION_READ_CURSOR_UNAVAILABLE
+    owner: Server
+    meaning: Project communication read-cursor truth is unavailable for the current actor, project, thread, or stored cursor boundary.
   - code: DEAL_CONFIRMATION_INVALID
     owner: Server
     meaning: The current deal-confirmation request body is missing one or more required bounded fields, uses unsupported confirmation role truth, or references confirmation material outside the current project-deal boundary.
@@ -388,6 +448,18 @@ codes:
   - code: RATING_INVALID_STATE
     owner: Server
     meaning: Rating truth exists, but the current rating state does not allow the requested submit transition.
+  - code: PROJECT_COUNTERPARTY_RATING_INVALID
+    owner: Server
+    meaning: Project counterparty rating submit request is missing required order, project, ratee, score, or comment fields under the bounded rating contract.
+  - code: PROJECT_COUNTERPARTY_RATING_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is outside the buyer or seller boundary for the targeted completed order rating.
+  - code: PROJECT_COUNTERPARTY_RATING_DUPLICATE
+    owner: Server
+    meaning: The same project counterparty rating direction has already been submitted and cannot create a second rating truth.
+  - code: PROJECT_COUNTERPARTY_RATING_UNAVAILABLE
+    owner: Server
+    meaning: The targeted order, project, or rating entry is unavailable, hidden, not completed, or not materialized for the current scope.
   - code: DISPUTE_OPEN_INVALID
     owner: Server
     meaning: Dispute open request is missing required entry-state fields.
@@ -427,6 +499,9 @@ codes:
   - code: FORUM_DRAFT_UNAVAILABLE
     owner: Server
     meaning: Forum draft truth is absent or not accessible to the current actor.
+  - code: FORUM_DRAFT_INVALID
+    owner: Server
+    meaning: Forum draft save, detail, or owner-continuation request is missing required minimum fields or violates the current draft input boundary.
   - code: FORUM_PUBLISH_INVALID
     owner: Server
     meaning: Forum publish request is missing required minimum fields or references for the current publish handoff.
@@ -442,12 +517,45 @@ codes:
   - code: FORUM_INTERACTION_UNAVAILABLE
     owner: Server
     meaning: Forum interaction capability is intentionally not connected to a real Server-owned write chain in the current bounded stage.
+  - code: FORUM_INTERACTION_INBOX_INVALID
+    owner: Server
+    meaning: Forum interaction inbox request is missing required minimum query fields or uses an unsupported inbox tab.
   - code: FORUM_REPORT_INVALID
     owner: Server
     meaning: Forum report-submit request is missing required minimum fields, uses an unsupported target type, or uses a reason code outside the current bounded report contract.
+  - code: FORUM_REPORT_UNAVAILABLE
+    owner: Server
+    meaning: Forum report ticket truth is absent or not accessible to the current reporter.
   - code: FORUM_SEARCH_INVALID
     owner: Server
     meaning: Forum search request is missing the minimum required query fields or violates the current search input boundary.
+  - code: MESSAGE_INTERACTION_INVALID
+    owner: Server
+    meaning: Message interaction list request is missing required fields or carries unsupported lane or route-target parameters.
+  - code: MESSAGE_INTERACTION_UNAVAILABLE
+    owner: Server
+    meaning: Message interaction list projection is unavailable, hidden, or not materialized for the current actor and organization scope.
+  - code: MESSAGE_INTERACTION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read the requested message interaction projection.
+  - code: COUNTERPART_CONVERSATION_INVALID
+    owner: Server
+    meaning: Counterpart conversation request is missing required identifiers or violates the current messages-building route boundary.
+  - code: COUNTERPART_CONVERSATION_UNAVAILABLE
+    owner: Server
+    meaning: Counterpart conversation read model is unavailable, hidden, or not materialized for the current actor and organization scope.
+  - code: COUNTERPART_CONVERSATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read the requested counterpart conversation.
+  - code: PROJECT_COMMUNICATION_INVALID
+    owner: Server
+    meaning: Project communication request is missing required fields, including required read-cursor fields, or violates the bounded project communication contract.
+  - code: PROJECT_COMMUNICATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not an admitted participant for the requested project communication thread.
+  - code: PROJECT_COMMUNICATION_UNAVAILABLE
+    owner: Server
+    meaning: Project communication thread, message, or projection is unavailable, hidden, or not materialized under the current project relation boundary.
   - code: ENTERPRISE_HUB_INVALID_BOARD_TYPE
     owner: BFF
     meaning: Enterprise hub boardType is missing, unsupported, or outside the current frozen company/factory/supplier boundary.
@@ -493,6 +601,9 @@ codes:
   - code: ENTERPRISE_HUB_CHANGE_CORRIDOR_REQUIRED
     owner: Server
     meaning: Direct enterprise hub continuation is no longer valid because the target truth has entered the published-governed change corridor and must continue through the formal published-change family.
+  - code: ENTERPRISE_HUB_CHANGE_CORRIDOR_NOT_AVAILABLE
+    owner: Server
+    meaning: Enterprise hub published-governed change corridor is unavailable because the current enterprise does not satisfy the corridor state or visibility boundary.
   - code: ENTERPRISE_HUB_INVALID_MEDIA_OWNERSHIP
     owner: Server
     meaning: Enterprise hub media write or live apply references a FileAsset that does not belong to the current enterprise_display scope, media role, or allowed image boundary.
@@ -562,6 +673,15 @@ codes:
   - code: NOTIFICATION_READ_INVALID
     owner: Server
     meaning: Notification mark-read request is missing required ids, contains unsupported ids, or violates the bounded read contract.
+  - code: NOTIFICATION_ROUTE_TARGET_UNAVAILABLE
+    owner: Server
+    meaning: Notification route target is unavailable, expired, forbidden, missing required context, or cannot be safely opened for the current actor.
+  - code: NOTIFICATION_MARK_READ_TARGET_UNAVAILABLE
+    owner: Server
+    meaning: Notification mark-read is rejected because the current routeTargetAvailability is not available or the client did not provide the required available-target navigation context.
+  - code: NOTIFICATION_BUSINESS_TODO_READ_UNSUPPORTED
+    owner: Server
+    meaning: Notification mark-read attempted to clear a business-todo state or project communication business badge that must remain governed by the Server-owned business todo truth.
   - code: PUSH_TOKEN_INVALID
     owner: Server
     meaning: Device push token registration request is missing required fields, carries an unsupported platform/provider pair, or fails token-shape validation.

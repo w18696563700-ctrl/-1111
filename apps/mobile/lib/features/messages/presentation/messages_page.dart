@@ -8,10 +8,24 @@ import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
+import 'package:mobile/shared/ui/safe_remote_image.dart';
 
 part 'messages_page_support.dart';
 
 enum _MessagesInteractionTab { replies, likes, follows }
+
+enum _MessagesPrimaryTab { projectCommunication, forumInteraction }
+
+enum _MessagesNotificationFilter {
+  all,
+  projectCommunication,
+  forumInteraction,
+  businessTodo,
+  system,
+}
+
+const int _notificationUnreadDiscoveryMaxPages = 3;
+const int _notificationUnreadDiscoveryMaxItems = 100;
 
 class MessagesPage extends StatefulWidget {
   const MessagesPage({super.key, this.refreshSignal, this.entrySignal});
@@ -34,6 +48,9 @@ class _MessagesPageState extends State<MessagesPage> {
         ForumReadResult<ForumPagedCollectionView<ForumInteractionInboxItemView>>
       >{};
   _MessagesInteractionTab? _selectedTab;
+  _MessagesPrimaryTab _selectedPrimaryTab =
+      _MessagesPrimaryTab.projectCommunication;
+  late final PageController _primaryPageController;
   MessageInteractionListResult? _projectCommunicationResult;
   AppNotificationListResult? _notificationResult;
   ValueListenable<int>? _refreshSignal;
@@ -46,10 +63,13 @@ class _MessagesPageState extends State<MessagesPage> {
   bool _projectCommunicationLoading = false;
   bool _notificationLoading = false;
   bool _notificationCenterExpanded = false;
+  _MessagesNotificationFilter _selectedNotificationFilter =
+      _MessagesNotificationFilter.all;
 
   @override
   void initState() {
     super.initState();
+    _primaryPageController = PageController();
     _bindRefreshSignal(widget.refreshSignal);
     _bindEntrySignal(widget.entrySignal);
     _loadNotifications();
@@ -71,6 +91,7 @@ class _MessagesPageState extends State<MessagesPage> {
   void dispose() {
     _refreshSignal?.removeListener(_handleRefreshSignal);
     _entrySignal?.removeListener(_handleEntrySignal);
+    _primaryPageController.dispose();
     super.dispose();
   }
 
@@ -116,8 +137,12 @@ class _MessagesPageState extends State<MessagesPage> {
     }
     setState(() {
       _selectedTab = null;
+      _selectedPrimaryTab = _MessagesPrimaryTab.projectCommunication;
       _loading = false;
     });
+    if (_primaryPageController.hasClients) {
+      _primaryPageController.jumpToPage(0);
+    }
   }
 
   Future<void> _refreshAll({bool showLoading = true}) async {
@@ -174,18 +199,18 @@ class _MessagesPageState extends State<MessagesPage> {
         _projectCommunicationLoading = false;
       }
     });
-    if (result.state == AppPageState.content ||
-        result.state == AppPageState.empty) {
-      _reloadShellContext();
-    }
   }
 
   Future<void> _loadNotifications({bool showLoading = true}) async {
     final shouldShowLoading = showLoading || _notificationResult == null;
+    final filter = _selectedNotificationFilter;
     if (shouldShowLoading) {
       setState(() => _notificationLoading = true);
     }
-    final result = await MessagesConsumerLayer.instance.loadNotifications();
+    var result = await MessagesConsumerLayer.instance.loadNotifications(
+      source: _notificationFilterQuery(filter),
+    );
+    result = await _loadUnreadNotificationWindow(result, filter: filter);
     if (!mounted) {
       return;
     }
@@ -193,6 +218,49 @@ class _MessagesPageState extends State<MessagesPage> {
       _notificationResult = result;
       _notificationLoading = false;
     });
+    _syncShellMessagesUnreadBadge(result);
+  }
+
+  Future<AppNotificationListResult> _loadUnreadNotificationWindow(
+    AppNotificationListResult initial, {
+    required _MessagesNotificationFilter filter,
+  }) async {
+    var result = initial;
+    var loadedPages = 1;
+    while (_shouldLoadMoreForUnreadDiscovery(result, filter) &&
+        loadedPages < _notificationUnreadDiscoveryMaxPages) {
+      final data = result.data;
+      if (data == null ||
+          data.items.length >= _notificationUnreadDiscoveryMaxItems) {
+        break;
+      }
+      final next = await MessagesConsumerLayer.instance.loadNotifications(
+        cursor: data.nextCursor,
+        source: _notificationFilterQuery(filter),
+      );
+      if (!mounted || next.data == null) {
+        break;
+      }
+      result = _mergeNotificationResults(result, next);
+      loadedPages += 1;
+    }
+    return result;
+  }
+
+  bool _shouldLoadMoreForUnreadDiscovery(
+    AppNotificationListResult result,
+    _MessagesNotificationFilter filter,
+  ) {
+    final data = result.data;
+    if (data == null || !data.hasMore || data.nextCursor == null) {
+      return false;
+    }
+    final expectedUnread = _notificationFilterUnreadCount(data.unread, filter);
+    if (expectedUnread <= 0) {
+      return false;
+    }
+    final loadedUnread = _notificationItemsForFilter(data.items, filter).length;
+    return loadedUnread < expectedUnread;
   }
 
   @override
@@ -206,68 +274,246 @@ class _MessagesPageState extends State<MessagesPage> {
       _projectCommunicationResult,
     );
 
-    return RefreshIndicator(
-      onRefresh: _refreshAll,
-      child: ListView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-        children: <Widget>[
-          if (_notificationLoading || _notificationResult != null) ...<Widget>[
-            _MessagesNotificationCenterSection(
+    return Column(
+      children: <Widget>[
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 10, 20, 8),
+          child: _MessagesTopBar(
+            unreadCount: _notificationUnreadCount(_notificationResult),
+            loading: _notificationLoading,
+            notificationExpanded: _notificationCenterExpanded,
+            onToggleNotifications: () {
+              setState(
+                () =>
+                    _notificationCenterExpanded = !_notificationCenterExpanded,
+              );
+            },
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+          child: _MessagesPrimaryNavigation(
+            selectedTab: _selectedPrimaryTab,
+            onSelectTab: _selectPrimaryTab,
+          ),
+        ),
+        if (_notificationCenterExpanded)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
+            child: _MessagesNotificationPanel(
               loading: _notificationLoading,
-              expanded: _notificationCenterExpanded,
               result: _notificationResult,
-              onToggleExpanded: () {
-                setState(
-                  () => _notificationCenterExpanded =
-                      !_notificationCenterExpanded,
-                );
-              },
+              selectedFilter: _selectedNotificationFilter,
+              onSelectFilter: _selectNotificationFilter,
               onOpen: _openNotification,
               onRetry: () => _loadNotifications(),
+              onLoadMore: _loadMoreNotifications,
             ),
-            const SizedBox(height: 14),
-          ],
-          if (_projectCommunicationLoading ||
-              _projectCommunicationResult != null) ...<Widget>[
-            _MessagesProjectCommunicationSection(
-              loading: _projectCommunicationLoading,
-              result: _projectCommunicationResult,
-              items: projectCommunicationItems,
-              onOpen: (MessageInteractionItemView item) =>
-                  _openProjectCommunication(context, item),
-            ),
-            const SizedBox(height: 14),
-          ],
-          _MessagesForumInteractionSection(
-            selectedTab: selectedTab,
-            onSelectTab: (_MessagesInteractionTab tab) {
-              if (tab == selectedTab) {
-                setState(() {
-                  _selectedTab = null;
-                  _loading = false;
-                });
-                return;
-              }
-              setState(() => _selectedTab = tab);
-              _load(tab: tab);
-            },
-            loading: _loading,
-            state: state,
-            message: result?.message,
-            items: items,
-            onRetry: () {
-              final currentTab = _selectedTab;
-              if (currentTab == null) {
-                return;
-              }
-              _load(tab: currentTab);
-            },
-            onOpenSource: (ForumInteractionInboxItemView item) =>
-                _openSource(context, item),
           ),
-        ],
+        Expanded(
+          child: PageView(
+            controller: _primaryPageController,
+            onPageChanged: (index) {
+              final tab = _primaryTabFromIndex(index);
+              setState(() => _selectedPrimaryTab = tab);
+              if (tab == _MessagesPrimaryTab.forumInteraction) {
+                _ensureForumTabLoaded();
+              }
+            },
+            children: <Widget>[
+              RefreshIndicator(
+                onRefresh: _refreshAll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  children: <Widget>[
+                    if (_projectCommunicationLoading ||
+                        _projectCommunicationResult != null)
+                      _MessagesProjectCommunicationSection(
+                        loading: _projectCommunicationLoading,
+                        result: _projectCommunicationResult,
+                        items: projectCommunicationItems,
+                        onOpen: (MessageInteractionItemView item) =>
+                            _openProjectCommunication(context, item),
+                      )
+                    else
+                      const _MessagesInlinePanel(
+                        title: '项目沟通正在加载',
+                        body: '正在读取主体会话列表。',
+                      ),
+                  ],
+                ),
+              ),
+              RefreshIndicator(
+                onRefresh: _refreshAll,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 28),
+                  children: <Widget>[
+                    _MessagesForumInteractionSection(
+                      selectedTab: selectedTab,
+                      onSelectTab: _selectForumInteractionTab,
+                      loading: _loading,
+                      state: state,
+                      message: result?.message,
+                      items: items,
+                      onRetry: () {
+                        final currentTab = _selectedTab;
+                        if (currentTab == null) {
+                          return;
+                        }
+                        _load(tab: currentTab);
+                      },
+                      onOpenSource: (ForumInteractionInboxItemView item) =>
+                          _openSource(context, item),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  int _notificationUnreadCount(AppNotificationListResult? result) {
+    final data = result?.data;
+    if ((result?.state == AppPageState.content ||
+            result?.state == AppPageState.empty) &&
+        data != null) {
+      return data.unread.total;
+    }
+    return 0;
+  }
+
+  void _syncShellMessagesUnreadBadge(AppNotificationListResult result) {
+    final data = result.data;
+    if (data == null) {
+      return;
+    }
+    _syncShellMessagesUnreadCount(data.unread.total);
+  }
+
+  void _syncShellMessagesUnreadCount(int unreadCount) {
+    try {
+      AppShellScope.read(context).applyMessagesUnreadProjection(unreadCount);
+    } catch (_) {
+      // Some focused widget tests mount MessagesPage outside the full shell.
+    }
+  }
+
+  void _selectPrimaryTab(_MessagesPrimaryTab tab) {
+    if (tab == _selectedPrimaryTab) {
+      return;
+    }
+    setState(() => _selectedPrimaryTab = tab);
+    _primaryPageController.animateToPage(
+      _primaryTabIndex(tab),
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+    );
+    if (tab == _MessagesPrimaryTab.forumInteraction) {
+      _ensureForumTabLoaded();
+    }
+  }
+
+  int _primaryTabIndex(_MessagesPrimaryTab tab) {
+    return switch (tab) {
+      _MessagesPrimaryTab.projectCommunication => 0,
+      _MessagesPrimaryTab.forumInteraction => 1,
+    };
+  }
+
+  _MessagesPrimaryTab _primaryTabFromIndex(int index) {
+    return index == 1
+        ? _MessagesPrimaryTab.forumInteraction
+        : _MessagesPrimaryTab.projectCommunication;
+  }
+
+  void _ensureForumTabLoaded() {
+    final selectedTab = _selectedTab ?? _MessagesInteractionTab.replies;
+    if (_selectedTab == null) {
+      setState(() => _selectedTab = selectedTab);
+    }
+    if (!_results.containsKey(selectedTab)) {
+      _load(tab: selectedTab);
+    }
+  }
+
+  void _selectForumInteractionTab(_MessagesInteractionTab tab) {
+    if (tab == _selectedTab && _results.containsKey(tab)) {
+      return;
+    }
+    setState(() => _selectedTab = tab);
+    _load(tab: tab);
+  }
+
+  void _selectNotificationFilter(_MessagesNotificationFilter filter) {
+    if (filter == _selectedNotificationFilter) {
+      return;
+    }
+    setState(() {
+      _selectedNotificationFilter = filter;
+    });
+    _loadNotifications(showLoading: false);
+  }
+
+  Future<void> _loadMoreNotifications() async {
+    final current = _notificationResult?.data;
+    if (current == null || current.nextCursor == null || _notificationLoading) {
+      return;
+    }
+    setState(() => _notificationLoading = true);
+    final result = await MessagesConsumerLayer.instance.loadNotifications(
+      cursor: current.nextCursor,
+      source: _notificationFilterQuery(_selectedNotificationFilter),
+    );
+    if (!mounted) {
+      return;
+    }
+    final next = result.data;
+    final mergedResult = next == null || _notificationResult == null
+        ? result
+        : _mergeNotificationResults(_notificationResult!, result);
+    setState(() {
+      _notificationLoading = false;
+      _notificationResult = mergedResult;
+    });
+    _syncShellMessagesUnreadBadge(mergedResult);
+  }
+
+  AppNotificationListResult _mergeNotificationResults(
+    AppNotificationListResult current,
+    AppNotificationListResult next,
+  ) {
+    final currentData = current.data;
+    final nextData = next.data;
+    if (currentData == null || nextData == null) {
+      return next;
+    }
+    final seen = <String>{};
+    final items = <AppNotificationItemView>[];
+    for (final item in <AppNotificationItemView>[
+      ...currentData.items,
+      ...nextData.items,
+    ]) {
+      if (seen.add(item.notificationId)) {
+        items.add(item);
+      }
+    }
+    return AppNotificationListResult(
+      state: items.isEmpty ? AppPageState.empty : AppPageState.content,
+      method: next.method,
+      path: next.path,
+      data: AppNotificationListView(
+        items: items,
+        nextCursor: nextData.nextCursor,
+        hasMore: nextData.hasMore,
+        unread: nextData.unread,
       ),
+      message: next.message ?? current.message,
+      errorCode: next.errorCode ?? current.errorCode,
     );
   }
 
@@ -291,40 +537,162 @@ class _MessagesPageState extends State<MessagesPage> {
     BuildContext context,
     MessageInteractionItemView item,
   ) async {
-    await Navigator.of(context).pushNamed(item.routeTarget.routeLocation);
+    if (!_canOpenProjectCommunication(item)) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(_projectCommunicationMissingContextMessage),
+        ),
+      );
+      return;
+    }
+    final routeLocation = Uri(
+      path: ExhibitionRoutes.counterpartConversation,
+      queryParameters: <String, String>{
+        'conversationId': item.conversationId.trim(),
+        'projectId': item.projectId.trim(),
+      },
+    ).toString();
+    await Navigator.of(context).pushNamed(routeLocation);
     if (!mounted) {
       return;
     }
     await _refreshAll(showLoading: false);
-    _reloadShellContext();
+    await _reloadShellContextPreservingNotificationUnread();
+  }
+
+  bool _canOpenProjectCommunication(MessageInteractionItemView item) {
+    return _nonEmpty(item.conversationId) && _nonEmpty(item.projectId);
+  }
+
+  bool _nonEmpty(String? value) => value != null && value.trim().isNotEmpty;
+
+  String _notificationAvailabilityMessage(String? message) {
+    final normalized = message?.trim();
+    if (normalized == null || normalized.isEmpty) {
+      return '当前通知暂时无法定位，请稍后重试或从对应入口进入。';
+    }
+    if (normalized.contains('COUNTERPART_CONVERSATION_UNAVAILABLE') ||
+        normalized.contains('routeTarget') ||
+        normalized.contains('routeParams') ||
+        normalized.contains('non-empty strings')) {
+      return '当前通知暂时无法定位，请稍后重试或从对应入口进入。';
+    }
+    return normalized;
   }
 
   Future<void> _openNotification(AppNotificationItemView item) async {
-    if (item.unread) {
-      await MessagesConsumerLayer.instance.markNotificationsRead(<String>[
-        item.notificationId,
-      ]);
-      await _loadNotifications(showLoading: false);
-      _reloadShellContext();
-    }
-    if (!mounted) {
+    final availability = item.routeTargetAvailability;
+    if (!availability.isAvailable) {
+      if (availability.canOpenFallback) {
+        setState(() {
+          _selectedPrimaryTab = _MessagesPrimaryTab.projectCommunication;
+          _notificationCenterExpanded = false;
+        });
+        if (_primaryPageController.hasClients) {
+          unawaited(
+            _primaryPageController.animateToPage(
+              0,
+              duration: const Duration(milliseconds: 180),
+              curve: Curves.easeOut,
+            ),
+          );
+        }
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(
+            content: Text(
+              _notificationAvailabilityMessage(availability.reasonText),
+            ),
+          ),
+        );
+        return;
+      }
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        SnackBar(
+          content: Text(
+            _notificationAvailabilityMessage(availability.reasonText),
+          ),
+        ),
+      );
       return;
     }
     final routeLocation = item.routeTarget?.routeLocation;
-    if (routeLocation == null || routeLocation.isEmpty) {
-      ScaffoldMessenger.maybeOf(
-        context,
-      )?.showSnackBar(const SnackBar(content: Text('当前通知暂时没有可打开的页面。')));
+    if (_isProjectCommunicationNotification(item) &&
+        !_hasCompleteProjectCommunicationRoute(item)) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(
+          content: Text(_projectCommunicationMissingContextMessage),
+        ),
+      );
       return;
     }
-    Navigator.of(context).pushNamed(routeLocation);
+    if (routeLocation == null || routeLocation.isEmpty) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
+      );
+      return;
+    }
+    try {
+      final routeFuture = Navigator.of(context).pushNamed(routeLocation);
+      unawaited(routeFuture);
+    } catch (_) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
+      );
+      return;
+    }
+    if (item.unread) {
+      final result = await MessagesConsumerLayer.instance.markNotificationsRead(
+        <String>[item.notificationId],
+      );
+      if (result.state != AppPageState.content) {
+        if (!mounted) {
+          return;
+        }
+        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+          SnackBar(content: Text(result.message ?? '当前通知已读操作暂不可用，请稍后再试。')),
+        );
+        return;
+      }
+      await _loadNotifications(showLoading: false);
+      await _reloadShellContextPreservingNotificationUnread();
+      final unread = result.unread;
+      if (unread != null) {
+        _syncShellMessagesUnreadCount(unread.total);
+      }
+    }
   }
 
-  void _reloadShellContext() {
+  bool _isProjectCommunicationNotification(AppNotificationItemView item) {
+    return item.source == 'project_communication' ||
+        item.type == 'project_communication_message' ||
+        item.routeTarget?.canonicalPath ==
+            '/api/app/message/counterpart-conversation/detail';
+  }
+
+  bool _hasCompleteProjectCommunicationRoute(AppNotificationItemView item) {
+    final routeTarget = item.routeTarget;
+    if (routeTarget == null || !_nonEmpty(routeTarget.routeLocation)) {
+      return false;
+    }
+    final params = routeTarget.params;
+    return _nonEmpty(params['conversationId']) &&
+        _nonEmpty(params['projectId']) &&
+        _nonEmpty(params['threadId']);
+  }
+
+  Future<void> _reloadShellContext() async {
     try {
-      unawaited(AppShellScope.read(context).reloadShellContext());
+      await AppShellScope.read(context).reloadShellContext();
     } catch (_) {
       // Tests may mount this page without the full shell scope.
+    }
+  }
+
+  Future<void> _reloadShellContextPreservingNotificationUnread() async {
+    await _reloadShellContext();
+    final notificationResult = _notificationResult;
+    if (notificationResult != null) {
+      _syncShellMessagesUnreadBadge(notificationResult);
     }
   }
 

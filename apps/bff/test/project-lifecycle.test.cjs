@@ -152,14 +152,14 @@ test('project lifecycle keeps invalid-state fallout stable at bff layer', async 
   );
 });
 
-test('project publish preserves 200 sincerity gate fail-closed semantics', async () => {
+test('project publish preserves green-channel gate rejection semantics', async () => {
   const service = createService({
     serverClient: {
       async post() {
         throw createAxiosError(
           409,
-          'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED',
-          'Project publish requires paid project authenticity sincerity order.',
+          'PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE',
+          'Project publish requires quote-basis materials and green-channel feedback.',
         );
       },
     },
@@ -169,8 +169,11 @@ test('project publish preserves 200 sincerity gate fail-closed semantics', async
     () => service.publishProject({ projectId: 'project-1' }, {}),
     (error) => {
       assert.equal(error.getStatus(), 409);
-      assert.equal(error.getResponse().code, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
-      assert.equal(error.getResponse().message, '发布项目需先完成 200 元项目真实性诚意金冻结。');
+      assert.equal(error.getResponse().code, 'PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE');
+      assert.equal(
+        error.getResponse().message,
+        '发布项目需先补齐必传报价依据资料，并完成项目真实性诚意金绿色通道表态；选择支持或暂不支持均可继续发布。',
+      );
       assert.equal(error.getResponse().source, 'server');
       return true;
     },

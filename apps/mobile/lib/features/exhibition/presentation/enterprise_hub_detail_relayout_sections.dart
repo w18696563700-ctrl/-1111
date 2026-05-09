@@ -112,6 +112,15 @@ class _EnterpriseDetailOverviewCardState
             // switching, so this next-button is part of the frozen behavior.
             if (heroImages.length > 1)
               Positioned(
+                right: 18,
+                bottom: 14,
+                child: EnterpriseDetailHeroImageCountBadge(
+                  current: _heroPageIndex + 1,
+                  total: heroImages.length,
+                ),
+              ),
+            if (heroImages.length > 1)
+              Positioned(
                 top: 0,
                 right: 12,
                 bottom: 0,

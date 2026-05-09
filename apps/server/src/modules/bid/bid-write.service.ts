@@ -1,23 +1,29 @@
 import { Injectable } from '@nestjs/common';
-import { randomUUID } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
 import { IdentityAuditLogEntity } from '../audit/identity-audit-log.entity';
 import { BidParticipationRequestAccessService } from '../bid_participation_request/bid-participation-request-access.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
-import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
-import { bidServiceFeeAuthorizationRequired } from '../p0_pay/p0-pay.errors';
-import { BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT, PLATFORM_PRICING_AUDIT_ACTIONS } from '../p0_pay/p0-pay.state';
 import { ProjectEntity } from '../project/entities/project.entity';
+import { ProjectCommunicationMaterialReviewEntity } from '../project_communication/entities/project-communication-material-review.entity';
+import { ProjectCommunicationBusinessEventService } from '../project_communication/project-communication-business-event.service';
+import type {
+  ProjectBidMaterialSlot,
+  ProjectCommunicationMaterialReviewEntryKey
+} from '../project_communication/project-communication-workbench.types';
 import { BidSubmittedSeedService } from '../trading_im/bid-submitted-seed.service';
 import { BidSubmissionAttachmentTruthService } from './bid-submission-attachment-truth.service';
 import { BidEntity } from './entities/bid.entity';
 import { BidPresenter } from './bid.presenter';
 import {
   bidDuplicateSubmission,
+  bidPermissionDenied,
   bidResourceUnavailable,
+  bidSupplementConflict,
   bidSubmitInvalid
 } from './bid.errors';
 
@@ -30,6 +36,19 @@ type SubmitBidCommand = {
   schedulePlanFileAssetId: string;
 };
 
+type SupplementBidSubmissionCommand = SubmitBidCommand & {
+  bidId: string;
+  entryKey: ProjectCommunicationMaterialReviewEntryKey;
+  bidMaterialSlot: ProjectBidMaterialSlot | null;
+  sourceVersionToken: string;
+};
+
+const BID_SUPPLEMENT_ENTRY_SLOTS: Record<string, ProjectBidMaterialSlot> = {
+  bid_project_understanding_review: 'project_understanding',
+  bid_quote_sheet_review: 'quote_sheet',
+  bid_schedule_plan_review: 'schedule_plan'
+};
+
 @Injectable()
 export class BidWriteService {
   constructor(
@@ -37,6 +56,8 @@ export class BidWriteService {
     private readonly bidRepository: Repository<BidEntity>,
     @InjectRepository(ProjectEntity)
     private readonly projectRepository: Repository<ProjectEntity>,
+    @InjectRepository(ProjectCommunicationMaterialReviewEntity)
+    private readonly materialReviewRepository: Repository<ProjectCommunicationMaterialReviewEntity>,
     private readonly dataSource: DataSource,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
@@ -44,8 +65,7 @@ export class BidWriteService {
     private readonly bidSubmittedSeedService: BidSubmittedSeedService,
     private readonly presenter: BidPresenter,
     private readonly bidParticipationAccessService: BidParticipationRequestAccessService,
-    @InjectRepository(PlatformServiceFeeAuthorizationEntity)
-    private readonly authorizationRepository?: Repository<PlatformServiceFeeAuthorizationEntity>
+    private readonly projectCommunicationBusinessEventService?: ProjectCommunicationBusinessEventService
   ) {}
 
   async submitBid(payload: Record<string, unknown>, context: RequestContext) {
@@ -64,13 +84,6 @@ export class BidWriteService {
     await this.bidParticipationAccessService.requireApprovedForOrganization(
       project,
       scope.organization.id,
-    );
-    const authorization = await this.requireFrozenPricingGate(
-      project,
-      scope.organization.id,
-      currentSession.userId,
-      scope.membership.roleKey,
-      context
     );
     const bidId = randomUUID();
     const submittedAt = new Date();
@@ -122,6 +135,13 @@ export class BidWriteService {
           bid,
           bidderDisplayName: scope.organization.name ?? ''
         });
+        await this.projectCommunicationBusinessEventService?.emitBidSubmitted({
+          manager,
+          project,
+          bid,
+          actorUserId: currentSession.userId,
+          actorId: currentSession.actorId
+        });
         threadId = seed.threadId;
         seedMessageId = seed.seedMessageId;
         await manager.getRepository(IdentityAuditLogEntity).save({
@@ -134,7 +154,7 @@ export class BidWriteService {
           actorRole: scope.membership.roleKey,
           beforeState: '',
           afterState: bid.state,
-          reason: `projectId=${project.id}; quoteAmount=${bid.quoteAmount}; authorizationId=${authorization.id}; quotaAmount=${authorization.authorizationQuotaAmount}`,
+          reason: `projectId=${project.id}; bidderOrganizationId=${scope.organization.id}; quoteAmount=${bid.quoteAmount}; projectUnderstandingFileAssetId=${bid.projectUnderstandingFileAssetId}; quoteSheetFileAssetId=${bid.quoteSheetFileAssetId}; schedulePlanFileAssetId=${bid.schedulePlanFileAssetId}`,
           requestId: context.requestId,
           traceId: context.traceId,
           occurredAt: new Date()
@@ -152,6 +172,128 @@ export class BidWriteService {
       projectId: project.id,
       threadId,
       seedMessageId
+    });
+  }
+
+  async supplementBidSubmission(payload: Record<string, unknown>, context: RequestContext) {
+    const command = this.toSupplementBidSubmissionCommand(payload);
+    const currentSession = await requireVerifiedCurrentSessionContext(
+      context,
+      this.currentSessionVerificationService
+    );
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    const scope = await this.eligibilityService.getCurrentOrganizationScope(currentSession);
+    if (!scope) {
+      throw bidPermissionDenied('Current organization scope is required for bid supplement.');
+    }
+
+    const [project, bid] = await Promise.all([
+      this.projectRepository.findOneBy({ id: command.projectId }),
+      this.bidRepository.findOneBy({ id: command.bidId })
+    ]);
+    if (!project || !bid || bid.projectId !== project.id) {
+      throw bidResourceUnavailable('Current bid supplement resource is unavailable.');
+    }
+    const bidderOrganizationId = this.bidderOrganizationId(bid);
+    if (bidderOrganizationId !== scope.organization.id) {
+      throw bidPermissionDenied('Current organization cannot supplement this bid.');
+    }
+    await this.bidParticipationAccessService.requireApprovedForOrganization(
+      project,
+      scope.organization.id
+    );
+
+    const expectedSlot = this.expectedSupplementSlot(command);
+    const review = await this.materialReviewRepository.findOneBy({
+      projectId: project.id,
+      bidId: bid.id,
+      reviewerOrganizationId: project.organizationId,
+      entryKey: command.entryKey
+    });
+    this.assertSupplementReviewWritable(review, expectedSlot, command);
+
+    const attachments = await this.bidSubmissionAttachmentTruthService.validateAndNormalize(
+      {
+        projectUnderstandingFileAssetId: command.projectUnderstandingFileAssetId,
+        quoteSheetFileAssetId: command.quoteSheetFileAssetId,
+        schedulePlanFileAssetId: command.schedulePlanFileAssetId
+      },
+      project.id,
+      bidderOrganizationId
+    );
+    const refreshedAt = new Date();
+
+    await this.dataSource.transaction(async (manager) => {
+      const bidRepository = manager.getRepository(BidEntity);
+      const reviewRepository = manager.getRepository(ProjectCommunicationMaterialReviewEntity);
+      const currentBid = await bidRepository.findOneBy({ id: bid.id });
+      const currentReview = await reviewRepository.findOneBy({
+        projectId: project.id,
+        bidId: bid.id,
+        reviewerOrganizationId: project.organizationId,
+        entryKey: command.entryKey
+      });
+      if (!currentBid || currentBid.projectId !== project.id) {
+        throw bidResourceUnavailable('Current bid supplement resource is unavailable.');
+      }
+      if (this.bidderOrganizationId(currentBid) !== bidderOrganizationId) {
+        throw bidPermissionDenied('Current organization cannot supplement this bid.');
+      }
+      this.assertSupplementReviewWritable(currentReview, expectedSlot, command);
+
+      currentBid.quoteAmount = command.quoteAmount.toFixed(2);
+      currentBid.proposalSummary = command.proposalSummary;
+      currentBid.projectUnderstandingFileAssetId = attachments.projectUnderstandingFileAssetId;
+      currentBid.quoteSheetFileAssetId = attachments.quoteSheetFileAssetId;
+      currentBid.schedulePlanFileAssetId = attachments.schedulePlanFileAssetId;
+      currentBid.updatedAt = refreshedAt;
+      await bidRepository.save(currentBid);
+
+      currentReview!.reviewState = 'pending_review';
+      currentReview!.feedbackReasonCodes = [];
+      currentReview!.feedbackText = null;
+      currentReview!.feedbackByUserId = null;
+      currentReview!.feedbackAt = null;
+      currentReview!.confirmedByUserId = null;
+      currentReview!.confirmedAt = null;
+      currentReview!.sourceVersionToken = this.bidMaterialSourceVersionToken(
+        currentBid,
+        expectedSlot,
+        refreshedAt
+      );
+      currentReview!.requestId = context.requestId;
+      currentReview!.traceId = context.traceId;
+      await reviewRepository.save(currentReview!);
+
+      await this.projectCommunicationBusinessEventService?.emitBidMaterialSupplementSubmitted({
+        manager,
+        project,
+        bid: currentBid,
+        review: currentReview!,
+        actorUserId: currentSession.userId,
+        actorId: currentSession.actorId
+      });
+      await manager.getRepository(IdentityAuditLogEntity).save({
+        id: randomUUID(),
+        objectType: 'bid',
+        objectId: currentBid.id,
+        objectNo: project.projectNo,
+        action: 'BidMaterialSupplemented',
+        actorId: currentSession.userId,
+        actorRole: scope.membership.roleKey,
+        beforeState: 'needs_supplement',
+        afterState: 'pending_review',
+        reason: `projectId=${project.id}; bidId=${currentBid.id}; entryKey=${command.entryKey}; slot=${expectedSlot}`,
+        requestId: context.requestId,
+        traceId: context.traceId,
+        occurredAt: new Date()
+      });
+    });
+
+    return this.presenter.toSupplementAcceptedResponse({
+      bidId: bid.id,
+      projectId: project.id,
+      entryKey: command.entryKey
     });
   }
 
@@ -174,6 +316,38 @@ export class BidWriteService {
         'schedulePlanFileAssetId',
       ),
     } satisfies SubmitBidCommand;
+  }
+
+  private toSupplementBidSubmissionCommand(payload: Record<string, unknown>) {
+    const source = this.asRecord(payload);
+    return {
+      ...this.toSubmitBidCommand(payload),
+      bidId: this.readRequiredString(source.bidId, 'bidId'),
+      entryKey: this.readRequiredString(
+        source.entryKey,
+        'entryKey'
+      ) as ProjectCommunicationMaterialReviewEntryKey,
+      bidMaterialSlot: this.readOptionalBidMaterialSlot(source.bidMaterialSlot),
+      sourceVersionToken: this.readRequiredString(
+        source.sourceVersionToken,
+        'sourceVersionToken'
+      )
+    } satisfies SupplementBidSubmissionCommand;
+  }
+
+  private readOptionalBidMaterialSlot(value: unknown) {
+    if (value === null || value === undefined || value === '') {
+      return null;
+    }
+    const normalized = this.readRequiredString(value, 'bidMaterialSlot');
+    if (
+      normalized !== 'project_understanding' &&
+      normalized !== 'quote_sheet' &&
+      normalized !== 'schedule_plan'
+    ) {
+      throw bidSubmitInvalid('Field `bidMaterialSlot` is invalid for bid supplement.');
+    }
+    return normalized as ProjectBidMaterialSlot;
   }
 
   private asRecord(value: unknown) {
@@ -202,6 +376,64 @@ export class BidWriteService {
     return amount;
   }
 
+  private expectedSupplementSlot(command: SupplementBidSubmissionCommand) {
+    const slot = BID_SUPPLEMENT_ENTRY_SLOTS[command.entryKey];
+    if (!slot) {
+      throw bidSubmitInvalid('Field `entryKey` is invalid for bid supplement.');
+    }
+    if (command.bidMaterialSlot && command.bidMaterialSlot !== slot) {
+      throw bidSubmitInvalid('Field `bidMaterialSlot` does not match bid supplement entry.');
+    }
+    return slot;
+  }
+
+  private assertSupplementReviewWritable(
+    review: ProjectCommunicationMaterialReviewEntity | null,
+    expectedSlot: ProjectBidMaterialSlot,
+    command: SupplementBidSubmissionCommand
+  ) {
+    if (!review) {
+      throw bidSupplementConflict('Current bid material review is unavailable for supplement.');
+    }
+    if (
+      review.subjectType !== 'bid_submission_material' ||
+      review.bidMaterialSlot !== expectedSlot ||
+      review.entryKey !== command.entryKey
+    ) {
+      throw bidSupplementConflict('Current bid material review does not match supplement entry.');
+    }
+    if (review.reviewState !== 'needs_supplement') {
+      throw bidSupplementConflict('Current bid material is not waiting for supplement.');
+    }
+    if (review.sourceVersionToken !== command.sourceVersionToken) {
+      throw bidSupplementConflict('Current bid material source has changed.');
+    }
+  }
+
+  private bidMaterialSourceVersionToken(
+    bid: BidEntity,
+    slot: ProjectBidMaterialSlot,
+    refreshedAt: Date
+  ) {
+    return createHash('sha256')
+      .update(
+        [
+          bid.id,
+          slot,
+          this.bidSlotFileAssetId(bid, slot) ?? '',
+          refreshedAt.toISOString()
+        ].join('|'),
+        'utf8'
+      )
+      .digest('hex');
+  }
+
+  private bidSlotFileAssetId(bid: BidEntity, slot: ProjectBidMaterialSlot) {
+    if (slot === 'project_understanding') return bid.projectUnderstandingFileAssetId;
+    if (slot === 'quote_sheet') return bid.quoteSheetFileAssetId;
+    return bid.schedulePlanFileAssetId;
+  }
+
   private buildBidNo(projectNo: string, bidId: string) {
     const normalizedProjectNo = projectNo.trim();
     const suffix = bidId.replace(/-/g, '').slice(0, 12).toUpperCase();
@@ -219,6 +451,10 @@ export class BidWriteService {
     return submittedBy;
   }
 
+  private bidderOrganizationId(bid: BidEntity) {
+    return bid.bidderOrganizationId || bid.organizationId;
+  }
+
   private readOptionalText(value: string | null | undefined) {
     const normalized = value?.trim() ?? '';
     return normalized ? normalized : null;
@@ -226,84 +462,5 @@ export class BidWriteService {
 
   private isUniqueViolation(error: unknown) {
     return typeof error === 'object' && error !== null && 'code' in error && error.code === '23505';
-  }
-
-  private async requireFrozenPricingGate(
-    project: ProjectEntity,
-    bidderOrganizationId: string,
-    actorUserId: string,
-    actorRole: string,
-    context: RequestContext
-  ) {
-    const authorization = await this.authorizationRepository?.findOne({
-      where: [
-        {
-          taskId: project.id,
-          bidderOrganizationId,
-          status: 'frozen',
-        },
-        {
-          taskId: project.id,
-          factoryOrganizationId: bidderOrganizationId,
-          status: 'frozen',
-        },
-      ],
-      order: { updatedAt: 'DESC' },
-    });
-    if (authorization && this.isFixedQuotaFrozen(authorization)) {
-      return authorization;
-    }
-
-    await this.recordBidSubmitBlockedByPricingGate(
-      project,
-      bidderOrganizationId,
-      actorUserId,
-      actorRole,
-      authorization?.status ?? 'missing',
-      context
-    );
-    throw bidServiceFeeAuthorizationRequired();
-  }
-
-  private isFixedQuotaFrozen(authorization: PlatformServiceFeeAuthorizationEntity) {
-    return (
-      authorization.status === 'frozen' &&
-      this.normalizeMoney(authorization.authorizationQuotaAmount) === BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT
-    );
-  }
-
-  private async recordBidSubmitBlockedByPricingGate(
-    project: ProjectEntity,
-    bidderOrganizationId: string,
-    actorUserId: string,
-    actorRole: string,
-    actualAuthorizationStatus: string,
-    context: RequestContext
-  ) {
-    await this.dataSource.transaction(async (manager) => {
-      await manager.getRepository(IdentityAuditLogEntity).save({
-        id: randomUUID(),
-        objectType: 'bid_service_fee_authorization',
-        objectId: project.id,
-        objectNo: project.projectNo,
-        action: PLATFORM_PRICING_AUDIT_ACTIONS.bidSubmitBlockedByPricingGate,
-        actorId: actorUserId,
-        actorRole,
-        beforeState: actualAuthorizationStatus,
-        afterState: 'blocked',
-        reason: `projectId=${project.id}; bidderOrganizationId=${bidderOrganizationId}; requiredAuthorizationStatus=frozen; requiredQuotaAmount=${BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT}; pricingErrorCode=BID_SERVICE_FEE_AUTHORIZATION_REQUIRED`,
-        requestId: context.requestId,
-        traceId: context.traceId,
-        occurredAt: new Date()
-      });
-    });
-  }
-
-  private normalizeMoney(value: string | number | null) {
-    if (value === null || value === undefined) {
-      return '';
-    }
-    const amount = Number(value);
-    return Number.isFinite(amount) ? amount.toFixed(2) : '';
   }
 }

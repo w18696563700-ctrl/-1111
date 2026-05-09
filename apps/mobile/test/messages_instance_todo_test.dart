@@ -39,6 +39,7 @@ Widget _buildApp({
   required FakeAppApiTransport forumTransport,
   FakeAppApiTransport? messageTransport,
   ValueListenable<int>? refreshSignal,
+  RouteFactory? onGenerateRoute,
 }) {
   ForumConsumerLayer.install(
     ForumConsumerLayer(
@@ -65,8 +66,19 @@ Widget _buildApp({
     ),
   );
   return MaterialApp(
+    onGenerateRoute: onGenerateRoute,
     home: Scaffold(body: MessagesPage(refreshSignal: refreshSignal)),
   );
+}
+
+Future<void> _openForumInteraction(WidgetTester tester) async {
+  await tester.tap(find.text('论坛互动'));
+  await tester.pumpAndSettle();
+}
+
+Future<void> _openProjectCommunication(WidgetTester tester) async {
+  await tester.tap(find.text('项目沟通'));
+  await tester.pumpAndSettle();
 }
 
 Map<String, Object?> _messageInteractionItem({
@@ -109,6 +121,7 @@ Map<String, Object?> _messageInteractionItem({
       'params': <String, String>{
         'conversationId': 'org-$interactionId',
         'projectId': projectId,
+        'threadId': 'thread-$interactionId',
       },
     },
   };
@@ -174,23 +187,20 @@ void main() {
 
     expect(find.text('互动中心'), findsNothing);
     expect(find.text('论坛互动'), findsOneWidget);
+    expect(find.text('回复我的'), findsNothing);
+    expect(find.text('收到的赞'), findsNothing);
+    expect(find.text('新关注'), findsNothing);
+    expect(find.text('这里集中查看别人对你的回复、点赞、关注，以及项目沟通会话。'), findsNothing);
+    expect(find.text('选择一个分类查看'), findsNothing);
+    expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
+    expect(find.text('回到源对象'), findsNothing);
+
+    await _openForumInteraction(tester);
     expect(find.text('回复我的'), findsWidgets);
     expect(find.text('收到的赞'), findsWidgets);
     expect(find.text('新关注'), findsWidgets);
-    expect(find.text('这里集中查看别人对你的回复、点赞、关注，以及项目沟通会话。'), findsNothing);
-    expect(find.text('选择一个分类查看'), findsOneWidget);
-    expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
-    expect(find.text('回到源对象'), findsNothing);
-
-    await tester.tap(find.text('回复我的').last);
-    await tester.pumpAndSettle();
     expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
     expect(find.text('回到源对象'), findsNothing);
-
-    await tester.tap(find.text('回复我的').last);
-    await tester.pumpAndSettle();
-    expect(find.text('选择一个分类查看'), findsOneWidget);
-    expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
 
     await tester.tap(find.text('收到的赞').last);
     await tester.pumpAndSettle();
@@ -297,24 +307,97 @@ void main() {
       expect(find.text('项目沟通'), findsOneWidget);
       expect(find.text('杭州搭建公司'), findsOneWidget);
       expect(find.text('苏州执行团队'), findsOneWidget);
+      expect(find.text('主体会话列表'), findsOneWidget);
       expect(find.text('昵称'), findsNothing);
       expect(find.text('对方主体'), findsNothing);
       expect(find.text('项目 1 个'), findsNWidgets(2));
-      expect(find.text('项目方在沟通与投标里回复了新的交付问题。'), findsNothing);
+      expect(find.textContaining('当前竞标已提交，可继续进入沟通。'), findsOneWidget);
+      expect(find.textContaining('项目方在沟通与投标里回复了新的交付问题。'), findsOneWidget);
       expect(find.text('订单状态'), findsNothing);
       expect(find.text('P0-Pay 只读状态'), findsNothing);
       expect(find.textContaining('发单诚意金：已支付'), findsNothing);
       expect(find.textContaining('只读 handoff'), findsNothing);
       expect(find.widgetWithText(FilledButton, '支付'), findsNothing);
-      expect(find.text('进入项目沟通'), findsNWidgets(2));
+      expect(find.text('进入项目沟通'), findsNothing);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsNothing);
-      await tester.tap(find.text('回复我的').last);
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('回复了你在《材料交接节点》里的问题'), 240);
+      await _openForumInteraction(tester);
       expect(find.text('回复了你在《材料交接节点》里的问题'), findsOneWidget);
       expect(find.text('回复我的'), findsWidgets);
     },
   );
+
+  testWidgets('messages primary tabs support horizontal swipe switching', (
+    WidgetTester tester,
+  ) async {
+    final forumTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/forum/interaction/inbox':
+                (AppApiRequest request) async {
+                  return AppApiResponse(
+                    statusCode: 200,
+                    uri: request.uri,
+                    body: <String, Object?>{
+                      'items': <Object?>[
+                        _inboxItem(
+                          notificationId: 'notice-reply-1',
+                          tab: 'replies',
+                          targetType: 'forum_post',
+                          targetId: 'post-1',
+                          title: '滑动后显示的论坛回复',
+                        ),
+                      ],
+                      'page': const <String, Object?>{
+                        'nextCursor': null,
+                        'hasMore': false,
+                      },
+                    },
+                  );
+                },
+          },
+    );
+    final messageTransport = FakeAppApiTransport(
+      handlers:
+          <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+            'GET /api/app/message/interactions': (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: <String, Object?>{
+                  'lane': 'project_communication',
+                  'items': <Object?>[
+                    _messageInteractionItem(
+                      interactionId: 'interaction-1',
+                      projectId: 'project-1',
+                      bidId: 'bid-1',
+                      counterpartName: '滑动前项目主体',
+                      summary: '滑动前项目主体已生成。',
+                      lastMessageText: '滑动前项目主体最近有更新。',
+                    ),
+                  ],
+                },
+              );
+            },
+          },
+    );
+
+    await tester.pumpWidget(
+      _buildApp(
+        forumTransport: forumTransport,
+        messageTransport: messageTransport,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('滑动前项目主体'), findsOneWidget);
+    expect(find.text('滑动后显示的论坛回复'), findsNothing);
+
+    await tester.drag(find.byType(PageView), const Offset(-420, 0));
+    await tester.pumpAndSettle();
+
+    expect(find.text('滑动前项目主体'), findsNothing);
+    expect(find.text('滑动后显示的论坛回复'), findsOneWidget);
+  });
 
   testWidgets(
     'messages page refresh reloads forum inbox and project communication interactions together',
@@ -391,14 +474,14 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('第一次论坛回复'), findsNothing);
-      await tester.tap(find.text('回复我的').last);
-      await tester.pumpAndSettle();
-      await tester.scrollUntilVisible(find.text('第一次论坛回复'), 240);
+      await _openForumInteraction(tester);
       expect(find.text('第一次论坛回复'), findsOneWidget);
+      expect(find.text('第一次项目沟通会话'), findsNothing);
+      await _openProjectCommunication(tester);
       expect(find.text('第一次项目沟通会话'), findsOneWidget);
 
       final refreshIndicator = tester.state<RefreshIndicatorState>(
-        find.byType(RefreshIndicator),
+        find.byType(RefreshIndicator).first,
       );
       // Trigger the page-level pull-to-refresh without depending on shell-level routes.
       refreshIndicator.show();
@@ -408,9 +491,171 @@ void main() {
 
       expect(forumRequestCount, greaterThanOrEqualTo(2));
       expect(messageRequestCount, greaterThanOrEqualTo(2));
-      await tester.scrollUntilVisible(find.text('第二次论坛回复'), 240);
+      await _openForumInteraction(tester);
       expect(find.text('第二次论坛回复'), findsOneWidget);
+      expect(find.text('第二次项目沟通会话'), findsNothing);
+      await _openProjectCommunication(tester);
       expect(find.text('第二次项目沟通会话'), findsOneWidget);
+    },
+  );
+
+  testWidgets(
+    'project communication subject card opens counterpart project list route',
+    (WidgetTester tester) async {
+      final pushedRoutes = <String>[];
+      final subjectItem = _messageInteractionItem(
+        interactionId: 'interaction-subject',
+        projectId: 'project-1',
+        bidId: 'bid-1',
+        counterpartName: '江北嘴嘴帅',
+        summary: '江北嘴嘴帅有项目沟通。',
+        lastMessageText: '最新沟通待查看。',
+      );
+      final forumTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/interaction/inbox':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'page': <String, Object?>{
+                          'nextCursor': null,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+      final messageTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[subjectItem],
+                      },
+                    );
+                  },
+              'GET /api/app/notifications/list': (AppApiRequest request) async {
+                return AppApiResponse(
+                  statusCode: 200,
+                  uri: request.uri,
+                  body: const <String, Object?>{
+                    'items': <Object?>[],
+                    'page': <String, Object?>{
+                      'hasMore': false,
+                      'nextCursor': null,
+                    },
+                    'unread': <String, Object?>{
+                      'total': 0,
+                      'projectCommunication': 0,
+                      'forumInteraction': 0,
+                      'businessTodo': 0,
+                      'system': 0,
+                    },
+                  },
+                );
+              },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          forumTransport: forumTransport,
+          messageTransport: messageTransport,
+          onGenerateRoute: (RouteSettings settings) {
+            pushedRoutes.add(settings.name ?? '');
+            return MaterialPageRoute<void>(
+              settings: settings,
+              builder: (_) => const Scaffold(body: Text('主体项目列表路由')),
+            );
+          },
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      await tester.tap(find.text('江北嘴嘴帅').first);
+      await tester.pumpAndSettle();
+
+      expect(pushedRoutes, isNotEmpty);
+      expect(
+        pushedRoutes.last,
+        '/exhibition/messages/counterpart-conversation?conversationId=org-interaction-subject&projectId=project-1',
+      );
+      expect(pushedRoutes.last, isNot(contains('threadId=')));
+    },
+  );
+
+  testWidgets(
+    'project communication invalid route params show Chinese fallback',
+    (WidgetTester tester) async {
+      final invalidItem = _messageInteractionItem(
+        interactionId: 'interaction-invalid',
+        projectId: 'project-1',
+        bidId: 'bid-1',
+        counterpartName: '参数缺失主体',
+        summary: '参数缺失主体已生成。',
+        lastMessageText: '最新沟通待查看。',
+      );
+      (invalidItem['routeTarget']! as Map<String, Object?>)['params'] =
+          <String, String>{'conversationId': '', 'projectId': 'project-1'};
+      final forumTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/forum/interaction/inbox':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: const <String, Object?>{
+                        'items': <Object?>[],
+                        'page': <String, Object?>{
+                          'nextCursor': null,
+                          'hasMore': false,
+                        },
+                      },
+                    );
+                  },
+            },
+      );
+      final messageTransport = FakeAppApiTransport(
+        handlers:
+            <String, Future<AppApiResponse> Function(AppApiRequest request)>{
+              'GET /api/app/message/interactions':
+                  (AppApiRequest request) async {
+                    return AppApiResponse(
+                      statusCode: 200,
+                      uri: request.uri,
+                      body: <String, Object?>{
+                        'lane': 'project_communication',
+                        'items': <Object?>[invalidItem],
+                      },
+                    );
+                  },
+            },
+      );
+
+      await tester.pumpWidget(
+        _buildApp(
+          forumTransport: forumTransport,
+          messageTransport: messageTransport,
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.textContaining('无法进入项目沟通，缺少项目上下文'), findsOneWidget);
+      expect(
+        find.textContaining('route params must contain non-empty strings'),
+        findsNothing,
+      );
     },
   );
 
@@ -501,10 +746,10 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('首次论坛回复'), findsNothing);
-      await tester.tap(find.text('回复我的').last);
-      await tester.pumpAndSettle();
-      expect(find.text('首次论坛回复'), findsOneWidget);
       expect(find.text('首次项目沟通会话'), findsOneWidget);
+      await _openForumInteraction(tester);
+      expect(find.text('首次论坛回复'), findsOneWidget);
+      expect(find.text('首次项目沟通会话'), findsNothing);
 
       refreshSignal.value += 1;
       await tester.pump();
@@ -513,7 +758,7 @@ void main() {
       expect(forumRequestCount, 2);
       expect(messageRequestCount, 2);
       expect(find.text('首次论坛回复'), findsOneWidget);
-      expect(find.text('首次项目沟通会话'), findsOneWidget);
+      expect(find.text('首次项目沟通会话'), findsNothing);
       expect(find.byType(LinearProgressIndicator), findsNothing);
 
       secondForumRequest.complete();
@@ -521,6 +766,8 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('后台刷新后的论坛回复'), findsOneWidget);
+      expect(find.text('后台刷新后的项目沟通会话'), findsNothing);
+      await _openProjectCommunication(tester);
       expect(find.text('后台刷新后的项目沟通会话'), findsOneWidget);
     },
   );
@@ -551,8 +798,7 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('回复我的').last);
-    await tester.pumpAndSettle();
+    await _openForumInteraction(tester);
     expect(find.text('回复我的当前为空'), findsOneWidget);
     expect(find.text('暂无新的回复我的提醒。'), findsOneWidget);
     expect(find.text('这里只显示别人回复你的帖子或评论；你自己发表评论，不会进入“回复我的”。'), findsNothing);
@@ -578,8 +824,7 @@ void main() {
       await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('回复我的').last);
-      await tester.pumpAndSettle();
+      await _openForumInteraction(tester);
       expect(find.text('互动通知暂时不可用，请稍后再试'), findsOneWidget);
       expect(find.widgetWithText(FilledButton, '重试'), findsOneWidget);
     },
@@ -620,8 +865,7 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('回复我的').last);
-    await tester.pumpAndSettle();
+    await _openForumInteraction(tester);
     expect(find.text('查看说明'), findsNothing);
     expect(find.text('继续回复'), findsNothing);
 
@@ -651,8 +895,7 @@ void main() {
     await tester.pumpWidget(_buildApp(forumTransport: forumTransport));
     await tester.pumpAndSettle();
 
-    await tester.tap(find.text('回复我的').last);
-    await tester.pumpAndSettle();
+    await _openForumInteraction(tester);
     expect(find.text('互动通知暂不可用'), findsOneWidget);
     expect(find.text('当前“回复我的”入口暂不可用，请稍后再试。'), findsOneWidget);
     expect(find.text('没有找到对应的论坛内容'), findsNothing);

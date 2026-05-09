@@ -13,12 +13,16 @@ final class AppNotificationUnreadView {
   const AppNotificationUnreadView({
     required this.total,
     required this.projectCommunication,
+    required this.businessTodo,
+    required this.bidParticipationRequest,
     required this.forumInteraction,
     required this.system,
   });
 
   final int total;
   final int projectCommunication;
+  final int businessTodo;
+  final int bidParticipationRequest;
   final int forumInteraction;
   final int system;
 }
@@ -37,6 +41,28 @@ final class AppNotificationRouteTargetView {
   final String? routeLocation;
 }
 
+final class AppNotificationRouteTargetAvailabilityView {
+  const AppNotificationRouteTargetAvailabilityView({
+    required this.state,
+    required this.reasonCode,
+    required this.reasonText,
+    required this.fallbackAction,
+    required this.fallbackRouteTarget,
+  });
+
+  final String state;
+  final String reasonCode;
+  final String reasonText;
+  final String fallbackAction;
+  final AppNotificationRouteTargetView? fallbackRouteTarget;
+
+  bool get isAvailable => state == 'available';
+
+  bool get canOpenFallback =>
+      fallbackAction == 'open_subject_list' &&
+      fallbackRouteTarget?.routeLocation?.trim().isNotEmpty == true;
+}
+
 final class AppNotificationItemView {
   const AppNotificationItemView({
     required this.notificationId,
@@ -47,6 +73,7 @@ final class AppNotificationItemView {
     required this.projectId,
     required this.threadId,
     required this.routeTarget,
+    required this.routeTargetAvailability,
     required this.createdAt,
     required this.readAt,
     required this.unread,
@@ -60,6 +87,7 @@ final class AppNotificationItemView {
   final String? projectId;
   final String? threadId;
   final AppNotificationRouteTargetView? routeTarget;
+  final AppNotificationRouteTargetAvailabilityView routeTargetAvailability;
   final String? createdAt;
   final String? readAt;
   final bool unread;

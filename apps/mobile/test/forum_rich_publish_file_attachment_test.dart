@@ -135,6 +135,11 @@ void main() {
                             },
                           ],
                           'publishedAt': '2026-03-30T18:30:00Z',
+                          'engagement': <String, Object?>{
+                            'replyCount': 0,
+                            'likeCount': 0,
+                            'viewCount': 0,
+                          },
                           'viewerHasLiked': false,
                           'viewerHasBookmarked': false,
                           'viewerFollowsTopic': true,
@@ -159,27 +164,18 @@ void main() {
       expect(find.textContaining('PDF ·'), findsOneWidget);
       await tester.pumpAndSettle();
 
-      expect(find.text('上传确认完成，请保存草稿'), findsOneWidget);
+      expect(find.text('上传确认完成，等待保存草稿'), findsOneWidget);
 
       await tester.pump(const Duration(seconds: 4));
       await tester.pumpAndSettle();
-      await tester.tap(find.text('保存草稿'));
+      await tester.tap(find.text('保存草稿并跳转至草稿箱发布帖子'));
       await tester.pumpAndSettle();
 
       expect(draftSaveBodies.last['attachmentFileAssetIds'], const <String>[
         'asset-file-1',
       ]);
-      expect(find.text('已保存到草稿，附件已承接'), findsOneWidget);
-      expect(find.text('已承接到当前草稿'), findsWidgets);
-
-      await tester.pump(const Duration(seconds: 4));
-      await tester.pumpAndSettle();
-      await tester.tap(find.text('发布'));
-      await tester.pumpAndSettle();
-
-      expect(find.text('附件'), findsOneWidget);
-      expect(find.text('现场交付清单.pdf'), findsOneWidget);
-      expect(find.text('PDF'), findsOneWidget);
+      expect(find.text('草稿'), findsOneWidget);
+      expect(find.text('本地进场夜班经验分享'), findsOneWidget);
       expect(find.text('application/pdf'), findsNothing);
     },
   );

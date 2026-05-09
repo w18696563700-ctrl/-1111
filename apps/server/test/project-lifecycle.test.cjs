@@ -17,12 +17,15 @@ function createContext(requestId, authorization = 'Bearer lifecycle') {
 
 function createHarness() {
   const { ProjectWriteService } = require('../dist/modules/project/project-write.service.js');
+  const { ProjectPublishGateService } = require('../dist/modules/project/project-publish-gate.service.js');
   const { ProjectQueryService } = require('../dist/modules/project/project-query.service.js');
   const { ProjectPresenter } = require('../dist/modules/project/project.presenter.js');
 
   const projects = [];
   const auditLogs = [];
   const sincerityOrders = [];
+  const attachments = [];
+  const freezeFeedback = [];
   const repository = {
     items: projects,
     create(input) {
@@ -107,6 +110,27 @@ function createHarness() {
       );
     },
   };
+  const attachmentRepository = {
+    async find(options) {
+      const where = options?.where ?? {};
+      return attachments.filter((attachment) => {
+        if (where.projectId && attachment.projectId !== where.projectId) return false;
+        return true;
+      });
+    },
+  };
+  const freezeFeedbackRepository = {
+    async findOne(options) {
+      const where = options?.where ?? {};
+      return (
+        freezeFeedback.find((feedback) => {
+          if (where.projectId && feedback.projectId !== where.projectId) return false;
+          if (where.userId && feedback.userId !== where.userId) return false;
+          return true;
+        }) ?? null
+      );
+    },
+  };
 
   const eligibilityService = {
     async requireProjectPublishEligibilityFromContext(context, resolver) {
@@ -150,6 +174,26 @@ function createHarness() {
   return {
     projects,
     sincerityOrders,
+    attachments,
+    freezeFeedback,
+    markRequiredQuoteBasisAttachments(projectId) {
+      for (const kind of ['effect_image', 'construction_doc', 'material_sample']) {
+        attachments.push({
+          id: `${projectId}-${kind}`,
+          projectId,
+          attachmentKind: kind,
+        });
+      }
+    },
+    submitSincerityFeedback(projectId, choice = 'oppose_freeze') {
+      freezeFeedback.push({
+        id: `feedback-${projectId}`,
+        projectId,
+        userId: 'user-1',
+        choice,
+        updatedAt: new Date('2026-04-29T00:00:00.000Z'),
+      });
+    },
     markSincerityPaid(projectId) {
       sincerityOrders.push({
         id: `sincerity-${projectId}`,
@@ -179,6 +223,12 @@ function createHarness() {
               if (entity?.name === 'InquiryQuoteDepositEntity') {
                 return sincerityRepository;
               }
+              if (entity?.name === 'ProjectAttachmentEntity') {
+                return attachmentRepository;
+              }
+              if (entity?.name === 'ProjectAuthenticitySincerityFreezeFeedbackEntity') {
+                return freezeFeedbackRepository;
+              }
               return repository;
             },
           });
@@ -192,6 +242,7 @@ function createHarness() {
       },
       verificationService,
       eligibilityService,
+      new ProjectPublishGateService(),
     ),
     queryService: new ProjectQueryService(
       repository,
@@ -255,7 +306,8 @@ test('project lifecycle closes create -> save -> submit -> publish with real ser
   assert.equal(harness.projects[0].state, 'submitted');
   assert.equal(harness.projects[0].publishedAt, null);
 
-  harness.markSincerityPaid(created.projectId);
+  harness.markRequiredQuoteBasisAttachments(created.projectId);
+  harness.submitSincerityFeedback(created.projectId, 'support_freeze');
   const published = await harness.writeService.publishProject(
     { projectId: created.projectId },
     createContext('project-publish'),
@@ -265,36 +317,33 @@ test('project lifecycle closes create -> save -> submit -> publish with real ser
   assert.ok(harness.projects[0].publishedAt instanceof Date);
 });
 
-test('project publish fail-closes until 200 project authenticity sincerity is paid', async () => {
+test('project publish fail-closes until required quote-basis materials and green-channel feedback are ready', async () => {
   const harness = createHarness();
   const created = await harness.writeService.createProject(
     createPayload(),
-    createContext('project-create-pricing-blocked'),
+    createContext('project-create-publish-gate-blocked'),
   );
   await harness.writeService.submitProject(
     { projectId: created.projectId },
-    createContext('project-submit-pricing-blocked'),
+    createContext('project-submit-publish-gate-blocked'),
   );
 
   await assert.rejects(
     () => harness.writeService.publishProject(
       { projectId: created.projectId },
-      createContext('project-publish-pricing-blocked'),
+      createContext('project-publish-gate-blocked'),
     ),
     (error) => {
-      assert.equal(error?.response?.code, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
+      assert.equal(error?.response?.code, 'PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE');
       return true;
     },
   );
 
   assert.equal(harness.projects[0].state, 'submitted');
   assert.equal(harness.projects[0].publishedAt, null);
-  assert.equal(harness.auditLogs.at(-1)?.eventType, 'project_publish_blocked_by_pricing_gate');
-  assert.equal(harness.auditLogs.at(-1)?.payload.requiredOrderStatus, 'paid');
-  assert.equal(harness.auditLogs.at(-1)?.payload.pricingErrorCode, 'PROJECT_AUTHENTICITY_SINCERITY_REQUIRED');
 });
 
-test('project publish allows internal-test no-freeze gate without marking sincerity paid', async () => {
+test('project publish allows green-channel feedback without marking sincerity paid', async () => {
   const oldValue = process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE;
   delete process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE;
   try {
@@ -308,17 +357,18 @@ test('project publish allows internal-test no-freeze gate without marking sincer
       createContext('project-submit-internal-no-freeze'),
     );
 
-    harness.markSincerityPayInitStarted(created.projectId);
+    harness.markRequiredQuoteBasisAttachments(created.projectId);
+    harness.submitSincerityFeedback(created.projectId, 'oppose_freeze');
     const published = await harness.writeService.publishProject(
       { projectId: created.projectId },
       createContext('project-publish-internal-no-freeze'),
     );
 
     assert.equal(published.state, 'published');
-    assert.equal(harness.sincerityOrders[0].status, 'pending_payment');
+    assert.equal(harness.sincerityOrders.length, 0);
     assert.equal(
       harness.auditLogs.at(-2)?.eventType,
-      'project_publish_pricing_gate_internal_test_no_freeze',
+      'project_publish_pricing_gate_green_channel_feedback',
     );
     assert.equal(
       harness.auditLogs.at(-2)?.payload.authenticitySincerityStatus,
@@ -328,6 +378,7 @@ test('project publish allows internal-test no-freeze gate without marking sincer
       harness.auditLogs.at(-1)?.payload.authenticitySincerityGateResult,
       'internal_test_no_freeze_allowed',
     );
+    assert.equal(harness.auditLogs.at(-1)?.payload.freezeFeedbackChoice, 'oppose_freeze');
   } finally {
     if (oldValue === undefined) {
       delete process.env.PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_NO_FREEZE;
@@ -404,7 +455,8 @@ test('project editable detail can read draft while public detail stays closed un
     { projectId: created.projectId },
     createContext('project-submit-visible'),
   );
-  harness.markSincerityPaid(created.projectId);
+  harness.markRequiredQuoteBasisAttachments(created.projectId);
+  harness.submitSincerityFeedback(created.projectId, 'support_freeze');
   await harness.writeService.publishProject(
     { projectId: created.projectId },
     createContext('project-publish-visible'),

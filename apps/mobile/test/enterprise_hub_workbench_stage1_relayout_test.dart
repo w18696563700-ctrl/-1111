@@ -35,7 +35,7 @@ void main() {
       find.byKey(const ValueKey<String>('company-workbench-homepage')),
       findsOneWidget,
     );
-    expect(find.text('公司展示工作台'), findsOneWidget);
+    expect(find.text('公司展示预览'), findsOneWidget);
     expect(find.text('西南会展搭建有限公司'), findsOneWidget);
     expect(find.text('快捷入口'), findsOneWidget);
     await tester.scrollUntilVisible(
@@ -44,12 +44,15 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('信息完整度'), findsOneWidget);
+    expect(find.text('公司展示预览'), findsOneWidget);
     await tester.scrollUntilVisible(
       find.byKey(const ValueKey<String>('company-workbench-module-entries')),
       220,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('核心信息概览'), findsOneWidget);
+    expect(find.text('展示资料管理'), findsOneWidget);
+    expect(find.text('基础信息'), findsOneWidget);
+    expect(find.text('详细信息'), findsOneWidget);
     expect(find.text('最新动态'), findsNothing);
     expect(find.text('暂无动态'), findsNothing);
     expect(find.text('数据看板'), findsNothing);
@@ -256,7 +259,7 @@ void main() {
       find.byKey(const ValueKey<String>('company-workbench-homepage')),
       findsOneWidget,
     );
-    expect(find.text('公司展示工作台'), findsOneWidget);
+    expect(find.text('公司展示预览'), findsOneWidget);
     expect(find.text('快捷入口'), findsOneWidget);
     final snapshotFinder = find.byKey(
       const ValueKey<String>('enterprise-published-change-snapshot-section'),

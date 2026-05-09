@@ -177,12 +177,7 @@ void installDefaultPaymentBillingSupportConsumers() {
   );
 }
 
-final class PassthroughHttpOverrides extends HttpOverrides {
-  @override
-  HttpClient createHttpClient(SecurityContext? context) {
-    return super.createHttpClient(context);
-  }
-}
+final class PassthroughHttpOverrides extends HttpOverrides {}
 
 Map<String, Future<AppApiResponse> Function(AppApiRequest request)>
 _forumHandlers() {

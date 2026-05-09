@@ -10,6 +10,7 @@ import { ProjectCommunicationReadCursorEntity } from './entities/project-communi
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
+import { ProjectCommunicationBusinessStateService } from './project-communication-business-state.service';
 import {
   projectCommunicationInvalid,
   projectCommunicationUnavailable
@@ -29,7 +30,7 @@ type SendMessageCommand = {
 type MarkReadCommand = {
   threadId: string;
   projectId: string;
-  lastReadMessageId: string | null;
+  lastReadMessageId: string;
 };
 
 const MESSAGE_LIMIT_DEFAULT = 50;
@@ -65,28 +66,61 @@ export class ProjectCommunicationMessageService {
     private readonly auditService: ProjectPublishAuditService,
     private readonly presenter: ProjectCommunicationPresenter,
     private readonly realtimeEvents: ProjectCommunicationRealtimeEventService,
+    private readonly businessStateService?: ProjectCommunicationBusinessStateService,
     private readonly notifications?: NotificationService
   ) {}
 
   async getOrCreateThread(query: Record<string, unknown>, context: RequestContext) {
     const projectId = this.readRequiredString(query.projectId, 'projectId');
     const counterpartOrganizationId = this.readOptionalString(query.counterpartOrganizationId);
+    const threadId = this.readOptionalString(query.threadId);
 
     return this.dataSource.transaction(async (manager) => {
+      const repository = manager.getRepository(ProjectCommunicationThreadEntity);
+      if (threadId) {
+        const thread = await repository.findOneBy({ id: threadId, projectId });
+        if (!thread) {
+          throw projectCommunicationUnavailable('Current project communication thread is unavailable.');
+        }
+        const actor = await this.accessService.requireExistingThreadParticipant(thread, context, manager);
+        if (counterpartOrganizationId) {
+          const expectedCounterpartOrganizationId = this.counterpartOrganizationIdForViewer(
+            thread,
+            actor.organizationId
+          );
+          if (counterpartOrganizationId !== expectedCounterpartOrganizationId) {
+            throw projectCommunicationInvalid(
+              'Field `counterpartOrganizationId` does not match this communication thread.'
+            );
+          }
+        }
+        const state = await this.buildBusinessStateForThread({
+          thread,
+          viewerOrganizationId: actor.organizationId
+        });
+        return this.presenter.toThread(thread, state.chatAvailability);
+      }
+
       const pair = await this.accessService.requireProjectConversationPair(
         projectId,
         counterpartOrganizationId ?? undefined,
         context,
         manager
       );
-      const repository = manager.getRepository(ProjectCommunicationThreadEntity);
+      const presentThread = async (thread: ProjectCommunicationThreadEntity) => {
+        const state = await this.buildBusinessStateForThread({
+          thread,
+          viewerOrganizationId: pair.organizationId
+        });
+        return this.presenter.toThread(thread, state.chatAvailability);
+      };
       const existing = await repository.findOneBy({
         projectId: pair.project.id,
         ownerOrganizationId: pair.ownerOrganizationId,
         counterpartOrganizationId: pair.counterpartOrganizationId
       });
       if (existing) {
-        return this.presenter.toThread(existing);
+        return presentThread(existing);
       }
 
       const thread = repository.create({
@@ -110,11 +144,11 @@ export class ProjectCommunicationMessageService {
           counterpartOrganizationId: pair.counterpartOrganizationId
         });
         if (raced) {
-          return this.presenter.toThread(raced);
+          return presentThread(raced);
         }
         throw error;
       }
-      return this.presenter.toThread(thread);
+      return presentThread(thread);
     });
   }
 
@@ -160,6 +194,15 @@ export class ProjectCommunicationMessageService {
       if (existing) {
         return this.presenter.toMessage(existing);
       }
+      const businessState = await this.buildBusinessStateForThread({
+        thread,
+        viewerOrganizationId: actor.organizationId
+      });
+      if (!businessState.chatAvailability.canSendMessage) {
+        throw projectCommunicationInvalid(
+          businessState.chatAvailability.lockReasonText ?? '当前项目沟通暂不可发送消息。'
+        );
+      }
       await this.ensureMessagePayload(command, actor.organizationId, thread.projectId, manager);
 
       const message = messageRepository.create({
@@ -200,6 +243,11 @@ export class ProjectCommunicationMessageService {
           aggregateType: 'project_communication_message',
           aggregateId: message.id,
           eventType: 'ProjectCommunicationMessageSent',
+          verifiedActor: {
+            actorId: actor.currentSession.actorId,
+            userId: actor.currentSession.userId,
+            organizationId: actor.organizationId
+          },
           payload: {
             threadId: thread.id,
             projectId: thread.projectId,
@@ -225,6 +273,30 @@ export class ProjectCommunicationMessageService {
       this.realtimeEvents.publishMessageCreated(createdMessage);
     }
     return result;
+  }
+
+  private async buildBusinessStateForThread(input: {
+    thread: ProjectCommunicationThreadEntity;
+    viewerOrganizationId: string;
+  }) {
+    if (this.businessStateService) {
+      return this.businessStateService.buildForThread(input);
+    }
+    return {
+      businessTodoSummary: {
+        bidParticipationReviewPendingCount: 0,
+        publisherMaterialReviewPendingCount: 0,
+        bidMaterialReviewPendingCount: 0,
+        dealConfirmationPendingCount: 0,
+        totalPendingCount: 0
+      },
+      chatAvailability: {
+        canSendMessage: true,
+        lockReasonCode: null,
+        lockReasonText: null,
+        requiredNextAction: 'none'
+      }
+    } as const;
   }
 
   async listRealtimeEvents(query: Record<string, unknown>, context: RequestContext) {
@@ -320,13 +392,10 @@ export class ProjectCommunicationMessageService {
   }
 
   private async ensureReadMessageBelongsToThread(
-    messageId: string | null,
+    messageId: string,
     thread: ProjectCommunicationThreadEntity,
     manager = this.dataSource.manager
   ) {
-    if (!messageId) {
-      return;
-    }
     const message = await manager.getRepository(ProjectCommunicationMessageEntity).findOneBy({
       id: messageId,
       threadId: thread.id,
@@ -492,7 +561,7 @@ export class ProjectCommunicationMessageService {
     return {
       threadId: this.readRequiredString(source.threadId, 'threadId'),
       projectId: this.readRequiredString(source.projectId, 'projectId'),
-      lastReadMessageId: this.readOptionalString(source.lastReadMessageId)
+      lastReadMessageId: this.readRequiredString(source.lastReadMessageId, 'lastReadMessageId')
     } satisfies MarkReadCommand;
   }
 

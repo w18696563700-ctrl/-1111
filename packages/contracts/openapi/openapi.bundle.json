@@ -1409,7 +1409,7 @@
         "tags": [
           "Message"
         ],
-        "summary": "Counterpart conversation detail canonical path for Flutter App",
+        "summary": "Counterpart conversation detail canonical path for Flutter App messages building",
         "operationId": "getAppCounterpartConversationDetail",
         "parameters": [
           {
@@ -1431,7 +1431,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Runtime-verified project communication counterpart conversation detail. This path only exposes project groups, unread projections, and bounded continuation cards; it must not become a generic chat, order, payment, settlement, or admin-governance surface.\n",
+            "description": "Server-owned counterpart conversation detail for project-scoped communication. `projectGroups[].businessTodoSummary` is the only business-todo badge source for second-layer project cards. This route must not become a generic chat, payment, order, fulfillment, settlement, or final amount truth owner.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -1441,16 +1441,16 @@
             }
           },
           "400": {
-            "description": "Controlled invalid counterpart conversation query response."
+            "description": "Controlled counterpart conversation invalid response."
           },
           "401": {
             "description": "Controlled invalid or expired app session response."
           },
           "403": {
-            "description": "Controlled forbidden counterpart conversation response."
+            "description": "Controlled counterpart conversation forbidden response."
           },
           "404": {
-            "description": "Controlled unavailable counterpart conversation response."
+            "description": "Controlled counterpart conversation unavailable response."
           }
         }
       }
@@ -1460,8 +1460,9 @@
         "tags": [
           "Message"
         ],
-        "summary": "Project communication thread canonical read path for Flutter App",
+        "summary": "Project communication thread read model for Flutter App",
         "operationId": "getAppProjectCommunicationThread",
+        "description": "Get-or-create app-facing project communication thread read model. When `threadId` is absent, Server resolves or creates the canonical thread from `projectId + counterpartOrganizationId`. When `threadId` is present, Server verifies it belongs to the requested `projectId` and current actor boundary before returning the read model.\n",
         "parameters": [
           {
             "in": "query",
@@ -1478,30 +1479,38 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "in": "query",
+            "name": "threadId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Runtime-verified read-only thread anchor for project communication. This path only resolves the current project communication thread boundary and must not create a new message state machine.\n",
+            "description": "Server-owned project communication thread get-or-create read model. `chatAvailability` is the only app-facing send lock / unlock projection. Flutter may disable input from this field, but Server must still enforce the same write lock on message-send commands.\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectCommunicationThreadResponse"
+                  "$ref": "#/components/schemas/ProjectCommunicationThreadReadModel"
                 }
               }
             }
           },
           "400": {
-            "description": "Controlled invalid project communication thread query response."
+            "description": "Controlled project communication invalid response."
           },
           "401": {
             "description": "Controlled invalid or expired app session response."
           },
           "403": {
-            "description": "Controlled forbidden project communication thread response."
+            "description": "Controlled project communication forbidden response."
           },
           "404": {
-            "description": "Controlled unavailable project communication thread response."
+            "description": "Controlled project communication unavailable response."
           }
         }
       }
@@ -1624,7 +1633,7 @@
         "tags": [
           "Message"
         ],
-        "summary": "Project communication workbench 10-entry read path",
+        "summary": "Project communication workbench 10-entry read model for Flutter App",
         "operationId": "getAppProjectCommunicationWorkbench",
         "parameters": [
           {
@@ -1662,11 +1671,11 @@
         ],
         "responses": {
           "200": {
-            "description": "Runtime-verified project communication workbench read model. It exposes the 10 fixed entries for material review and reserved deal confirmation entry points. It must not claim contract confirmation, final amount confirmation, payment, charge, callback, or upload completion as current runtime truth.\n",
+            "description": "Server-owned project communication workbench read model. This path returns the fixed 10 downstream entries for material review and deal-confirmation handoff only. It must not make BFF or Flutter the owner of review state, final amount truth, order truth, contract truth, payment truth, or service-fee truth.\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectCommunicationWorkbenchResponse"
+                  "$ref": "#/components/schemas/ProjectCommunicationWorkbenchReadModel"
                 }
               }
             }
@@ -1678,10 +1687,10 @@
             "description": "Controlled invalid or expired app session response."
           },
           "403": {
-            "description": "Controlled forbidden workbench response."
+            "description": "Controlled project communication forbidden response."
           },
           "404": {
-            "description": "Controlled unavailable workbench response."
+            "description": "Controlled project communication unavailable response."
           }
         }
       }
@@ -1691,11 +1700,11 @@
         "tags": [
           "Message"
         ],
-        "summary": "Submit project communication workbench material review action",
-        "operationId": "submitAppProjectCommunicationWorkbenchMaterialReview",
+        "summary": "Project communication material review command for Flutter App",
+        "operationId": "reviewAppProjectCommunicationMaterial",
         "requestBody": {
           "required": true,
-          "description": "Runtime-verified material-review command for the first eight workbench material entries only. Deal confirmation, final confirmed amount, payment, charge, callback, and file-upload completion are explicitly outside this request.\n",
+          "description": "Material review command for the first eight workbench entries only. Deal-confirmation entries are intentionally excluded from this command and must use the dedicated deal-confirmations route family.\n",
           "content": {
             "application/json": {
               "schema": {
@@ -1706,29 +1715,29 @@
         },
         "responses": {
           "202": {
-            "description": "Material review action accepted and refreshed workbench projection returned.",
+            "description": "Material review accepted. The response carries the updated Server-owned entry and may carry the refreshed 10-entry list.\n",
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewResponse"
+                  "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewAcceptedResponse"
                 }
               }
             }
           },
           "400": {
-            "description": "Controlled invalid material review payload response."
+            "description": "Controlled material-review invalid response."
           },
           "401": {
             "description": "Controlled invalid or expired app session response."
           },
           "403": {
-            "description": "Controlled forbidden material review response."
+            "description": "Controlled material-review forbidden response."
           },
           "404": {
             "description": "Controlled unavailable material review response."
           },
           "409": {
-            "description": "Controlled material source version conflict response."
+            "description": "Controlled material-review invalid-state response."
           }
         }
       }
@@ -3996,11 +4005,29 @@
               "minimum": 1,
               "maximum": 50
             }
+          },
+          {
+            "in": "query",
+            "name": "source",
+            "required": false,
+            "description": "Optional notification source lane filter. `all` or omitted returns all notification items. `business_todo` is a notification-center lane and does not replace project-communication `businessTodoSummary`.\n",
+            "schema": {
+              "$ref": "#/components/schemas/AppNotificationSourceLane"
+            }
+          },
+          {
+            "in": "query",
+            "name": "lane",
+            "required": false,
+            "description": "Compatibility alias for `source`. When both are provided, `source` takes precedence.\n",
+            "schema": {
+              "$ref": "#/components/schemas/AppNotificationSourceLane"
+            }
           }
         ],
         "responses": {
           "200": {
-            "description": "Minimal notification-center list. It may aggregate only project communication notifications, forum interaction reminders, and system reminders.\n",
+            "description": "Minimal notification-center list. It may aggregate only project communication notifications, forum interaction reminders, and system reminders. The `unread` projection is global for the current actor / organization and remains explainable across all source buckets even when the returned item list is filtered.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -4315,7 +4342,7 @@
         "tags": [
           "Project"
         ],
-        "summary": "Publish submitted project canonical path for Flutter App with pre-publish pricing gate",
+        "summary": "Publish submitted project canonical path for Flutter App with green-channel feedback gate",
         "operationId": "publishAppProject",
         "requestBody": {
           "required": true,
@@ -4329,7 +4356,7 @@
         },
         "responses": {
           "202": {
-            "description": "Project publish accepted only when the current submitted project has either completed the required `200 元项目真实性诚意金` payment or is admitted without that pricing gate. This path must not auto-create a sincerity order, auto-charge, or silently treat publish success as pricing consumption success.\n",
+            "description": "Project publish accepted only when the current submitted project has the three required quote-basis attachment kinds and the current publisher has submitted the project-authenticity-sincerity green channel feedback choice. This path must not auto-create a sincerity order, auto-charge, or silently treat publish success as pricing consumption success.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -4339,7 +4366,7 @@
             }
           },
           "409": {
-            "description": "Controlled publish pricing-gate or invalid-state response. Server must fail closed with `PROJECT_AUTHENTICITY_SINCERITY_REQUIRED` or `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the required `200 元项目真实性诚意金` truth is not in an admitted paid state for publish.\n"
+            "description": "Controlled publish pricing-gate or invalid-state response. Server must fail closed with `PROJECT_AUTHENTICITY_SINCERITY_INTERNAL_TEST_POLICY_UNAVAILABLE`, `PROJECT_AUTHENTICITY_SINCERITY_REQUIRED`, or `PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE` when the required quote-basis attachment truth, green-channel feedback truth, or project state is not admitted for publish.\n"
           }
         }
       }
@@ -5268,11 +5295,11 @@
         "tags": [
           "Bid"
         ],
-        "summary": "Exhibition bid submit canonical path for Flutter App with pricing gate",
+        "summary": "Exhibition bid submit canonical path for Flutter App",
         "operationId": "submitAppBid",
         "requestBody": {
           "required": true,
-          "description": "Minimum bid submit command request for current Flutter App consumption. This request freezes only the current page-submitted fields. Pricing truth stays outside this body and must be admitted by upstream `approved bidParticipationRequest + frozen 4000 元竞标服务费预授权额度` gate truth before submit may succeed.\n",
+          "description": "Minimum bid submit command request for current Flutter App consumption. This request freezes only the current page-submitted fields. Bid submit must be admitted by Server-owned participation eligibility, project-biddable state, confirmed three-file attachment truth, legal quote fields, duplicate-submit protection, and permission checks. The bounded `4000 元竞标服务费预授权额度` truth stays outside this body and must not block bid submit; it becomes the project-level free-send opening gate after publisher material confirmation.\n",
           "content": {
             "application/json": {
               "schema": {
@@ -5283,7 +5310,7 @@
         },
         "responses": {
           "202": {
-            "description": "Minimum bid submit command success body for Flutter App. The current frontend success chain freezes only `bidId`; this response must not expand into a full bid read projection, bid compare truth, shortlist or win-loss management, or order-create truth. Success is admitted only when the current actor already owns an `approved` participation truth and a `frozen` bounded `4000 元竞标服务费预授权额度`.\n",
+            "description": "Minimum bid submit command success body for Flutter App. The current frontend success chain freezes only `bidId`; this response must not expand into a full bid read projection, bid compare truth, shortlist or win-loss management, or order-create truth. Success is admitted only when the current actor owns an `approved` participation truth and Server has accepted the quote fields plus the three confirmed bid material attachments. It does not mean publisher material confirmation, BidAward, deal completion, final contract amount confirmation, service-fee authorization completion, or payment deduction.\n",
             "content": {
               "application/json": {
                 "schema": {
@@ -5293,7 +5320,42 @@
             }
           },
           "409": {
-            "description": "Controlled bid-submit pricing-gate or invalid-state response. Server must fail closed with `BID_SERVICE_FEE_AUTHORIZATION_REQUIRED` or `BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE` when the required current `4000 元竞标服务费预授权额度` truth is absent or not yet frozen.\n"
+            "description": "Controlled bid-submit invalid-state response. Server may fail closed for invalid project state, missing approved participation truth, invalid or unconfirmed bid material attachments, illegal quote fields, duplicate submission, or permission mismatch. Server must not return `BID_SERVICE_FEE_AUTHORIZATION_REQUIRED` solely because the bounded `4000 元竞标服务费预授权额度` truth is absent or not yet frozen; that authorization gate belongs after publisher material confirmation and before project-level free-send opening.\n"
+          }
+        }
+      }
+    },
+    "/api/app/bid/submission/supplement": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Supplement existing bid submission materials after publisher feedback",
+        "operationId": "supplementAppBidSubmission",
+        "requestBody": {
+          "required": true,
+          "description": "Supplement command for an existing bid material review that is explicitly in `needs_supplement`. This path is not first bid submit and must not create a second bid. It updates the existing bid quote/proposal and three bid material FileAsset references, then returns the targeted material review to `pending_review` for publisher re-check. It must not carry final contract amount, payment, service-fee charging, or settlement fields.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Existing bid submission supplement accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidSubmissionSupplementAcceptedResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Controlled conflict when the target material is no longer in `needs_supplement`, sourceVersionToken changed, or the entry does not match the requested bid material slot."
           }
         }
       }
@@ -7060,11 +7122,61 @@
         "tags": [
           "Bid"
         ],
-        "summary": "Bid submission skeleton",
+        "summary": "Internal truth pair for app-facing bid submit",
         "operationId": "submitBid",
         "responses": {
           "202": {
-            "description": "Placeholder until contract freeze"
+            "description": "Internal bid submit accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidSubmitAcceptedResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Internal truth pair for `POST /api/app/bid/submit`. This request writes `Bid.quoteAmount` and the three confirmed bid attachment FileAsset references. `Bid.quoteAmount` remains bid quote truth only and must not be reinterpreted as final confirmed contract amount.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidSubmitRequest"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/bids/submission/supplement": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for bid submission supplement",
+        "operationId": "supplementBidSubmission",
+        "responses": {
+          "202": {
+            "description": "Internal bid submission supplement accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidSubmissionSupplementAcceptedResponse"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "description": "Internal truth pair for `POST /api/app/bid/submission/supplement`. Server owns permissions, needs_supplement gating, FileAsset ownership, sourceVersionToken concurrency, audit, and business event emission. BFF must only forward and shape errors.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementRequest"
+              }
+            }
           }
         }
       }
@@ -8796,6 +8908,1025 @@
           }
         }
       }
+    },
+    "/api/app/forum/post/edit": {
+      "post": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Enter own forum post edit continuation via canonical path for Flutter App",
+        "operationId": "enterAppForumPostEdit",
+        "requestBody": {
+          "required": true,
+          "description": "Minimum owner-only post-edit continuation handoff. This path creates or resumes a Server-owned edit draft and must not mutate public post truth directly from Flutter App.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumPostOwnerActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Minimum owner post-edit continuation accepted response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumPostEditContinuationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Controlled owner-post unavailable response. When the current actor cannot continue editing the requested post, the server must return `FORUM_DRAFT_UNAVAILABLE`.\n"
+          }
+        }
+      }
+    },
+    "/api/app/forum/post/delete": {
+      "post": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Delete own forum post via canonical path for Flutter App",
+        "operationId": "deleteAppForumPost",
+        "requestBody": {
+          "required": true,
+          "description": "Minimum owner-only post delete command. The Server owns the archived state and audit boundary; Flutter App only receives continuation feedback for the current owner asset surface.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumPostOwnerActionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Minimum owner post-delete accepted response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumPostDeleteContinuationResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Controlled owner-post unavailable response. When the current actor cannot delete the requested post, the server must return `FORUM_DRAFT_UNAVAILABLE`.\n"
+          }
+        }
+      }
+    },
+    "/api/app/forum/author/follow": {
+      "post": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Toggle public author follow via canonical path for Flutter App",
+        "operationId": "toggleAppForumAuthorFollow",
+        "requestBody": {
+          "required": true,
+          "description": "Current route-matrix alignment freezes source truth as public author follow. Topic follow remains a future extension and is not an active app-facing route in this matrix.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumAuthorFollowToggleRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Minimum author-follow toggle accepted response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumToggleAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/app/forum/draft/detail": {
+      "get": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Forum draft detail canonical path for Flutter App",
+        "operationId": "getAppForumDraftDetail",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "draftId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimum forum draft-detail carrier for continuing an existing Server-owned draft or owner post-edit draft. This path must not expose autosave history, moderation internals, or attachment object storage truth.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumDraftDetailResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Controlled draft-unavailable response. When the current actor cannot access the draft, the server must return `FORUM_DRAFT_UNAVAILABLE`.\n"
+          }
+        }
+      }
+    },
+    "/api/app/forum/me/likes": {
+      "get": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "My forum likes canonical path for Flutter App",
+        "operationId": "getAppForumMyLikes",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimum my-likes projection for the profile forum assets surface.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumMyLikesResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/app/forum/reports/mine": {
+      "get": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "My forum report tickets canonical path for Flutter App",
+        "operationId": "getAppForumMyReports",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "cursor",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "pageSize",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimum my-report-ticket projection for the profile forum assets surface. This path is read-only for reporters and does not expose moderation console actions.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumMyReportsResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/app/forum/reports/mine/{ticketId}": {
+      "get": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "My forum report ticket detail canonical path for Flutter App",
+        "operationId": "getAppForumMyReportDetail",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "ticketId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Minimum my-report-ticket detail projection. This path must not add reporter-side adjudication, escalation, or operator governance actions.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumMyReportTicket"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Controlled report-unavailable response. When the current actor cannot read the report ticket, the server must return `FORUM_REPORT_UNAVAILABLE`.\n"
+          }
+        }
+      }
+    },
+    "/api/app/forum/report/submit": {
+      "post": {
+        "tags": [
+          "Forum"
+        ],
+        "summary": "Submit forum content report via canonical path for Flutter App",
+        "operationId": "submitAppForumReport",
+        "requestBody": {
+          "required": true,
+          "description": "Minimum forum report-submit request only. This path accepts reporter input for post/comment targets and must not become an Admin moderation console or reporter-side adjudication workflow.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ForumReportSubmitRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Minimum forum report-submit accepted response.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ForumReportSubmitResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled forum report request error. Invalid target or reason input must return `FORUM_REPORT_INVALID`.\n"
+          }
+        }
+      }
+    },
+    "/api/app/project/bid-participation/request": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Bid participation request create canonical path for Flutter App",
+        "operationId": "createAppBidParticipationRequest",
+        "requestBody": {
+          "required": true,
+          "description": "Create the current bidder's request to participate in the published project. Approved participation unlocks protected project name, quote-basis materials, file access, and bid-submit entry according to Server truth. This request must not become a project-name-only request, payment request, or client-owned approval state.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidParticipationRequestCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Bid participation request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationRequestAcceptedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `BID_PARTICIPATION_CONFLICT` or invalid-state response."
+          }
+        }
+      }
+    },
+    "/api/app/project/bid-participation/thread/detail": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Bid participation review thread detail canonical path for Flutter App",
+        "operationId": "getAppBidParticipationThreadDetail",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requestId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Read model for the current bid-participation request and publisher review handoff. BFF and Flutter must not infer final review truth from local UI state.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationThreadDetailReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "404": {
+            "description": "Controlled `BID_PARTICIPATION_UNAVAILABLE` response."
+          }
+        }
+      }
+    },
+    "/api/app/project/{projectId}/album/photos": {
+      "get": {
+        "tags": [
+          "Project"
+        ],
+        "summary": "Project album photo list canonical path for Flutter App",
+        "operationId": "getAppProjectAlbumPhotos",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Server-owned project evidence album list. This response carries FileAsset-backed photo records only; it must not expose objectKey, create a fulfillment album, or become acceptance/dispute truth.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAlbumPhotoListReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `PROJECT_ALBUM_FORBIDDEN` response."
+          },
+          "404": {
+            "description": "Controlled `PROJECT_ALBUM_UNAVAILABLE` response."
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "Project"
+        ],
+        "summary": "Bind a confirmed FileAsset as a project album photo",
+        "operationId": "bindAppProjectAlbumPhoto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Bind a FileAsset already confirmed through the shared upload three-step flow. The FileAsset must belong to the same project, current organization, and `project_album_photo` file kind.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectAlbumPhotoBindRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Project album photo bound.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAlbumPhotoReadModel"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled `PROJECT_ALBUM_INVALID` response."
+          },
+          "403": {
+            "description": "Controlled `PROJECT_ALBUM_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `PROJECT_ALBUM_LIMIT_EXCEEDED` response."
+          }
+        }
+      }
+    },
+    "/api/app/project/{projectId}/album/photos/{photoId}": {
+      "delete": {
+        "tags": [
+          "Project"
+        ],
+        "summary": "Remove a project album photo via canonical path for Flutter App",
+        "operationId": "deleteAppProjectAlbumPhoto",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "photoId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Project album photo marked removed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAlbumPhotoReadModel"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `PROJECT_ALBUM_FORBIDDEN` response."
+          },
+          "404": {
+            "description": "Controlled `PROJECT_ALBUM_UNAVAILABLE` response."
+          }
+        }
+      }
+    },
+    "/api/app/project/{projectId}/authenticity-sincerity/freeze-feedback": {
+      "post": {
+        "tags": [
+          "ProjectPricing"
+        ],
+        "summary": "Project authenticity sincerity green-channel feedback canonical path for Flutter App",
+        "operationId": "submitAppProjectAuthenticitySincerityFreezeFeedback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Submit or replace the current user's green-channel feedback choice for the current project's `项目真实性诚意金` mechanism. The choice is a publish-gate input during the internal-test stage, not payment, freeze, refund, or finance truth.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Feedback accepted and current summary returned. Repeated submission for the same `userId + projectId` replaces the effective choice.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled invalid feedback choice response. Server must return `PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_INVALID` when `choice` is outside `support_freeze / oppose_freeze`.\n"
+          },
+          "409": {
+            "description": "Controlled rejected feedback response. Server must return `PROJECT_AUTHENTICITY_SINCERITY_FREEZE_FEEDBACK_REJECTED` when the current actor, organization, or project boundary cannot write feedback.\n"
+          }
+        }
+      }
+    },
+    "/api/app/my/projects/{projectId}/bid-participation/pending": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Publisher pending bid-participation requests canonical path for Flutter App",
+        "operationId": "getAppPendingBidParticipationRequests",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Publisher-scoped pending bid-participation requests for one current project. Server owns request state and review availability.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationPendingListResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          }
+        }
+      }
+    },
+    "/api/app/my/projects/{projectId}/bid-participation/{requestId}/approve": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Publisher approve bid-participation request canonical path for Flutter App",
+        "operationId": "approveAppBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Bid participation request approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `BID_PARTICIPATION_INVALID_STATE` response."
+          }
+        }
+      }
+    },
+    "/api/app/my/projects/{projectId}/bid-participation/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Publisher reject bid-participation request canonical path for Flutter App",
+        "operationId": "rejectAppBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Bid participation request rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Controlled `BID_PARTICIPATION_FORBIDDEN` response."
+          },
+          "409": {
+            "description": "Controlled `BID_PARTICIPATION_INVALID_STATE` response."
+          }
+        }
+      }
+    },
+    "/server/project-communication/workbench": {
+      "get": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Internal truth pair for app-facing project communication workbench",
+        "operationId": "getProjectCommunicationWorkbench",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "threadId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "counterpartOrganizationId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "bidId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal 10-entry workbench read model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCommunicationWorkbenchReadModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/project-communication/workbench/material-review": {
+      "post": {
+        "tags": [
+          "Message"
+        ],
+        "summary": "Internal truth pair for app-facing project communication material review",
+        "operationId": "reviewProjectCommunicationMaterial",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Internal material review accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/bid-participation/request": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth create pair for app-facing bid participation request",
+        "operationId": "createBidParticipationRequest",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BidParticipationRequestCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "202": {
+            "description": "Internal bid participation request accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationRequestAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/bid-participation/thread/detail": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth read pair for app-facing bid participation thread detail",
+        "operationId": "getBidParticipationThreadDetail",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "requestId",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal bid participation thread detail read model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationThreadDetailReadModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/{projectId}/deal-confirmations": {
+      "post": {
+        "tags": [
+          "ProjectPricing"
+        ],
+        "summary": "Internal truth pair for app-facing deal-confirmation create or advance",
+        "operationId": "upsertProjectDealConfirmation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "description": "Internal truth pair for `POST /api/app/project/{projectId}/deal-confirmations`. Server may reuse the existing ContractConfirmation entity and service, but this project-family path is the only internal pair for the current app-facing final amount confirmation surface.\n",
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DealConfirmationCreateRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Internal deal confirmation accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealConfirmationAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/projects/{projectId}/deal-confirmations/{dealConfirmationId}": {
+      "get": {
+        "tags": [
+          "ProjectPricing"
+        ],
+        "summary": "Internal truth pair for app-facing deal-confirmation detail",
+        "operationId": "getProjectDealConfirmation",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dealConfirmationId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal deal confirmation detail read model.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DealConfirmationReadModel"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/my/projects/{projectId}/bid-participation/pending": {
+      "get": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for publisher pending bid-participation requests",
+        "operationId": "getPendingBidParticipationRequests",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Internal publisher pending bid-participation request list.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationPendingListResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/my/projects/{projectId}/bid-participation/{requestId}/approve": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for publisher approve bid-participation request",
+        "operationId": "approveBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Internal bid participation request approved.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/server/my/projects/{projectId}/bid-participation/{requestId}/reject": {
+      "post": {
+        "tags": [
+          "Bid"
+        ],
+        "summary": "Internal truth pair for publisher reject bid-participation request",
+        "operationId": "rejectBidParticipationRequest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "projectId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "requestId",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Internal bid participation request rejected.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BidParticipationReviewAcceptedResponse"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "x-instance-todo-registry": {
@@ -8811,6 +9942,7 @@
         "inspection",
         "dispute",
         "project_clarification",
+        "counterpart_conversation",
         "bid_thread"
       ]
     },
@@ -8819,6 +9951,7 @@
         "inspection.submit",
         "dispute.open",
         "project_clarification.open",
+        "counterpart_conversation.open",
         "bid_thread.open"
       ]
     },
@@ -8871,6 +10004,20 @@
         "state": "enabled"
       },
       {
+        "entryKey": "counterpart_conversation_open_entry",
+        "objectType": "counterpart_conversation",
+        "actionKey": "counterpart_conversation.open",
+        "canonicalPath": "/api/app/message/counterpart-conversation/detail",
+        "requiredParams": [
+          "conversationId",
+          "projectId",
+          "threadId"
+        ],
+        "consumerBuilding": "messages",
+        "localEntryKey": "registered.counterpart_conversation.open",
+        "state": "enabled"
+      },
+      {
         "entryKey": "bid_thread_open_entry",
         "objectType": "bid_thread",
         "actionKey": "bid_thread.open",
@@ -8881,7 +10028,7 @@
         ],
         "consumerBuilding": "messages",
         "localEntryKey": "registered.bid_thread.open",
-        "state": "enabled"
+        "state": "carrier_only"
       }
     ]
   },
@@ -12946,7 +14093,8 @@
         "type": "string",
         "enum": [
           "topic",
-          "reply"
+          "reply",
+          "topic_edit"
         ],
         "description": "Current minimum draft-kind set consumed by the Flutter App forum draft surfaces.\n"
       },
@@ -13251,7 +14399,8 @@
           "author",
           "content",
           "attachmentRefs",
-          "publishedAt"
+          "publishedAt",
+          "engagement"
         ],
         "description": "Minimum forum post detail read projection only. This model freezes one post body plus confirmed attachment references and must not become edit truth or moderation truth.\n",
         "properties": {
@@ -13300,6 +14449,9 @@
               "boolean",
               "null"
             ]
+          },
+          "engagement": {
+            "$ref": "#/components/schemas/ForumEngagementSummary"
           }
         }
       },
@@ -13492,7 +14644,8 @@
           "avatarUrl",
           "organizationName",
           "publicPostCount",
-          "publicCommentCount"
+          "publicCommentCount",
+          "viewerFollowsAuthor"
         ],
         "description": "Minimum public author profile projection. This is not profile editing truth, DM truth, follow truth, or organization governance truth.\n",
         "properties": {
@@ -13521,6 +14674,9 @@
           "publicCommentCount": {
             "type": "integer",
             "minimum": 0
+          },
+          "viewerFollowsAuthor": {
+            "type": "boolean"
           }
         }
       },
@@ -13662,6 +14818,31 @@
           },
           "state": {
             "type": "string"
+          },
+          "viewerHasLiked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "viewerHasBookmarked": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "viewerFollowsAuthor": {
+            "type": [
+              "boolean",
+              "null"
+            ]
+          },
+          "likeCount": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
           }
         }
       },
@@ -13978,7 +15159,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ForumPostCard"
+              "$ref": "#/components/schemas/ForumMyPostItem"
             }
           },
           "page": {
@@ -14032,7 +15213,7 @@
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/ForumTopicCard"
+              "$ref": "#/components/schemas/ForumFollowedAuthorItem"
             }
           },
           "page": {
@@ -14195,7 +15376,8 @@
           "project_clarification",
           "project_key_reminder",
           "forum_interaction",
-          "system_reminder"
+          "system_reminder",
+          "bid_participation_request"
         ],
         "description": "Bounded notification type family for V1."
       },
@@ -14204,7 +15386,9 @@
         "enum": [
           "project_communication",
           "forum_interaction",
-          "system"
+          "system",
+          "business_todo",
+          "bid_participation_request"
         ],
         "description": "Bounded source lane for messages-building notification center aggregation."
       },
@@ -14226,7 +15410,9 @@
               "/api/app/message/project-communication/thread",
               "/api/app/forum/interaction/inbox",
               "/api/app/project/clarification/list",
-              "/api/app/confirmation/softlink/detail"
+              "/api/app/confirmation/softlink/detail",
+              "/api/app/message/counterpart-conversation/detail",
+              "/api/app/project/bid-participation/thread/detail"
             ]
           },
           "localEntryKey": {
@@ -14261,7 +15447,8 @@
           "source",
           "title",
           "createdAt",
-          "unread"
+          "unread",
+          "routeTargetAvailability"
         ],
         "description": "Bounded notification-center item. Server owns notification and unread truth; BFF only shapes and Flutter only renders.\n",
         "properties": {
@@ -14318,6 +15505,9 @@
           },
           "unread": {
             "type": "boolean"
+          },
+          "routeTargetAvailability": {
+            "$ref": "#/components/schemas/AppNotificationRouteTargetAvailability"
           }
         }
       },
@@ -14327,9 +15517,11 @@
           "total",
           "projectCommunication",
           "forumInteraction",
-          "system"
+          "system",
+          "businessTodo",
+          "bidParticipationRequest"
         ],
-        "description": "Server-owned notification-center unread projection.",
+        "description": "Server-owned notification-center unread projection. `businessTodo` carries V1 business-todo notification unread. `bidParticipationRequest` remains a compatibility bucket and must not create a second UI truth.\n",
         "properties": {
           "total": {
             "type": "integer",
@@ -14337,15 +15529,28 @@
           },
           "projectCommunication": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Ordinary project-communication notification unread count; not business todo."
           },
           "forumInteraction": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Ordinary forum-interaction notification unread count."
           },
           "system": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Ordinary system notification unread count."
+          },
+          "businessTodo": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Business-todo notification unread lane. This must not be mixed with project communication `businessTodoSummary` badge truth."
+          },
+          "bidParticipationRequest": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Compatibility projection only; it must be included in or reconciled with `businessTodo`, not rendered as a second business-todo truth."
           }
         }
       },
@@ -14371,11 +15576,37 @@
           }
         }
       },
+      "AppNotificationMarkReadContext": {
+        "type": "object",
+        "required": [
+          "routeTargetAvailabilityState",
+          "completion"
+        ],
+        "description": "Client read context for notification mark-read. Day 1 forbids ordinary mark-read for unavailable route targets; Server must re-check current routeTargetAvailability before accepting the write.\n",
+        "properties": {
+          "routeTargetAvailabilityState": {
+            "type": "string",
+            "enum": [
+              "available"
+            ],
+            "description": "The only client-admitted state for mark-read. Any unavailable, expired, forbidden, or missing-context target must not be submitted."
+          },
+          "completion": {
+            "type": "string",
+            "enum": [
+              "navigated_to_available_target"
+            ],
+            "description": "Client confirms it has completed safe navigation to the currently available original route target. Fallback navigation does not satisfy this condition."
+          }
+        }
+      },
       "AppNotificationReadRequest": {
         "type": "object",
         "required": [
-          "notificationIds"
+          "notificationIds",
+          "readContext"
         ],
+        "description": "Notification-center mark-read request. This is not project communication read-cursor and not business-todo completion; unavailable route targets must be rejected instead of being cleared as ordinary unread.\n",
         "properties": {
           "notificationIds": {
             "type": "array",
@@ -14384,6 +15615,9 @@
             "items": {
               "type": "string"
             }
+          },
+          "readContext": {
+            "$ref": "#/components/schemas/AppNotificationMarkReadContext"
           }
         }
       },
@@ -14971,7 +16205,8 @@
           "refunded",
           "withheld",
           "cancelled",
-          "failed"
+          "failed",
+          "internal_test_no_freeze_required"
         ],
         "description": "Canonical bounded state machine for the current project's `项目真实性诚意金` object only.\n"
       },
@@ -15207,13 +16442,30 @@
             "format": "date-time"
           },
           "publishGateStatus": {
-            "type": "string"
+            "type": "string",
+            "description": "`satisfied` means paid/frozen truth satisfies the formal gate. `internal_test_no_freeze_allowed` means current internal-test green-channel feedback truth admits publish without real fund freeze.\n"
           },
           "formalResultProcessingRequired": {
             "type": "boolean"
           },
           "nextAction": {
             "$ref": "#/components/schemas/PricingNextActionToken"
+          },
+          "sincerityFreezePolicyNotice": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "freezeFeedbackSummary": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackSummary"
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         }
       },
@@ -15700,9 +16952,12 @@
         "required": [
           "projectId",
           "quoteAmount",
-          "proposalSummary"
+          "proposalSummary",
+          "projectUnderstandingFileAssetId",
+          "quoteSheetFileAssetId",
+          "schedulePlanFileAssetId"
         ],
-        "description": "Minimum bid submit command request only. This request is frozen to the current Flutter App page-submitted fields and must not be expanded into bid comparison, shortlist, or award-management truth.\n",
+        "description": "Minimum bid submit command request only. This request is frozen to the current Flutter App page-submitted fields: bid quote, proposal summary, and three confirmed bid attachment FileAsset ids. `quoteAmount` is `Bid.quoteAmount` only and must not become final confirmed contract amount, order amount truth, compare scoring truth, shortlist truth, or award-management truth.\n",
         "properties": {
           "projectId": {
             "type": "string"
@@ -15712,8 +16967,96 @@
           },
           "proposalSummary": {
             "type": "string"
+          },
+          "projectUnderstandingFileAssetId": {
+            "type": "string",
+            "description": "Confirmed FileAsset id for the project-understanding bid material."
+          },
+          "quoteSheetFileAssetId": {
+            "type": "string",
+            "description": "Confirmed FileAsset id for the quote-sheet bid material."
+          },
+          "schedulePlanFileAssetId": {
+            "type": "string",
+            "description": "Confirmed FileAsset id for the schedule-plan bid material."
           }
         }
+      },
+      "BidSubmissionSupplementEntryKey": {
+        "type": "string",
+        "enum": [
+          "bid_project_understanding_review",
+          "bid_quote_sheet_review",
+          "bid_schedule_plan_review"
+        ],
+        "description": "Target bid material review entry that is currently in needs_supplement."
+      },
+      "BidSubmissionSupplementSlot": {
+        "type": "string",
+        "enum": [
+          "project_understanding",
+          "quote_sheet",
+          "schedule_plan"
+        ],
+        "description": "Optional focused bid material slot used by Flutter for direct positioning."
+      },
+      "BidSubmissionSupplementRequest": {
+        "allOf": [
+          {
+            "$ref": "#/components/schemas/BidSubmitRequest"
+          },
+          {
+            "type": "object",
+            "required": [
+              "bidId",
+              "entryKey",
+              "sourceVersionToken"
+            ],
+            "properties": {
+              "bidId": {
+                "type": "string"
+              },
+              "entryKey": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementEntryKey"
+              },
+              "bidMaterialSlot": {
+                "$ref": "#/components/schemas/BidSubmissionSupplementSlot"
+              },
+              "sourceVersionToken": {
+                "type": "string",
+                "description": "Current material review source token used to prevent stale supplement writes."
+              }
+            }
+          }
+        ],
+        "description": "Existing bid supplement request. It intentionally reuses the three bid material FileAsset fields because supplement submission replaces the existing bid material package for publisher re-review. It does not create a new bid and must not contain final contract amount or service-fee fields.\n"
+      },
+      "BidSubmissionSupplementAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "bidId",
+          "projectId",
+          "entryKey",
+          "reviewState"
+        ],
+        "properties": {
+          "bidId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "entryKey": {
+            "$ref": "#/components/schemas/BidSubmissionSupplementEntryKey"
+          },
+          "reviewState": {
+            "type": "string",
+            "enum": [
+              "pending_review"
+            ]
+          }
+        },
+        "description": "Existing bid supplement accepted response. The targeted material review is returned to pending_review for publisher confirmation."
       },
       "BidSeatLockRequest": {
         "type": "object",
@@ -16141,9 +17484,10 @@
           "currency",
           "contractFileAssetIds",
           "confirmationRole",
-          "idempotencyKey"
+          "idempotencyKey",
+          "platformServiceFeeRecalculationAwarenessConfirmed"
         ],
-        "description": "Create-or-advance request for the current bounded deal-confirmation object only.\n",
+        "description": "Create-or-advance request for the current bounded deal-confirmation object only. This request confirms awareness that platform service-fee calculation may read `finalConfirmedAmount` later, but this field does not open service-fee charge, payment, settlement, invoice, or wallet behavior in the current V1 boundary.\n",
         "properties": {
           "selectedBidId": {
             "type": "string"
@@ -16169,6 +17513,9 @@
           },
           "idempotencyKey": {
             "type": "string"
+          },
+          "platformServiceFeeRecalculationAwarenessConfirmed": {
+            "type": "boolean"
           }
         }
       },
@@ -16624,7 +17971,7 @@
           },
           "pricingGateRequired": {
             "type": "boolean",
-            "description": "Minimum current pricing-gate carrier for the admitted thread continuation only. `true` means the current actor must complete a bounded pricing gate before bid submit may open.\n"
+            "description": "Minimum current pricing-gate carrier for the admitted thread continuation only. `true` means the current actor must complete a bounded pricing gate before project-level free-send continuation may open.\n"
           },
           "pricingGateType": {
             "$ref": "#/components/schemas/BidThreadPricingGateType"
@@ -16698,7 +18045,7 @@
         "required": [
           "orderId"
         ],
-        "description": "Minimum contract confirm command request only. This request carries the current `orderId` continuation anchor used by the existing `contract/detail` carrier and must not expand into full contract edit semantics.\n",
+        "description": "Minimum contract confirm command request only. This request carries the current `orderId` continuation anchor used by the existing `contract/detail` carrier and must not expand into full contract edit semantics. This request must not carry `finalConfirmedAmount`, `quoteAmount`, `totalAmount`, service-fee fields, payment fields, settlement fields, or invoice fields; final contract amount confirmation is only admitted through the deal-confirmations route family.\n",
         "properties": {
           "orderId": {
             "type": "string"
@@ -17458,7 +18805,8 @@
         "type": "object",
         "required": [
           "publicProject",
-          "privateSummary"
+          "privateSummary",
+          "projectCreatedAt"
         ],
         "description": "Private my-project list item carrier only. This model keeps public project summary truth and private continuation summary truth explicitly separated and must not collapse into public showcase list, recent project workbench summary, or full single-project detail truth.\n",
         "properties": {
@@ -17467,6 +18815,14 @@
           },
           "privateSummary": {
             "$ref": "#/components/schemas/MyProjectPrivateProgressSummaryReadModel"
+          },
+          "projectCreatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time",
+            "description": "App-facing project creation time for private my-project list display only. Truth source is Server `Project.createdAt`; this field is not save time, update time, draft saved time, or recent operation time. BFF must not synthesize it from current time.\n"
           }
         }
       },
@@ -18142,7 +19498,14 @@
           "actionKey": {
             "type": "string",
             "enum": [
-              "counterpart_conversation.open"
+              "counterpart_conversation.open",
+              "project_name_access_thread.open",
+              "bid_participation_request.open",
+              "bid_service_fee_authorization.open",
+              "bid_submit.open",
+              "bid_thread.open",
+              "project_clarification.open",
+              "order_detail.open"
             ]
           },
           "canonicalPath": {
@@ -18171,7 +19534,7 @@
           "myBidUnreadCount",
           "projectGroups"
         ],
-        "description": "Runtime-verified counterpart conversation detail projection for project communication only. This response is read-only aggregation and must not become business truth for contracts, payment, settlement, or admin governance.\n",
+        "description": "Server-owned counterpart conversation detail read model. It groups project-scoped communication under one counterpart subject and carries business todo only at project-group level.\n",
         "properties": {
           "conversationId": {
             "type": "string"
@@ -18235,7 +19598,9 @@
           "latestUnreadMessageAt",
           "orderSummary",
           "ratingEntry",
-          "cards"
+          "cards",
+          "threadId",
+          "businessTodoSummary"
         ],
         "properties": {
           "projectId": {
@@ -18252,18 +19617,19 @@
             ]
           },
           "projectRelation": {
-            "type": "string",
+            "type": [
+              "string",
+              "null"
+            ],
             "enum": [
               "my_published",
               "my_bid",
               "unknown"
-            ]
+            ],
+            "description": "Current-organization relation hint for UI filtering. This field expresses the current actor's relation, not the counterpart's role.\n"
           },
           "projectState": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "type": "string"
           },
           "projectPublishedAt": {
             "type": [
@@ -18285,10 +19651,12 @@
           },
           "projectUnreadCount": {
             "type": "integer",
-            "minimum": 0
+            "minimum": 0,
+            "description": "Ordinary message unread count for this project/thread."
           },
           "hasProjectUnread": {
-            "type": "boolean"
+            "type": "boolean",
+            "description": "Ordinary message unread flag for this project/thread."
           },
           "latestUnreadMessageAt": {
             "type": [
@@ -18328,10 +19696,18 @@
           "cards": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CounterpartConversationCard"
+              "$ref": "#/components/schemas/CounterpartConversationBusinessCard"
             }
+          },
+          "threadId": {
+            "type": "string",
+            "description": "Required project communication thread anchor for this project group. Flutter must not infer it from `projectId` alone."
+          },
+          "businessTodoSummary": {
+            "$ref": "#/components/schemas/ProjectCommunicationBusinessTodoSummary"
           }
-        }
+        },
+        "description": "Project-scoped group under one counterpart conversation. The `businessTodoSummary` field is the only source for business-todo red badges in the project list; ordinary unread fields remain separate.\n"
       },
       "CounterpartConversationOrderSummary": {
         "type": "object",
@@ -18702,7 +20078,7 @@
           "threadId",
           "lastReadMessageId"
         ],
-        "description": "Read cursor payload for the current authenticated organization. The organizationId is always derived by Server and must not be accepted from Flutter.\n",
+        "description": "Read cursor payload for the current authenticated organization. The organizationId is always derived by Server and must not be accepted from Flutter. New writes must include a non-empty `lastReadMessageId`; historical null cursor values are compatible only on read responses / stored old cursors.\n",
         "properties": {
           "projectId": {
             "type": "string"
@@ -18711,7 +20087,8 @@
             "type": "string"
           },
           "lastReadMessageId": {
-            "type": "string"
+            "type": "string",
+            "description": "Required message anchor for new read-cursor writes. It must belong to the submitted `projectId + threadId`."
           }
         }
       },
@@ -18739,7 +20116,8 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Nullable only for historical or empty stored cursor reads; new write requests must not submit null."
           },
           "lastReadAt": {
             "type": "string",
@@ -18975,7 +20353,8 @@
               "null"
             ]
           }
-        }
+        },
+        "description": "Structured Server truth anchor for workbench entries. Flutter must not parse labels or summaries to derive business truth.\n"
       },
       "ProjectCommunicationWorkbenchEntry": {
         "type": "object",
@@ -18998,14 +20377,16 @@
           "latestFeedbackAt",
           "reviewedAt",
           "routeTarget",
-          "truthAnchor"
+          "truthAnchor",
+          "badgeCount",
+          "disabledReason"
         ],
         "properties": {
           "entryKey": {
             "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntryKey"
           },
           "group": {
-            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntryGroup"
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchGroup"
           },
           "label": {
             "type": "string"
@@ -19029,13 +20410,31 @@
             ]
           },
           "viewerRole": {
-            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchViewerRole"
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchViewerRole",
+            "type": "string",
+            "enum": [
+              "publisher",
+              "bidder",
+              "unknown"
+            ]
           },
           "subjectOwnerRole": {
-            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchSubjectOwnerRole"
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchSubjectOwnerRole",
+            "type": "string",
+            "enum": [
+              "publisher",
+              "bidder",
+              "platform"
+            ]
           },
           "availabilityState": {
-            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchAvailabilityState"
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchAvailabilityState",
+            "type": "string",
+            "enum": [
+              "unsubmitted",
+              "readable",
+              "unavailable"
+            ]
           },
           "reviewState": {
             "oneOf": [
@@ -19044,12 +20443,21 @@
               },
               {
                 "type": "null"
+              },
+              {
+                "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewState"
               }
             ],
             "description": "Null only for deal confirmation entries."
           },
           "actionState": {
-            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchActionState"
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchActionState",
+            "type": "string",
+            "enum": [
+              "enabled",
+              "readonly",
+              "blocked"
+            ]
           },
           "attachmentCount": {
             "type": "integer",
@@ -19093,6 +20501,18 @@
           },
           "truthAnchor": {
             "$ref": "#/components/schemas/ProjectCommunicationWorkbenchTruthAnchor"
+          },
+          "badgeCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Server-owned business todo badge count for this workbench tool. It is not ordinary unread and must not be inferred from attachment count, review state, or local UI state.\n"
+          },
+          "disabledReason": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Chinese controlled reason when the tool is blocked or unavailable. Null means no disabled reason is needed for the current viewer.\n"
           }
         }
       },
@@ -19156,19 +20576,28 @@
             "type": [
               "string",
               "null"
-            ]
+            ],
+            "description": "Conditional material-review anchor. It is optional only for `publisher_materials` entries because publisher quote-basis confirmation happens before bid submit can create a bid. It is required for `bid_materials` entries and must not be used for contract or final-amount confirmation.\n"
           },
           "entryKey": {
-            "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewEntryKey"
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntryKey"
           },
           "reviewAction": {
-            "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewAction"
+            "$ref": "#/components/schemas/ProjectCommunicationMaterialReviewAction",
+            "type": "string",
+            "enum": [
+              "confirm",
+              "request_supplement"
+            ]
           },
           "feedbackReasonCodes": {
             "type": "array",
             "items": {
               "type": "string"
-            }
+            },
+            "default": [
+
+            ]
           },
           "feedbackText": {
             "type": [
@@ -19185,7 +20614,8 @@
           "idempotencyKey": {
             "type": "string"
           }
-        }
+        },
+        "description": "Material review command for the eight material entries only. It must not accept `contract_confirmation` or `final_confirmed_amount_confirmation`. `publisher_materials` review may omit `bidId` before bid submit; `bid_materials` review must carry a concrete `bidId`.\n"
       },
       "ProjectCommunicationMaterialReviewResponse": {
         "type": "object",
@@ -22666,6 +24096,7 @@
               "inspection",
               "dispute",
               "project_clarification",
+              "counterpart_conversation",
               "bid_thread"
             ]
           },
@@ -22691,6 +24122,7 @@
               "/api/app/inspection/detail",
               "/api/app/order/detail",
               "/api/app/project/clarification/list",
+              "/api/app/message/counterpart-conversation/detail",
               "/api/app/bid/thread/detail"
             ],
             "description": "App-facing canonical entry reference only."
@@ -22707,6 +24139,8 @@
                 "orderId",
                 "milestoneId",
                 "projectId",
+                "conversationId",
+                "threadId",
                 "bidId"
               ]
             },
@@ -22759,8 +24193,10 @@
               "inspection.submit",
               "dispute.open",
               "project_clarification.open",
+              "counterpart_conversation.open",
               "bid_thread.open"
-            ]
+            ],
+            "description": "`counterpart_conversation.open` is the messages-building mainline. `bid_thread.open` remains only as an old business detail carrier.\n"
           },
           "title": {
             "type": "string"
@@ -22803,6 +24239,7 @@
               "inspection",
               "dispute",
               "project_clarification",
+              "counterpart_conversation",
               "bid_thread"
             ]
           },
@@ -22812,8 +24249,10 @@
               "inspection.submit",
               "dispute.open",
               "project_clarification.open",
+              "counterpart_conversation.open",
               "bid_thread.open"
-            ]
+            ],
+            "description": "`counterpart_conversation.open` is the messages-building mainline action. `bid_thread.open` is carrier-only and must not be used as the primary messages-building entry.\n"
           },
           "canonicalPath": {
             "type": "string",
@@ -22821,6 +24260,7 @@
               "/api/app/inspection/detail",
               "/api/app/order/detail",
               "/api/app/project/clarification/list",
+              "/api/app/message/counterpart-conversation/detail",
               "/api/app/bid/thread/detail"
             ],
             "description": "App-facing canonical entry reference only; not frontend routing detail."
@@ -22833,6 +24273,8 @@
                 "orderId",
                 "milestoneId",
                 "projectId",
+                "conversationId",
+                "threadId",
                 "bidId"
               ]
             }
@@ -22851,8 +24293,1202 @@
           "state": {
             "type": "string",
             "enum": [
-              "enabled"
+              "enabled",
+              "carrier_only"
+            ],
+            "description": "`carrier_only` means the entry is retained for legacy business detail handoff only and must not become the main messages-building entry.\n"
+          }
+        }
+      },
+      "ForumMyPostItem": {
+        "type": "object",
+        "required": [
+          "postId",
+          "title",
+          "topicId",
+          "topicTitle",
+          "excerpt",
+          "state",
+          "publishedAt",
+          "updatedAt",
+          "canEdit",
+          "canDelete"
+        ],
+        "description": "Minimum owner post asset projection for `forum/me/posts` only.\n",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "topicId": {
+            "type": "string"
+          },
+          "topicTitle": {
+            "type": "string"
+          },
+          "excerpt": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ForumPostState"
+          },
+          "publishedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "canEdit": {
+            "type": "boolean"
+          },
+          "canDelete": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ForumAuthorFollowToggleRequest": {
+        "type": "object",
+        "required": [
+          "authorId",
+          "action"
+        ],
+        "properties": {
+          "authorId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "follow",
+              "unfollow"
             ]
+          }
+        }
+      },
+      "ForumPostOwnerActionRequest": {
+        "type": "object",
+        "required": [
+          "postId"
+        ],
+        "properties": {
+          "postId": {
+            "type": "string"
+          }
+        }
+      },
+      "ForumPostEditContinuationResponse": {
+        "type": "object",
+        "required": [
+          "draftId",
+          "targetPostId",
+          "state",
+          "status",
+          "message"
+        ],
+        "description": "Minimum owner post-edit continuation response. It carries only the Server-owned edit draft anchor and user-facing continuation status.\n",
+        "properties": {
+          "draftId": {
+            "type": "string"
+          },
+          "targetPostId": {
+            "type": "string"
+          },
+          "state": {
+            "$ref": "#/components/schemas/ForumDraftState"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "accepted_edit_draft",
+              "resumed_active_edit_draft"
+            ]
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ForumPostDeleteContinuationResponse": {
+        "type": "object",
+        "required": [
+          "postId",
+          "state",
+          "archivedAt",
+          "message"
+        ],
+        "description": "Minimum owner post-delete continuation response. It must not expose a separate moderation or audit workflow to Flutter App.\n",
+        "properties": {
+          "postId": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "archived"
+            ]
+          },
+          "archivedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "message": {
+            "type": "string"
+          }
+        }
+      },
+      "ForumDraftDetailResponse": {
+        "type": "object",
+        "required": [
+          "draftId",
+          "draftType",
+          "targetPostId",
+          "topicId",
+          "title",
+          "body",
+          "attachmentFileAssetIds",
+          "state",
+          "updatedAt"
+        ],
+        "description": "Minimum forum draft detail response for continuing a Server-owned draft or own-post edit draft.\n",
+        "properties": {
+          "draftId": {
+            "type": "string"
+          },
+          "draftType": {
+            "type": "string"
+          },
+          "targetPostId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "topicId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "title": {
+            "type": "string"
+          },
+          "body": {
+            "type": "string"
+          },
+          "attachmentFileAssetIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "state": {
+            "$ref": "#/components/schemas/ForumDraftState"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ForumMyLikesResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "page"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForumPostCard"
+            }
+          },
+          "page": {
+            "$ref": "#/components/schemas/ForumCursorPageInfo"
+          }
+        }
+      },
+      "ForumFollowedAuthorItem": {
+        "type": "object",
+        "required": [
+          "authorId",
+          "displayName",
+          "avatarUrl",
+          "organizationName",
+          "followedAt",
+          "publicPostCount",
+          "publicCommentCount",
+          "viewerFollowsAuthor"
+        ],
+        "description": "Minimum followed-author asset projection for `forum/me/follows` only. This is author follow truth, not topic follow truth or generic social graph truth.\n",
+        "properties": {
+          "authorId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "organizationName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "followedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "publicPostCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "publicCommentCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "viewerFollowsAuthor": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ForumReportTargetType": {
+        "type": "string",
+        "enum": [
+          "post",
+          "comment"
+        ]
+      },
+      "ForumReportReasonCode": {
+        "type": "string",
+        "enum": [
+          "ad_or_solicitation",
+          "abuse_or_insult",
+          "flamebait_or_conflict",
+          "spam_or_flood",
+          "plagiarism_or_repost",
+          "other"
+        ]
+      },
+      "ForumReportStatus": {
+        "type": "string",
+        "enum": [
+          "submitted",
+          "pending_review",
+          "resolved",
+          "rejected",
+          "closed"
+        ]
+      },
+      "ForumReportSubmitRequest": {
+        "type": "object",
+        "required": [
+          "targetType",
+          "targetId",
+          "reasonCode"
+        ],
+        "properties": {
+          "targetType": {
+            "$ref": "#/components/schemas/ForumReportTargetType"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "$ref": "#/components/schemas/ForumReportReasonCode"
+          },
+          "reasonDetail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "ForumReportSubmitResponse": {
+        "type": "object",
+        "required": [
+          "reportTicketId",
+          "status",
+          "target",
+          "reason",
+          "submittedAt"
+        ],
+        "properties": {
+          "reportTicketId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/ForumReportStatus"
+          },
+          "target": {
+            "type": "object",
+            "required": [
+              "targetType",
+              "targetId"
+            ],
+            "properties": {
+              "targetType": {
+                "$ref": "#/components/schemas/ForumReportTargetType"
+              },
+              "targetId": {
+                "type": "string"
+              }
+            }
+          },
+          "reason": {
+            "type": "object",
+            "required": [
+              "reasonCode",
+              "reasonDetail"
+            ],
+            "properties": {
+              "reasonCode": {
+                "$ref": "#/components/schemas/ForumReportReasonCode"
+              },
+              "reasonDetail": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            }
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ForumReportTargetSnapshot": {
+        "type": "object",
+        "additionalProperties": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "ForumMyReportTicket": {
+        "type": "object",
+        "required": [
+          "ticketId",
+          "targetType",
+          "targetTypeLabel",
+          "targetId",
+          "targetSummary",
+          "reasonCode",
+          "reasonLabel",
+          "reasonDetail",
+          "status",
+          "statusLabel",
+          "submittedAt",
+          "updatedAt",
+          "targetSnapshot"
+        ],
+        "properties": {
+          "ticketId": {
+            "type": "string"
+          },
+          "targetType": {
+            "$ref": "#/components/schemas/ForumReportTargetType"
+          },
+          "targetTypeLabel": {
+            "type": "string"
+          },
+          "targetId": {
+            "type": "string"
+          },
+          "targetSummary": {
+            "type": "string"
+          },
+          "reasonCode": {
+            "$ref": "#/components/schemas/ForumReportReasonCode"
+          },
+          "reasonLabel": {
+            "type": "string"
+          },
+          "reasonDetail": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "status": {
+            "$ref": "#/components/schemas/ForumReportStatus"
+          },
+          "statusLabel": {
+            "type": "string"
+          },
+          "submittedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "targetSnapshot": {
+            "$ref": "#/components/schemas/ForumReportTargetSnapshot"
+          }
+        }
+      },
+      "ForumMyReportsResponse": {
+        "type": "object",
+        "required": [
+          "items",
+          "count",
+          "traceId"
+        ],
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ForumMyReportTicket"
+            }
+          },
+          "count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "traceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "AppNotificationSourceLane": {
+        "type": "string",
+        "enum": [
+          "all",
+          "project_communication",
+          "forum_interaction",
+          "business_todo",
+          "system"
+        ],
+        "description": "App-facing notification list filter lane. `business_todo` is a notification-center grouping lane; project-communication business red points still read `businessTodoSummary` and `entries[].badgeCount`.\n"
+      },
+      "AppNotificationRouteTargetAvailability": {
+        "type": "object",
+        "required": [
+          "state",
+          "reasonCode",
+          "reasonText",
+          "fallbackAction"
+        ],
+        "description": "Server-owned availability projection for a notification routeTarget. It lets Flutter avoid stale technical error pages and prevents automatic mark-read when the target is unavailable.\n",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "available",
+              "unavailable",
+              "expired",
+              "forbidden",
+              "missing_context"
+            ]
+          },
+          "reasonCode": {
+            "type": "string"
+          },
+          "reasonText": {
+            "type": "string"
+          },
+          "fallbackAction": {
+            "type": "string",
+            "enum": [
+              "none",
+              "open_subject_list"
+            ]
+          },
+          "fallbackRouteTarget": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AppNotificationRouteTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackChoice": {
+        "type": "string",
+        "enum": [
+          "support_freeze",
+          "oppose_freeze"
+        ]
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackSummary": {
+        "type": "object",
+        "required": [
+          "supportFreezeCount",
+          "opposeFreezeCount",
+          "myChoice",
+          "updatedAt"
+        ],
+        "description": "Current green-channel feedback summary for one project only. This summary is publish-gate input during internal test, not payment or finance truth.\n",
+        "properties": {
+          "supportFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opposeFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "myChoice": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackChoice"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "updatedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackRequest": {
+        "type": "object",
+        "required": [
+          "choice"
+        ],
+        "properties": {
+          "choice": {
+            "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackChoice"
+          }
+        }
+      },
+      "ProjectAuthenticitySincerityFreezeFeedbackResponse": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "myChoice",
+          "supportFreezeCount",
+          "opposeFreezeCount",
+          "updatedAt"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "myChoice": {
+            "$ref": "#/components/schemas/ProjectAuthenticitySincerityFreezeFeedbackChoice"
+          },
+          "supportFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "opposeFreezeCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "traceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BidParticipationRequestStatus": {
+        "type": "string",
+        "enum": [
+          "pending",
+          "approved",
+          "rejected"
+        ],
+        "description": "Server-owned bid participation request state. Flutter and BFF must not invent or finalize this state locally.\n"
+      },
+      "BidParticipationRequestCreateRequest": {
+        "type": "object",
+        "required": [
+          "projectId"
+        ],
+        "description": "Create request for the current bidder's participation request in one published project. This is not a standalone project-name request and carries no approval state.\n",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          }
+        }
+      },
+      "BidParticipationRequestAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "projectId",
+          "status",
+          "threadId"
+        ],
+        "description": "Bid participation request accepted response. `status` remains Server-owned and must not be inferred by BFF or Flutter.\n",
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "$ref": "#/components/schemas/BidParticipationRequestStatus"
+          },
+          "threadId": {
+            "type": "string"
+          }
+        }
+      },
+      "BidParticipationRequesterReadModel": {
+        "type": "object",
+        "required": [
+          "organizationId",
+          "displayName",
+          "avatarUrl"
+        ],
+        "properties": {
+          "organizationId": {
+            "type": "string"
+          },
+          "displayName": {
+            "type": "string"
+          },
+          "avatarUrl": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
+      "BidParticipationPrimaryReviewAction": {
+        "type": "object",
+        "required": [
+          "actionKey",
+          "enabled",
+          "availableDecisions"
+        ],
+        "properties": {
+          "actionKey": {
+            "type": "string",
+            "enum": [
+              "bid_participation.review"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "availableDecisions": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "approve",
+                "reject"
+              ]
+            }
+          }
+        }
+      },
+      "BidParticipationThreadDetailReadModel": {
+        "type": "object",
+        "required": [
+          "threadId",
+          "threadType",
+          "projectId",
+          "requestId",
+          "requestStatus",
+          "displayTitle",
+          "requesterOrganization",
+          "items",
+          "primaryReviewAction"
+        ],
+        "description": "Bid participation review thread detail. It may carry message-like display items and review handoff, but Server remains the request-state truth owner.\n",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "threadType": {
+            "type": "string",
+            "enum": [
+              "bid_participation_review"
+            ]
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "requestId": {
+            "type": "string"
+          },
+          "requestStatus": {
+            "$ref": "#/components/schemas/BidParticipationRequestStatus"
+          },
+          "displayTitle": {
+            "type": "string"
+          },
+          "requesterOrganization": {
+            "$ref": "#/components/schemas/BidParticipationRequesterReadModel"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": true
+            }
+          },
+          "primaryReviewAction": {
+            "$ref": "#/components/schemas/BidParticipationPrimaryReviewAction"
+          }
+        }
+      },
+      "BidParticipationPendingListResponse": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "requests"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "requests": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BidParticipationThreadDetailReadModel"
+            }
+          }
+        }
+      },
+      "BidParticipationReviewAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "requestId",
+          "projectId",
+          "status"
+        ],
+        "properties": {
+          "requestId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "approved",
+              "rejected"
+            ]
+          }
+        }
+      },
+      "ProjectCommunicationBusinessTodoSummary": {
+        "type": "object",
+        "required": [
+          "bidParticipationReviewPendingCount",
+          "publisherMaterialReviewPendingCount",
+          "bidMaterialReviewPendingCount",
+          "dealConfirmationPendingCount",
+          "totalPendingCount"
+        ],
+        "description": "Server-owned business todo projection for project communication. This summary is not ordinary message unread and must not be inferred by BFF or Flutter from copy, attachment counts, workbench entry counts, or route availability.\n",
+        "properties": {
+          "bidParticipationReviewPendingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "publisherMaterialReviewPendingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "bidMaterialReviewPendingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "dealConfirmationPendingCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "totalPendingCount": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Server-calculated total business todo count for badge display. A zero value means Flutter must not render a fake red badge.\n"
+          }
+        }
+      },
+      "ProjectCommunicationChatAvailability": {
+        "type": "object",
+        "required": [
+          "canSendMessage",
+          "lockReasonCode",
+          "lockReasonText",
+          "requiredNextAction"
+        ],
+        "description": "Server-owned send availability projection for one project communication thread. Flutter input locking is display protection only; Server message-write commands must enforce the same rule. Project communication entry visibility does not mean project-level free-send availability; after publisher confirms bid materials, the bounded `4000 元竞标服务费预授权额度` may still lock free-send until Server marks the authorization requirement satisfied.\n",
+        "properties": {
+          "canSendMessage": {
+            "type": "boolean"
+          },
+          "lockReasonCode": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "enum": [
+              "bid_participation_review_pending",
+              "publisher_material_confirmation_pending",
+              "bid_submission_pending",
+              "bid_material_confirmation_pending",
+              "service_fee_authorization_pending",
+              "deal_confirmation_pending",
+              null
+            ]
+          },
+          "lockReasonText": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "description": "Chinese display reason when sending is locked."
+          },
+          "requiredNextAction": {
+            "type": "string",
+            "enum": [
+              "review_bid_participation",
+              "confirm_publisher_materials",
+              "submit_bid_materials",
+              "confirm_bid_materials",
+              "complete_service_fee_authorization",
+              "open_deal_confirmation",
+              "none"
+            ]
+          }
+        }
+      },
+      "ProjectCommunicationThreadReadModel": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "threadId",
+          "chatAvailability",
+          "generatedAt"
+        ],
+        "description": "Minimal project communication get-or-create thread read model. It exposes the project/thread anchors and Server-owned chat availability only; it does not own final amount, order, contract, payment, settlement, or fulfillment truth.\n",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "counterpartOrganizationId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "chatAvailability": {
+            "$ref": "#/components/schemas/ProjectCommunicationChatAvailability"
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectCommunicationWorkbenchGroup": {
+        "type": "string",
+        "enum": [
+          "publisher_materials",
+          "bid_materials",
+          "deal_confirmation"
+        ]
+      },
+      "ProjectCommunicationMaterialReviewState": {
+        "type": "string",
+        "enum": [
+          "unsubmitted",
+          "pending_review",
+          "confirmed",
+          "needs_supplement"
+        ],
+        "description": "Server-owned material review state. Deal-confirmation entries must not carry this state as final amount truth.\n"
+      },
+      "ProjectCommunicationWorkbenchReadModel": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "threadId",
+          "viewerRole",
+          "businessTodoSummary",
+          "chatAvailability",
+          "entries",
+          "generatedAt"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "threadId": {
+            "type": "string"
+          },
+          "viewerRole": {
+            "type": "string",
+            "enum": [
+              "publisher",
+              "bidder",
+              "unknown"
+            ]
+          },
+          "businessTodoSummary": {
+            "$ref": "#/components/schemas/ProjectCommunicationBusinessTodoSummary"
+          },
+          "chatAvailability": {
+            "$ref": "#/components/schemas/ProjectCommunicationChatAvailability"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+            }
+          },
+          "generatedAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectCommunicationMaterialReviewAcceptedResponse": {
+        "type": "object",
+        "required": [
+          "entry"
+        ],
+        "properties": {
+          "entry": {
+            "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectCommunicationWorkbenchEntry"
+            }
+          }
+        }
+      },
+      "ProjectAlbumPhotoCategory": {
+        "type": "string",
+        "enum": [
+          "contract",
+          "progress",
+          "final",
+          "defect"
+        ],
+        "description": "Bounded project album evidence category. These categories are for evidence display only and do not open fulfillment, acceptance, dispute, settlement, or public case-gallery truth.\n"
+      },
+      "ProjectAlbumPhotoBindRequest": {
+        "type": "object",
+        "required": [
+          "fileAssetId",
+          "category"
+        ],
+        "description": "Bind a confirmed FileAsset to the current project album. The upload itself must already have completed the shared init -> direct upload -> confirm flow; this command must not accept objectKey.\n",
+        "properties": {
+          "fileAssetId": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ProjectAlbumPhotoCategory"
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 200
+          },
+          "sortOrder": {
+            "type": [
+              "integer",
+              "null"
+            ],
+            "minimum": 0
+          }
+        }
+      },
+      "ProjectAlbumPhotoReadModel": {
+        "type": "object",
+        "required": [
+          "photoId",
+          "projectId",
+          "fileAssetId",
+          "category",
+          "mimeType",
+          "sortOrder",
+          "photoState",
+          "uploadedByUserId",
+          "uploadedByOrganizationId",
+          "createdAt"
+        ],
+        "description": "Server-owned project album photo read model. The FileAsset id is the durable truth anchor; preview image URLs must be obtained through the bounded file preview/access surface and objectKey must never be exposed.\n",
+        "properties": {
+          "photoId": {
+            "type": "string"
+          },
+          "projectId": {
+            "type": "string"
+          },
+          "fileAssetId": {
+            "type": "string"
+          },
+          "category": {
+            "$ref": "#/components/schemas/ProjectAlbumPhotoCategory"
+          },
+          "caption": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "mimeType": {
+            "type": "string"
+          },
+          "sortOrder": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "photoState": {
+            "type": "string",
+            "enum": [
+              "active",
+              "removed"
+            ]
+          },
+          "uploadedByUserId": {
+            "type": "string"
+          },
+          "uploadedByActorId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "uploadedByOrganizationId": {
+            "type": "string"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "removedAt": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "date-time"
+          }
+        }
+      },
+      "ProjectAlbumPhotoListReadModel": {
+        "type": "object",
+        "required": [
+          "projectId",
+          "limit",
+          "photoCount",
+          "items"
+        ],
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 50
+          },
+          "photoCount": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ProjectAlbumPhotoReadModel"
+            }
+          }
+        }
+      },
+      "CounterpartConversationBusinessCard": {
+        "type": "object",
+        "required": [
+          "cardId",
+          "cardType",
+          "title",
+          "summary",
+          "status",
+          "updatedAt",
+          "truthAnchor",
+          "detailRouteTarget",
+          "decisionAvailability"
+        ],
+        "description": "Bounded business-card projection inside a counterpart conversation. This remains a display and route carrier only and must not define business truth.\n",
+        "properties": {
+          "cardId": {
+            "type": "string"
+          },
+          "cardType": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "truthAnchor": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "detailRouteTarget": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/MessageInteractionRouteTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "decisionAvailability": {
+            "type": "object",
+            "additionalProperties": true
           }
         }
       }

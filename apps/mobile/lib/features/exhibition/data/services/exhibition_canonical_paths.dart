@@ -42,6 +42,8 @@ final class ExhibitionCanonicalPaths {
   static const String exhibitionReportSubmit =
       '/api/app/exhibition/report/submit';
   static const String bidSubmit = '/api/app/bid/submit';
+  static const String bidSubmissionSupplement =
+      '/api/app/bid/submission/supplement';
   static const String bidAward = '/api/app/bid/award';
   static const String bidSelectAndCreateOrder =
       '/api/app/bid/select-bid-and-create-order';
@@ -73,6 +75,17 @@ final class ExhibitionCanonicalPaths {
 
   static String projectPricingSummary(String projectId) {
     return '/api/app/project/${Uri.encodeComponent(projectId)}/pricing-summary';
+  }
+
+  static String projectDealConfirmations(String projectId) {
+    return '/api/app/project/${Uri.encodeComponent(projectId)}/deal-confirmations';
+  }
+
+  static String projectDealConfirmationDetail(
+    String projectId,
+    String dealConfirmationId,
+  ) {
+    return '${projectDealConfirmations(projectId)}/${Uri.encodeComponent(dealConfirmationId)}';
   }
 
   static String projectAuthenticitySincerityOrders(String projectId) {

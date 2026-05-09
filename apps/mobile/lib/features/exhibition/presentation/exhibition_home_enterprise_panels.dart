@@ -262,9 +262,19 @@ class _HomeEnterpriseModulePanelState
               padding: const EdgeInsets.only(bottom: 10),
               child: _HomeEnterpriseRecommendationCard(
                 title: item.name,
-                summary: _homeEnterpriseCardSummary(item),
-                badgeLabel: _homeEnterpriseCardBadgeLabel(item),
+                summary:
+                    enterpriseBoardCardSummaryText(item) ??
+                    _homeEnterpriseCardSummary(item),
+                badgeLabel:
+                    _homeEnterpriseUsesCleanCard(item.boardType) ||
+                        item.boardType == EnterpriseBoardType.company
+                    ? null
+                    : _homeEnterpriseCardBadgeLabel(item),
                 actionLabel: _homeEnterpriseDetailActionLabel(item.boardType),
+                imageUrl: item.logoUrl,
+                locationLabel: _homeEnterpriseCardLocationLabel(item),
+                chips: enterpriseBoardCardSummaryChips(item),
+                clean: _homeEnterpriseUsesCleanCard(item.boardType),
                 onPressed: () => widget.onOpenEnterpriseItem(item),
               ),
             ),

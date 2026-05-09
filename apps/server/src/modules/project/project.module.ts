@@ -6,12 +6,16 @@ import { AuthModule } from '../auth/auth.module';
 import { BidParticipationRequestModule } from '../bid_participation_request/bid-participation-request.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { ProjectNameAccessModule } from '../project_name_access/project-name-access.module';
+import { ProjectCommunicationModule } from '../project_communication/project-communication.module';
+import { ProjectCommunicationThreadEntity } from '../project_communication/entities/project-communication-thread.entity';
 import { UploadModule } from '../upload/upload.module';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { BidEntity } from '../bid/entities/bid.entity';
 import { ProjectOrderEntity } from '../order/entities/project-order.entity';
 import { InquiryQuoteDepositEntity } from '../p0_pay/entities/inquiry-quote-deposit.entity';
 import { PlatformServiceFeeAuthorizationEntity } from '../p0_pay/entities/platform-service-fee-authorization.entity';
+import { ProjectAuthenticitySincerityFreezeFeedbackEntity } from '../p0_pay/entities/project-authenticity-sincerity-freeze-feedback.entity';
+import { ForumPostEntity } from '../forum/entities/forum-post.entity';
 import { ProjectAttachmentFileAccessController } from './project-attachment-file-access.controller';
 import { ProjectAttachmentFileAccessService } from './project-attachment-file-access.service';
 import { ProjectAttachmentController } from './project-attachment.controller';
@@ -30,6 +34,7 @@ import { ProjectEntity } from './entities/project.entity';
 import { ProjectController } from './project.controller';
 import { ProjectExitGovernanceService } from './project-exit-governance.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
+import { ProjectPublishGateService } from './project-publish-gate.service';
 import { ProjectPresenter } from './project.presenter';
 import { ProjectQueryService } from './project-query.service';
 import { ProjectWriteService } from './project-write.service';
@@ -43,16 +48,20 @@ import { ProjectWriteService } from './project-write.service';
       ProjectPublicResourceEntity,
       ProjectExitCaseEntity,
       FileAssetEntity,
+      ForumPostEntity,
+      ProjectCommunicationThreadEntity,
       BidEntity,
       ProjectOrderEntity,
       InquiryQuoteDepositEntity,
-      PlatformServiceFeeAuthorizationEntity
+      PlatformServiceFeeAuthorizationEntity,
+      ProjectAuthenticitySincerityFreezeFeedbackEntity
     ]),
     ProjectPublishAuditModule,
     AuthModule,
     OrganizationModule,
     BidParticipationRequestModule,
     ProjectNameAccessModule,
+    ProjectCommunicationModule,
     UploadModule
   ],
   controllers: [
@@ -68,6 +77,7 @@ import { ProjectWriteService } from './project-write.service';
     ProjectBidMaterialPresenter,
     ProjectPublicResourcePresenter,
     ProjectQueryService,
+    ProjectPublishGateService,
     ProjectLifecycleService,
     ProjectExitGovernanceService,
     ProjectWriteService,

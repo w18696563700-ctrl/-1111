@@ -1,6 +1,7 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
 import { ForumAuthorProfileService } from './forum-author-profile.service';
+import { ForumDraftDeleteService } from './forum-draft-delete.service';
 import { ForumDraftOpenService } from './forum-draft-open.service';
 import { ForumInteractionInboxService } from './forum-interaction-inbox.service';
 import { ForumInteractionService } from './forum-interaction.service';
@@ -16,6 +17,7 @@ export class ForumController {
     private readonly forumInteractionService: ForumInteractionService,
     private readonly forumInteractionInboxService: ForumInteractionInboxService,
     private readonly forumDraftOpenService: ForumDraftOpenService,
+    private readonly forumDraftDeleteService: ForumDraftDeleteService,
     private readonly forumOwnPostContinuityService: ForumOwnPostContinuityService,
     private readonly forumReportMineService: ForumReportMineService,
   ) {}
@@ -181,6 +183,12 @@ export class ForumController {
   @HttpCode(HttpStatus.ACCEPTED)
   saveDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
     return this.forumService.saveDraft(payload, headers);
+  }
+
+  @Post('draft/delete')
+  @HttpCode(HttpStatus.ACCEPTED)
+  deleteDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    return this.forumDraftDeleteService.deleteDraft(payload, headers);
   }
 
   @Post('publish')

@@ -7,11 +7,13 @@ import { BidEntity } from '../bid/entities/bid.entity';
 import { ProjectAttachmentEntity } from '../project/entities/project-attachment.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { UploadPublicUrlService } from '../upload/upload-public-url.service';
+import { ProjectAlbumPhotoEntity } from './entities/project-album-photo.entity';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
 import { ProjectCommunicationAccessService } from './project-communication-access.service';
 
 const PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND = 'project_communication_attachment';
+const PROJECT_ALBUM_PHOTO_FILE_KIND = 'project_album_photo';
 const WORKBENCH_PUBLISHER_MATERIAL_KINDS = new Set([
   'effect_image',
   'construction_doc',
@@ -25,7 +27,7 @@ const WORKBENCH_BID_MATERIAL_SLOTS = [
   { field: 'schedulePlanFileAssetId', label: '进度安排' }
 ] as const;
 
-type WorkbenchSourceFile = {
+type PreviewSourceFile = {
   fileName: string | null;
 };
 
@@ -42,6 +44,8 @@ export class ProjectCommunicationFilePreviewService {
     private readonly projectAttachmentRepository: Repository<ProjectAttachmentEntity>,
     @InjectRepository(BidEntity)
     private readonly bidRepository: Repository<BidEntity>,
+    @InjectRepository(ProjectAlbumPhotoEntity)
+    private readonly projectAlbumPhotoRepository: Repository<ProjectAlbumPhotoEntity>,
     private readonly accessService: ProjectCommunicationAccessService,
     private readonly publicUrlService: UploadPublicUrlService,
     private readonly config: RuntimeConfigService
@@ -57,8 +61,8 @@ export class ProjectCommunicationFilePreviewService {
     }
     await this.accessService.requireExistingThreadParticipant(thread, context);
     const message = await this.findAttachmentMessage(projectId, threadId, fileAssetId);
-    const workbenchSource = message ? null : await this.findWorkbenchSourceFile(projectId, thread, fileAssetId);
-    if (!message && !workbenchSource) {
+    const source = message ? null : await this.findPreviewSourceFile(projectId, thread, fileAssetId);
+    if (!message && !source) {
       throw this.forbidden('Current FileAsset is not attached to this project communication thread.');
     }
     const fileAsset = await this.fileAssetRepository.findOneBy({ id: fileAssetId });
@@ -68,11 +72,14 @@ export class ProjectCommunicationFilePreviewService {
     if (message && !this.isProjectCommunicationFileAsset(fileAsset, projectId)) {
       throw this.forbidden('Current FileAsset truth is not aligned with project communication preview.');
     }
+    if (source?.sourceKind === 'project_album_photo' && !this.isProjectAlbumPhotoFileAsset(fileAsset, projectId)) {
+      throw this.forbidden('Current FileAsset truth is not aligned with project album preview.');
+    }
     const previewType = this.previewType(fileAsset.mimeType);
     const canPreview = previewType !== 'unsupported';
-    const accessUrl = canPreview ? await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey) : null;
-    if (canPreview && !accessUrl) {
-      throw this.unavailable('Current file preview access URL is unavailable.');
+    const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
+    if (!accessUrl) {
+      throw this.unavailable('Current file access URL is unavailable.');
     }
     return {
       fileAssetId,
@@ -80,10 +87,10 @@ export class ProjectCommunicationFilePreviewService {
       threadId,
       previewType,
       canPreview,
-      fileName: this.readPayloadFileName(message?.payload) ?? workbenchSource?.fileName ?? fileAsset.id,
+      fileName: this.readPayloadFileName(message?.payload) ?? source?.fileName ?? fileAsset.id,
       mimeType: fileAsset.mimeType,
       accessUrl,
-      expiresAt: accessUrl ? this.buildExpiresAt() : null,
+      expiresAt: this.buildExpiresAt(),
       contentLengthBytes: fileAsset.size,
       downloadAvailable: true,
       fallbackReason: canPreview ? null : 'unsupported_mime_type'
@@ -95,11 +102,20 @@ export class ProjectCommunicationFilePreviewService {
     return items.find((item) => this.readPayloadFileAssetId(item.payload) === fileAssetId) ?? null;
   }
 
-  private async findWorkbenchSourceFile(
+  private async findPreviewSourceFile(
     projectId: string,
     thread: ProjectCommunicationThreadEntity,
     fileAssetId: string
-  ): Promise<WorkbenchSourceFile | null> {
+  ): Promise<(PreviewSourceFile & { sourceKind: 'workbench' | 'project_album_photo' }) | null> {
+    const albumPhoto = await this.projectAlbumPhotoRepository.findOneBy({
+      projectId,
+      fileAssetId,
+      photoState: 'active'
+    });
+    if (albumPhoto) {
+      return { sourceKind: 'project_album_photo', fileName: albumPhoto.caption };
+    }
+
     const projectAttachment = await this.projectAttachmentRepository.findOneBy({
       projectId,
       fileAssetId,
@@ -109,7 +125,7 @@ export class ProjectCommunicationFilePreviewService {
       projectAttachment &&
       WORKBENCH_PUBLISHER_MATERIAL_KINDS.has(projectAttachment.attachmentKind)
     ) {
-      return { fileName: projectAttachment.fileName };
+      return { sourceKind: 'workbench', fileName: projectAttachment.fileName };
     }
 
     const bid = await this.bidRepository.findOneBy({
@@ -122,13 +138,20 @@ export class ProjectCommunicationFilePreviewService {
     const slot = WORKBENCH_BID_MATERIAL_SLOTS.find(
       (item) => bid[item.field] === fileAssetId
     );
-    return slot ? { fileName: slot.label } : null;
+    return slot ? { sourceKind: 'workbench', fileName: slot.label } : null;
   }
 
   private isProjectCommunicationFileAsset(fileAsset: FileAssetEntity, projectId: string) {
     return fileAsset.businessType === 'project' &&
       fileAsset.businessId === projectId &&
       fileAsset.fileKind === PROJECT_COMMUNICATION_ATTACHMENT_FILE_KIND;
+  }
+
+  private isProjectAlbumPhotoFileAsset(fileAsset: FileAssetEntity, projectId: string) {
+    return fileAsset.businessType === 'project' &&
+      fileAsset.businessId === projectId &&
+      fileAsset.fileKind === PROJECT_ALBUM_PHOTO_FILE_KIND &&
+      fileAsset.mimeType.toLowerCase().startsWith('image/');
   }
 
   private previewType(mimeType: string) {

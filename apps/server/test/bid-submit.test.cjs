@@ -216,6 +216,7 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   const { BidWriteService } = require('../dist/modules/bid/bid-write.service.js');
   const savedBids = [];
   const savedAudit = [];
+  const emittedBusinessEvents = [];
   const service = new BidWriteService(
     {
       create(input) {
@@ -227,6 +228,7 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
         return createProject();
       },
     },
+    {},
     {
       async transaction(callback) {
         return callback({
@@ -305,12 +307,8 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
     },
     { async requireApprovedForOrganization() {} },
     {
-      async findOne() {
-        return {
-          id: 'authorization-1',
-          status: 'frozen',
-          authorizationQuotaAmount: '4000.00',
-        };
+      async emitBidSubmitted(input) {
+        emittedBusinessEvents.push(input);
       },
     },
   );
@@ -343,7 +341,10 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   assert.equal(savedAudit[0].objectType, 'bid');
   assert.equal(savedAudit[0].action, 'BidSubmitted');
   assert.equal(savedAudit[0].afterState, 'submitted');
-  assert.match(savedAudit[0].reason, /authorizationId=authorization-1/);
+  assert.match(savedAudit[0].reason, /quoteAmount=88888.00/);
+  assert.match(savedAudit[0].reason, /projectUnderstandingFileAssetId=file-understanding-1/);
+  assert.equal(emittedBusinessEvents.length, 1);
+  assert.equal(emittedBusinessEvents[0].bid.id, savedBids[0].id);
   assert.deepEqual(result, {
     bidId: savedBids[0].id,
     projectId: 'project-1',
@@ -352,10 +353,13 @@ test('bid submit writes bid truth and append-only audit, then returns accepted b
   });
 });
 
-test('bid submit fail-closes until approved bidder has frozen 4000 authorization', async () => {
+test('bid submit no longer requires 4000 authorization before validating attachments and saving bid', async () => {
+  const { BidEntity } = require('../dist/modules/bid/entities/bid.entity.js');
   const { IdentityAuditLogEntity } = require('../dist/modules/audit/identity-audit-log.entity.js');
   const { BidWriteService } = require('../dist/modules/bid/bid-write.service.js');
+  const savedBids = [];
   const savedAudit = [];
+  let attachmentsValidated = false;
   const service = new BidWriteService(
     { create(input) { return input; } },
     {
@@ -363,10 +367,22 @@ test('bid submit fail-closes until approved bidder has frozen 4000 authorization
         return createProject();
       },
     },
+    {},
     {
       async transaction(callback) {
         return callback({
           getRepository(entity) {
+            if (entity === BidEntity) {
+              return {
+                async findOneBy() {
+                  return null;
+                },
+                async save(value) {
+                  savedBids.push(value);
+                  return value;
+                },
+              };
+            }
             if (entity === IdentityAuditLogEntity) {
               return {
                 async save(value) {
@@ -375,7 +391,7 @@ test('bid submit fail-closes until approved bidder has frozen 4000 authorization
                 },
               };
             }
-            throw new Error('should not touch bid repository before pricing gate');
+            throw new Error('unexpected repository');
           },
         });
       },
@@ -411,13 +427,17 @@ test('bid submit fail-closes until approved bidder has frozen 4000 authorization
       },
     },
     {
-      async validateAndNormalize() {
-        throw new Error('should not validate attachments before pricing gate');
+      async validateAndNormalize(command) {
+        attachmentsValidated = true;
+        return command;
       },
     },
     {
       async createForSubmittedBid() {
-        throw new Error('should not seed bid before pricing gate');
+        return {
+          threadId: 'thread-1',
+          seedMessageId: 'seed-1',
+        };
       },
     },
     {
@@ -426,30 +446,24 @@ test('bid submit fail-closes until approved bidder has frozen 4000 authorization
       },
     },
     { async requireApprovedForOrganization() {} },
-    { async findOne() { return null; } },
   );
 
-  await assert.rejects(
-    () =>
-      service.submitBid(
-        {
-          projectId: 'project-1',
-          quoteAmount: 88888,
-          proposalSummary: '供应商最小报价与执行方案',
-          projectUnderstandingFileAssetId: 'file-understanding-1',
-          quoteSheetFileAssetId: 'file-quote-1',
-          schedulePlanFileAssetId: 'file-schedule-1',
-        },
-        createContext('bid-submit-pricing-blocked'),
-      ),
-    (error) => {
-      assert.equal(error?.response?.code, 'BID_SERVICE_FEE_AUTHORIZATION_REQUIRED');
-      return true;
+  const result = await service.submitBid(
+    {
+      projectId: 'project-1',
+      quoteAmount: 88888,
+      proposalSummary: '供应商最小报价与执行方案',
+      projectUnderstandingFileAssetId: 'file-understanding-1',
+      quoteSheetFileAssetId: 'file-quote-1',
+      schedulePlanFileAssetId: 'file-schedule-1',
     },
+    createContext('bid-submit-without-pricing-gate'),
   );
+  assert.equal(attachmentsValidated, true);
+  assert.equal(savedBids.length, 1);
   assert.equal(savedAudit.length, 1);
-  assert.equal(savedAudit[0].action, 'bid_submit_blocked_by_pricing_gate');
-  assert.match(savedAudit[0].reason, /requiredQuotaAmount=4000.00/);
+  assert.equal(savedAudit[0].action, 'BidSubmitted');
+  assert.equal(result.projectId, 'project-1');
 });
 
 test('bid submit rejects same organization duplicate submission with controlled conflict', async () => {
@@ -467,6 +481,7 @@ test('bid submit rejects same organization duplicate submission with controlled 
         return createProject();
       },
     },
+    {},
     {
       async transaction(callback) {
         return callback({
@@ -587,6 +602,7 @@ test('bid submit rejects malformed body and unavailable project with controlled 
         return null;
       },
     },
+    {},
     {
       async transaction() {
         throw new Error('should not start transaction');
@@ -595,6 +611,7 @@ test('bid submit rejects malformed body and unavailable project with controlled 
     { async verifyCurrentSessionContext() { throw new Error('should not verify'); } },
     { async requireBidSubmitEligibilityFromContext() { throw new Error('should not check eligibility'); } },
     { async validateAndNormalize() { throw new Error('should not validate attachments'); } },
+    { async createForSubmittedBid() { throw new Error('should not seed bid'); } },
     { toAcceptedResponse(bidId) { return { bidId }; } },
     { async requireApprovedForOrganization() { throw new Error('should not check participation'); } },
   );

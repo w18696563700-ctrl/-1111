@@ -82,6 +82,7 @@ final class CounterpartConversationBusinessCardView {
 final class CounterpartConversationProjectGroupView {
   const CounterpartConversationProjectGroupView({
     required this.projectId,
+    required this.threadId,
     required this.projectDisplayTitle,
     required this.titleVisibility,
     required this.projectRelation,
@@ -92,12 +93,14 @@ final class CounterpartConversationProjectGroupView {
     required this.latestUnreadMessageAt,
     required this.projectUnreadCount,
     required this.hasProjectUnread,
+    required this.businessTodoSummary,
     required this.orderSummary,
     required this.ratingEntry,
     required this.cards,
   });
 
   final String projectId;
+  final String threadId;
   final String projectDisplayTitle;
   final String titleVisibility;
   final String projectRelation;
@@ -108,9 +111,29 @@ final class CounterpartConversationProjectGroupView {
   final String? latestUnreadMessageAt;
   final int projectUnreadCount;
   final bool hasProjectUnread;
+  final ProjectCommunicationBusinessTodoSummaryView businessTodoSummary;
   final CounterpartConversationOrderSummaryView? orderSummary;
   final CounterpartConversationRatingEntryView? ratingEntry;
   final List<CounterpartConversationBusinessCardView> cards;
+}
+
+final class ProjectCommunicationBusinessTodoSummaryView {
+  const ProjectCommunicationBusinessTodoSummaryView({
+    required this.bidParticipationReviewPendingCount,
+    required this.publisherMaterialReviewPendingCount,
+    required this.bidMaterialReviewPendingCount,
+    required this.dealConfirmationPendingCount,
+    required this.totalPendingCount,
+  });
+
+  final int bidParticipationReviewPendingCount;
+  final int publisherMaterialReviewPendingCount;
+  final int bidMaterialReviewPendingCount;
+  final int dealConfirmationPendingCount;
+  final int totalPendingCount;
+
+  int get materialReviewPendingCount =>
+      publisherMaterialReviewPendingCount + bidMaterialReviewPendingCount;
 }
 
 final class CounterpartConversationOrderSummaryView {
@@ -203,6 +226,7 @@ final class ProjectCommunicationThreadView {
     required this.projectId,
     required this.ownerOrganizationId,
     required this.counterpartOrganizationId,
+    required this.chatAvailability,
     required this.threadState,
     required this.lastMessageId,
     required this.lastMessageAt,
@@ -214,11 +238,26 @@ final class ProjectCommunicationThreadView {
   final String projectId;
   final String ownerOrganizationId;
   final String counterpartOrganizationId;
+  final ProjectCommunicationChatAvailabilityView chatAvailability;
   final String threadState;
   final String? lastMessageId;
   final String? lastMessageAt;
   final String createdAt;
   final String updatedAt;
+}
+
+final class ProjectCommunicationChatAvailabilityView {
+  const ProjectCommunicationChatAvailabilityView({
+    required this.canSendMessage,
+    required this.lockReasonCode,
+    required this.lockReasonText,
+    required this.requiredNextAction,
+  });
+
+  final bool canSendMessage;
+  final String? lockReasonCode;
+  final String? lockReasonText;
+  final String requiredNextAction;
 }
 
 final class ProjectCommunicationMessageView {
@@ -233,6 +272,11 @@ final class ProjectCommunicationMessageView {
     required this.body,
     required this.attachment,
     required this.confirmation,
+    required this.eventType,
+    required this.sourceType,
+    required this.sourceId,
+    required this.requiredNextAction,
+    required this.routeTarget,
     required this.clientMessageId,
     required this.messageState,
     required this.deliveryState,
@@ -251,12 +295,32 @@ final class ProjectCommunicationMessageView {
   final String body;
   final ProjectCommunicationAttachmentView? attachment;
   final ProjectCommunicationConfirmationView? confirmation;
+  final String? eventType;
+  final String? sourceType;
+  final String? sourceId;
+  final String? requiredNextAction;
+  final MessageInteractionRouteTarget? routeTarget;
   final String? clientMessageId;
   final String messageState;
   final String deliveryState;
   final String readState;
   final String? readByCounterpartAt;
   final String createdAt;
+
+  bool get isServiceFeeAuthorizationPrompt {
+    return eventType ==
+            'bid_materials_confirmed_service_fee_authorization_required' &&
+        requiredNextAction == 'complete_service_fee_authorization';
+  }
+
+  bool get isPublisherMaterialReReviewPrompt {
+    return eventType == 'publisher_material_supplement_submitted' &&
+        requiredNextAction == 're_review_material';
+  }
+
+  bool get hasBusinessActionPrompt {
+    return isServiceFeeAuthorizationPrompt || isPublisherMaterialReReviewPrompt;
+  }
 }
 
 final class ProjectCommunicationAttachmentView {
@@ -374,6 +438,8 @@ final class ProjectCommunicationWorkbenchView {
     required this.projectId,
     required this.threadId,
     required this.viewerRole,
+    required this.businessTodoSummary,
+    required this.chatAvailability,
     required this.entries,
     required this.generatedAt,
   });
@@ -381,6 +447,8 @@ final class ProjectCommunicationWorkbenchView {
   final String projectId;
   final String threadId;
   final String viewerRole;
+  final ProjectCommunicationBusinessTodoSummaryView businessTodoSummary;
+  final ProjectCommunicationChatAvailabilityView chatAvailability;
   final List<ProjectCommunicationWorkbenchEntryView> entries;
   final String generatedAt;
 }
@@ -400,6 +468,8 @@ final class ProjectCommunicationWorkbenchEntryView {
     required this.reviewState,
     required this.actionState,
     required this.attachmentCount,
+    required this.badgeCount,
+    required this.disabledReason,
     required this.sourceFiles,
     required this.latestFeedbackText,
     required this.latestFeedbackAt,
@@ -421,6 +491,8 @@ final class ProjectCommunicationWorkbenchEntryView {
   final String? reviewState;
   final String actionState;
   final int attachmentCount;
+  final int badgeCount;
+  final String? disabledReason;
   final List<ProjectCommunicationWorkbenchSourceFileView> sourceFiles;
   final String? latestFeedbackText;
   final String? latestFeedbackAt;

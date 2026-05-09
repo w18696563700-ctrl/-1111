@@ -16,11 +16,11 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
       children: <Widget>[
         if (selection != null) ...<Widget>[
           if (selection.winningBidId != null)
-            const _DetailLine(label: '已选竞标', value: '已确认'),
+            const _DetailLine(label: '已选竞标', value: '已选择'),
           if (selection.orderId != null)
             const _DetailLine(label: '后续承接锚点', value: '已生成'),
           if (selection.contractId != null)
-            const _DetailLine(label: '合同记录', value: '已生成'),
+            const _DetailLine(label: '合同承接锚点', value: '已生成'),
         ],
         const SizedBox(height: 12),
         if (candidates.isEmpty)
@@ -53,14 +53,14 @@ extension _ProjectBidSelectionSupport on _ProjectDetailPageState {
           detailLines: <Widget>[
             if (candidate.quoteAmount != null)
               _DetailLine(
-                label: '报价',
+                label: '竞标报价',
                 value: _currencyText(candidate.quoteAmount),
                 highlight: true,
               ),
             if (candidate.submittedAt != null)
               _DetailLine(label: '提交时间', value: candidate.submittedAt!),
           ],
-          actionLabel: canSelect ? '确认合作并生成订单' : null,
+          actionLabel: canSelect ? '选择合作方并生成承接锚点' : null,
           onPressed: canSelect
               ? () => _showBidSelectionConfirmSheet(
                   projectId: projectId,
@@ -177,15 +177,14 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
       _lastResult = null;
     });
 
-    final result = await ExhibitionConsumerLayer.instance
-        .selectBidAndCreateOrder(
-          BidSelectAndCreateOrderCommand(
-            projectId: widget.projectId,
-            winningBidId: widget.candidate.bidId,
-            reasonCode: 'publisher_selected_partner',
-            reasonText: reasonText,
-          ),
-        );
+    final result = await ExhibitionConsumerLayer.instance.awardBid(
+      BidAwardCommand(
+        projectId: widget.projectId,
+        winningBidId: widget.candidate.bidId,
+        reasonCode: 'publisher_selected_partner',
+        reasonText: reasonText,
+      ),
+    );
 
     if (result.isSuccess) {
       await widget.onAccepted();
@@ -203,7 +202,7 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
     setState(() {
       _lastResult = ExhibitionActionResult(
         method: 'POST',
-        path: ExhibitionCanonicalPaths.bidSelectAndCreateOrder,
+        path: ExhibitionCanonicalPaths.bidAward,
         isSuccess: false,
         controlledState: AppPageState.errorNonRetryable,
         message: message,
@@ -244,7 +243,7 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
                   ],
                   if (widget.candidate.quoteAmount != null)
                     _DetailLine(
-                      label: '报价',
+                      label: '竞标报价',
                       value: _currencyText(widget.candidate.quoteAmount),
                       highlight: true,
                     ),
@@ -265,7 +264,9 @@ class _ProjectBidSelectionSheetState extends State<_ProjectBidSelectionSheet> {
                     key: const ValueKey<String>('project_bid_select_submit'),
                     onPressed: _submitting ? null : _submit,
                     icon: const Icon(Icons.handshake_rounded),
-                    label: Text(_submitting ? '提交中...' : '确认合作并生成订单'),
+                    label: Text(
+                      _submitting ? '提交中...' : '选择合作方并生成承接锚点',
+                    ),
                   ),
                 ],
               ),

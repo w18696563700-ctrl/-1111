@@ -3,6 +3,8 @@ import 'package:mobile/features/exhibition/data/p0_pay_read_only_summary.dart';
 import 'package:mobile/features/messages/data/messages_interaction_models.dart';
 import 'package:mobile/features/messages/data/messages_registered_entry_registry.dart';
 
+const String _missingProjectContextMessage = '无法进入项目沟通，缺少项目上下文，请返回项目列表重新进入。';
+
 const Set<String> _counterpartCardTypes = <String>{
   'project_name_access_request',
   'bid_participation_request',
@@ -293,10 +295,10 @@ Object _parseRouteTarget(Object? raw) {
     params as Map<String, String>,
   );
   if (routeLocation == null) {
-    return 'message interaction routeTarget failed to build local route location';
+    return _missingProjectContextMessage;
   }
   if (routeLocation.startsWith('routeTarget.')) {
-    return routeLocation;
+    return _missingProjectContextMessage;
   }
 
   return MessageInteractionRouteTarget(
@@ -310,14 +312,14 @@ Object _parseRouteTarget(Object? raw) {
 
 Object _parseRouteParams(Object? raw) {
   if (raw is! Map) {
-    return 'message interaction routeTarget.params must be an object';
+    return _missingProjectContextMessage;
   }
   final params = <String, String>{};
   for (final entry in raw.entries) {
     final key = '${entry.key}'.trim();
     final value = _readNullableString(entry.value);
     if (key.isEmpty || value == null || value.trim().isEmpty) {
-      return 'message interaction routeTarget.params must contain only non-empty strings';
+      return _missingProjectContextMessage;
     }
     params[key] = value;
   }

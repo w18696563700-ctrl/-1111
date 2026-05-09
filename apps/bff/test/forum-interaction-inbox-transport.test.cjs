@@ -14,6 +14,7 @@ const { NestFactory } = require('@nestjs/core');
 
 const { AppForumController } = require('../src/routes/forum/app-forum.controller.ts');
 const { ForumAuthorProfileService } = require('../src/routes/forum/forum-author-profile.service.ts');
+const { ForumDraftDeleteService } = require('../src/routes/forum/forum-draft-delete.service.ts');
 const { ForumDraftOpenService } = require('../src/routes/forum/forum-draft-open.service.ts');
 const { ForumInteractionInboxService } = require('../src/routes/forum/forum-interaction-inbox.service.ts');
 const { ForumInteractionService } = require('../src/routes/forum/forum-interaction.service.ts');
@@ -62,6 +63,7 @@ test('forum interaction inbox app route is materialized and calls BFF inbox serv
       { provide: ForumInteractionService, useValue: {} },
       { provide: ForumInteractionInboxService, useValue: inboxService },
       { provide: ForumDraftOpenService, useValue: {} },
+      { provide: ForumDraftDeleteService, useValue: {} },
       { provide: ForumOwnPostContinuityService, useValue: {} },
       { provide: ForumReportMineService, useValue: {} },
     ],

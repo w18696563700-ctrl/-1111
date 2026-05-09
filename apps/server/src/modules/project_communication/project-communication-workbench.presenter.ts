@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { ProjectCommunicationMaterialReviewEntity } from './entities/project-communication-material-review.entity';
 import type {
+  ProjectCommunicationBusinessTodoSummary,
+  ProjectCommunicationChatAvailability
+} from './project-communication-business-state.service';
+import type {
   ProjectCommunicationWorkbenchActionState,
   ProjectCommunicationWorkbenchAvailabilityState,
   ProjectCommunicationWorkbenchEntryDefinition,
@@ -23,6 +27,8 @@ export type ProjectCommunicationWorkbenchEntryProjection = {
   reviewerOrganizationId: string | null;
   sourceVersionToken: string | null;
   sourceFiles: ProjectCommunicationWorkbenchSourceFileProjection[];
+  badgeCount: number;
+  disabledReason: string | null;
 };
 
 export type ProjectCommunicationWorkbenchSourceFileProjection = {
@@ -38,6 +44,8 @@ export class ProjectCommunicationWorkbenchPresenter {
     projectId: string;
     threadId: string;
     viewerRole: ProjectCommunicationWorkbenchViewerRole;
+    businessTodoSummary: ProjectCommunicationBusinessTodoSummary;
+    chatAvailability: ProjectCommunicationChatAvailability;
     entries: ProjectCommunicationWorkbenchEntryProjection[];
     generatedAt?: Date;
   }) {
@@ -45,6 +53,8 @@ export class ProjectCommunicationWorkbenchPresenter {
       projectId: input.projectId,
       threadId: input.threadId,
       viewerRole: input.viewerRole,
+      businessTodoSummary: input.businessTodoSummary,
+      chatAvailability: input.chatAvailability,
       entries: input.entries.map((entry) => this.toEntry(entry)),
       generatedAt: (input.generatedAt ?? new Date()).toISOString()
     };
@@ -83,6 +93,8 @@ export class ProjectCommunicationWorkbenchPresenter {
       reviewState: input.reviewState,
       actionState: input.actionState,
       attachmentCount: input.attachmentCount,
+      badgeCount: input.badgeCount,
+      disabledReason: input.disabledReason,
       sourceFiles: input.sourceFiles.map((file) => ({
         fileAssetId: file.fileAssetId,
         fileName: file.fileName,

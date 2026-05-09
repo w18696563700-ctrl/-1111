@@ -48,6 +48,19 @@ export class BidPresenter {
     };
   }
 
+  toSupplementAcceptedResponse(input: {
+    bidId: string;
+    projectId: string;
+    entryKey: string;
+  }) {
+    return {
+      bidId: input.bidId,
+      projectId: input.projectId,
+      entryKey: input.entryKey,
+      reviewState: 'pending_review'
+    };
+  }
+
   toSeatReleaseResponse(seat: BidSeatEntity) {
     return {
       seatId: seat.seatId,

@@ -20,6 +20,7 @@ const PAY_CHANNELS = new Set(['alipay_candidate', 'wechat_candidate', 'other_can
 const RESULT_ACTIONS = new Set(['select_factory', 'close_without_deal', 'cancel_project']);
 const CONFIRMATION_ROLES = new Set(['publisher', 'factory']);
 const FREEZE_FEEDBACK_CHOICES = new Set(['support_freeze', 'oppose_freeze']);
+const BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT = 4000;
 
 @Injectable()
 export class ExhibitionP0PayPayloadService {
@@ -107,7 +108,7 @@ export class ExhibitionP0PayPayloadService {
   toBidServiceFeeAuthorizationPayload(value: unknown, idempotencyKey?: string) {
     const source = this.requireRecord(value);
     const expectedAmount = this.readMoney(source.expectedAmount, 'expectedAmount');
-    if (Number(expectedAmount) !== 4000) {
+    if (Number(expectedAmount) !== BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT) {
       throw this.badRequest('Bid service fee authorization quota must be 4000.00 CNY.');
     }
     return {
@@ -245,6 +246,10 @@ export class ExhibitionP0PayPayloadService {
       currency: this.readCurrency(source.currency),
       contractFileAssetIds: this.readStringArray(source.contractFileAssetIds, 'contractFileAssetIds'),
       confirmationRole: this.readEnum(source.confirmationRole, CONFIRMATION_ROLES, 'confirmationRole'),
+      platformServiceFeeRecalculationAwarenessConfirmed: this.readConfirmed(
+        source.platformServiceFeeRecalculationAwarenessConfirmed,
+        'platformServiceFeeRecalculationAwarenessConfirmed',
+      ),
       idempotencyKey: this.readIdempotencyKey(source.idempotencyKey, idempotencyKey),
     };
   }

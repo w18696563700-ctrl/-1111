@@ -90,11 +90,30 @@ ExhibitionMobileApp _buildApp({
     messagesConsumerLayer: MessagesConsumerLayer(client: _client(transport)),
     counterpartConversationConsumerLayer: CounterpartConversationConsumerLayer(
       client: _client(transport),
+      realtimeClient: const _NoopProjectCommunicationRealtimeClient(),
     ),
     forumConsumerLayer: forumConsumerLayer ?? _forumConsumer(),
     profileConsumerLayer: _profileConsumer(),
     sessionStore: sessionStore,
   );
+}
+
+final class _NoopProjectCommunicationRealtimeClient
+    implements ProjectCommunicationRealtimeClient {
+  const _NoopProjectCommunicationRealtimeClient();
+
+  @override
+  Future<ProjectCommunicationRealtimeSubscription> subscribe({
+    required String threadId,
+    required String projectId,
+    required String counterpartOrganizationId,
+  }) async {
+    return ProjectCommunicationRealtimeSubscription(
+      events: const Stream<ProjectCommunicationMessageCreatedEvent>.empty(),
+      done: Future<void>.value(),
+      close: () async {},
+    );
+  }
 }
 
 Map<String, Object?> _projectPayload({
@@ -159,6 +178,7 @@ Map<String, Object?> _projectInteractionItem() {
       'params': <String, Object?>{
         'conversationId': 'org-requester-1',
         'projectId': 'project-1',
+        'threadId': 'request-1',
       },
     },
   };
@@ -185,6 +205,7 @@ Map<String, Object?> _counterpartConversationDetailPayload() {
     'projectGroups': <Object?>[
       <String, Object?>{
         'projectId': 'project-1',
+        'threadId': 'request-1',
         'projectDisplayTitle': '项目名称需申请查看',
         'titleVisibility': 'masked',
         'projectState': 'published',
@@ -222,6 +243,49 @@ Map<String, Object?> _counterpartConversationDetailPayload() {
         ],
       },
     ],
+  };
+}
+
+Map<String, Object?> _projectCommunicationThreadPayload() {
+  return const <String, Object?>{
+    'threadId': 'request-1',
+    'projectId': 'project-1',
+    'ownerOrganizationId': 'org-owner',
+    'counterpartOrganizationId': 'org-requester-1',
+    'chatAvailability': <String, Object?>{
+      'canSendMessage': false,
+      'lockReasonCode': 'bid_participation_review_pending',
+      'lockReasonText': '请先处理参与竞标申请。',
+      'requiredNextAction': 'review_bid_participation',
+    },
+    'threadState': 'active',
+    'lastMessageId': null,
+    'lastMessageAt': null,
+    'createdAt': '2026-04-24T10:00:00Z',
+    'updatedAt': '2026-04-24T10:00:00Z',
+  };
+}
+
+Map<String, Object?> _projectCommunicationWorkbenchPayload() {
+  return const <String, Object?>{
+    'projectId': 'project-1',
+    'threadId': 'request-1',
+    'viewerRole': 'publisher',
+    'businessTodoSummary': <String, Object?>{
+      'bidParticipationReviewPendingCount': 1,
+      'publisherMaterialReviewPendingCount': 0,
+      'bidMaterialReviewPendingCount': 0,
+      'dealConfirmationPendingCount': 0,
+      'totalPendingCount': 1,
+    },
+    'chatAvailability': <String, Object?>{
+      'canSendMessage': false,
+      'lockReasonCode': 'bid_participation_review_pending',
+      'lockReasonText': '请先处理参与竞标申请。',
+      'requiredNextAction': 'review_bid_participation',
+    },
+    'entries': <Object?>[],
+    'generatedAt': '2026-04-24T10:00:00Z',
   };
 }
 
@@ -543,6 +607,35 @@ void main() {
                 body: _counterpartConversationDetailPayload(),
               );
             },
+        'GET /api/app/message/project-communication/thread':
+            (AppApiRequest request) async {
+              expect(request.uri.queryParameters['projectId'], 'project-1');
+              expect(request.uri.queryParameters['threadId'], 'request-1');
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _projectCommunicationThreadPayload(),
+              );
+            },
+        'GET /api/app/message/project-communication/messages':
+            (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: const <String, Object?>{
+                  'items': <Object?>[],
+                  'nextCursor': null,
+                },
+              );
+            },
+        'GET /api/app/message/project-communication/workbench':
+            (AppApiRequest request) async {
+              return AppApiResponse(
+                statusCode: 200,
+                uri: request.uri,
+                body: _projectCommunicationWorkbenchPayload(),
+              );
+            },
         'GET /api/app/project/bid-participation/thread/detail':
             (AppApiRequest request) async {
               threadLoadCount += 1;
@@ -582,19 +675,16 @@ void main() {
 
     expect(find.text('项目沟通'), findsOneWidget);
     expect(find.text('重庆搭建公司'), findsOneWidget);
-    expect(find.widgetWithText(FilledButton, '进入项目沟通'), findsOneWidget);
+    expect(find.widgetWithText(FilledButton, '进入项目沟通'), findsNothing);
 
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '进入项目沟通'));
+    await _tapVisible(tester, find.text('重庆搭建公司').first);
 
     expect(find.text('项目名称需申请查看'), findsOneWidget);
-    expect(find.text('项目列表'), findsOneWidget);
+    expect(find.text('项目列表'), findsNothing);
+    expect(find.widgetWithText(OutlinedButton, '进入审核'), findsOneWidget);
     expect(find.text('参与竞标申请'), findsNothing);
 
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '进入沟通'));
-
-    expect(find.text('项目工作入口'), findsOneWidget);
-
-    await _tapVisible(tester, find.widgetWithText(FilledButton, '进入审核'));
+    await _tapVisible(tester, find.widgetWithText(OutlinedButton, '进入审核'));
 
     expect(find.text('参与竞标申请'), findsWidgets);
     expect(

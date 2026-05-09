@@ -10,6 +10,7 @@ class ForumDraftsPage extends StatefulWidget {
 class _ForumDraftsPageState extends State<ForumDraftsPage> {
   ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>? _result;
   final Set<String> _deletingDraftIds = <String>{};
+  final Set<String> _publishingDraftIds = <String>{};
   bool _loading = true;
 
   @override
@@ -31,7 +32,8 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
   }
 
   Future<void> _deleteDraft(ForumDraftCardView draft) async {
-    if (_deletingDraftIds.contains(draft.draftId)) {
+    if (_deletingDraftIds.contains(draft.draftId) ||
+        _publishingDraftIds.contains(draft.draftId)) {
       return;
     }
 
@@ -49,24 +51,59 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
       return;
     }
 
-    final current = _result;
-    if (current?.data != null) {
-      final remaining = current!.data!.items
-          .where((ForumDraftCardView item) => item.draftId != draft.draftId)
-          .toList(growable: false);
-      setState(() {
-        _result = ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>(
-          state: remaining.isEmpty ? AppPageState.empty : AppPageState.content,
-          method: current.method,
-          path: current.path,
-          data: ForumPagedCollectionView<ForumDraftCardView>(
-            items: remaining,
-            page: current.data!.page,
-          ),
-        );
-      });
-    }
+    _removeDraftFromResult(draft.draftId);
     await _load();
+  }
+
+  Future<void> _publishDraft(ForumDraftCardView draft) async {
+    if (!_canPublishDraft(draft) ||
+        _publishingDraftIds.contains(draft.draftId) ||
+        _deletingDraftIds.contains(draft.draftId)) {
+      return;
+    }
+
+    setState(() => _publishingDraftIds.add(draft.draftId));
+    final result = await ForumConsumerLayer.instance.publishDraft(
+      draftId: draft.draftId,
+    );
+    if (!mounted) {
+      return;
+    }
+    setState(() => _publishingDraftIds.remove(draft.draftId));
+
+    if (!result.isSuccess || result.data == null) {
+      _showDraftMessage(result.message);
+      return;
+    }
+
+    _removeDraftFromResult(draft.draftId);
+    final plan = await _resolveForumPublishContinuation(result.data!);
+    if (!mounted) {
+      return;
+    }
+    _showDraftMessage(plan.message);
+    Navigator.of(context).pushReplacementNamed(plan.routeName);
+  }
+
+  void _removeDraftFromResult(String draftId) {
+    final current = _result;
+    if (current?.data == null) {
+      return;
+    }
+    final remaining = current!.data!.items
+        .where((ForumDraftCardView item) => item.draftId != draftId)
+        .toList(growable: false);
+    setState(() {
+      _result = ForumReadResult<ForumPagedCollectionView<ForumDraftCardView>>(
+        state: remaining.isEmpty ? AppPageState.empty : AppPageState.content,
+        method: current.method,
+        path: current.path,
+        data: ForumPagedCollectionView<ForumDraftCardView>(
+          items: remaining,
+          page: current.data!.page,
+        ),
+      );
+    });
   }
 
   void _showDraftMessage(String? message) {
@@ -129,17 +166,25 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
               (ForumDraftCardView draft) => Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _ForumSwipeDeleteCard(
-                  enabled: !_deletingDraftIds.contains(draft.draftId),
+                  enabled:
+                      !_deletingDraftIds.contains(draft.draftId) &&
+                      !_publishingDraftIds.contains(draft.draftId),
                   onDelete: () => _deleteDraft(draft),
                   child: _ForumDraftListCard(
                     draft: draft,
                     onOpen: () => Navigator.of(context).pushNamed(
                       ExhibitionRoutes.forumPublishWithDraftId(draft.draftId),
                     ),
+                    onPublish: _canPublishDraft(draft)
+                        ? () => _publishDraft(draft)
+                        : null,
+                    publishing: _publishingDraftIds.contains(draft.draftId),
                     actionLabel: _deletingDraftIds.contains(draft.draftId)
                         ? '删除中'
                         : null,
-                    actionEnabled: !_deletingDraftIds.contains(draft.draftId),
+                    actionEnabled:
+                        !_deletingDraftIds.contains(draft.draftId) &&
+                        !_publishingDraftIds.contains(draft.draftId),
                   ),
                 ),
               ),
@@ -150,6 +195,10 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
       ),
     );
   }
+}
+
+bool _canPublishDraft(ForumDraftCardView draft) {
+  return draft.state.trim() == 'ready_to_publish';
 }
 
 class _ForumSwipeDeleteCard extends StatefulWidget {
@@ -293,12 +342,16 @@ class _ForumDraftListCard extends StatelessWidget {
   const _ForumDraftListCard({
     required this.draft,
     required this.onOpen,
+    required this.onPublish,
+    required this.publishing,
     this.actionLabel,
     this.actionEnabled = true,
   });
 
   final ForumDraftCardView draft;
   final VoidCallback onOpen;
+  final VoidCallback? onPublish;
+  final bool publishing;
   final String? actionLabel;
   final bool actionEnabled;
 
@@ -361,6 +414,25 @@ class _ForumDraftListCard extends StatelessWidget {
               Text(
                 '更新于 ${_compactPublishedAt(draft.updatedAt)}',
                 style: AppTextTokens.caption,
+              ),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 10,
+                runSpacing: 8,
+                children: <Widget>[
+                  AppPrimaryButton(
+                    icon: publishing
+                        ? Icons.hourglass_top_rounded
+                        : Icons.send_rounded,
+                    label: publishing ? '发布中' : '发布帖子',
+                    onPressed: publishing ? null : onPublish,
+                  ),
+                  AppSecondaryButton(
+                    icon: Icons.edit_outlined,
+                    label: '继续编辑',
+                    onPressed: actionEnabled ? onOpen : null,
+                  ),
+                ],
               ),
             ],
           ),

@@ -41,6 +41,7 @@ void main() {
             'params': const <String, Object?>{
               'conversationId': 'conversation-1',
               'projectId': 'project-1',
+              'threadId': 'thread-1',
             },
           },
         },
@@ -79,6 +80,7 @@ void main() {
       'projectGroups': <Object?>[
         <String, Object?>{
           'projectId': 'project-1',
+          'threadId': 'thread-1',
           'projectDisplayTitle': '西洽会 - 泸州',
           'titleVisibility': 'visible',
           'projectRelation': 'my_published',
@@ -89,6 +91,39 @@ void main() {
           'latestUnreadMessageAt': '2026-05-04T10:03:00Z',
           'projectUnreadCount': 3,
           'hasProjectUnread': true,
+          'businessTodoSummary': _businessTodoSummary(
+            bidParticipationReviewPendingCount: 2,
+          ),
+          'cards': const <Object?>[],
+        },
+        <String, Object?>{
+          'projectId': 'project-2',
+          'threadId': 'thread-2',
+          'projectDisplayTitle': '西洽会 - 成都',
+          'titleVisibility': 'visible',
+          'projectRelation': 'my_bid',
+          'projectState': 'published',
+          'projectPublishedAt': '2026-05-02T18:00:00Z',
+          'projectUpdatedAt': '2026-05-04T09:30:00Z',
+          'latestActivityAt': '2026-05-04T09:30:00Z',
+          'projectUnreadCount': 2,
+          'hasProjectUnread': true,
+          'businessTodoSummary': _businessTodoSummary(),
+          'cards': const <Object?>[],
+        },
+        <String, Object?>{
+          'projectId': 'project-3',
+          'threadId': 'thread-3',
+          'projectDisplayTitle': '身份待确认项目',
+          'titleVisibility': 'visible',
+          'projectRelation': 'unknown',
+          'projectState': 'published',
+          'projectPublishedAt': '2026-05-03T18:00:00Z',
+          'projectUpdatedAt': '2026-05-04T08:30:00Z',
+          'latestActivityAt': '2026-05-04T08:30:00Z',
+          'projectUnreadCount': 0,
+          'hasProjectUnread': false,
+          'businessTodoSummary': _businessTodoSummary(),
           'cards': const <Object?>[],
         },
       ],
@@ -98,13 +133,84 @@ void main() {
     expect(detail.hasUnread, isTrue);
     expect(detail.myPublishedUnreadCount, 3);
     expect(detail.myBidUnreadCount, 2);
-    expect(detail.projectGroups.single.projectUnreadCount, 3);
-    expect(detail.projectGroups.single.hasProjectUnread, isTrue);
     expect(
-      detail.projectGroups.single.latestUnreadMessageAt,
+      detail.projectGroups.map((group) => group.projectRelation),
+      containsAllInOrder(<String>['my_published', 'my_bid', 'unknown']),
+    );
+    expect(detail.projectGroups.first.projectUnreadCount, 3);
+    expect(detail.projectGroups.first.hasProjectUnread, isTrue);
+    expect(detail.projectGroups.first.threadId, 'thread-1');
+    expect(detail.projectGroups.first.businessTodoSummary.totalPendingCount, 2);
+    expect(detail.projectGroups[1].projectUnreadCount, 2);
+    expect(detail.projectGroups[1].businessTodoSummary.totalPendingCount, 0);
+    expect(
+      detail.projectGroups.first.latestUnreadMessageAt,
       '2026-05-04T10:03:00Z',
     );
   });
+
+  test('counterpart detail tolerates legacy missing business todo summary', () {
+    final detail = parseCounterpartConversationDetail(<String, Object?>{
+      'conversationId': 'conversation-legacy',
+      'counterpart': const <String, Object?>{
+        'organizationId': 'org-counterpart',
+        'displayName': '江北嘴嘴帅',
+        'companyName': '重庆展宏展览展示有限公司',
+        'role': 'counterpart',
+      },
+      'summary': const <String, Object?>{
+        'focusProjectId': 'project-legacy',
+        'title': '项目沟通',
+        'text': '有新的项目消息。',
+        'projectCount': 1,
+        'latestCardType': 'project_order',
+      },
+      'focusProjectId': 'project-legacy',
+      'latestActivityAt': '2026-05-04T10:04:00Z',
+      'projectGroups': const <Object?>[
+        <String, Object?>{
+          'projectId': 'project-legacy',
+          'threadId': 'thread-legacy',
+          'projectDisplayTitle': '旧云端项目',
+          'titleVisibility': 'visible',
+          'projectRelation': 'my_published',
+          'projectState': 'published',
+          'latestActivityAt': '2026-05-04T10:04:00Z',
+          'projectUnreadCount': 1,
+          'hasProjectUnread': true,
+          'cards': <Object?>[],
+        },
+      ],
+    });
+
+    final summary = detail.projectGroups.single.businessTodoSummary;
+    expect(summary.totalPendingCount, 0);
+    expect(summary.bidParticipationReviewPendingCount, 0);
+    expect(summary.publisherMaterialReviewPendingCount, 0);
+    expect(summary.bidMaterialReviewPendingCount, 0);
+    expect(summary.dealConfirmationPendingCount, 0);
+  });
+
+  test(
+    'legacy project communication thread stays locked without chat availability',
+    () {
+      final thread = parseProjectCommunicationThread(const <String, Object?>{
+        'threadId': 'thread-legacy',
+        'projectId': 'project-legacy',
+        'ownerOrganizationId': 'org-owner',
+        'counterpartOrganizationId': 'org-counterpart',
+        'threadState': 'open',
+        'lastMessageId': null,
+        'lastMessageAt': null,
+        'createdAt': '2026-05-04T10:04:00Z',
+        'updatedAt': '2026-05-04T10:04:00Z',
+      });
+
+      expect(thread.chatAvailability.canSendMessage, isFalse);
+      expect(thread.chatAvailability.requiredNextAction, 'none');
+      expect(thread.chatAvailability.lockReasonText, '当前项目沟通状态正在同步，请稍后重试。');
+    },
+  );
 
   test('project communication message status fields default safely', () {
     final message = parseProjectCommunicationMessage(<String, Object?>{
@@ -150,4 +256,53 @@ void main() {
     expect(messages.items.single.readState, 'read_by_counterpart');
     expect(messages.items.single.readByCounterpartAt, '2026-05-04T10:01:00Z');
   });
+
+  test(
+    'project communication message accepts publisher material re-review action',
+    () {
+      final message = parseProjectCommunicationMessage(<String, Object?>{
+        'messageId': 'message-1',
+        'threadId': 'thread-1',
+        'projectId': 'project-1',
+        'senderUserId': 'user-1',
+        'senderOrganizationId': 'org-1',
+        'messageKind': 'text',
+        'body': '发布方已补充服务清单，请重新预览确认。',
+        'payload': <String, Object?>{
+          'eventType': 'publisher_material_supplement_submitted',
+          'sourceType': 'project_attachment_supplement',
+          'requiredNextAction': 're_review_material',
+        },
+        'messageState': 'active',
+        'deliveryState': 'persisted',
+        'readState': 'not_applicable',
+        'readByCounterpartAt': null,
+        'createdAt': '2026-05-04T10:00:00Z',
+      });
+
+      expect(message.requiredNextAction, 're_review_material');
+      expect(message.isPublisherMaterialReReviewPrompt, isTrue);
+      expect(message.hasBusinessActionPrompt, isTrue);
+    },
+  );
+}
+
+Map<String, Object?> _businessTodoSummary({
+  int bidParticipationReviewPendingCount = 0,
+  int publisherMaterialReviewPendingCount = 0,
+  int bidMaterialReviewPendingCount = 0,
+  int dealConfirmationPendingCount = 0,
+}) {
+  final total =
+      bidParticipationReviewPendingCount +
+      publisherMaterialReviewPendingCount +
+      bidMaterialReviewPendingCount +
+      dealConfirmationPendingCount;
+  return <String, Object?>{
+    'bidParticipationReviewPendingCount': bidParticipationReviewPendingCount,
+    'publisherMaterialReviewPendingCount': publisherMaterialReviewPendingCount,
+    'bidMaterialReviewPendingCount': bidMaterialReviewPendingCount,
+    'dealConfirmationPendingCount': dealConfirmationPendingCount,
+    'totalPendingCount': total,
+  };
 }

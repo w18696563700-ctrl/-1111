@@ -53,6 +53,32 @@ class AppShellContextData {
     );
   }
 
+  AppShellContextData copyWith({Map<String, Object?>? unreadSummary}) {
+    return AppShellContextData(
+      userId: userId,
+      displayName: displayName,
+      avatarUrl: avatarUrl,
+      organizationId: organizationId,
+      organizationType: organizationType,
+      roleKeys: roleKeys,
+      certificationStatus: certificationStatus,
+      personalCertificationStatus: personalCertificationStatus,
+      personalCertificationQualified: personalCertificationQualified,
+      personalCertificationLockedToOtherActor:
+          personalCertificationLockedToOtherActor,
+      membershipStatus: membershipStatus,
+      projectCreateEligibility: projectCreateEligibility,
+      paidMembershipTier: paidMembershipTier,
+      paidMembershipEntitlementsSummary: paidMembershipEntitlementsSummary,
+      paidMembershipQuotaSummary: paidMembershipQuotaSummary,
+      paidMembershipNextRefreshAt: paidMembershipNextRefreshAt,
+      visibleBuildings: visibleBuildings,
+      featureFlagsVersion: featureFlagsVersion,
+      unreadSummary: unreadSummary ?? this.unreadSummary,
+      myBuildingProjection: myBuildingProjection,
+    );
+  }
+
   final String? userId;
   final String? displayName;
   final String? avatarUrl;

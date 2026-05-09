@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Optional } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
@@ -9,6 +9,7 @@ import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { authPermissionInsufficient } from '../organization/organization-auth.errors';
 import { ProjectEntity } from './entities/project.entity';
+import { ProjectCommunicationBusinessEventService } from '../project_communication/project-communication-business-event.service';
 import { ProjectAttachmentEntity } from './entities/project-attachment.entity';
 import {
   projectAttachmentDuplicate,
@@ -63,7 +64,9 @@ export class ProjectAttachmentService {
     private readonly auditService: ProjectPublishAuditService,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
-    private readonly presenter: ProjectAttachmentPresenter
+    private readonly presenter: ProjectAttachmentPresenter,
+    @Optional()
+    private readonly projectCommunicationBusinessEventService?: ProjectCommunicationBusinessEventService
   ) {}
 
   async list(projectId: string, context: RequestContext) {
@@ -150,6 +153,14 @@ export class ProjectAttachmentService {
         context,
         manager
       );
+
+      await this.projectCommunicationBusinessEventService?.emitPublisherMaterialSupplementSubmitted({
+        manager,
+        project,
+        attachment,
+        actorUserId: currentSession.userId || currentSession.actorId,
+        actorId: currentSession.actorId
+      });
 
       return this.presenter.toReadModel(attachment);
     });

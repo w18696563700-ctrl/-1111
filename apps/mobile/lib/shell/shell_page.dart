@@ -41,14 +41,19 @@ class _PersistentShellPage extends StatefulWidget {
 class _PersistentShellPageState extends State<_PersistentShellPage>
     with SingleTickerProviderStateMixin {
   static const Duration _messagesAutoRefreshInterval = Duration(seconds: 3);
+  static const Duration _shellContextAutoRefreshInterval = Duration(
+    seconds: 20,
+  );
   final Map<AppBuilding, Widget> _cachedPages = <AppBuilding, Widget>{};
   final Set<AppBuilding> _activatedBottomBuildings = <AppBuilding>{};
   final ValueNotifier<int> _messagesRefreshSignal = ValueNotifier<int>(0);
   final ValueNotifier<int> _messagesEntrySignal = ValueNotifier<int>(0);
   late final AnimationController _rootBuildingTransitionController;
   Timer? _messagesRefreshTimer;
+  Timer? _shellContextRefreshTimer;
   late AppBuilding _currentBuilding = widget.initialBuilding;
   int _rootBuildingTransitionDirection = 0;
+  bool _shellContextRefreshing = false;
 
   @override
   void initState() {
@@ -60,11 +65,13 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
     );
     _activateBuilding(_currentBuilding);
     _syncMessagesRefreshTimer();
+    _startShellContextRefreshTimer();
   }
 
   @override
   void dispose() {
     _messagesRefreshTimer?.cancel();
+    _shellContextRefreshTimer?.cancel();
     _rootBuildingTransitionController.dispose();
     _messagesRefreshSignal.dispose();
     _messagesEntrySignal.dispose();
@@ -134,6 +141,25 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
     });
   }
 
+  void _startShellContextRefreshTimer() {
+    _shellContextRefreshTimer ??= Timer.periodic(
+      _shellContextAutoRefreshInterval,
+      (_) => _refreshShellContextForUnreadBadge(),
+    );
+  }
+
+  Future<void> _refreshShellContextForUnreadBadge() async {
+    if (!mounted || _shellContextRefreshing) {
+      return;
+    }
+    _shellContextRefreshing = true;
+    try {
+      await AppShellScope.read(context).reloadShellContext();
+    } finally {
+      _shellContextRefreshing = false;
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = AppShellScope.of(context);
@@ -149,6 +175,7 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
     final canSwitchRootBuilding =
         _currentBuilding.showsInBottomNavigation &&
         controller.snapshot.isBuildingVisible(_currentBuilding) &&
+        _currentBuilding != AppBuilding.messages &&
         !Navigator.of(context).canPop();
     final shellBody = canSwitchRootBuilding
         ? _RootBuildingSwipeRegion(
@@ -161,7 +188,6 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
 
     return AppShellScaffold(
       currentBuilding: _currentBuilding,
-      titleOverride: _currentBuilding == AppBuilding.messages ? '互动中心' : null,
       onBuildingSelected: _selectBuilding,
       showStageBanner: _currentBuilding != AppBuilding.exhibition,
       child: shellBody,
@@ -192,12 +218,20 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
       return const SizedBox.shrink();
     }
 
-    return KeyedSubtree(
-      key: ValueKey<String>('shell-root-${building.code}'),
-      child: _cachedPages.putIfAbsent(
-        building,
-        () => Builder(
-          builder: (BuildContext context) => _buildingBody(context, building),
+    final active = _currentBuilding == building;
+    return ExcludeSemantics(
+      excluding: !active,
+      child: TickerMode(
+        enabled: active,
+        child: KeyedSubtree(
+          key: ValueKey<String>('shell-root-${building.code}'),
+          child: _cachedPages.putIfAbsent(
+            building,
+            () => Builder(
+              builder: (BuildContext context) =>
+                  _buildingBody(context, building),
+            ),
+          ),
         ),
       ),
     );

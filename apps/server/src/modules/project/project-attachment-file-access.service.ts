@@ -5,6 +5,7 @@ import { RuntimeConfigService } from '../../core/runtime-config.service';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { BidEntity } from '../bid/entities/bid.entity';
 import { BidParticipationRequestAccessService } from '../bid_participation_request/bid-participation-request-access.service';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
@@ -12,6 +13,7 @@ import { UploadPublicUrlService } from '../upload/upload-public-url.service';
 import { ProjectAttachmentEntity } from './entities/project-attachment.entity';
 import { ProjectPublicResourceEntity } from './entities/project-public-resource.entity';
 import { ProjectEntity } from './entities/project.entity';
+import { ForumPostEntity } from '../forum/entities/forum-post.entity';
 import {
   fileAccessInvalid,
   fileAccessNotFound,
@@ -21,7 +23,12 @@ import {
 
 type FileAccessMode = 'preview' | 'download';
 type FileAccessScope = 'owner_private' | 'bid_material' | 'public_resource';
+type BidSubmissionAttachmentField =
+  | 'projectUnderstandingFileAssetId'
+  | 'quoteSheetFileAssetId'
+  | 'schedulePlanFileAssetId';
 
+const FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE = 'forum_draft_attachment';
 const OWNER_PRIVATE_VISIBILITY = 'owner_private';
 const APP_SHARED_VISIBILITY = 'app_shared';
 const PUBLIC_RESOURCE_SCOPE = 'public_resource';
@@ -40,6 +47,17 @@ const BID_MATERIAL_ATTACHMENT_KINDS = new Set([
   'equipment_material_list',
   'service_list'
 ]);
+const BID_SUBMISSION_ATTACHMENT_FIELDS: {
+  field: BidSubmissionAttachmentField;
+  fileKind: string;
+}[] = [
+  { field: 'projectUnderstandingFileAssetId', fileKind: 'bid_project_understanding' },
+  { field: 'quoteSheetFileAssetId', fileKind: 'bid_quote_sheet' },
+  { field: 'schedulePlanFileAssetId', fileKind: 'bid_schedule_plan' }
+];
+const BID_SUBMISSION_ATTACHMENT_FILE_KINDS = new Set(
+  BID_SUBMISSION_ATTACHMENT_FIELDS.map((item) => item.fileKind)
+);
 const PUBLIC_RESOURCE_CATEGORIES = new Set([
   'contract_template',
   'process_guide',
@@ -63,8 +81,12 @@ export class ProjectAttachmentFileAccessService {
     private readonly attachmentRepository: Repository<ProjectAttachmentEntity>,
     @InjectRepository(ProjectEntity)
     private readonly projectRepository: Repository<ProjectEntity>,
+    @InjectRepository(BidEntity)
+    private readonly bidRepository: Repository<BidEntity>,
     @InjectRepository(ProjectPublicResourceEntity)
     private readonly publicResourceRepository: Repository<ProjectPublicResourceEntity>,
+    @InjectRepository(ForumPostEntity)
+    private readonly forumPostRepository: Repository<ForumPostEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly publicUrlService: UploadPublicUrlService,
@@ -95,6 +117,23 @@ export class ProjectAttachmentFileAccessService {
     const attachment = await this.attachmentRepository.findOneBy({ fileAssetId: fileAsset.id });
     if (!attachment || this.normalizeText(attachment.visibility) !== OWNER_PRIVATE_VISIBILITY) {
       if (!hasExplicitAccessScope) {
+        const bidSubmissionAttachmentAccess = await this.tryGetBidSubmissionAttachmentAccess(
+          fileAsset,
+          mode,
+          requestedProjectId,
+          currentSession
+        );
+        if (bidSubmissionAttachmentAccess) {
+          return bidSubmissionAttachmentAccess;
+        }
+        const forumPostAccess = await this.tryGetForumPostAttachmentAccess(
+          fileAsset,
+          mode,
+          currentSession
+        );
+        if (forumPostAccess) {
+          return forumPostAccess;
+        }
         const publicResourceAccess = await this.tryGetPublicResourceAccess(
           fileAsset,
           mode,
@@ -182,6 +221,96 @@ export class ProjectAttachmentFileAccessService {
     };
   }
 
+  private async tryGetForumPostAttachmentAccess(
+    fileAsset: FileAssetEntity,
+    mode: FileAccessMode,
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>
+  ) {
+    if (this.normalizeText(fileAsset.businessType) !== FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE) {
+      return null;
+    }
+
+    const post = await this.forumPostRepository
+      .createQueryBuilder('post')
+      .where('post.state = :state', { state: 'published' })
+      .andWhere('post.attachment_file_asset_ids @> :fileAssetIds', {
+        fileAssetIds: JSON.stringify([fileAsset.id])
+      })
+      .orderBy('post.published_at', 'DESC')
+      .getOne();
+    if (!post) {
+      return null;
+    }
+
+    await this.eligibilityService.requireAuthenticatedActor(currentSession);
+    this.ensureForumAttachmentFileAsset(fileAsset, post);
+
+    const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
+    if (!accessUrl) {
+      throw fileAccessUnavailable('Current forum attachment access URL is unavailable.');
+    }
+
+    return {
+      fileAssetId: fileAsset.id,
+      mode,
+      accessUrl,
+      fileName: this.toFileName(fileAsset.objectKey),
+      mimeType: this.normalizeMimeType(fileAsset.mimeType),
+      expiresAt: this.buildExpiresAt(),
+      contentLengthBytes: fileAsset.size
+    };
+  }
+
+  private async tryGetBidSubmissionAttachmentAccess(
+    fileAsset: FileAssetEntity,
+    mode: FileAccessMode,
+    requestedProjectId: string | null,
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>
+  ) {
+    if (!BID_SUBMISSION_ATTACHMENT_FILE_KINDS.has(this.normalizeText(fileAsset.fileKind))) {
+      return null;
+    }
+
+    const bid = await this.findBidSubmissionAttachmentBid(fileAsset.id);
+    if (!bid) {
+      return null;
+    }
+    const project = await this.projectRepository.findOneBy({ id: bid.projectId });
+    if (!project) {
+      throw fileAccessNotFound('Current bid project is unavailable for file access.');
+    }
+    if (requestedProjectId && requestedProjectId !== project.id) {
+      throw fileAccessPermissionDenied('Current file access request is not aligned with the requested bid project.');
+    }
+
+    this.ensureBidSubmissionAttachmentFileAsset(fileAsset, bid, project);
+    await this.requireBidSubmissionAttachmentAccess(currentSession, project, bid);
+
+    const accessUrl = await this.publicUrlService.buildObjectAccessUrl(fileAsset.objectKey);
+    if (!accessUrl) {
+      throw fileAccessUnavailable('Current bid submission attachment access URL is unavailable.');
+    }
+
+    return {
+      fileAssetId: fileAsset.id,
+      mode,
+      accessUrl,
+      fileName: this.toFileName(fileAsset.objectKey),
+      mimeType: this.normalizeMimeType(fileAsset.mimeType),
+      expiresAt: this.buildExpiresAt(),
+      contentLengthBytes: fileAsset.size
+    };
+  }
+
+  private findBidSubmissionAttachmentBid(fileAssetId: string) {
+    return this.bidRepository
+      .createQueryBuilder('bid')
+      .where('bid.projectUnderstandingFileAssetId = :fileAssetId', { fileAssetId })
+      .orWhere('bid.quoteSheetFileAssetId = :fileAssetId', { fileAssetId })
+      .orWhere('bid.schedulePlanFileAssetId = :fileAssetId', { fileAssetId })
+      .getOne();
+  }
+
   private isReadablePublicResource(
     resource: ProjectPublicResourceEntity,
     fileAsset: FileAssetEntity
@@ -205,6 +334,37 @@ export class ProjectAttachmentFileAccessService {
       this.normalizeText(fileAsset.organizationId) !== this.normalizeText(project.organizationId)
     ) {
       throw fileAccessUnavailable('Current FileAsset truth is not aligned with the project attachment.');
+    }
+  }
+
+  private ensureForumAttachmentFileAsset(fileAsset: FileAssetEntity, post: ForumPostEntity) {
+    if (
+      this.normalizeText(fileAsset.businessType) !== FORUM_DRAFT_ATTACHMENT_BUSINESS_TYPE ||
+      this.normalizeText(fileAsset.businessId) !== this.normalizeText(post.sourceDraftId) ||
+      this.normalizeText(fileAsset.organizationId) !== this.normalizeText(post.organizationId)
+    ) {
+      throw fileAccessUnavailable('Current FileAsset truth is not aligned with the forum post attachment.');
+    }
+  }
+
+  private ensureBidSubmissionAttachmentFileAsset(
+    fileAsset: FileAssetEntity,
+    bid: BidEntity,
+    project: ProjectEntity
+  ) {
+    const slot = BID_SUBMISSION_ATTACHMENT_FIELDS.find(
+      (item) => this.normalizeText(bid[item.field]) === this.normalizeText(fileAsset.id)
+    );
+    if (!slot) {
+      throw fileAccessUnavailable('Current FileAsset truth is not aligned with the bid submission attachment.');
+    }
+    if (
+      this.normalizeText(fileAsset.businessType) !== PROJECT_UPLOAD_BUSINESS_TYPE ||
+      this.normalizeText(fileAsset.businessId) !== this.normalizeText(project.id) ||
+      this.normalizeText(fileAsset.fileKind) !== slot.fileKind ||
+      this.normalizeText(fileAsset.organizationId) !== this.bidderOrganizationId(bid)
+    ) {
+      throw fileAccessUnavailable('Current FileAsset truth is not aligned with the bid submission attachment.');
     }
   }
 
@@ -239,6 +399,28 @@ export class ProjectAttachmentFileAccessService {
       project,
       scope.organization.id,
     );
+  }
+
+  private async requireBidSubmissionAttachmentAccess(
+    currentSession: Awaited<ReturnType<typeof requireVerifiedCurrentSessionContext>>,
+    project: ProjectEntity,
+    bid: BidEntity
+  ) {
+    const currentOrganizationId = this.normalizeText(currentSession.organizationId);
+    const publisherOrganizationId = this.normalizeText(project.organizationId);
+    const bidderOrganizationId = this.bidderOrganizationId(bid);
+
+    if (currentOrganizationId === publisherOrganizationId) {
+      await this.eligibilityService.requireCurrentOrganizationScope(currentSession, publisherOrganizationId);
+      return;
+    }
+
+    if (currentOrganizationId === bidderOrganizationId) {
+      await this.eligibilityService.requireCurrentOrganizationScope(currentSession, bidderOrganizationId);
+      return;
+    }
+
+    throw fileAccessPermissionDenied('Current actor cannot access this bid submission attachment.');
   }
 
   private readMode(value: unknown): FileAccessMode {
@@ -291,6 +473,16 @@ export class ProjectAttachmentFileAccessService {
       ? this.config.uploadSignedUrlExpiresSeconds
       : 0;
     return new Date(Date.now() + Math.max(expiresSeconds, 0) * 1000).toISOString();
+  }
+
+  private toFileName(objectKey: string) {
+    const segments = objectKey.split('/');
+    const fileName = segments[segments.length - 1]?.trim();
+    return fileName || objectKey;
+  }
+
+  private bidderOrganizationId(bid: BidEntity) {
+    return this.normalizeText(bid.bidderOrganizationId || bid.organizationId);
   }
 
   private normalizeText(value: string | null | undefined) {
