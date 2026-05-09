@@ -655,7 +655,8 @@ class AppRouter {
 
     if ((!RcReleaseFlags.profileCreditReserveEntriesEnabled &&
             (routePath == ProfileRoutes.organizationCreditScoring ||
-                routePath == ProfileRoutes.organizationCreditScoringExplanation ||
+                routePath ==
+                    ProfileRoutes.organizationCreditScoringExplanation ||
                 routePath == ProfileRoutes.organizationCreditScoringHandoff)) ||
         (!RcReleaseFlags.forumPublishingEnabled &&
             routePath == ProfileRoutes.forum) ||
@@ -682,6 +683,13 @@ class AppRouter {
       _ when appealCaseId != null => ProfileGovernanceAppealDetailPage(
         appealCaseId: appealCaseId,
       ),
+      ProfileRoutes.bidServiceFeeAuthorization => BidSubmitPage(
+        projectId: routeUri.queryParameters['projectId'],
+        mode: 'service_fee_authorization',
+        bidParticipationRequestId:
+            routeUri.queryParameters['bidParticipationRequestId'],
+        bidId: routeUri.queryParameters['bidId'],
+      ),
       ProfileRoutes.settings => const ProfileSettingsPage(),
       ProfileRoutes.privacyPermissions =>
         const ProfilePrivacyPermissionInfoPage(),
@@ -706,6 +714,7 @@ class AppRouter {
       ProfileRoutes.forum => '我的论坛',
       ProfileRoutes.governanceAppeals => '我的申诉记录',
       _ when appealCaseId != null => '申诉详情',
+      ProfileRoutes.bidServiceFeeAuthorization => '竞标服务费预授权',
       ProfileRoutes.settings => '设置',
       ProfileRoutes.privacyPermissions => '隐私与权限说明',
       ProfileRoutes.certificationIdentityStatus => '公司认证与我的身份',

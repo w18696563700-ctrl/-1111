@@ -303,7 +303,9 @@ class _ProjectCommunicationMessageBubble extends StatelessWidget {
 
   String? _businessActionLabel(ProjectCommunicationMessageView message) {
     if (message.isServiceFeeAuthorizationPrompt) {
-      return '去完成预授权';
+      return RcReleaseFlags.bidServiceFeeAuthorizationEnabled
+          ? '去支付入口处理'
+          : '该功能暂未开放';
     }
     if (message.isPublisherMaterialReReviewPrompt) {
       return '重新确认资料';
@@ -1118,7 +1120,7 @@ class _ProjectCommunicationComposer extends StatelessWidget {
       'confirm_publisher_materials' => '打开资料确认单',
       'submit_bid_materials' => '去提交竞标资料',
       'confirm_bid_materials' => '打开资料确认单',
-      'complete_service_fee_authorization' => '去完成预授权',
+      'complete_service_fee_authorization' => '去支付入口处理',
       'open_deal_confirmation' => '打开成交确认',
       _ => null,
     };

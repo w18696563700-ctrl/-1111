@@ -554,12 +554,16 @@ class _CounterpartConversationPageState
         _openWorkbenchEntryList(<String>{'bid_materials'}, title: '竞标资料确认');
         return;
       case 'complete_service_fee_authorization':
-        final card = _firstServiceFeeAuthorizationCard(group);
-        if (card == null) {
+        if (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled) {
+          _showSnack(rcFeatureUnavailableTitle);
+          return;
+        }
+        final routeTarget = _serviceFeeAuthorizationRouteTargetFromGroup(group);
+        if (routeTarget == null) {
           _showSnack('预授权入口暂不可用，请刷新后重试。');
           return;
         }
-        _openBusinessCard(card);
+        Navigator.of(context).pushNamed(routeTarget.routeLocation);
         return;
       case 'open_deal_confirmation':
         _openFirstPendingWorkbenchEntry(<String>{'deal_confirmation'});
@@ -1305,7 +1309,20 @@ class _CounterpartConversationPageState
       return;
     }
     if (message.requiredNextAction == 'complete_service_fee_authorization') {
-      _openChatRequiredAction();
+      if (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled) {
+        _showSnack(rcFeatureUnavailableTitle);
+        return;
+      }
+      final data = _result?.data;
+      final group = data == null ? null : _selectedProjectGroup(data);
+      final routeTarget = group == null
+          ? null
+          : _serviceFeeAuthorizationRouteTargetFromGroup(group);
+      if (routeTarget == null) {
+        _showSnack('预授权入口暂不可用，请刷新后重试。');
+        return;
+      }
+      Navigator.of(context).pushNamed(routeTarget.routeLocation);
       return;
     }
     if (message.requiredNextAction == 're_review_material') {
@@ -2063,6 +2080,60 @@ class _CounterpartConversationPageState
       }
     }
     return null;
+  }
+
+  MessageInteractionRouteTarget? _serviceFeeAuthorizationRouteTargetFromGroup(
+    CounterpartConversationProjectGroupView group,
+  ) {
+    if (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled) {
+      return null;
+    }
+    final serviceFeeCard = _firstServiceFeeAuthorizationCard(group);
+    final serviceFeeTarget = serviceFeeCard == null
+        ? null
+        : _serviceFeeAuthorizationRouteTargetFromCard(serviceFeeCard);
+    if (serviceFeeTarget != null) {
+      return serviceFeeTarget;
+    }
+    for (final card in group.cards) {
+      final anchor = card.truthAnchor;
+      if (card.cardType != 'bid_participation_request' &&
+          anchor.truthType != 'bid_participation_request') {
+        continue;
+      }
+      final target = _serviceFeeAuthorizationRouteTargetFromCard(card);
+      if (target != null) {
+        return target;
+      }
+    }
+    return null;
+  }
+
+  MessageInteractionRouteTarget? _serviceFeeAuthorizationRouteTargetFromCard(
+    CounterpartConversationBusinessCardView card,
+  ) {
+    final target = card.detailRouteTarget;
+    if (target != null &&
+        target.actionKey == 'bid_service_fee_authorization.open') {
+      return target;
+    }
+    final anchor = card.truthAnchor;
+    final requestId = anchor.requestId?.trim();
+    if (requestId == null || requestId.isEmpty) {
+      return null;
+    }
+    return _routeTarget(
+      objectType: 'bid_service_fee_authorization',
+      actionKey: 'bid_service_fee_authorization.open',
+      canonicalPath:
+          '/api/app/project/{projectId}/bid-service-fee-authorizations',
+      params: <String, String>{
+        'projectId': anchor.projectId,
+        'bidParticipationRequestId': requestId,
+        if (anchor.bidId?.trim().isNotEmpty == true)
+          'bidId': anchor.bidId!.trim(),
+      },
+    );
   }
 
   String? _firstBidId(CounterpartConversationProjectGroupView? group) {

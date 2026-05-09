@@ -286,6 +286,7 @@ export function readBidServiceFeeAuthorizationFreezeInitReadModel(value: unknown
   return {
     freezeInitStatus: readFirst(record.freezeInitStatus, record.authorizationInitStatus),
     authorizationId: record.authorizationId,
+    authorizationStatus: record.authorizationStatus,
     paymentReferenceId: record.paymentReferenceId,
     channelActionType: record.channelActionType,
     channelPayload: optionalRecord(record.channelPayload) ?? null,

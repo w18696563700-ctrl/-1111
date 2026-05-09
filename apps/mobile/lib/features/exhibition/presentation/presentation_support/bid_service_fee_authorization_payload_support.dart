@@ -11,12 +11,25 @@ String? _projectBidServiceFeeAuthorizationIdFromPayload(Object? payload) {
 
 String? _bidServiceFeeAuthorizationStatusFromPayload(Object? payload) {
   final map = _payloadMap(payload);
-  return _normalizeDynamicText(map?['authorizationStatus']) ??
+  final status =
+      _normalizeDynamicText(map?['authorizationStatus']) ??
       _normalizeDynamicText(map?['status']) ??
       _normalizeDynamicText(_payloadMap(map?['authorization'])?['status']) ??
       _normalizeDynamicText(
         _payloadMap(map?['authorization'])?['authorizationStatus'],
       );
+  return _normalizeBidServiceFeeAuthorizationStatus(status);
+}
+
+String? _normalizeBidServiceFeeAuthorizationStatus(String? status) {
+  return switch (status) {
+    'authorized' => 'frozen',
+    'pending_authorization' => 'pending_freeze',
+    'authorization_released' || 'refund_pending' || 'refunded' => 'released',
+    'pending_contract_confirm' => 'charge_pending',
+    'expired' => 'failed',
+    _ => status,
+  };
 }
 
 String _bidServiceFeeAuthorizationStatusText(ExhibitionLoadResult result) {
@@ -42,14 +55,21 @@ String _bidServiceFeeAuthorizationStatusText(ExhibitionLoadResult result) {
 String _bidServiceFeeAuthorizationActionFailureText(
   ExhibitionActionResult result,
 ) {
+  if (result.errorCode ==
+      'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED') {
+    return result.message ?? '当前预授权状态暂不能重新拉起，请刷新状态后处理。';
+  }
+  if ((result.message ?? '').contains(
+    'Current service fee authorization cannot be initialized',
+  )) {
+    return '当前预授权状态暂不能重新拉起支付宝，请刷新状态后处理。';
+  }
   return result.message ?? result.errorCode ?? 'BFF/Server 返回失败，当前不本地放行。';
 }
 
 String _bidServiceFeeAuthorizationChannelActionText(Object? payload) {
   final map = _payloadMap(payload);
-  final actionType =
-      _normalizeDynamicText(map?['channelActionType']) ??
-      _normalizeDynamicText(_payloadMap(map?['channelPayload'])?['actionType']);
+  final actionType = _bidServiceFeeAuthorizationChannelActionType(payload);
   final payloadSummary = _bidServiceFeeAuthorizationPayloadSummary(
     map?['channelPayload'],
   );
@@ -57,6 +77,52 @@ String _bidServiceFeeAuthorizationChannelActionText(Object? payload) {
     return actionType ?? '通道 payload 暂未返回';
   }
   return actionType == null ? payloadSummary : '$actionType；$payloadSummary';
+}
+
+String? _bidServiceFeeAuthorizationChannelActionType(Object? payload) {
+  final map = _payloadMap(payload);
+  return _normalizeDynamicText(map?['channelActionType']) ??
+      _normalizeDynamicText(_payloadMap(map?['channelPayload'])?['actionType']);
+}
+
+String _bidServiceFeeAuthorizationChannelHandoffText(
+  Object? payload, {
+  required bool channelOpened,
+}) {
+  final actionType = _bidServiceFeeAuthorizationChannelActionType(payload);
+  if (actionType == 'unavailable') {
+    return '通道暂不可用，当前不本地判定完成。';
+  }
+  if (actionType == 'sdk_payload') {
+    return channelOpened
+        ? '已请求拉起支付宝 SDK，等待 Server callback。'
+        : '当前环境未能拉起支付宝 SDK，继续等待 Server 状态回读。';
+  }
+  if (actionType == 'web_redirect') {
+    return channelOpened
+        ? '已打开通道页面，等待 Server callback。'
+        : '当前环境未能打开通道页面，继续等待 Server 状态回读。';
+  }
+  if (actionType == 'qr_code') {
+    return '已收到二维码通道 payload，本页仅等待 Server 状态回读。';
+  }
+  return channelOpened ? '已请求通道拉起。' : '未识别可拉起通道，等待 Server 状态回读。';
+}
+
+String _bidServiceFeeAuthorizationPollText(P0PayPaymentPollResult result) {
+  if (result.status == 'frozen') {
+    return 'Server 已回读完成，状态：${result.status ?? 'frozen'}。';
+  }
+  if (result.outcome == P0PayPaymentOutcome.success) {
+    return 'Server 回读成功态 ${result.status ?? '未知'}，本页继续等待 frozen 真值。';
+  }
+  if (result.timedOut) {
+    return '等待 Server 回调超时，状态：${result.status ?? '未完成'}。';
+  }
+  if (result.isFailure) {
+    return 'Server 回读失败或终态异常，状态：${result.status ?? '未知'}。';
+  }
+  return '已回读 ${result.attempts} 次，状态：${result.status ?? '等待中'}。';
 }
 
 String? _bidServiceFeeAuthorizationPayloadSummary(Object? payload) {
