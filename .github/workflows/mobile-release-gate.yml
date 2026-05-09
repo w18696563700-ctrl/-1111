@@ -1,0 +1,103 @@
+name: Mobile Release Gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      app_version:
+        description: "Mobile app version, for example 1.0.0"
+        required: true
+        type: string
+      build_number:
+        description: "Mobile build number, for example 1"
+        required: true
+        type: string
+      platform:
+        description: "Platform scope for this manual gate"
+        required: true
+        type: choice
+        options:
+          - ios
+          - android
+          - both
+      release_channel:
+        description: "Release channel label for this check-only gate"
+        required: true
+        type: choice
+        options:
+          - internal
+          - testflight
+          - play-internal
+          - production-dry-run
+      confirm_no_auto_bump:
+        description: "Type YES to confirm this workflow will not bump versions"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  mobile-release-gate:
+    name: Check mobile release version gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate mobile release gate
+        shell: bash
+        env:
+          APP_VERSION: ${{ inputs.app_version }}
+          BUILD_NUMBER: ${{ inputs.build_number }}
+          PLATFORM: ${{ inputs.platform }}
+          RELEASE_CHANNEL: ${{ inputs.release_channel }}
+          CONFIRM_NO_AUTO_BUMP: ${{ inputs.confirm_no_auto_bump }}
+        run: |
+          set -euo pipefail
+
+          fail() {
+            printf 'ERROR: %s\n' "$*" >&2
+            exit 1
+          }
+
+          [[ "$APP_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || fail "app_version must use x.y.z format"
+          [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || fail "build_number must be a positive integer"
+          [[ "$CONFIRM_NO_AUTO_BUMP" == "YES" ]] || fail "confirm_no_auto_bump must be YES"
+
+          pubspec_path="apps/mobile/pubspec.yaml"
+          [[ -f "$pubspec_path" ]] || fail "Missing $pubspec_path"
+
+          pubspec_version_line="$(grep -E '^[[:space:]]*version:' "$pubspec_path" | head -n 1 || true)"
+          [[ -n "$pubspec_version_line" ]] || fail "Missing version field in $pubspec_path"
+
+          pubspec_version="${pubspec_version_line#*:}"
+          pubspec_version="${pubspec_version%%#*}"
+          pubspec_version="$(printf '%s' "$pubspec_version" | xargs)"
+          expected_version="${APP_VERSION}+${BUILD_NUMBER}"
+
+          [[ "$pubspec_version" == "$expected_version" ]] || fail "Input version $expected_version does not match $pubspec_path version $pubspec_version"
+
+          bash packages/tooling/mobile_version_preflight_check.sh
+
+          {
+            printf '## Mobile Release Gate Summary\n\n'
+            printf '| Field | Value |\n'
+            printf '| --- | --- |\n'
+            printf '| App version | `%s` |\n' "$APP_VERSION"
+            printf '| Build number | `%s` |\n' "$BUILD_NUMBER"
+            printf '| Platform | `%s` |\n' "$PLATFORM"
+            printf '| Release channel | `%s` |\n' "$RELEASE_CHANNEL"
+            printf '| Pubspec version | `%s` |\n' "$pubspec_version"
+            printf '| Preflight script | `packages/tooling/mobile_version_preflight_check.sh` |\n'
+            printf '| Result | `PASS` |\n\n'
+            printf 'Check-only guarantees:\n\n'
+            printf '- No automatic version bump.\n'
+            printf '- No Git tag creation.\n'
+            printf '- No git push.\n'
+            printf '- No Flutter build.\n'
+            printf '- No App Store, TestFlight, or Play Console upload.\n'
+            printf '- No pubspec.yaml changes.\n'
+            printf '- No Android or iOS project file changes.\n'
+          } >> "$GITHUB_STEP_SUMMARY"
