@@ -67,6 +67,10 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   ExhibitionActionResult? _p0PayAuthorizationInitResult;
   ExhibitionLoadResult? _p0PayAuthorizationStatusResult;
   P0PayPaymentPollResult? _p0PayAuthorizationPollResult;
+  bool _bidServiceFeeAuthorizationSubmitting = false;
+  ExhibitionActionResult? _bidServiceFeeAuthorizationCreateResult;
+  ExhibitionActionResult? _bidServiceFeeAuthorizationFreezeInitResult;
+  ExhibitionLoadResult? _bidServiceFeeAuthorizationStatusResult;
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
   bool get _isSupplementMode => widget.mode?.trim() == 'supplement';
@@ -437,7 +441,10 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
       title: pageTitle,
       summary: pageSummary,
       canonicalPath: canonicalPath,
-      submitting: _submitting || _p0PaySubmitting,
+      submitting:
+          _submitting ||
+          _p0PaySubmitting ||
+          _bidServiceFeeAuthorizationSubmitting,
       lastResult: _lastResult,
       onSubmitPressed: _submitCurrentBidFlow,
       submitButtonLabel: bidAlreadySubmitted
@@ -504,6 +511,10 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
             const _DetailLine(label: '竞标记录', value: '已定位', highlight: true),
           const SizedBox(height: 12),
           ..._buildP0PayFixedPriceBidAuthorizationFields(),
+          ..._buildBidServiceFeeAuthorizationActionFields(
+            routeProjectId: routeProjectId,
+            bidParticipationRequestId: requestId,
+          ),
         ],
       ),
     ];

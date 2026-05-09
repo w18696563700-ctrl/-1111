@@ -98,6 +98,8 @@ part 'presentation_support/order_status_card.dart';
 part 'presentation_support/project_exit_governance_status_support.dart';
 part 'presentation_support/p0_pay_bid_authorization_support.dart';
 part 'presentation_support/p0_pay_bid_authorization_actions.dart';
+part 'presentation_support/bid_service_fee_authorization_flow_support.dart';
+part 'presentation_support/bid_service_fee_authorization_payload_support.dart';
 part 'presentation_support/exhibition_payload_support.dart';
 part 'presentation_support/my_project_stage_support.dart';
 part 'presentation_support/my_project_workspace_support.dart';
