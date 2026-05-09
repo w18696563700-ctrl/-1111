@@ -55,17 +55,20 @@ namespaces:
   - SECURITY
   - PROJECT
   - BID
+  - BID_PARTICIPATION
   - THREAD
   - ORDER
   - CONTRACT
   - MILESTONE
   - INSPECTION
   - RATING
+  - PROJECT_COUNTERPARTY_RATING
   - DISPUTE
   - FORUM
   - MESSAGE_INTERACTION
   - COUNTERPART_CONVERSATION
   - PROJECT_COMMUNICATION
+  - PROJECT_ALBUM
   - ENTERPRISE_HUB
   - GOVERNANCE
   - FILE
@@ -274,12 +277,27 @@ codes:
   - code: PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE
     owner: Server
     meaning: The current project or targeted `项目真实性诚意金` order is not in a state that allows the requested publish gate, order-create, or pay-init transition.
+  - code: PROJECT_ALBUM_INVALID
+    owner: Server
+    meaning: Project album photo bind, list, or delete request is missing required anchors or violates the bounded project album input contract.
+  - code: PROJECT_ALBUM_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read or mutate the targeted project album photo boundary.
+  - code: PROJECT_ALBUM_LIMIT_EXCEEDED
+    owner: Server
+    meaning: Project album photo mutation is rejected because the current bounded album limit has already been reached.
+  - code: PROJECT_ALBUM_UNAVAILABLE
+    owner: Server
+    meaning: The targeted project album, project truth, or photo binding is unavailable, hidden, or not materialized under the current scope.
   - code: BID_SUBMIT_INVALID
     owner: Server
     meaning: Bid submit request is missing required fields or violates minimum constraints.
   - code: BID_DUPLICATE_SUBMISSION
     owner: Server
     meaning: The same bid command was submitted more than once.
+  - code: BID_SUBMISSION_SUPPLEMENT_CONFLICT
+    owner: Server
+    meaning: Bid submission supplement is rejected because the targeted material review, bid ownership, source version token, or supplement state conflicts with current Server truth.
   - code: BID_SERVICE_FEE_AUTHORIZATION_REQUIRED
     owner: Server
     meaning: Project-level free-send is blocked after publisher material confirmation because the current actor does not yet have a `frozen` bounded `4000 元竞标服务费预授权额度`; bid submit itself must not use this code solely for missing or unfinished authorization.
@@ -322,6 +340,24 @@ codes:
   - code: BID_THREAD_FORBIDDEN
     owner: Server
     meaning: The current actor or organization scope is not an admitted participant for the targeted project-bid private thread.
+  - code: BID_PARTICIPATION_INVALID
+    owner: Server
+    meaning: Bid participation request command is missing required project or requester fields or violates the bounded application input contract.
+  - code: BID_PARTICIPATION_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to create, review, read, or use the targeted bid participation request.
+  - code: BID_PARTICIPATION_UNAVAILABLE
+    owner: Server
+    meaning: The targeted project, bid participation request, or participation thread is unavailable, hidden, or not materialized under the current scope.
+  - code: BID_PARTICIPATION_CONFLICT
+    owner: Server
+    meaning: Bid participation request conflicts with an existing pending or approved participation truth and cannot create a competing request.
+  - code: BID_PARTICIPATION_INVALID_STATE
+    owner: Server
+    meaning: The targeted bid participation request is not in a state that allows the requested approve, reject, material read, or bid continuation transition.
+  - code: BID_PARTICIPATION_REQUIRED
+    owner: Server
+    meaning: The current bidder organization has not passed the required project bid participation request gate for the requested material read or bid action.
   - code: PROJECT_COMMUNICATION_THREAD_INVALID
     owner: Server
     meaning: Project communication thread get-or-create request is missing required project/counterpart anchors, carries a threadId outside the submitted project, or violates the current actor boundary.
@@ -412,6 +448,18 @@ codes:
   - code: RATING_INVALID_STATE
     owner: Server
     meaning: Rating truth exists, but the current rating state does not allow the requested submit transition.
+  - code: PROJECT_COUNTERPARTY_RATING_INVALID
+    owner: Server
+    meaning: Project counterparty rating submit request is missing required order, project, ratee, score, or comment fields under the bounded rating contract.
+  - code: PROJECT_COUNTERPARTY_RATING_FORBIDDEN
+    owner: Server
+    meaning: The current actor or organization scope is outside the buyer or seller boundary for the targeted completed order rating.
+  - code: PROJECT_COUNTERPARTY_RATING_DUPLICATE
+    owner: Server
+    meaning: The same project counterparty rating direction has already been submitted and cannot create a second rating truth.
+  - code: PROJECT_COUNTERPARTY_RATING_UNAVAILABLE
+    owner: Server
+    meaning: The targeted order, project, or rating entry is unavailable, hidden, not completed, or not materialized for the current scope.
   - code: DISPUTE_OPEN_INVALID
     owner: Server
     meaning: Dispute open request is missing required entry-state fields.
@@ -553,6 +601,9 @@ codes:
   - code: ENTERPRISE_HUB_CHANGE_CORRIDOR_REQUIRED
     owner: Server
     meaning: Direct enterprise hub continuation is no longer valid because the target truth has entered the published-governed change corridor and must continue through the formal published-change family.
+  - code: ENTERPRISE_HUB_CHANGE_CORRIDOR_NOT_AVAILABLE
+    owner: Server
+    meaning: Enterprise hub published-governed change corridor is unavailable because the current enterprise does not satisfy the corridor state or visibility boundary.
   - code: ENTERPRISE_HUB_INVALID_MEDIA_OWNERSHIP
     owner: Server
     meaning: Enterprise hub media write or live apply references a FileAsset that does not belong to the current enterprise_display scope, media role, or allowed image boundary.

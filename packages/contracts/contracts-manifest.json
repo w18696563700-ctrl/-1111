@@ -7,7 +7,7 @@
     },
     {
       "path": "docs/01_contracts/error_codes.yaml",
-      "sha256": "9c42060315f21c4d182c9ec7a863067772554a0306cbce7a3a38f70d873b6b97"
+      "sha256": "387ec0adcbb638581d14351143884a4cc0bb69db6a8fc83341a1f5cfa3b67c8a"
     }
   ],
   "generationEntry": "pnpm contracts:generate",
@@ -31,7 +31,7 @@
     {
       "path": "packages/contracts/src/generated/error-codes.ts",
       "kind": "error-codes",
-      "sha256": "eb139ede255135fcbe6733334cf01db114c34806a3d34a4d3d396e80fadee9e1"
+      "sha256": "928ccdbb566ef8bd46426c873233525484c675c684bb0d7c17633be476ebbd55"
     },
     {
       "path": "packages/contracts/src/generated/index.ts",
@@ -60,5 +60,5 @@
       "random_value"
     ]
   },
-  "manifestHash": "05d678ae714fde101c8ca60efcf60ef1247159bef13dc4aaf3e500a3a35fa9c5"
+  "manifestHash": "e12063d0aa3590ef8e4cdc7f73981c92d34be38a1d7edd5078cdf72ae6d0fc82"
 }
