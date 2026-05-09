@@ -1136,6 +1136,44 @@ void main() {
   );
 
   test(
+    'forum interaction notification routeTarget opens messages forum tab',
+    () {
+      final item = parseAppNotificationItem(const <String, Object?>{
+        'notificationId': 'notice-forum-1',
+        'type': 'forum_interaction',
+        'source': 'forum_interaction',
+        'title': '有新的论坛回复',
+        'body': '有人回复了你的帖子。',
+        'routeTarget': <String, Object?>{
+          'state': 'enabled',
+          'routeParams': <String, Object?>{
+            'tab': 'replies',
+            'targetId': 'post-1',
+          },
+          'canonicalPath': '/api/app/forum/interaction/inbox',
+          'localEntryKey': 'forum_interaction.open',
+          'requiredParams': <Object?>['tab'],
+        },
+        'routeTargetAvailability': <String, Object?>{
+          'state': 'available',
+          'reasonCode': 'ROUTE_TARGET_AVAILABLE',
+          'reasonText': '当前通知入口可用。',
+          'fallbackAction': 'none',
+          'fallbackRouteTarget': null,
+        },
+        'createdAt': '2026-05-01T08:00:00Z',
+        'readAt': null,
+        'unread': true,
+      });
+
+      expect(
+        item.routeTarget?.routeLocation,
+        '/messages?tab=forum_interaction&interactionTab=replies&targetId=post-1',
+      );
+    },
+  );
+
+  test(
     'bid participation notification routeTarget opens existing review thread',
     () {
       final item = parseAppNotificationItem(const <String, Object?>{

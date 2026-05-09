@@ -1,6 +1,7 @@
 import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/profile/navigation/profile_routes.dart';
+import 'package:mobile/shell/navigation/app_building.dart';
 
 class MessagesRegisteredEntryDefinition {
   const MessagesRegisteredEntryDefinition({
@@ -82,6 +83,8 @@ class MessagesRegisteredEntryDefinition {
         return _bidThreadRouteLocation(routeParams);
       case 'order_detail.open':
         return _orderDetailRouteLocation(routeParams);
+      case 'forum_interaction.open':
+        return _forumInteractionRouteLocation(routeParams);
     }
 
     return 'routeTarget actionKey "$actionKey" is unsupported';
@@ -99,6 +102,7 @@ const Set<String> messagesAllowedObjectTypes = <String>{
   'bid_thread',
   'bid_submit',
   'order',
+  'forum_interaction',
 };
 
 const Set<String> messagesAllowedActionKeys = <String>{
@@ -112,6 +116,7 @@ const Set<String> messagesAllowedActionKeys = <String>{
   'bid_submit.open',
   'bid_thread.open',
   'order_detail.open',
+  'forum_interaction.open',
 };
 
 const Set<String> messagesProjectCommunicationActionKeys = <String>{
@@ -136,6 +141,7 @@ const Map<String, String> messagesActionKeyToObjectType = <String, String>{
   'bid_submit.open': 'bid_submit',
   'bid_thread.open': 'bid_thread',
   'order_detail.open': 'order',
+  'forum_interaction.open': 'forum_interaction',
 };
 
 const Map<String, MessagesRegisteredEntryDefinition>
@@ -211,6 +217,13 @@ messagesRegisteredEntryByActionKey =
         canonicalPath: '/api/app/order/detail',
         localEntryKey: 'registered.order_detail.open',
         requiredParams: <String>['projectId', 'orderId'],
+      ),
+      'forum_interaction.open': MessagesRegisteredEntryDefinition(
+        objectType: 'forum_interaction',
+        actionKey: 'forum_interaction.open',
+        canonicalPath: '/api/app/forum/interaction/inbox',
+        localEntryKey: 'forum_interaction.open',
+        requiredParams: <String>['tab'],
       ),
     };
 
@@ -368,6 +381,29 @@ String? _bidServiceFeeAuthorizationRouteLocation(
     bidParticipationRequestId: requestId,
     bidId: routeParams['bidId'],
   );
+}
+
+String? _forumInteractionRouteLocation(Map<String, String> routeParams) {
+  if (!routeParams.containsKey('tab')) {
+    return 'routeTarget.routeParams must include "tab"';
+  }
+  final tab = routeParams['tab'];
+  if (tab == null || tab.trim().isEmpty) {
+    return 'routeTarget.routeParams tab must be non-empty';
+  }
+  final normalizedTab = tab.trim();
+  if (!const <String>{'replies', 'likes', 'follows'}.contains(normalizedTab)) {
+    return 'routeTarget.routeParams tab is outside the frozen forum interaction tabs';
+  }
+  final targetId = routeParams['targetId']?.trim();
+  return Uri(
+    path: AppBuilding.messages.routePath,
+    queryParameters: <String, String>{
+      'tab': 'forum_interaction',
+      'interactionTab': normalizedTab,
+      if (targetId != null && targetId.isNotEmpty) 'targetId': targetId,
+    },
+  ).toString();
 }
 
 bool _sameOrderedList(List<String> left, List<String> right) {

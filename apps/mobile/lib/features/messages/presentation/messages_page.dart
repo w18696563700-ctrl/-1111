@@ -29,10 +29,18 @@ const int _notificationUnreadDiscoveryMaxPages = 3;
 const int _notificationUnreadDiscoveryMaxItems = 100;
 
 class MessagesPage extends StatefulWidget {
-  const MessagesPage({super.key, this.refreshSignal, this.entrySignal});
+  const MessagesPage({
+    super.key,
+    this.refreshSignal,
+    this.entrySignal,
+    this.initialPrimaryTabKey,
+    this.initialForumInteractionTabKey,
+  });
 
   final ValueListenable<int>? refreshSignal;
   final ValueListenable<int>? entrySignal;
+  final String? initialPrimaryTabKey;
+  final String? initialForumInteractionTabKey;
 
   @override
   State<MessagesPage> createState() => _MessagesPageState();
@@ -70,11 +78,28 @@ class _MessagesPageState extends State<MessagesPage> {
   @override
   void initState() {
     super.initState();
-    _primaryPageController = PageController();
+    _selectedPrimaryTab = _initialPrimaryTabFromKey(
+      widget.initialPrimaryTabKey,
+    );
+    if (_selectedPrimaryTab == _MessagesPrimaryTab.forumInteraction) {
+      _selectedTab =
+          _forumInteractionTabFromKey(widget.initialForumInteractionTabKey) ??
+          _MessagesInteractionTab.replies;
+    }
+    _primaryPageController = PageController(
+      initialPage: _primaryTabIndex(_selectedPrimaryTab),
+    );
     _bindRefreshSignal(widget.refreshSignal);
     _bindEntrySignal(widget.entrySignal);
     _loadNotifications();
     _loadProjectCommunication();
+    if (_selectedPrimaryTab == _MessagesPrimaryTab.forumInteraction) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _ensureForumTabLoaded();
+        }
+      });
+    }
   }
 
   @override
@@ -144,6 +169,21 @@ class _MessagesPageState extends State<MessagesPage> {
     if (_primaryPageController.hasClients) {
       _primaryPageController.jumpToPage(0);
     }
+  }
+
+  _MessagesPrimaryTab _initialPrimaryTabFromKey(String? raw) {
+    return raw == 'forum_interaction'
+        ? _MessagesPrimaryTab.forumInteraction
+        : _MessagesPrimaryTab.projectCommunication;
+  }
+
+  _MessagesInteractionTab? _forumInteractionTabFromKey(String? raw) {
+    return switch (raw) {
+      'likes' => _MessagesInteractionTab.likes,
+      'follows' => _MessagesInteractionTab.follows,
+      'replies' => _MessagesInteractionTab.replies,
+      _ => null,
+    };
   }
 
   Future<void> _refreshAll({bool showLoading = true}) async {

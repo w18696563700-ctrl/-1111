@@ -36,7 +36,14 @@ class AppNotificationBootstrapService {
     String? deviceTokenOverride,
     String? appInstallationId,
     String? appVersion,
+    Future<void> Function(Map<String, Object?> routeTarget)?
+    onRouteTargetOpened,
   }) async {
+    if (Platform.isIOS && onRouteTargetOpened != null) {
+      await _iosApnsNotificationService.installRouteTargetOpenHandler(
+        onRouteTargetOpened,
+      );
+    }
     String? token = deviceTokenOverride?.trim();
     var permissionSupported = true;
     var permissionGranted = true;

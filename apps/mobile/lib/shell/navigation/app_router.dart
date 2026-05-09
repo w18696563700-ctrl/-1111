@@ -60,7 +60,10 @@ class AppRouter {
         name: building.routePath,
         arguments: settings.arguments,
       ),
-      builder: (_) => AppShellPage(currentBuilding: building),
+      builder: (_) => AppShellPage(
+        currentBuilding: building,
+        initialRouteQueryParameters: routeUri.queryParameters,
+      ),
     );
   }
 
