@@ -23,6 +23,12 @@ class _ProfileMembershipPackageConfirmPageState
   String? _errorMessage;
 
   Future<void> _startAlipay() async {
+    if (!RcReleaseFlags.membershipPurchaseEnabled) {
+      setState(() {
+        _errorMessage = rcFeatureUnavailableTitle;
+      });
+      return;
+    }
     if (_submitting) {
       return;
     }
@@ -72,9 +78,9 @@ class _ProfileMembershipPackageConfirmPageState
   @override
   Widget build(BuildContext context) {
     final offer = widget.offer;
-    final alipayAvailable = widget.channelCandidates.contains(
-      'alipay_candidate',
-    );
+    final alipayAvailable =
+        RcReleaseFlags.membershipPurchaseEnabled &&
+        widget.channelCandidates.contains('alipay_candidate');
     final wechatRetained = widget.channelCandidates.contains(
       'wechat_candidate',
     );
@@ -115,10 +121,12 @@ class _ProfileMembershipPackageConfirmPageState
           title: '支付入口',
           children: <Widget>[
             _ProfileActionRow(
-              title: _submitting ? '正在初始化支付宝支付' : '支付宝支付',
+              title: RcReleaseFlags.membershipPurchaseEnabled
+                  ? (_submitting ? '正在初始化支付宝支付' : '支付宝支付')
+                  : rcFeatureUnavailableTitle,
               subtitle: alipayAvailable
                   ? '首轮优先通道；支付成功后等待 Server 回调写入会员权益。'
-                  : '当前支付宝通道暂未提供。',
+                  : '当前 RC 版本不开放会员真实购买和支付。',
               emphasized: alipayAvailable,
               onTap: alipayAvailable && !_submitting ? _startAlipay : null,
               trailing: _submitting

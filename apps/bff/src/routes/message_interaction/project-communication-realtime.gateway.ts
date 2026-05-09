@@ -31,6 +31,7 @@ type RejectedSubscription = {
 
 const REALTIME_PATH = "/api/app/message/project-communication/realtime";
 const POLL_INTERVAL_MS = 2000;
+const RC_PROJECT_COMMUNICATION_REALTIME_ENABLED = false;
 
 @Injectable()
 export class ProjectCommunicationRealtimeGateway {
@@ -47,6 +48,10 @@ export class ProjectCommunicationRealtimeGateway {
       return;
     }
     this.attached = true;
+    if (!RC_PROJECT_COMMUNICATION_REALTIME_ENABLED) {
+      this.logger.warn("project communication realtime is disabled for RC");
+      return;
+    }
     const websocketServer = new WebSocketServer({ noServer: true });
     server.on("upgrade", (request, socket, head) => {
       if (!this.isRealtimeRequest(request)) {
@@ -154,6 +159,15 @@ export class ProjectCommunicationRealtimeGateway {
     message: Record<string, unknown>,
     headers: IncomingMessage["headers"] = {},
   ): Promise<AcceptedSubscription | RejectedSubscription> {
+    if (!RC_PROJECT_COMMUNICATION_REALTIME_ENABLED) {
+      const rejected = {
+        eventType: "project_communication.subscription.rejected",
+        code: "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE",
+        message: "该功能暂未开放",
+      } satisfies RejectedSubscription;
+      this.sendPlain(client, rejected);
+      return rejected;
+    }
     const subscription = this.readSubscribeRecord(message);
     if (!subscription) {
       const rejected = {

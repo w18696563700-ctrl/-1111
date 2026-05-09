@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_detail_pages.dart';
@@ -78,6 +79,24 @@ class AppRouter {
     );
   }
 
+  Route<dynamic> _rcFeatureUnavailableRoute(
+    RouteSettings settings, {
+    required AppBuilding currentBuilding,
+  }) {
+    return MaterialPageRoute<void>(
+      settings: settings,
+      builder: (_) => AppShellScaffold(
+        currentBuilding: currentBuilding,
+        titleOverride: rcFeatureUnavailableTitle,
+        child: RouteUnavailablePage(
+          routeName: settings.name,
+          title: rcFeatureUnavailableTitle,
+          message: rcFeatureUnavailableMessage,
+        ),
+      ),
+    );
+  }
+
   Route<dynamic>? _matchExhibitionForumRoute(RouteSettings settings) {
     final routeName = settings.name;
     if (routeName == null) {
@@ -95,6 +114,14 @@ class AppRouter {
     );
     final commentPostId = routeUri.queryParameters['postId'];
     final initialFeedTopicId = routeUri.queryParameters['topicId'];
+
+    if (routePath == ExhibitionRoutes.forumPublish &&
+        !RcReleaseFlags.forumPublishingEnabled) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
 
     final Widget? child = switch (routePath) {
       ExhibitionRoutes.forum => ForumHubPage(
@@ -189,13 +216,15 @@ class AppRouter {
         authorId != null ||
         topicId != null ||
         postId != null;
-    final showForumPublishFab = <String>{
-      ExhibitionRoutes.forum,
-      ExhibitionRoutes.forumSquare,
-      ExhibitionRoutes.forumLocal,
-      ExhibitionRoutes.forumFollowing,
-      ExhibitionRoutes.forumTopics,
-    }.contains(routePath);
+    final showForumPublishFab =
+        RcReleaseFlags.forumPublishingEnabled &&
+        <String>{
+          ExhibitionRoutes.forum,
+          ExhibitionRoutes.forumSquare,
+          ExhibitionRoutes.forumLocal,
+          ExhibitionRoutes.forumFollowing,
+          ExhibitionRoutes.forumTopics,
+        }.contains(routePath);
 
     return MaterialPageRoute<void>(
       settings: settings,
@@ -250,6 +279,30 @@ class AppRouter {
 
     final routeUri = _routeUri(routeName);
     final routePath = routeUri.path;
+
+    if (!RcReleaseFlags.projectPublishingEnabled &&
+        (routePath == ExhibitionRoutes.projectCreate ||
+            routePath == ExhibitionRoutes.projectEdit)) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
+    if (!RcReleaseFlags.bidThreadEnabled &&
+        routePath == ExhibitionRoutes.bidThread) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
+    if (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled &&
+        routePath == ExhibitionRoutes.bidSubmit &&
+        routeUri.queryParameters['mode'] == 'service_fee_authorization') {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
     final boardListActionController = EnterpriseBoardListActionController();
 
     final Widget? child = switch (routePath) {
@@ -596,6 +649,21 @@ class AppRouter {
       routeUri,
       ProfileRoutes.governanceAppeals,
     );
+
+    if ((!RcReleaseFlags.profileCreditReserveEntriesEnabled &&
+            (routePath == ProfileRoutes.organizationCreditScoring ||
+                routePath == ProfileRoutes.organizationCreditScoringExplanation ||
+                routePath == ProfileRoutes.organizationCreditScoringHandoff)) ||
+        (!RcReleaseFlags.forumPublishingEnabled &&
+            routePath == ProfileRoutes.forum) ||
+        (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled &&
+            routePath == ProfileRoutes.bidServiceFeeAuthorization) ||
+        routePath == ProfileRoutes.rcFeatureUnavailable) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.profile,
+      );
+    }
     final Widget? child = switch (routePath) {
       ProfileRoutes.personal => const ProfilePersonalPage(),
       ProfileRoutes.company => const ProfileCompanyPage(),

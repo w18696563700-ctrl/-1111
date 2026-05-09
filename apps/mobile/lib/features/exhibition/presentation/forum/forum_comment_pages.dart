@@ -57,6 +57,10 @@ class _ForumCommentInteractionPageState
     if (_submitting) {
       return;
     }
+    if (!RcReleaseFlags.forumUserCommandsEnabled) {
+      _showMessage('当前 RC 版本只保留论坛只读浏览，互动写入暂未开放。');
+      return;
+    }
     final body = _controller.text.trim();
     if (body.isEmpty) {
       _showMessage('请先输入回复内容');

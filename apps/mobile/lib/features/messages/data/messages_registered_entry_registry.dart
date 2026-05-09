@@ -1,4 +1,6 @@
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/profile/navigation/profile_routes.dart';
 
 class MessagesRegisteredEntryDefinition {
   const MessagesRegisteredEntryDefinition({
@@ -65,10 +67,18 @@ class MessagesRegisteredEntryDefinition {
       case 'bid_participation_request.open':
         return _bidParticipationThreadRouteLocation(routeParams);
       case 'bid_service_fee_authorization.open':
+        if (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled) {
+          return ProfileRoutes.rcFeatureUnavailableFor(
+            'bid_service_fee_authorization',
+          );
+        }
         return _bidServiceFeeAuthorizationRouteLocation(routeParams);
       case 'bid_submit.open':
         return _bidSubmitRouteLocation(routeParams);
       case 'bid_thread.open':
+        if (!RcReleaseFlags.bidThreadEnabled) {
+          return ProfileRoutes.rcFeatureUnavailableFor('bid_thread');
+        }
         return _bidThreadRouteLocation(routeParams);
       case 'order_detail.open':
         return _orderDetailRouteLocation(routeParams);
@@ -353,9 +363,8 @@ String? _bidServiceFeeAuthorizationRouteLocation(
       requestId.trim().isEmpty) {
     return 'routeTarget.routeParams projectId and bidParticipationRequestId must be non-empty';
   }
-  return ExhibitionRoutes.bidSubmitWithProjectId(
-    projectId,
-    mode: 'service_fee_authorization',
+  return ProfileRoutes.bidServiceFeeAuthorizationWithIds(
+    projectId: projectId,
     bidParticipationRequestId: requestId,
     bidId: routeParams['bidId'],
   );

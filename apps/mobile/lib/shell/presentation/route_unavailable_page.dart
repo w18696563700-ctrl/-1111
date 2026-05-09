@@ -2,9 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:mobile/shell/navigation/app_building.dart';
 
 class RouteUnavailablePage extends StatelessWidget {
-  const RouteUnavailablePage({super.key, required this.routeName});
+  const RouteUnavailablePage({
+    super.key,
+    required this.routeName,
+    this.title,
+    this.message,
+  });
 
   final String? routeName;
+  final String? title;
+  final String? message;
 
   @override
   Widget build(BuildContext context) {
@@ -29,14 +36,15 @@ class RouteUnavailablePage extends StatelessWidget {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    '路由不可用',
+                    title ?? '路由不可用',
                     style: theme.textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    '当前页面暂时不可进入，应用已经把你带到受控承接页，不会静默跳回其他页面。',
+                    message ??
+                        '当前页面暂时不可进入，应用已经把你带到受控承接页，不会静默跳回其他页面。',
                     style: theme.textTheme.bodyLarge?.copyWith(height: 1.45),
                   ),
                   const SizedBox(height: 18),

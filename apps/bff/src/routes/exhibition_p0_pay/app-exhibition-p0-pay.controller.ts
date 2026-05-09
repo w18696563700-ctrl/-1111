@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { ExhibitionP0PayService } from './exhibition-p0-pay.service';
 
 @Controller('api/app/exhibition/trade-tasks')
@@ -13,6 +14,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('exhibition_trade_task_create');
     return this.service.createTradeTask(payload, headers, idempotencyKey);
   }
 
@@ -55,6 +57,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('legacy_service_fee_authorization');
     return this.service.createServiceFeeAuthorization(
       taskId,
       bidId,
@@ -74,6 +77,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('legacy_service_fee_authorization_init');
     return this.service.authorizeServiceFee(
       taskId,
       bidId,
@@ -91,6 +95,7 @@ export class AppExhibitionP0PayController {
     @Param('authorizationId') authorizationId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_service_fee_authorization_detail');
     return this.service.getServiceFeeAuthorization(taskId, bidId, authorizationId, headers);
   }
 
@@ -102,6 +107,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('inquiry_deposit_order');
     return this.service.createInquiryDepositOrder(taskId, payload, headers, idempotencyKey);
   }
 
@@ -114,6 +120,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('inquiry_deposit_payment');
     return this.service.initInquiryDepositPay(
       taskId,
       depositOrderId,
@@ -129,6 +136,7 @@ export class AppExhibitionP0PayController {
     @Param('depositOrderId') depositOrderId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('inquiry_deposit_order_detail');
     return this.service.getInquiryDepositOrder(taskId, depositOrderId, headers);
   }
 
@@ -170,6 +178,7 @@ export class AppExhibitionP0PayController {
     @Param('taskId') taskId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('p0_pay_summary');
     return this.service.getP0PaySummary(taskId, headers);
   }
 
@@ -181,6 +190,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('p0_pay_release_non_winning');
     return this.service.releaseNonWinning(taskId, payload, headers, idempotencyKey);
   }
 
@@ -192,6 +202,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('p0_pay_publisher_breach_release');
     return this.service.releasePublisherBreach(taskId, payload, headers, idempotencyKey);
   }
 
@@ -203,6 +214,7 @@ export class AppExhibitionP0PayController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('p0_pay_factory_refusal_breach_hold');
     return this.service.holdFactoryRefusal(taskId, payload, headers, idempotencyKey);
   }
 }

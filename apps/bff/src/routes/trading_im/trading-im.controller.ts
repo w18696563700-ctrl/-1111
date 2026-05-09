@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { TradingImService } from './trading-im.service';
 
 @Controller('api/app/project/clarification')
@@ -34,6 +35,7 @@ export class AppBidThreadController {
     @Query('bidId') bidId: string | undefined,
     @Headers() headers: IncomingHttpHeaders
   ) {
+    rcFeatureDisabled('bid_thread_detail');
     return this.service.getBidThreadDetail(projectId, bidId, headers);
   }
 
@@ -43,6 +45,7 @@ export class AppBidThreadController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders
   ) {
+    rcFeatureDisabled('bid_thread_message_send');
     return this.service.sendThreadMessage(payload, headers);
   }
 
@@ -52,6 +55,7 @@ export class AppBidThreadController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders
   ) {
+    rcFeatureDisabled('bid_thread_confirmation_create');
     return this.service.createConfirmation(payload, headers);
   }
 }

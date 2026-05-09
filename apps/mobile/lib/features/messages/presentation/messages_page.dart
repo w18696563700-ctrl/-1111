@@ -7,6 +7,7 @@ import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
+import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/shell/context/app_shell_scope.dart';
 import 'package:mobile/shared/ui/safe_remote_image.dart';
 
@@ -629,6 +630,13 @@ class _MessagesPageState extends State<MessagesPage> {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(content: Text('当前通知暂时无法定位，请稍后重试或从对应入口进入。')),
       );
+      return;
+    }
+    if (Uri.tryParse(routeLocation)?.path ==
+        ProfileRoutes.rcFeatureUnavailable) {
+      ScaffoldMessenger.maybeOf(
+        context,
+      )?.showSnackBar(const SnackBar(content: Text('当前提醒入口暂未开放，请稍后再试。')));
       return;
     }
     try {

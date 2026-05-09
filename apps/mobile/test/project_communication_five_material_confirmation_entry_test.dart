@@ -232,7 +232,9 @@ Map<String, Object?> _threadPayload({
   };
 }
 
-Map<String, Object?> _serviceFeeAuthorizationMessagePayload() {
+Map<String, Object?> _serviceFeeAuthorizationMessagePayload({
+  bool includeRouteTarget = true,
+}) {
   return <String, Object?>{
     'messageId': 'message-auth-required',
     'threadId': 'thread-1',
@@ -249,17 +251,18 @@ Map<String, Object?> _serviceFeeAuthorizationMessagePayload() {
       'bidId': 'bid-1',
       'group': 'bid_materials',
       'requiredNextAction': 'complete_service_fee_authorization',
-      'routeTarget': <String, Object?>{
-        'objectType': 'bid_service_fee_authorization',
-        'actionKey': 'bid_service_fee_authorization.open',
-        'canonicalPath':
-            '/api/app/project/{projectId}/bid-service-fee-authorizations',
-        'params': <String, Object?>{
-          'projectId': 'project-1',
-          'bidParticipationRequestId': 'request-1',
-          'bidId': 'bid-1',
+      if (includeRouteTarget)
+        'routeTarget': <String, Object?>{
+          'objectType': 'bid_service_fee_authorization',
+          'actionKey': 'bid_service_fee_authorization.open',
+          'canonicalPath':
+              '/api/app/project/{projectId}/bid-service-fee-authorizations',
+          'params': <String, Object?>{
+            'projectId': 'project-1',
+            'bidParticipationRequestId': 'request-1',
+            'bidId': 'bid-1',
+          },
         },
-      },
     },
     'clientMessageId': null,
     'messageState': 'active',
@@ -698,17 +701,59 @@ void main() {
       await tester.pumpWidget(_buildPage(transport));
       await tester.pumpAndSettle();
       await _enterProjectCommunication(tester);
-      await _ensureVisible(tester, find.widgetWithText(TextButton, '去完成预授权'));
-      await tester.tap(find.widgetWithText(TextButton, '去完成预授权').first);
+      await _ensureVisible(tester, find.widgetWithText(TextButton, '去支付入口处理'));
+      await tester.tap(find.widgetWithText(TextButton, '去支付入口处理').first);
       await tester.pumpAndSettle();
 
+      expect(find.text('该功能暂未开放'), findsOneWidget);
       expect(
         find.textContaining(
-          '/exhibition/bids/submit?projectId=project-1&mode=service_fee_authorization&bidParticipationRequestId=request-1&bidId=bid-1',
+          '/profile/payment-billing/bid-service-fee-authorization',
         ),
-        findsOneWidget,
+        findsNothing,
       );
-      expect(find.text('预授权入口暂不可用，请刷新后重试。'), findsNothing);
+    },
+  );
+
+  testWidgets(
+    'service fee authorization message CTA falls back to current project card',
+    (WidgetTester tester) async {
+      final handlers = _baseHandlers(includeServiceFeeAuthorizationCard: true);
+      handlers['GET /api/app/message/project-communication/thread'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: _threadPayload()
+              ..['chatAvailability'] = _chatAvailability(canSendMessage: true),
+          );
+      handlers['GET /api/app/message/project-communication/messages'] =
+          (AppApiRequest request) async => AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: <String, Object?>{
+              'items': <Object?>[
+                _serviceFeeAuthorizationMessagePayload(
+                  includeRouteTarget: false,
+                ),
+              ],
+              'nextCursor': null,
+            },
+          );
+      final transport = FakeAppApiTransport(handlers: handlers);
+
+      await tester.pumpWidget(_buildPage(transport));
+      await tester.pumpAndSettle();
+      await _enterProjectCommunication(tester);
+
+      expect(find.widgetWithText(FilledButton, '去支付入口处理'), findsNothing);
+      expect(find.text('该功能暂未开放'), findsWidgets);
+      expect(
+        find.textContaining(
+          '/profile/payment-billing/bid-service-fee-authorization',
+        ),
+        findsNothing,
+      );
+      expect(find.text('当前没有需要处理的业务待办。'), findsNothing);
     },
   );
 
@@ -736,7 +781,7 @@ void main() {
         find.text('资料确认已通过，需等待竞标方完成 4000 元竞标服务费预授权额度后开启项目级自由发送。'),
         findsOneWidget,
       );
-      expect(find.text('去完成预授权'), findsNothing);
+      expect(find.text('去支付入口处理'), findsNothing);
     },
   );
 
@@ -1175,15 +1220,13 @@ void main() {
 
       await _ensureVisible(tester, find.text('资料确认已通过'));
       expect(find.text('资料确认已通过'), findsOneWidget);
-      expect(find.text('去完成预授权'), findsWidgets);
-      await _ensureVisible(tester, find.widgetWithText(FilledButton, '去完成预授权'));
-      await tester.tap(find.widgetWithText(FilledButton, '去完成预授权'));
-      await tester.pumpAndSettle();
+      expect(find.widgetWithText(FilledButton, '去支付入口处理'), findsNothing);
+      expect(find.text('该功能暂未开放'), findsWidgets);
       expect(
         find.textContaining(
-          '/exhibition/bids/submit?projectId=project-1&mode=service_fee_authorization&bidParticipationRequestId=request-1&bidId=bid-1',
+          '/profile/payment-billing/bid-service-fee-authorization',
         ),
-        findsOneWidget,
+        findsNothing,
       );
       expect(
         transport.requests

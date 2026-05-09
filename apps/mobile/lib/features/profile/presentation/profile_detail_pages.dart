@@ -9,6 +9,7 @@ import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/core/local_cache/local_cache_cleanup_service.dart';
 import 'package:mobile/core/location/device_location_service.dart';
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/core/runtime_info/app_runtime_info_service.dart';
 import 'package:mobile/features/profile/data/profile_credit_constraints_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_organization_credit_scoring_consumer_layer.dart';

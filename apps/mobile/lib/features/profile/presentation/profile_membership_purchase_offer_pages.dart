@@ -16,7 +16,11 @@ class _ProfileMembershipPurchaseOffersPageState
   @override
   void initState() {
     super.initState();
-    _load();
+    if (RcReleaseFlags.membershipPurchaseEnabled) {
+      _load();
+    } else {
+      _loading = false;
+    }
   }
 
   Future<void> _load() async {
@@ -34,6 +38,12 @@ class _ProfileMembershipPurchaseOffersPageState
 
   @override
   Widget build(BuildContext context) {
+    if (!RcReleaseFlags.membershipPurchaseEnabled) {
+      return const _ProfileScreenStatePanel(
+        title: rcFeatureUnavailableTitle,
+        message: '当前 RC 版本只保留会员当前态、权益与配额只读展示，会员真实购买暂未开放。',
+      );
+    }
     if (!AppSessionStore.instance.hasAnySession) {
       return _ProfileScreenStatePanel(
         title: '当前会话暂不可用',

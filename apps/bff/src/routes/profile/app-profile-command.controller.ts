@@ -1,5 +1,6 @@
 import { Body, Controller, Headers, HttpCode, Param, Patch, Post } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { ProfileBlockService } from './profile-block.service';
 import { ProfileCommandService } from './profile-command.service';
 import { ProfileMembershipPurchaseService } from './profile-membership-purchase.service';
@@ -49,6 +50,7 @@ export class AppProfileCommandController {
     @Body() body: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('membership_purchase_order');
     return this.profileMembershipPurchaseService.createOrder(body, headers);
   }
 
@@ -59,6 +61,7 @@ export class AppProfileCommandController {
     @Body() body: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('membership_purchase_payment');
     return this.profileMembershipPurchaseService.payInit(membershipOrderId, body, headers);
   }
 

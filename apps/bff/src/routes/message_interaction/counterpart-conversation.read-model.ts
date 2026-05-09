@@ -127,6 +127,10 @@ const DETAIL_ACTION_KEYS = new Set([
   "project_clarification.open",
   "order_detail.open",
 ]);
+const RC_DISABLED_DETAIL_ACTION_KEYS = new Set([
+  "bid_service_fee_authorization.open",
+  "bid_thread.open",
+]);
 
 export function readCounterpartConversationDetailReadModel(
   value: unknown,
@@ -368,13 +372,15 @@ function readCard(value: unknown) {
     );
   }
   const truthAnchor = readTruthAnchor(record.truthAnchor);
-  const detailRouteTarget = normalizePricingGateRouteTarget({
-    cardType,
-    status: readNullableString(record.status),
-    truthAnchor,
-    detailRouteTarget: readDetailRouteTarget(record.detailRouteTarget),
-    pricingGateRequired: record.pricingGateRequired,
-  });
+  const detailRouteTarget = rcFilterDetailRouteTarget(
+    normalizePricingGateRouteTarget({
+      cardType,
+      status: readNullableString(record.status),
+      truthAnchor,
+      detailRouteTarget: readDetailRouteTarget(record.detailRouteTarget),
+      pricingGateRequired: record.pricingGateRequired,
+    }),
+  );
   validateBusinessCardTruth({
     cardType,
     truthAnchor,
@@ -446,6 +452,18 @@ function normalizePricingGateRouteTarget(input: {
       bidParticipationRequestId: requestId,
     },
   };
+}
+
+function rcFilterDetailRouteTarget(
+  target: MessageInteractionRouteTarget | null,
+) {
+  if (target == null) {
+    return null;
+  }
+  if (RC_DISABLED_DETAIL_ACTION_KEYS.has(target.actionKey)) {
+    return null;
+  }
+  return target;
 }
 
 function readTruthAnchor(value: unknown) {

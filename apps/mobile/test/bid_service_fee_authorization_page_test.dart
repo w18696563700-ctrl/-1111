@@ -4,7 +4,7 @@ import 'package:mobile/core/api/app_api_client.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
-import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
+import 'package:mobile/features/profile/navigation/profile_routes.dart';
 import 'package:mobile/shell/shell_app.dart';
 
 AppApiClient _client(FakeAppApiTransport transport) {
@@ -41,9 +41,8 @@ ExhibitionMobileApp _buildApp(FakeAppApiTransport transport) {
     );
 
   return ExhibitionMobileApp(
-    initialRoute: ExhibitionRoutes.bidSubmitWithProjectId(
-      'project-1',
-      mode: 'service_fee_authorization',
+    initialRoute: ProfileRoutes.bidServiceFeeAuthorizationWithIds(
+      projectId: 'project-1',
       bidParticipationRequestId: 'request-1',
       bidId: 'bid-1',
     ),
@@ -68,7 +67,9 @@ ExhibitionMobileApp _buildApp(FakeAppApiTransport transport) {
 
 Map<String, Future<AppApiResponse> Function(AppApiRequest request)> _handlers({
   required String authorizationStatus,
+  String createAuthorizationStatus = 'pending_freeze',
   bool failCreate = false,
+  bool failFreezeInit = false,
 }) {
   return <String, Future<AppApiResponse> Function(AppApiRequest request)>{
     'GET ${ExhibitionCanonicalPaths.projectDetail}':
@@ -92,26 +93,42 @@ Map<String, Future<AppApiResponse> Function(AppApiRequest request)> _handlers({
           return AppApiResponse(
             statusCode: 201,
             uri: request.uri,
-            body: const <String, Object?>{
+            body: <String, Object?>{
               'authorizationId': 'auth-1',
-              'authorizationStatus': 'pending_freeze',
+              'authorizationStatus': createAuthorizationStatus,
               'quotaAmount': '4000.00',
               'currency': 'CNY',
             },
           );
         },
     'POST ${ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit('project-1', 'auth-1')}':
-        (AppApiRequest request) async => AppApiResponse(
-          statusCode: 200,
-          uri: request.uri,
-          body: const <String, Object?>{
-            'authorizationId': 'auth-1',
-            'paymentReferenceId': 'auth-ref-1',
-            'channelActionType': 'controlled_callback',
-            'channelPayload': <String, Object?>{'callbackMode': 'server'},
-            'callbackAwaiting': true,
-          },
-        ),
+        (AppApiRequest request) async {
+          if (failFreezeInit) {
+            return AppApiResponse(
+              statusCode: 409,
+              uri: request.uri,
+              body: const <String, Object?>{
+                'code': 'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED',
+                'message': '当前竞标服务费预授权状态为 failed，暂不能重新拉起支付宝确认，请刷新状态后处理。',
+              },
+            );
+          }
+          return AppApiResponse(
+            statusCode: 200,
+            uri: request.uri,
+            body: const <String, Object?>{
+              'authorizationId': 'auth-1',
+              'authorizationStatus': 'pending_freeze',
+              'paymentReferenceId': 'auth-ref-1',
+              'channelActionType': 'sdk_payload',
+              'channelPayload': <String, Object?>{
+                'provider': 'alipay',
+                'orderString': 'alipay-sdk-order',
+              },
+              'callbackAwaiting': true,
+            },
+          );
+        },
     'GET ${ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationStatus('project-1', 'auth-1')}':
         (AppApiRequest request) async => AppApiResponse(
           statusCode: 200,
@@ -137,102 +154,55 @@ Future<void> _pumpPage(
   await tester.pumpAndSettle();
 }
 
-Future<void> _tapCreateAndFreeze(WidgetTester tester) async {
-  await tester.ensureVisible(find.widgetWithText(FilledButton, '创建并拉起预授权'));
-  await tester.tap(find.widgetWithText(FilledButton, '创建并拉起预授权'));
-  await tester.pumpAndSettle();
-}
-
 void main() {
   tearDown(AppSessionStore.reset);
 
-  testWidgets('service fee authorization page calls create freeze and status', (
-    WidgetTester tester,
-  ) async {
-    final transport = FakeAppApiTransport(
-      handlers: _handlers(authorizationStatus: 'pending_freeze'),
-    );
-
-    await _pumpPage(tester, transport);
-
-    expect(find.text('竞标服务费预授权'), findsWidgets);
-    expect(find.text('创建并拉起预授权'), findsOneWidget);
-
-    await _tapCreateAndFreeze(tester);
-
-    expect(
-      transport.requests.map((AppApiRequest request) => request.canonicalPath),
-      containsAllInOrder(<String>[
-        ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizations(
-          'project-1',
-        ),
-        ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit(
-          'project-1',
-          'auth-1',
-        ),
-        ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationStatus(
-          'project-1',
-          'auth-1',
-        ),
-      ]),
-    );
-    final initRequest = transport.requests.firstWhere(
-      (AppApiRequest request) =>
-          request.canonicalPath ==
-          ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit(
-            'project-1',
-            'auth-1',
-          ),
-    );
-    final initBody = initRequest.body! as Map<String, Object?>;
-    expect(initBody['payChannel'], 'other_candidate');
-    expect(initBody['clientPlatform'], 'flutter');
-    expect(find.textContaining('等待 Server 受控回调确认'), findsWidgets);
-    expect(find.textContaining('预授权已完成'), findsNothing);
-  });
-
   testWidgets(
-    'service fee authorization completion only follows frozen readback',
+    'service fee authorization route is RC-unavailable and does not call payment APIs',
     (WidgetTester tester) async {
       final transport = FakeAppApiTransport(
-        handlers: _handlers(authorizationStatus: 'frozen'),
+        handlers: _handlers(authorizationStatus: 'pending_freeze'),
       );
 
       await _pumpPage(tester, transport);
-      await _tapCreateAndFreeze(tester);
 
-      expect(find.textContaining('预授权已完成'), findsWidgets);
+      expect(find.text('该功能暂未开放'), findsWidgets);
+      expect(find.textContaining('当前 RC 版本只保留最小可上线闭环'), findsOneWidget);
+      expect(find.text('去支付宝确认预授权'), findsNothing);
+      expect(find.text('预授权确认'), findsNothing);
       expect(
-        find.textContaining('Server 返回的 chatAvailability.canSendMessage'),
-        findsOneWidget,
+        transport.requests.any(
+          (AppApiRequest request) =>
+              request.method == AppApiMethod.post &&
+              request.canonicalPath ==
+                  ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizations(
+                    'project-1',
+                  ),
+        ),
+        isFalse,
+      );
+      expect(
+        transport.requests.any(
+          (AppApiRequest request) =>
+              request.canonicalPath ==
+              ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit(
+                'project-1',
+                'auth-1',
+              ),
+        ),
+        isFalse,
+      );
+      expect(
+        transport.requests.any(
+          (AppApiRequest request) =>
+              request.canonicalPath ==
+              ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationStatus(
+                'project-1',
+                'auth-1',
+              ),
+        ),
+        isFalse,
       );
     },
   );
-
-  testWidgets('service fee authorization create failure is shown fail closed', (
-    WidgetTester tester,
-  ) async {
-    final transport = FakeAppApiTransport(
-      handlers: _handlers(
-        authorizationStatus: 'pending_freeze',
-        failCreate: true,
-      ),
-    );
-
-    await _pumpPage(tester, transport);
-    await _tapCreateAndFreeze(tester);
-
-    expect(find.textContaining('当前资料确认状态不满足预授权前置条件'), findsOneWidget);
-    expect(
-      transport.requests.any(
-        (AppApiRequest request) =>
-            request.canonicalPath ==
-            ExhibitionCanonicalPaths.projectBidServiceFeeAuthorizationFreezeInit(
-              'project-1',
-              'auth-1',
-            ),
-      ),
-      isFalse,
-    );
-  });
 }
