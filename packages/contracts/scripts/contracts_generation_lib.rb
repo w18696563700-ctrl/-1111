@@ -500,6 +500,8 @@ module ContractsGeneration
     notification_types = schemas.fetch('AppNotificationType').fetch('enum')
     notification_sources = schemas.fetch('AppNotificationSource').fetch('enum')
     notification_source_lanes = schemas.fetch('AppNotificationSourceLane').fetch('enum')
+    device_push_platforms = schemas.fetch('DevicePushPlatform').fetch('enum')
+    device_push_providers = schemas.fetch('DevicePushProvider').fetch('enum')
     notification_canonical_paths = schemas.fetch('AppNotificationRouteTarget')
       .fetch('properties')
       .fetch('canonicalPath')
@@ -529,6 +531,28 @@ module ContractsGeneration
       export const PROJECT_COMMUNICATION_MESSAGE_READ_STATES = #{json_array(read_states)} as const;
       export type ProjectCommunicationMessageReadState =
         (typeof PROJECT_COMMUNICATION_MESSAGE_READ_STATES)[number];
+
+      export const DEVICE_PUSH_PLATFORMS = #{json_array(device_push_platforms)} as const;
+      export type DevicePushPlatform = (typeof DEVICE_PUSH_PLATFORMS)[number];
+
+      export const DEVICE_PUSH_PROVIDERS = #{json_array(device_push_providers)} as const;
+      export type DevicePushProvider = (typeof DEVICE_PUSH_PROVIDERS)[number];
+
+      export interface DevicePushTokenRegisterRequest {
+        platform: DevicePushPlatform;
+        provider: DevicePushProvider;
+        deviceToken: string;
+        appInstallationId: string;
+        appVersion?: string | null;
+        deviceLabel?: string | null;
+      }
+
+      export interface DevicePushTokenRegisterResponse {
+        registered: boolean;
+        tokenId?: string | null;
+        platform: DevicePushPlatform;
+        provider: DevicePushProvider;
+      }
 
       export interface ProjectCommunicationThreadResponse {
         threadId: string;
