@@ -37,7 +37,9 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final canSubmit = bottomPlan.kind == _MyProjectBottomPublishCtaKind.publish;
+    final canSubmit =
+        RcReleaseFlags.projectPublishingEnabled &&
+        bottomPlan.kind == _MyProjectBottomPublishCtaKind.publish;
     final feedback = sincerity?.freezeFeedback;
     return _ActionCard(
       title: '发布前待办',
@@ -94,7 +96,9 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
             _PrepublishTodoTile(
               icon: Icons.fact_check_outlined,
               title: '发布确认',
-              body: bottomPlan.helper,
+              body: RcReleaseFlags.projectPublishingEnabled
+                  ? bottomPlan.helper
+                  : '项目发布入口当前暂未开放，当前只保留项目资料查看与补齐。',
               statusLabel: canSubmit ? '可提交' : '未满足',
               emphasized: canSubmit,
               accentColor: canSubmit ? _prepublishReadyGreen : null,
@@ -107,8 +111,10 @@ class _MyProjectPrepublishTodoCard extends StatelessWidget {
                     : null,
                 onPressed: bottomPlan.enabled && canSubmit ? onPublish : null,
                 child: Text(
-                  submittingLifecycleAction ==
-                          _MyProjectLifecycleActionKind.publish
+                  !RcReleaseFlags.projectPublishingEnabled
+                      ? rcFeatureUnavailableTitle
+                      : submittingLifecycleAction ==
+                            _MyProjectLifecycleActionKind.publish
                       ? '提交中...'
                       : '确认并发布',
                 ),
@@ -445,7 +451,13 @@ class _PrepublishGreenChannelTodoActions extends StatelessWidget {
       runSpacing: 8,
       alignment: WrapAlignment.end,
       children: <Widget>[
-        if (sincerity?.canContinuePayment == true)
+        if (sincerity?.canContinuePayment == true &&
+            !RcReleaseFlags.paymentAndFundsEnabled)
+          const OutlinedButton(
+            onPressed: null,
+            child: Text(rcFeatureUnavailableTitle),
+          )
+        else if (sincerity?.canContinuePayment == true)
           OutlinedButton(
             onPressed: continuingSincerity || pricingLoading
                 ? null
