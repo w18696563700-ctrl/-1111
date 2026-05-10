@@ -1,4 +1,4 @@
-import { BadRequestException, HttpException, Injectable } from '@nestjs/common';
+import { BadRequestException, HttpException, Injectable, Logger } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
 import { AuthContextService } from '../../core/auth/auth-context.service';
 import { ErrorNormalizerService } from '../../core/errors/error-normalizer.service';
@@ -31,6 +31,8 @@ const PROJECT_COMMUNICATION_ERROR_CODES = {
 
 @Injectable()
 export class MessageInteractionService {
+  private readonly logger = new Logger(MessageInteractionService.name);
+
   constructor(
     private readonly serverClient: ServerClientService,
     private readonly authContext: AuthContextService,
@@ -38,25 +40,36 @@ export class MessageInteractionService {
   ) {}
 
   async getInteractions(lane: string | undefined, headers: IncomingHttpHeaders) {
+    const normalizedLane = this.readLane(lane);
+    const upstreamPath = '/server/message/interactions';
+    const startedAt = Date.now();
     try {
-      const result = await this.serverClient.get<unknown>('/server/message/interactions', {
+      const result = await this.serverClient.get<unknown>(upstreamPath, {
         headers: this.buildScopedHeaders(headers),
-        params: { lane: this.readLane(lane) }
+        params: { lane: normalizedLane }
       });
       return readMessageInteractionListReadModel(result);
     } catch (error) {
+      const httpException = this.errors.toHttpException(
+        error,
+        'MESSAGE_INTERACTION_UNAVAILABLE',
+        '当前项目沟通入口暂不可用，请稍后再试。',
+        {
+          400: 'MESSAGE_INTERACTION_UNAVAILABLE',
+          401: 'AUTH_SESSION_INVALID',
+          403: 'MESSAGE_INTERACTION_FORBIDDEN',
+          404: 'MESSAGE_INTERACTION_UNAVAILABLE'
+        }
+      );
+      this.logMessageInteractionsFailure({
+        error,
+        httpException,
+        upstreamPath,
+        durationMs: Date.now() - startedAt,
+        headers
+      });
       throw this.sanitizeError(
-        this.errors.toHttpException(
-          error,
-          'MESSAGE_INTERACTION_UNAVAILABLE',
-          '当前项目沟通入口暂不可用，请稍后再试。',
-          {
-            400: 'MESSAGE_INTERACTION_UNAVAILABLE',
-            401: 'AUTH_SESSION_INVALID',
-            403: 'MESSAGE_INTERACTION_FORBIDDEN',
-            404: 'MESSAGE_INTERACTION_UNAVAILABLE'
-          }
-        )
+        httpException
       );
     }
   }
@@ -234,6 +247,28 @@ export class MessageInteractionService {
         source: payload.source === 'bff' ? 'bff' : 'server'
       },
       error.getStatus()
+    );
+  }
+
+  private logMessageInteractionsFailure(input: {
+    error: unknown;
+    httpException: HttpException;
+    upstreamPath: string;
+    durationMs: number;
+    headers: IncomingHttpHeaders;
+  }) {
+    const transportError = input.error as {
+      code?: string;
+      response?: { status?: number };
+    };
+    const payload = this.readErrorPayload(input.httpException);
+    this.logger.warn(
+      `message_interactions upstream_failed route="GET /api/app/message/interactions" ` +
+      `upstream_path=${input.upstreamPath} duration_ms=${input.durationMs} ` +
+      `status=${input.httpException.getStatus()} upstream_status=${transportError.response?.status ?? 'transport_error'} ` +
+      `fallback_code=${String(payload.code ?? 'MESSAGE_INTERACTION_UNAVAILABLE')} ` +
+      `error_code=${transportError.code ?? 'unknown'} request_id=${this.readHeader(input.headers, 'x-request-id') ?? 'missing'} ` +
+      `trace_id=${this.readHeader(input.headers, 'x-trace-id') ?? 'missing'}`
     );
   }
 

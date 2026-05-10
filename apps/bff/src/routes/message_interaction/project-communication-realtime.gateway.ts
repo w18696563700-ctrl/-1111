@@ -31,6 +31,8 @@ type RejectedSubscription = {
 
 const REALTIME_PATH = "/api/app/message/project-communication/realtime";
 const POLL_INTERVAL_MS = 2000;
+const POLL_FAILURE_BACKOFF_BASE_MS = 5000;
+const POLL_FAILURE_BACKOFF_MAX_MS = 30000;
 const RC_PROJECT_COMMUNICATION_REALTIME_ENABLED = false;
 
 @Injectable()
@@ -72,6 +74,9 @@ export class ProjectCommunicationRealtimeGateway {
     });
     let timer: NodeJS.Timeout | null = null;
     let afterEventId: string | null = null;
+    let pollInFlight = false;
+    let consecutiveFailures = 0;
+    let nextPollAt = 0;
 
     client.on("message", (data) => {
       void this.handleMessage(client, request, data, {
@@ -86,6 +91,10 @@ export class ProjectCommunicationRealtimeGateway {
             clearInterval(timer);
           }
           const poll = async () => {
+            if (pollInFlight || Date.now() < nextPollAt) {
+              return;
+            }
+            pollInFlight = true;
             try {
               const result =
                 await this.service.listProjectCommunicationRealtimeEvents(
@@ -98,7 +107,11 @@ export class ProjectCommunicationRealtimeGateway {
                 afterEventId = event.eventId;
                 this.send(client, event);
               }
+              consecutiveFailures = 0;
+              nextPollAt = 0;
             } catch (error) {
+              consecutiveFailures += 1;
+              nextPollAt = Date.now() + this.pollFailureBackoffMs(consecutiveFailures);
               this.logger.warn(
                 `project communication realtime poll failed: ${(error as Error).message}`,
               );
@@ -106,6 +119,8 @@ export class ProjectCommunicationRealtimeGateway {
                 eventType: "project_communication.error",
                 code: "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE",
               });
+            } finally {
+              pollInFlight = false;
             }
           };
           void poll();
@@ -120,6 +135,11 @@ export class ProjectCommunicationRealtimeGateway {
       }
       this.removeClient(client);
     });
+  }
+
+  private pollFailureBackoffMs(consecutiveFailures: number) {
+    const backoff = POLL_FAILURE_BACKOFF_BASE_MS * consecutiveFailures;
+    return Math.min(backoff, POLL_FAILURE_BACKOFF_MAX_MS);
   }
 
   private async handleMessage(
