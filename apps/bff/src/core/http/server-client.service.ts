@@ -1,3 +1,5 @@
+import { Agent as HttpAgent } from 'http';
+import { Agent as HttpsAgent } from 'https';
 import { HttpService } from '@nestjs/axios';
 import { Injectable, Logger } from '@nestjs/common';
 import type { AxiosRequestConfig, Method } from 'axios';
@@ -11,11 +13,21 @@ type RequestOptions = {
 @Injectable()
 export class ServerClientService {
   private readonly logger = new Logger(ServerClientService.name);
+  private readonly httpAgent: HttpAgent;
+  private readonly httpsAgent: HttpsAgent;
 
   constructor(
     private readonly httpService: HttpService,
     private readonly config: RuntimeConfigService,
-  ) {}
+  ) {
+    const agentOptions = {
+      keepAlive: this.config.serverKeepAliveEnabled,
+      maxSockets: this.config.serverMaxSockets,
+      maxFreeSockets: this.config.serverMaxFreeSockets,
+    };
+    this.httpAgent = new HttpAgent(agentOptions);
+    this.httpsAgent = new HttpsAgent(agentOptions);
+  }
 
   async get<T>(path: string, options: RequestOptions = {}): Promise<T> {
     return this.send<T>('GET', path, undefined, options, this.config.serverGetTimeoutMs);
@@ -54,6 +66,8 @@ export class ServerClientService {
       timeout,
       headers: options.headers,
       params: options.params,
+      httpAgent: this.httpAgent,
+      httpsAgent: this.httpsAgent,
     };
 
     try {

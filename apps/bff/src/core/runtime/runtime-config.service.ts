@@ -57,6 +57,18 @@ export class RuntimeConfigService {
     return parsePositiveInt(process.env.SERVER_POST_TIMEOUT_MS, 10000);
   }
 
+  get serverKeepAliveEnabled(): boolean {
+    return parseBoolean(process.env.SERVER_KEEPALIVE_ENABLED, true);
+  }
+
+  get serverMaxSockets(): number {
+    return parsePositiveInt(process.env.SERVER_MAX_SOCKETS, 256);
+  }
+
+  get serverMaxFreeSockets(): number {
+    return parsePositiveInt(process.env.SERVER_MAX_FREE_SOCKETS, 64);
+  }
+
   get authWhitelistTestSessionEnabled(): boolean {
     return parseBoolean(process.env.AUTH_WHITELIST_TEST_SESSION_ENABLED, false);
   }
