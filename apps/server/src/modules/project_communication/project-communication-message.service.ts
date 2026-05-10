@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, MoreThan, Repository } from 'typeorm';
@@ -58,6 +58,8 @@ const CONFIRMATION_TYPES = new Set<ProjectCommunicationConfirmationType>([
 
 @Injectable()
 export class ProjectCommunicationMessageService {
+  private readonly logger = new Logger(ProjectCommunicationMessageService.name);
+
   constructor(
     @InjectRepository(ProjectCommunicationMessageEntity)
     private readonly messageRepository: Repository<ProjectCommunicationMessageEntity>,
@@ -311,30 +313,40 @@ export class ProjectCommunicationMessageService {
 
   async markRead(payload: Record<string, unknown>, context: RequestContext) {
     const command = this.toMarkReadCommand(payload);
-    return this.dataSource.transaction(async (manager) => {
-      const { actor, thread } = await this.requireThreadParticipant(
-        command.threadId,
-        command.projectId,
-        context,
-        manager
+    const { actor, thread } = await this.requireThreadParticipant(
+      command.threadId,
+      command.projectId,
+      context
+    );
+    await this.ensureReadMessageBelongsToThread(command.lastReadMessageId, thread);
+    const startedAt = Date.now();
+    try {
+      const cursor = await this.dataSource.transaction(async (manager) => {
+        const repository = manager.getRepository(ProjectCommunicationReadCursorEntity);
+        const cursor =
+          (await repository.findOneBy({
+            threadId: thread.id,
+            organizationId: actor.organizationId
+          })) ??
+          repository.create({
+            threadId: thread.id,
+            projectId: thread.projectId,
+            organizationId: actor.organizationId
+          });
+        cursor.lastReadMessageId = command.lastReadMessageId;
+        cursor.lastReadAt = new Date();
+        return repository.save(cursor);
+      });
+      this.logger.log(
+        `markRead transaction committed duration_ms=${Date.now() - startedAt} request_id=${context.requestId} trace_id=${context.traceId}`
       );
-      await this.ensureReadMessageBelongsToThread(command.lastReadMessageId, thread, manager);
-      const repository = manager.getRepository(ProjectCommunicationReadCursorEntity);
-      const cursor =
-        (await repository.findOneBy({
-          threadId: thread.id,
-          organizationId: actor.organizationId
-        })) ??
-        repository.create({
-          threadId: thread.id,
-          projectId: thread.projectId,
-          organizationId: actor.organizationId
-        });
-      cursor.lastReadMessageId = command.lastReadMessageId;
-      cursor.lastReadAt = new Date();
-      await repository.save(cursor);
       return this.presenter.toReadCursor(cursor);
-    });
+    } catch (error) {
+      this.logger.warn(
+        `markRead transaction rolled_back duration_ms=${Date.now() - startedAt} request_id=${context.requestId} trace_id=${context.traceId} error_message=${(error as Error).message}`
+      );
+      throw error;
+    }
   }
 
   private async requireThreadParticipant(

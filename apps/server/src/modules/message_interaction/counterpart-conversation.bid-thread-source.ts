@@ -65,40 +65,31 @@ export class CounterpartConversationBidThreadSource
       context.bidMap,
       viewerOrganizationId,
     );
-    const seeds: CounterpartConversationCardSeed[] = [];
-    for (const thread of threads) {
-      const seed = await this.toSeed({
+    const avatarUrlCache = new Map<string, Promise<string | null>>();
+    const seeds = await Promise.all(threads.map((thread) =>
+      this.toSeed({
         thread,
         viewerOrganizationId,
         context,
         counterpart,
-      });
-      if (seed) {
-        seeds.push(seed);
-      }
-    }
-    return seeds;
+        avatarUrlCache,
+      }),
+    ));
+    return seeds.filter((seed): seed is CounterpartConversationCardSeed =>
+      Boolean(seed),
+    );
   }
 
   private async loadContext(threads: BidPrivateThreadEntity[]) {
     const projectIds = [...new Set(threads.map((item) => item.projectId))];
     const bidIds = [...new Set(threads.map((item) => item.bidId))];
     const threadIds = threads.map((item) => item.id);
-    const [projects, bids, messages, authorizations, deposits] = await Promise.all([
+    const [projects, bids, messages, authorizationByTaskId, depositByTaskId] = await Promise.all([
       this.projectRepository.findBy({ id: In(projectIds) }),
       this.bidRepository.findBy({ id: In(bidIds) }),
-      this.messageRepository.find({
-        where: { threadId: In(threadIds) },
-        order: { threadId: 'ASC', createdAt: 'DESC' },
-      }),
-      this.authorizationRepository.find({
-        where: { taskId: In(projectIds) },
-        order: { taskId: 'ASC', updatedAt: 'DESC' },
-      }),
-      this.depositRepository.find({
-        where: { taskId: In(projectIds) },
-        order: { taskId: 'ASC', updatedAt: 'DESC' },
-      }),
+      this.loadLatestMessagesByThreadId(threadIds),
+      this.loadLatestAuthorizationsByTaskId(projectIds),
+      this.loadLatestDepositsByTaskId(projectIds),
     ]);
     const latestMessageByThreadId = new Map<string, BidThreadMessageEntity>();
     for (const message of messages) {
@@ -109,10 +100,87 @@ export class CounterpartConversationBidThreadSource
     return {
       projectMap: new Map(projects.map((item) => [item.id, item])),
       bidMap: new Map(bids.map((item) => [item.id, item])),
-      authorizationByTaskId: this.latestByTaskId(authorizations),
-      depositByTaskId: this.latestByTaskId(deposits),
+      authorizationByTaskId,
+      depositByTaskId,
       latestMessageByThreadId,
     };
+  }
+
+  private async loadLatestMessagesByThreadId(threadIds: string[]) {
+    if (!threadIds.length) {
+      return [];
+    }
+    if (typeof this.messageRepository.createQueryBuilder !== 'function') {
+      const messages = await this.messageRepository.find({
+        where: { threadId: In(threadIds) },
+        order: { threadId: 'ASC', createdAt: 'DESC' },
+      });
+      return this.firstMessagePerThread(messages);
+    }
+    return this.messageRepository
+      .createQueryBuilder('message')
+      .distinctOn(['message.threadId'])
+      .where('message.threadId IN (:...threadIds)', { threadIds })
+      .orderBy('message.threadId', 'ASC')
+      .addOrderBy('message.createdAt', 'DESC')
+      .addOrderBy('message.id', 'DESC')
+      .getMany();
+  }
+
+  private async loadLatestAuthorizationsByTaskId(taskIds: string[]) {
+    if (!taskIds.length) {
+      return new Map<string, PlatformServiceFeeAuthorizationEntity>();
+    }
+    if (typeof this.authorizationRepository.createQueryBuilder !== 'function') {
+      const authorizations = await this.authorizationRepository.find({
+        where: { taskId: In(taskIds) },
+        order: { taskId: 'ASC', updatedAt: 'DESC', createdAt: 'DESC' },
+      });
+      return this.latestByTaskId(authorizations);
+    }
+    const authorizations = await this.authorizationRepository
+      .createQueryBuilder('authorization')
+      .distinctOn(['authorization.taskId'])
+      .where('authorization.taskId IN (:...taskIds)', { taskIds })
+      .orderBy('authorization.taskId', 'ASC')
+      .addOrderBy('authorization.updatedAt', 'DESC')
+      .addOrderBy('authorization.createdAt', 'DESC')
+      .addOrderBy('authorization.id', 'DESC')
+      .getMany();
+    return this.latestByTaskId(authorizations);
+  }
+
+  private async loadLatestDepositsByTaskId(taskIds: string[]) {
+    if (!taskIds.length) {
+      return new Map<string, InquiryQuoteDepositEntity>();
+    }
+    if (typeof this.depositRepository.createQueryBuilder !== 'function') {
+      const deposits = await this.depositRepository.find({
+        where: { taskId: In(taskIds) },
+        order: { taskId: 'ASC', updatedAt: 'DESC', createdAt: 'DESC' },
+      });
+      return this.latestByTaskId(deposits);
+    }
+    const deposits = await this.depositRepository
+      .createQueryBuilder('deposit')
+      .distinctOn(['deposit.taskId'])
+      .where('deposit.taskId IN (:...taskIds)', { taskIds })
+      .orderBy('deposit.taskId', 'ASC')
+      .addOrderBy('deposit.updatedAt', 'DESC')
+      .addOrderBy('deposit.createdAt', 'DESC')
+      .addOrderBy('deposit.id', 'DESC')
+      .getMany();
+    return this.latestByTaskId(deposits);
+  }
+
+  private firstMessagePerThread(messages: BidThreadMessageEntity[]) {
+    const latestMessageByThreadId = new Map<string, BidThreadMessageEntity>();
+    for (const message of messages) {
+      if (!latestMessageByThreadId.has(message.threadId)) {
+        latestMessageByThreadId.set(message.threadId, message);
+      }
+    }
+    return [...latestMessageByThreadId.values()];
   }
 
   private async loadCounterpartContext(
@@ -162,7 +230,8 @@ export class CounterpartConversationBidThreadSource
     viewerOrganizationId: string;
     context: Awaited<ReturnType<CounterpartConversationBidThreadSource['loadContext']>>;
     counterpart: Awaited<ReturnType<CounterpartConversationBidThreadSource['loadCounterpartContext']>>;
-  }) {
+    avatarUrlCache: Map<string, Promise<string | null>>;
+  }): Promise<CounterpartConversationCardSeed | null> {
     const project = input.context.projectMap.get(input.thread.projectId);
     const bid = input.context.bidMap.get(input.thread.bidId);
     if (!project || !bid) {
@@ -197,7 +266,8 @@ export class CounterpartConversationBidThreadSource
       counterpartDisplayName,
       counterpartNickname: this.displayNameService.resolveNickname(counterpartUser),
       counterpartCompanyName,
-      counterpartAvatarUrl: await this.avatarService.readAvatarUrl(
+      counterpartAvatarUrl: await this.readCachedAvatarUrl(
+        input.avatarUrlCache,
         counterpartUser?.avatarUrl ?? null,
       ),
       counterpartCertificationSummary:
@@ -288,6 +358,23 @@ export class CounterpartConversationBidThreadSource
       },
       updatedAt: project.updatedAt.toISOString(),
     };
+  }
+
+  private async readCachedAvatarUrl(
+    cache: Map<string, Promise<string | null>>,
+    value: string | null | undefined,
+  ) {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+      return null;
+    }
+    const existing = cache.get(normalized);
+    if (existing) {
+      return existing;
+    }
+    const pending = this.avatarService.readAvatarUrl(normalized);
+    cache.set(normalized, pending);
+    return pending;
   }
 
 }

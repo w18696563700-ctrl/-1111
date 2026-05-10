@@ -52,7 +52,7 @@ export type ProjectCommunicationBusinessState = {
   chatAvailability: ProjectCommunicationChatAvailability;
 };
 
-type ProjectCommunicationBusinessStateInput = {
+export type ProjectCommunicationBusinessStateInput = {
   projectId: string;
   ownerOrganizationId: string;
   counterpartOrganizationId: string;
@@ -61,9 +61,23 @@ type ProjectCommunicationBusinessStateInput = {
   bidId?: string | null;
 };
 
+export type ProjectCommunicationBusinessStateBatchInput =
+  ProjectCommunicationBusinessStateInput & {
+    cacheKey: string;
+  };
+
 type MaterialSource = {
   attachmentCount: number;
   sourceVersionToken: string | null;
+};
+
+type BusinessStateBatchContext = {
+  bidByCacheKey: Map<string, BidEntity | null>;
+  pendingParticipationCountByPairKey: Map<string, number>;
+  publisherMaterialSourcesByProjectId: Map<string, Map<ProjectQuoteBasisMaterialKind, MaterialSource>>;
+  reviewsBySubjectKey: Map<string, ProjectCommunicationMaterialReviewEntity[]>;
+  pendingConfirmationsByProjectId: Map<string, ContractConfirmationEntity[]>;
+  frozenAuthorizationBySubjectKey: Map<string, PlatformServiceFeeAuthorizationEntity>;
 };
 
 const PUBLISHER_MATERIAL_KINDS: ProjectQuoteBasisMaterialKind[] = [
@@ -154,6 +168,22 @@ export class ProjectCommunicationBusinessStateService {
     };
   }
 
+  async buildForPairs(
+    inputs: ProjectCommunicationBusinessStateBatchInput[]
+  ): Promise<Map<string, ProjectCommunicationBusinessState>> {
+    const normalizedInputs = this.normalizeBatchInputs(inputs);
+    if (!normalizedInputs.length) {
+      return new Map();
+    }
+    const context = await this.loadBatchContext(normalizedInputs);
+    return new Map(
+      normalizedInputs.map((input) => [
+        input.cacheKey,
+        this.buildStateFromBatchContext(input, context)
+      ])
+    );
+  }
+
   emptyBusinessTodoSummary(): ProjectCommunicationBusinessTodoSummary {
     return this.toBusinessTodoSummary({
       bidParticipationReviewPendingCount: 0,
@@ -170,6 +200,448 @@ export class ProjectCommunicationBusinessStateService {
       lockReasonText: null,
       requiredNextAction: 'none'
     };
+  }
+
+  private normalizeBatchInputs(inputs: ProjectCommunicationBusinessStateBatchInput[]) {
+    const map = new Map<string, ProjectCommunicationBusinessStateBatchInput>();
+    for (const input of inputs) {
+      const cacheKey = input.cacheKey.trim();
+      if (!cacheKey || map.has(cacheKey)) {
+        continue;
+      }
+      map.set(cacheKey, {
+        ...input,
+        cacheKey,
+        projectId: input.projectId.trim(),
+        ownerOrganizationId: input.ownerOrganizationId.trim(),
+        counterpartOrganizationId: input.counterpartOrganizationId.trim(),
+        viewerOrganizationId: input.viewerOrganizationId.trim(),
+        threadId: input.threadId?.trim() ?? null,
+        bidId: input.bidId?.trim() ?? null
+      });
+    }
+    return [...map.values()].filter(
+      (input) =>
+        input.projectId &&
+        input.ownerOrganizationId &&
+        input.counterpartOrganizationId &&
+        input.viewerOrganizationId
+    );
+  }
+
+  private async loadBatchContext(
+    inputs: ProjectCommunicationBusinessStateBatchInput[]
+  ): Promise<BusinessStateBatchContext> {
+    const projectIds = this.unique(inputs.map((input) => input.projectId));
+    const counterpartOrganizationIds = this.unique(inputs.map((input) => input.counterpartOrganizationId));
+    const reviewerOrganizationIds = this.unique(
+      inputs.flatMap((input) => [input.viewerOrganizationId, input.ownerOrganizationId])
+    );
+    const [
+      bidByCacheKey,
+      pendingParticipationCountByPairKey,
+      publisherMaterialSourcesByProjectId,
+      reviewsBySubjectKey,
+      pendingConfirmationsByProjectId
+    ] = await Promise.all([
+      this.loadBatchBids(inputs),
+      this.loadPendingParticipationCountMap(projectIds, counterpartOrganizationIds),
+      this.loadPublisherMaterialSourcesMap(projectIds),
+      this.loadReviewMap(projectIds, reviewerOrganizationIds),
+      this.loadPendingConfirmationMap(projectIds)
+    ]);
+    const frozenAuthorizationBySubjectKey = await this.loadFrozenAuthorizationMap([
+      ...bidByCacheKey.values()
+    ]);
+    return {
+      bidByCacheKey,
+      pendingParticipationCountByPairKey,
+      publisherMaterialSourcesByProjectId,
+      reviewsBySubjectKey,
+      pendingConfirmationsByProjectId,
+      frozenAuthorizationBySubjectKey
+    };
+  }
+
+  private buildStateFromBatchContext(
+    input: ProjectCommunicationBusinessStateBatchInput,
+    context: BusinessStateBatchContext
+  ): ProjectCommunicationBusinessState {
+    const bid = context.bidByCacheKey.get(input.cacheKey) ?? null;
+    const pendingParticipationCount =
+      context.pendingParticipationCountByPairKey.get(this.projectCounterpartKey(input)) ?? 0;
+    const bidParticipationReviewPendingCount =
+      input.viewerOrganizationId === input.ownerOrganizationId ? pendingParticipationCount : 0;
+    const publisherMaterialReviewPendingCount = this.countPublisherMaterialReviewsFromContext(
+      input,
+      bid,
+      context
+    );
+    const bidMaterialReviewPendingCount = this.countBidMaterialReviewsFromContext(
+      input,
+      bid,
+      input.viewerOrganizationId,
+      input.viewerOrganizationId === input.ownerOrganizationId,
+      context
+    );
+    const bidMaterialReviewPendingForChatCount = this.countBidMaterialReviewsFromContext(
+      input,
+      bid,
+      input.ownerOrganizationId,
+      Boolean(bid),
+      context
+    );
+    const dealConfirmationPendingCount = this.countPendingDealConfirmationsFromContext(
+      input,
+      context
+    );
+    const businessTodoSummary = this.toBusinessTodoSummary({
+      bidParticipationReviewPendingCount,
+      publisherMaterialReviewPendingCount,
+      bidMaterialReviewPendingCount,
+      dealConfirmationPendingCount
+    });
+    return {
+      businessTodoSummary,
+      chatAvailability: this.toChatAvailability({
+        hasPendingParticipationReview: pendingParticipationCount > 0,
+        publisherMaterialReviewPendingCount,
+        bidMaterialReviewPendingCount: bidMaterialReviewPendingForChatCount,
+        dealConfirmationPendingCount,
+        bid,
+        viewerOrganizationId: input.viewerOrganizationId,
+        serviceFeeAuthorizationSatisfied: this.hasFrozenServiceFeeAuthorizationFromContext(
+          input,
+          bid,
+          context
+        )
+      })
+    };
+  }
+
+  private async loadBatchBids(inputs: ProjectCommunicationBusinessStateBatchInput[]) {
+    const bidIds = this.unique(inputs.map((input) => input.bidId ?? '').filter(Boolean));
+    const pairInputs = inputs.filter((input) => !input.bidId);
+    const [bidsById, bidsByPair] = await Promise.all([
+      bidIds.length ? this.bidRepository.find({ where: { id: In(bidIds) } }) : Promise.resolve([]),
+      pairInputs.length
+        ? this.bidRepository.find({
+            where: pairInputs.map((input) => ({
+              projectId: input.projectId,
+              bidderOrganizationId: input.counterpartOrganizationId
+            }))
+          })
+        : Promise.resolve([])
+    ]);
+    const bidById = new Map(bidsById.map((bid) => [bid.id, bid]));
+    const bidByPair = new Map(
+      bidsByPair.map((bid) => [
+        this.projectCounterpartKey({
+          projectId: bid.projectId,
+          counterpartOrganizationId: this.bidderOrganizationId(bid)
+        }),
+        bid
+      ])
+    );
+    return new Map(
+      inputs.map((input) => {
+        const bid = input.bidId
+          ? bidById.get(input.bidId) ?? null
+          : bidByPair.get(this.projectCounterpartKey(input)) ?? null;
+        return [input.cacheKey, this.isPairBid(input, bid) ? bid : null] as const;
+      })
+    );
+  }
+
+  private async loadPendingParticipationCountMap(
+    projectIds: string[],
+    counterpartOrganizationIds: string[]
+  ) {
+    if (!projectIds.length || !counterpartOrganizationIds.length) {
+      return new Map<string, number>();
+    }
+    const requests = await this.bidParticipationRepository.find({
+      where: {
+        projectId: In(projectIds),
+        requesterOrganizationId: In(counterpartOrganizationIds),
+        state: 'pending'
+      }
+    });
+    const countByPair = new Map<string, number>();
+    for (const request of requests) {
+      const key = this.projectCounterpartKey({
+        projectId: request.projectId,
+        counterpartOrganizationId: request.requesterOrganizationId
+      });
+      countByPair.set(key, (countByPair.get(key) ?? 0) + 1);
+    }
+    return countByPair;
+  }
+
+  private async loadPublisherMaterialSourcesMap(projectIds: string[]) {
+    const result = new Map<string, Map<ProjectQuoteBasisMaterialKind, MaterialSource>>();
+    for (const projectId of projectIds) {
+      result.set(projectId, this.emptyPublisherMaterialSources());
+    }
+    if (!projectIds.length) {
+      return result;
+    }
+    const attachments = await this.attachmentRepository.find({
+      where: {
+        projectId: In(projectIds),
+        attachmentKind: In(PUBLISHER_MATERIAL_KINDS),
+        visibility: 'owner_private'
+      },
+      order: { projectId: 'ASC', sortOrder: 'ASC', createdAt: 'ASC' }
+    });
+    const grouped = new Map<string, ProjectAttachmentEntity[]>();
+    for (const attachment of attachments) {
+      const key = [attachment.projectId, attachment.attachmentKind].join(':');
+      grouped.set(key, [...(grouped.get(key) ?? []), attachment]);
+    }
+    for (const projectId of projectIds) {
+      const sources = new Map<ProjectQuoteBasisMaterialKind, MaterialSource>();
+      for (const kind of PUBLISHER_MATERIAL_KINDS) {
+        const items = grouped.get([projectId, kind].join(':')) ?? [];
+        sources.set(kind, {
+          attachmentCount: items.length,
+          sourceVersionToken: items.length
+            ? this.hashSource(items.map((item) => `${item.id}:${item.fileAssetId}:${item.createdAt.toISOString()}`))
+            : null
+        });
+      }
+      result.set(projectId, sources);
+    }
+    return result;
+  }
+
+  private async loadReviewMap(projectIds: string[], reviewerOrganizationIds: string[]) {
+    if (!projectIds.length || !reviewerOrganizationIds.length) {
+      return new Map<string, ProjectCommunicationMaterialReviewEntity[]>();
+    }
+    const reviews = await this.reviewRepository.find({
+      where: {
+        projectId: In(projectIds),
+        reviewerOrganizationId: In(reviewerOrganizationIds)
+      }
+    });
+    const reviewsBySubjectKey = new Map<string, ProjectCommunicationMaterialReviewEntity[]>();
+    for (const review of reviews) {
+      const key = this.reviewSubjectKey(review.projectId, review.bidId, review.reviewerOrganizationId);
+      reviewsBySubjectKey.set(key, [...(reviewsBySubjectKey.get(key) ?? []), review]);
+    }
+    return reviewsBySubjectKey;
+  }
+
+  private async loadPendingConfirmationMap(projectIds: string[]) {
+    if (!projectIds.length) {
+      return new Map<string, ContractConfirmationEntity[]>();
+    }
+    const confirmations = await this.contractConfirmationRepository.find({
+      where: {
+        taskId: In(projectIds),
+        contractStatus: In([...PENDING_DEAL_CONFIRMATION_STATUSES])
+      }
+    });
+    const byProjectId = new Map<string, ContractConfirmationEntity[]>();
+    for (const confirmation of confirmations) {
+      byProjectId.set(confirmation.taskId, [
+        ...(byProjectId.get(confirmation.taskId) ?? []),
+        confirmation
+      ]);
+    }
+    return byProjectId;
+  }
+
+  private async loadFrozenAuthorizationMap(bids: Array<BidEntity | null>) {
+    if (!this.authorizationRepository) {
+      return new Map<string, PlatformServiceFeeAuthorizationEntity>();
+    }
+    const activeBids = bids.filter((bid): bid is BidEntity => Boolean(bid));
+    const bidIds = this.unique(activeBids.map((bid) => bid.id));
+    const projectIds = this.unique(activeBids.map((bid) => bid.projectId));
+    if (!bidIds.length || !projectIds.length) {
+      return new Map<string, PlatformServiceFeeAuthorizationEntity>();
+    }
+    const authorizations = await this.authorizationRepository.find({
+      where: {
+        taskId: In(projectIds),
+        bidId: In(bidIds),
+        status: 'frozen'
+      },
+      order: { updatedAt: 'DESC' }
+    });
+    const bySubjectKey = new Map<string, PlatformServiceFeeAuthorizationEntity>();
+    for (const authorization of authorizations) {
+      for (const organizationId of [
+        authorization.bidderOrganizationId,
+        authorization.factoryOrganizationId
+      ]) {
+        const bidderOrganizationId = organizationId?.trim() ?? '';
+        if (!bidderOrganizationId) {
+          continue;
+        }
+        const key = this.authorizationSubjectKey(
+          authorization.taskId,
+          authorization.bidId,
+          bidderOrganizationId
+        );
+        if (!bySubjectKey.has(key)) {
+          bySubjectKey.set(key, authorization);
+        }
+      }
+    }
+    return bySubjectKey;
+  }
+
+  private countPublisherMaterialReviewsFromContext(
+    input: ProjectCommunicationBusinessStateBatchInput,
+    bid: BidEntity | null,
+    context: BusinessStateBatchContext
+  ) {
+    if (input.viewerOrganizationId !== input.counterpartOrganizationId) {
+      return 0;
+    }
+    const publisherSources =
+      context.publisherMaterialSourcesByProjectId.get(input.projectId) ??
+      this.emptyPublisherMaterialSources();
+    const reviews = bid
+      ? [
+          ...this.reviewsFor(context, input.projectId, bid.id, input.viewerOrganizationId),
+          ...this.reviewsFor(
+            context,
+            input.projectId,
+            PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
+            input.viewerOrganizationId
+          )
+        ]
+      : this.reviewsFor(
+          context,
+          input.projectId,
+          PROJECT_COMMUNICATION_NO_BID_REVIEW_BID_ID,
+          input.viewerOrganizationId
+        );
+    return projectCommunicationWorkbenchEntryDefinitions
+      .filter((definition) => definition.group === 'publisher_materials')
+      .filter((definition) =>
+        this.needsMaterialReview(
+          publisherSources.get(definition.materialKind as ProjectQuoteBasisMaterialKind),
+          definition,
+          reviews
+        )
+      ).length;
+  }
+
+  private countBidMaterialReviewsFromContext(
+    input: ProjectCommunicationBusinessStateBatchInput,
+    bid: BidEntity | null,
+    reviewerOrganizationId: string,
+    shouldCount: boolean,
+    context: BusinessStateBatchContext
+  ) {
+    if (!shouldCount || !bid) {
+      return 0;
+    }
+    const reviews = this.reviewsFor(context, input.projectId, bid.id, reviewerOrganizationId);
+    return this.countBidMaterialReviewsFromReviewList(bid, reviews);
+  }
+
+  private countPendingDealConfirmationsFromContext(
+    input: ProjectCommunicationBusinessStateBatchInput,
+    context: BusinessStateBatchContext
+  ) {
+    const confirmations = context.pendingConfirmationsByProjectId.get(input.projectId) ?? [];
+    return confirmations.filter((confirmation) => {
+      if (
+        input.viewerOrganizationId === confirmation.publisherOrganizationId &&
+        !confirmation.publisherConfirmedAt
+      ) {
+        return true;
+      }
+      return (
+        input.viewerOrganizationId === confirmation.factoryOrganizationId &&
+        !confirmation.factoryConfirmedAt
+      );
+    }).length;
+  }
+
+  private hasFrozenServiceFeeAuthorizationFromContext(
+    input: ProjectCommunicationBusinessStateBatchInput,
+    bid: BidEntity | null,
+    context: BusinessStateBatchContext
+  ) {
+    if (!bid) {
+      return false;
+    }
+    const authorization = context.frozenAuthorizationBySubjectKey.get(
+      this.authorizationSubjectKey(input.projectId, bid.id, this.bidderOrganizationId(bid))
+    );
+    return (
+      authorization?.status === 'frozen' &&
+      this.normalizeMoney(authorization.authorizationQuotaAmount) === BID_SERVICE_FEE_AUTHORIZATION_QUOTA_AMOUNT
+    );
+  }
+
+  private countBidMaterialReviewsFromReviewList(
+    bid: BidEntity,
+    reviews: ProjectCommunicationMaterialReviewEntity[]
+  ) {
+    return projectCommunicationWorkbenchEntryDefinitions
+      .filter((definition) => definition.group === 'bid_materials')
+      .filter((definition) =>
+        this.needsMaterialReview(
+          this.bidMaterialSource(bid, definition.bidMaterialSlot),
+          definition,
+          reviews
+        )
+      ).length;
+  }
+
+  private reviewsFor(
+    context: BusinessStateBatchContext,
+    projectId: string,
+    bidId: string,
+    reviewerOrganizationId: string
+  ) {
+    return context.reviewsBySubjectKey.get(
+      this.reviewSubjectKey(projectId, bidId, reviewerOrganizationId)
+    ) ?? [];
+  }
+
+  private emptyPublisherMaterialSources() {
+    return new Map(
+      PUBLISHER_MATERIAL_KINDS.map((kind) => [
+        kind,
+        { attachmentCount: 0, sourceVersionToken: null }
+      ])
+    );
+  }
+
+  private projectCounterpartKey(input: {
+    projectId: string;
+    counterpartOrganizationId: string;
+  }) {
+    return [input.projectId, input.counterpartOrganizationId].join(':');
+  }
+
+  private reviewSubjectKey(
+    projectId: string,
+    bidId: string,
+    reviewerOrganizationId: string
+  ) {
+    return [projectId, bidId, reviewerOrganizationId].join(':');
+  }
+
+  private authorizationSubjectKey(
+    projectId: string,
+    bidId: string,
+    bidderOrganizationId: string
+  ) {
+    return [projectId, bidId, bidderOrganizationId].join(':');
+  }
+
+  private unique(values: string[]) {
+    return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
   }
 
   private async resolveBid(input: ProjectCommunicationBusinessStateInput) {

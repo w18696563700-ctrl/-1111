@@ -1,4 +1,4 @@
-import { Injectable, Optional } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { ProjectEntity } from '../project/entities/project.entity';
@@ -71,8 +71,38 @@ type SeedConversationAggregate = {
   projectGroups: Map<string, ProjectGroupAggregate>;
 };
 
+type CounterpartConversationBuildLogContext = {
+  requestId?: string;
+  traceId?: string;
+  source?: string;
+};
+
+type CounterpartConversationBuildTiming = {
+  step: string;
+  durationMs: number;
+};
+
+type ProjectPairLookup = {
+  cacheKey: string;
+  conversationId: string;
+  projectId: string;
+  ownerOrganizationId: string;
+  counterpartOrganizationId: string;
+  group: ProjectGroupAggregate;
+};
+
+type ProjectCommunicationBusinessStateBatchInput = {
+  cacheKey: string;
+  projectId: string;
+  ownerOrganizationId: string;
+  counterpartOrganizationId: string;
+  viewerOrganizationId: string;
+  bidId?: string | null;
+};
+
 @Injectable()
 export class CounterpartConversationProjectionService {
+  private readonly logger = new Logger(CounterpartConversationProjectionService.name);
   private readonly cardSources: CounterpartConversationCardSource[];
 
   constructor(
@@ -105,8 +135,9 @@ export class CounterpartConversationProjectionService {
 
   async listConversations(
     viewerOrganizationId: string,
+    logContext: CounterpartConversationBuildLogContext = {},
   ): Promise<CounterpartConversationListItemProjection[]> {
-    const catalog = await this.buildConversationCatalog(viewerOrganizationId);
+    const catalog = await this.buildConversationCatalog(viewerOrganizationId, logContext);
     return catalog.map((conversation) => ({
       interactionId: conversation.conversationId,
       interactionType: 'counterpart_conversation',
@@ -169,45 +200,88 @@ export class CounterpartConversationProjectionService {
     };
   }
 
-  private async buildConversationCatalog(viewerOrganizationId: string) {
-    const seeds = await this.loadCardSeeds(viewerOrganizationId);
+  private async buildConversationCatalog(
+    viewerOrganizationId: string,
+    logContext: CounterpartConversationBuildLogContext = {},
+  ) {
+    const startedAt = Date.now();
+    const timings: CounterpartConversationBuildTiming[] = [];
+    const seeds = await this.timeStep(timings, 'loadCardSeeds', () =>
+      this.loadCardSeeds(viewerOrganizationId, timings),
+    );
     if (!seeds.length) {
+      this.logBuildTiming({
+        logContext,
+        timings,
+        totalDurationMs: Date.now() - startedAt,
+        seedCount: 0,
+        projectCount: 0,
+        conversationCount: 0,
+        projectPairCount: 0,
+      });
       return [];
     }
 
     const projectIds = [...new Set(seeds.map((item) => item.projectId))];
     const [projects, ratingEntryMap, unreadStatsByProjectId] = await Promise.all([
-      this.projectRepository.findBy({ id: In(projectIds) }),
-      this.buildRatingEntryMap(projectIds, viewerOrganizationId),
-      this.buildProjectUnreadStatsMap(projectIds, viewerOrganizationId),
+      this.timeStep(timings, 'loadBaseProjectionMaps:projectMap', () =>
+        this.projectRepository.findBy({ id: In(projectIds) }),
+      ),
+      this.timeStep(timings, 'loadBaseProjectionMaps:ratingMap', () =>
+        this.buildRatingEntryMap(projectIds, viewerOrganizationId),
+      ),
+      this.timeStep(timings, 'loadBaseProjectionMaps:unreadMap', () =>
+        this.buildProjectUnreadStatsMap(projectIds, viewerOrganizationId),
+      ),
     ]);
     const projectMap = new Map(projects.map((item) => [item.id, item]));
-    const nameAccessProjectionMap = await this.buildNameAccessProjectionMap({
-      projects,
+    const nameAccessProjectionMap = await this.timeStep(
+      timings,
+      'buildNameAccessProjectionMap',
+      () =>
+        this.buildNameAccessProjectionMap({
+          projects,
+          viewerOrganizationId,
+        }),
+    );
+    const conversationMap = this.groupSeedsByConversation(seeds);
+    const projectPairLookup = this.buildProjectPairLookup({
+      conversationMap,
+      projectMap,
       viewerOrganizationId,
     });
-    const conversationMap = this.groupSeedsByConversation(seeds);
+    const [businessStateByPairKey, threadIdByPairKey] = await Promise.all([
+      this.timeStep(timings, 'buildBusinessStateMap', () =>
+        this.buildBusinessStateMap({
+          lookups: projectPairLookup.all,
+          viewerOrganizationId,
+        }),
+      ),
+      this.timeStep(timings, 'buildProjectCommunicationThreadIdMap', () =>
+        this.buildProjectCommunicationThreadIdMap({
+          lookups: projectPairLookup.all,
+        }),
+      ),
+    ]);
+    const serviceFeeAuthorizationRouteTargetByPairKey = await this.timeStep(
+      timings,
+      'buildServiceFeeAuthorizationRouteTargetMap',
+      () =>
+        this.buildServiceFeeAuthorizationRouteTargetMap({
+          lookups: projectPairLookup.all,
+          viewerOrganizationId,
+          businessStateByPairKey,
+        }),
+    );
 
     const conversations = await Promise.all([...conversationMap.entries()]
       .map(async ([conversationId, aggregate]): Promise<ConversationAggregate | null> => {
+        const lookups = projectPairLookup.byConversationId.get(conversationId) ?? [];
         const businessStateByProjectId =
-          await this.buildBusinessStateMap({
-            aggregate,
-            projectMap,
-            viewerOrganizationId,
-          });
-        const threadIdByProjectId = await this.buildProjectCommunicationThreadIdMap({
-          aggregate,
-          projectMap,
-          viewerOrganizationId,
-        });
+          this.slicePairMapByProject(lookups, businessStateByPairKey);
+        const threadIdByProjectId = this.slicePairMapByProject(lookups, threadIdByPairKey);
         const serviceFeeAuthorizationRouteTargetByProjectId =
-          await this.buildServiceFeeAuthorizationRouteTargetMap({
-            aggregate,
-            projectMap,
-            viewerOrganizationId,
-            businessStateByProjectId,
-          });
+          this.slicePairMapByProject(lookups, serviceFeeAuthorizationRouteTargetByPairKey);
         const projectGroups = this.buildProjectGroups({
           aggregate,
           projectMap,
@@ -247,18 +321,37 @@ export class CounterpartConversationProjectionService {
           projectGroups,
         };
       }));
-    return conversations
+    const result = conversations
       .filter((conversation): conversation is ConversationAggregate =>
         Boolean(conversation),
       )
       .sort((left, right) =>
         right.latestActivityAt.localeCompare(left.latestActivityAt),
       );
+    this.logBuildTiming({
+      logContext,
+      timings,
+      totalDurationMs: Date.now() - startedAt,
+      seedCount: seeds.length,
+      projectCount: projectIds.length,
+      conversationCount: result.length,
+      projectPairCount: projectPairLookup.all.length,
+    });
+    return result;
   }
 
-  private async loadCardSeeds(viewerOrganizationId: string) {
+  private async loadCardSeeds(
+    viewerOrganizationId: string,
+    timings?: CounterpartConversationBuildTiming[],
+  ) {
     const seedGroups = await Promise.all(
-      this.cardSources.map((source) => source.buildSeeds(viewerOrganizationId)),
+      this.cardSources.map((source) =>
+        this.timeStep(
+          timings ?? [],
+          `seed:${source.constructor.name}`,
+          () => source.buildSeeds(viewerOrganizationId),
+        ),
+      ),
     );
     return seedGroups
       .flat()
@@ -299,6 +392,64 @@ export class CounterpartConversationProjectionService {
       this.appendSeedToAggregate(aggregate, seed);
     }
     return conversationMap;
+  }
+
+  private buildProjectPairLookup(input: {
+    conversationMap: Map<string, SeedConversationAggregate>;
+    projectMap: Map<string, ProjectEntity>;
+    viewerOrganizationId: string;
+  }) {
+    const uniqueLookups = new Map<string, ProjectPairLookup>();
+    const byConversationId = new Map<string, ProjectPairLookup[]>();
+    for (const [conversationId, aggregate] of input.conversationMap.entries()) {
+      const lookups: ProjectPairLookup[] = [];
+      for (const [projectId, group] of aggregate.projectGroups.entries()) {
+        const project = input.projectMap.get(projectId);
+        const ownerOrganizationId = project?.organizationId?.trim() ?? '';
+        const counterpartOrganizationId = project
+          ? this.resolveThreadCounterpartOrganizationId({
+              project,
+              aggregate,
+              viewerOrganizationId: input.viewerOrganizationId,
+            })
+          : '';
+        if (
+          !ownerOrganizationId ||
+          !counterpartOrganizationId ||
+          ownerOrganizationId === counterpartOrganizationId
+        ) {
+          continue;
+        }
+        const cacheKey = this.projectThreadKey({
+          projectId,
+          ownerOrganizationId,
+          counterpartOrganizationId,
+        });
+        const lookup = {
+          cacheKey,
+          conversationId,
+          projectId,
+          ownerOrganizationId,
+          counterpartOrganizationId,
+          group,
+        };
+        uniqueLookups.set(cacheKey, lookup);
+        lookups.push(lookup);
+      }
+      byConversationId.set(conversationId, lookups);
+    }
+    return { all: [...uniqueLookups.values()], byConversationId };
+  }
+
+  private slicePairMapByProject<T>(
+    lookups: ProjectPairLookup[],
+    valuesByPairKey: Map<string, T>,
+  ) {
+    return new Map(
+      lookups
+        .map((lookup) => [lookup.projectId, valuesByPairKey.get(lookup.cacheKey)] as const)
+        .filter((entry): entry is readonly [string, T] => Boolean(entry[1])),
+    );
   }
 
   private createConversationAggregate(seed: CounterpartConversationCardSeed): SeedConversationAggregate {
@@ -444,64 +595,78 @@ export class CounterpartConversationProjectionService {
   }
 
   private async buildBusinessStateMap(input: {
-    aggregate: SeedConversationAggregate;
-    projectMap: Map<string, ProjectEntity>;
+    lookups: ProjectPairLookup[];
     viewerOrganizationId: string;
   }) {
     if (!this.businessStateService) {
       return new Map(
-        [...input.aggregate.projectGroups.keys()].map((projectId) => [
-          projectId,
+        input.lookups.map((lookup) => [
+          lookup.cacheKey,
           this.emptyBusinessState(),
         ]),
       );
     }
-    const entries = await Promise.all([...input.aggregate.projectGroups.keys()].map(async (projectId) => {
-      const project = input.projectMap.get(projectId);
-      if (!project?.organizationId) {
-        return [projectId, this.emptyBusinessState()] as const;
-      }
-      const state = await this.businessStateService.buildForPair({
-        projectId,
-        ownerOrganizationId: project.organizationId,
-        counterpartOrganizationId: this.resolveThreadCounterpartOrganizationId({
-          project,
-          aggregate: input.aggregate,
-          viewerOrganizationId: input.viewerOrganizationId,
-        }),
+    const batchInputs: ProjectCommunicationBusinessStateBatchInput[] =
+      input.lookups.map((lookup) => ({
+        cacheKey: lookup.cacheKey,
+        projectId: lookup.projectId,
+        ownerOrganizationId: lookup.ownerOrganizationId,
+        counterpartOrganizationId: lookup.counterpartOrganizationId,
         viewerOrganizationId: input.viewerOrganizationId,
+        bidId: this.serviceFeeAuthorizationBidId(lookup.group),
+      }));
+    const batchBuilder = (
+      this.businessStateService as {
+        buildForPairs?: (
+          inputs: ProjectCommunicationBusinessStateBatchInput[],
+        ) => Promise<Map<string, ProjectCommunicationBusinessState>>;
+      }
+    ).buildForPairs?.bind(this.businessStateService);
+    if (batchBuilder) {
+      const stateByPairKey = await batchBuilder(batchInputs);
+      return new Map(
+        input.lookups.map((lookup) => [
+          lookup.cacheKey,
+          stateByPairKey.get(lookup.cacheKey) ?? this.emptyBusinessState(),
+        ]),
+      );
+    }
+    const entries = await Promise.all(batchInputs.map(async (item) => {
+      const state = await this.businessStateService!.buildForPair({
+        projectId: item.projectId,
+        ownerOrganizationId: item.ownerOrganizationId,
+        counterpartOrganizationId: item.counterpartOrganizationId,
+        viewerOrganizationId: item.viewerOrganizationId,
+        bidId: item.bidId,
       });
-      return [projectId, state] as const;
+      return [item.cacheKey, state] as const;
     }));
     return new Map(entries);
   }
 
   private async buildServiceFeeAuthorizationRouteTargetMap(input: {
-    aggregate: SeedConversationAggregate;
-    projectMap: Map<string, ProjectEntity>;
+    lookups: ProjectPairLookup[];
     viewerOrganizationId: string;
-    businessStateByProjectId: Map<string, ProjectCommunicationBusinessState>;
+    businessStateByPairKey: Map<string, ProjectCommunicationBusinessState>;
   }) {
     if (!this.bidParticipationRepository) {
       return new Map<string, CounterpartConversationRouteTarget>();
     }
-    const candidateProjectIds = [...input.aggregate.projectGroups.keys()]
-      .filter((projectId) => {
-        const project = input.projectMap.get(projectId);
-        const businessState = input.businessStateByProjectId.get(projectId);
+    const candidateLookups = input.lookups
+      .filter((lookup) => {
+        const businessState = input.businessStateByPairKey.get(lookup.cacheKey);
         return (
-          project?.organizationId &&
-          project.organizationId !== input.viewerOrganizationId &&
+          lookup.ownerOrganizationId !== input.viewerOrganizationId &&
           businessState?.chatAvailability.requiredNextAction ===
             'complete_service_fee_authorization'
         );
       });
-    if (!candidateProjectIds.length) {
+    if (!candidateLookups.length) {
       return new Map<string, CounterpartConversationRouteTarget>();
     }
     const requests = await this.bidParticipationRepository.find({
-      where: candidateProjectIds.map((projectId) => ({
-        projectId,
+      where: candidateLookups.map((lookup) => ({
+        projectId: lookup.projectId,
         requesterOrganizationId: input.viewerOrganizationId,
         state: 'approved',
       })),
@@ -514,15 +679,15 @@ export class CounterpartConversationProjectionService {
       }
     }
     return new Map(
-      candidateProjectIds
-        .map((projectId) => {
-          const request = requestByProjectId.get(projectId);
+      candidateLookups
+        .map((lookup) => {
+          const request = requestByProjectId.get(lookup.projectId);
           return request
             ? [
-                projectId,
+                lookup.cacheKey,
                 this.toServiceFeeAuthorizationRouteTarget(
                   request,
-                  input.aggregate.projectGroups.get(projectId),
+                  lookup.group,
                 ),
               ] as const
             : null;
@@ -577,55 +742,23 @@ export class CounterpartConversationProjectionService {
   }
 
   private async buildProjectCommunicationThreadIdMap(input: {
-    aggregate: SeedConversationAggregate;
-    projectMap: Map<string, ProjectEntity>;
-    viewerOrganizationId: string;
+    lookups: ProjectPairLookup[];
   }) {
-    const projectGroups = [...input.aggregate.projectGroups.entries()];
     if (!this.threadRepository) {
       return new Map(
-        projectGroups
-          .map(([projectId, group]) => [
-            projectId,
-            this.legacyProjectCommunicationThreadId(group),
+        input.lookups
+          .map((lookup) => [
+            lookup.cacheKey,
+            this.legacyProjectCommunicationThreadId(lookup.group),
           ] as const)
           .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
       );
     }
-    const lookup = projectGroups
-      .map(([projectId]) => {
-        const project = input.projectMap.get(projectId);
-        const ownerOrganizationId = project?.organizationId?.trim() ?? '';
-        const counterpartOrganizationId = project
-          ? this.resolveThreadCounterpartOrganizationId({
-              project,
-              aggregate: input.aggregate,
-              viewerOrganizationId: input.viewerOrganizationId,
-            })
-          : '';
-        if (
-          !ownerOrganizationId ||
-          !counterpartOrganizationId ||
-          ownerOrganizationId === counterpartOrganizationId
-        ) {
-          return null;
-        }
-        return {
-          projectId,
-          ownerOrganizationId,
-          counterpartOrganizationId,
-        };
-      })
-      .filter((item): item is {
-        projectId: string;
-        ownerOrganizationId: string;
-        counterpartOrganizationId: string;
-      } => Boolean(item));
-    if (!lookup.length) {
+    if (!input.lookups.length) {
       return new Map<string, string>();
     }
     const threads = await this.threadRepository.find({
-      where: lookup.map((item) => ({
+      where: input.lookups.map((item) => ({
         projectId: item.projectId,
         ownerOrganizationId: item.ownerOrganizationId,
         counterpartOrganizationId: item.counterpartOrganizationId,
@@ -642,9 +775,9 @@ export class CounterpartConversationProjectionService {
       ]),
     );
     return new Map(
-      lookup
+      input.lookups
         .map((item) => [
-          item.projectId,
+          item.cacheKey,
           threadIdByPair.get(this.projectThreadKey(item)),
         ] as const)
         .filter((entry): entry is readonly [string, string] => Boolean(entry[1])),
@@ -676,6 +809,40 @@ export class CounterpartConversationProjectionService {
       input.ownerOrganizationId,
       input.counterpartOrganizationId,
     ].join(':');
+  }
+
+  private async timeStep<T>(
+    timings: CounterpartConversationBuildTiming[],
+    step: string,
+    action: () => Promise<T>,
+  ) {
+    const startedAt = Date.now();
+    try {
+      return await action();
+    } finally {
+      timings.push({ step, durationMs: Date.now() - startedAt });
+    }
+  }
+
+  private logBuildTiming(input: {
+    logContext: CounterpartConversationBuildLogContext;
+    timings: CounterpartConversationBuildTiming[];
+    totalDurationMs: number;
+    seedCount: number;
+    projectCount: number;
+    conversationCount: number;
+    projectPairCount: number;
+  }) {
+    const stepMetrics = input.timings
+      .map((item) => `${item.step}:${item.durationMs}`)
+      .join(',');
+    this.logger.log(
+      `message_interactions_read_model source=${input.logContext.source ?? 'unknown'} ` +
+      `duration_ms=${input.totalDurationMs} request_id=${input.logContext.requestId ?? 'missing'} ` +
+      `trace_id=${input.logContext.traceId ?? 'missing'} seed_count=${input.seedCount} ` +
+      `project_count=${input.projectCount} conversation_count=${input.conversationCount} ` +
+      `project_pair_count=${input.projectPairCount} steps=${stepMetrics}`,
+    );
   }
 
   private summarizeProjectGroupUnread(

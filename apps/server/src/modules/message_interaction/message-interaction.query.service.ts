@@ -37,6 +37,11 @@ export class MessageInteractionQueryService {
     }
     const items = await this.counterpartConversationProjectionService.listConversations(
       organizationId,
+      {
+        requestId: context.requestId,
+        traceId: context.traceId,
+        source: 'message_interactions',
+      },
     );
     return this.presenter.toListResponse(normalizedLane, items);
   }

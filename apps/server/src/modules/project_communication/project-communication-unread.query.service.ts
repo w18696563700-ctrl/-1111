@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import { ProjectCommunicationMessageEntity } from './entities/project-communication-message.entity';
 import { ProjectCommunicationReadCursorEntity } from './entities/project-communication-read-cursor.entity';
 import { ProjectCommunicationThreadEntity } from './entities/project-communication-thread.entity';
@@ -9,6 +9,12 @@ export type ProjectCommunicationUnreadStats = {
   unreadCount: number;
   hasUnread: boolean;
   latestUnreadMessageAt: string | null;
+};
+
+type UnreadAggregateRow = {
+  projectId?: string;
+  unreadCount?: string | number;
+  latestUnreadMessageAt?: string | Date | null;
 };
 
 @Injectable()
@@ -112,22 +118,52 @@ export class ProjectCommunicationUnreadQueryService {
       return unreadByProjectId;
     }
 
-    const [cursors, messages] = await Promise.all([
-      this.readCursorRepository.find({
-        where: {
-          organizationId: input.viewerOrganizationId,
-          threadId: In(threads.map((thread) => thread.id)),
-        },
-      }),
-      this.messageRepository.find({
-        where: {
-          threadId: In(threads.map((thread) => thread.id)),
-          messageState: 'active',
-        },
-        order: { createdAt: 'ASC', id: 'ASC' },
-      }),
-    ]);
-    const cursorMap = new Map(cursors.map((cursor) => [cursor.threadId, cursor]));
+    const cursors = await this.readCursorRepository.find({
+      where: {
+        organizationId: input.viewerOrganizationId,
+        threadId: In(threads.map((thread) => thread.id)),
+      },
+    });
+    if (typeof this.messageRepository.createQueryBuilder !== 'function') {
+      const cursorMap = new Map(cursors.map((cursor) => [cursor.threadId, cursor]));
+      const cursorMessageMap = await this.loadCursorMessageMap(cursors);
+      return this.countUnreadMessagesByProjectInMemory({
+        unreadByProjectId,
+        threads,
+        viewerOrganizationId: input.viewerOrganizationId,
+        cursorMap,
+        cursorMessageMap,
+      });
+    }
+    const rows = await this.aggregateUnreadMessageRows({
+      threads,
+      viewerOrganizationId: input.viewerOrganizationId,
+    });
+
+    for (const row of rows) {
+      const projectId = row.projectId?.trim() ?? '';
+      if (!projectId) {
+        continue;
+      }
+      const unreadCount = Number(row.unreadCount ?? 0);
+      if (!Number.isFinite(unreadCount) || unreadCount <= 0) {
+        continue;
+      }
+      const current = unreadByProjectId.get(projectId) ?? this.emptyStats();
+      const latestUnreadMessageAt = this.toIso(row.latestUnreadMessageAt);
+      const mergedLatestUnreadMessageAt = latestUnreadMessageAt
+        ? this.maxIso(current.latestUnreadMessageAt, latestUnreadMessageAt)
+        : current.latestUnreadMessageAt;
+      unreadByProjectId.set(projectId, {
+        unreadCount: current.unreadCount + unreadCount,
+        hasUnread: true,
+        latestUnreadMessageAt: mergedLatestUnreadMessageAt,
+      });
+    }
+    return unreadByProjectId;
+  }
+
+  private async loadCursorMessageMap(cursors: ProjectCommunicationReadCursorEntity[]) {
     const cursorMessageIds = this.normalizeIds(
       cursors
         .map((cursor) => cursor.lastReadMessageId ?? '')
@@ -136,10 +172,64 @@ export class ProjectCommunicationUnreadQueryService {
     const cursorMessages = cursorMessageIds.length
       ? await this.messageRepository.findBy({ id: In(cursorMessageIds) })
       : [];
-    const cursorMessageMap = new Map(
-      cursorMessages.map((message) => [message.id, message]),
-    );
-    const threadMap = new Map(threads.map((thread) => [thread.id, thread]));
+    return new Map(cursorMessages.map((message) => [message.id, message]));
+  }
+
+  private async aggregateUnreadMessageRows(input: {
+    threads: ProjectCommunicationThreadEntity[];
+    viewerOrganizationId: string;
+  }) {
+    const query = this.messageRepository
+      .createQueryBuilder('message')
+      .innerJoin(ProjectCommunicationThreadEntity, 'thread', 'thread.id = message.thread_id')
+      .leftJoin(
+        ProjectCommunicationReadCursorEntity,
+        'cursor',
+        'cursor.thread_id = thread.id AND cursor.organization_id = :viewerOrganizationId',
+        { viewerOrganizationId: input.viewerOrganizationId },
+      )
+      .leftJoin(
+        ProjectCommunicationMessageEntity,
+        'cursor_message',
+        'cursor_message.id = cursor.last_read_message_id',
+      )
+      .select('thread.project_id', 'projectId')
+      .addSelect('COUNT(*)', 'unreadCount')
+      .addSelect('MAX(message.created_at)', 'latestUnreadMessageAt')
+      .where('thread.id IN (:...threadIds)', {
+        threadIds: input.threads.map((thread) => thread.id),
+      })
+      .andWhere('message.message_state = :messageState', { messageState: 'active' })
+      .andWhere('message.sender_organization_id <> :viewerOrganizationId', {
+        viewerOrganizationId: input.viewerOrganizationId,
+      })
+      .andWhere(
+        'message.created_at > COALESCE(' +
+          'CASE WHEN cursor_message.thread_id = thread.id THEN cursor_message.created_at END,' +
+          'cursor.last_read_at,' +
+          ':epoch' +
+        ')',
+        { epoch: new Date(0) },
+      )
+      .groupBy('thread.project_id');
+    return query.getRawMany<UnreadAggregateRow>();
+  }
+
+  private async countUnreadMessagesByProjectInMemory(input: {
+    unreadByProjectId: Map<string, ProjectCommunicationUnreadStats>;
+    threads: ProjectCommunicationThreadEntity[];
+    viewerOrganizationId: string;
+    cursorMap: Map<string, ProjectCommunicationReadCursorEntity>;
+    cursorMessageMap: Map<string, ProjectCommunicationMessageEntity>;
+  }) {
+    const messages = await this.messageRepository.find({
+      where: {
+        threadId: In(input.threads.map((thread) => thread.id)),
+        messageState: 'active',
+      },
+      order: { createdAt: 'ASC', id: 'ASC' },
+    });
+    const threadMap = new Map(input.threads.map((thread) => [thread.id, thread]));
 
     for (const message of messages) {
       const thread = threadMap.get(message.threadId);
@@ -149,16 +239,16 @@ export class ProjectCommunicationUnreadQueryService {
       if (message.senderOrganizationId === input.viewerOrganizationId) {
         continue;
       }
-      if (this.isCoveredByCursor(message, cursorMap.get(thread.id), cursorMessageMap)) {
+      if (this.isCoveredByCursor(message, input.cursorMap.get(thread.id), input.cursorMessageMap)) {
         continue;
       }
       this.incrementUnread(
-        unreadByProjectId,
+        input.unreadByProjectId,
         thread.projectId,
         message.createdAt,
       );
     }
-    return unreadByProjectId;
+    return input.unreadByProjectId;
   }
 
   private isCoveredByCursor(
@@ -200,6 +290,17 @@ export class ProjectCommunicationUnreadQueryService {
       return right;
     }
     return left >= right ? left : right;
+  }
+
+  private toIso(value: string | Date | null | undefined) {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return value.toISOString();
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
   private emptyStats(): ProjectCommunicationUnreadStats {
