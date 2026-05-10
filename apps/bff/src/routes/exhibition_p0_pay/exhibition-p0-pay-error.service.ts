@@ -132,6 +132,9 @@ export class ExhibitionP0PayErrorService {
   }
 
   private conflictCode(operation: Operation) {
+    if (operation === 'bid_service_fee_authorization_freeze_init') {
+      return 'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED';
+    }
     if (
       operation === 'create_task' ||
       operation === 'service_fee_authorization_create' ||
@@ -143,7 +146,6 @@ export class ExhibitionP0PayErrorService {
       operation === 'project_authenticity_sincerity_refund' ||
       operation === 'project_authenticity_sincerity_freeze_feedback' ||
       operation === 'bid_service_fee_authorization_create' ||
-      operation === 'bid_service_fee_authorization_freeze_init' ||
       operation === 'bid_service_fee_authorization_release' ||
       operation === 'contract_confirmation' ||
       operation === 'deal_confirmation' ||

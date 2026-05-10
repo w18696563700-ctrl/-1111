@@ -7,6 +7,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:crypto/crypto.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_visible_copy.dart';

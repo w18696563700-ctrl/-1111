@@ -170,3 +170,135 @@ test('notification service records APNs delivery result and deactivates invalid 
   assert.equal(tokens[0].tokenState, 'inactive');
   assert.equal(savedTokens.length, 1);
 });
+
+test('notification service creates forum interaction notifications in the forum bucket', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const savedNotifications = [];
+  const savedAttempts = [];
+  const notificationRepository = {
+    create(value) {
+      return {
+        ...value,
+        createdAt: new Date('2026-05-06T08:00:00.000Z'),
+        updatedAt: new Date('2026-05-06T08:00:00.000Z'),
+      };
+    },
+    async save(value) {
+      savedNotifications.push(value);
+      return value;
+    },
+  };
+  const tokenRepository = {
+    async findBy() {
+      return [];
+    },
+  };
+  const attemptRepository = {
+    create(value) {
+      return value;
+    },
+    async save(value) {
+      savedAttempts.push(...(Array.isArray(value) ? value : [value]));
+      return value;
+    },
+  };
+  const manager = {
+    getRepository(entity) {
+      if (String(entity?.name).includes('AppNotificationEntity')) return notificationRepository;
+      if (String(entity?.name).includes('DevicePushTokenEntity')) return tokenRepository;
+      if (String(entity?.name).includes('PushDeliveryAttemptEntity')) return attemptRepository;
+      throw new Error('Unexpected repository ' + entity?.name);
+    },
+  };
+  const service = new NotificationService(
+    {},
+    {},
+    {},
+    createVerifier(),
+    new NotificationPresenter(),
+    undefined,
+    {
+      async deliver() {
+        throw new Error('no token should be delivered');
+      },
+    },
+  );
+
+  await service.createForumInteractionNotification(
+    {
+      tab: 'replies',
+      title: '有新的论坛回复',
+      body: '有人评论了你的帖子。',
+      recipientUserId: 'owner-user',
+      recipientOrganizationId: 'owner-org',
+      actorUserId: 'other-user',
+      targetId: 'post-1',
+    },
+    manager,
+  );
+
+  assert.equal(savedNotifications.length, 1);
+  assert.equal(savedNotifications[0].type, 'forum_interaction');
+  assert.equal(savedNotifications[0].source, 'forum_interaction');
+  assert.equal(savedNotifications[0].userId, 'owner-user');
+  assert.equal(savedNotifications[0].organizationId, 'owner-org');
+  assert.deepEqual(savedNotifications[0].routeTarget, {
+    canonicalPath: '/api/app/forum/interaction/inbox',
+    localEntryKey: 'forum_interaction.open',
+    requiredParams: ['tab'],
+    routeParams: {
+      tab: 'replies',
+      targetId: 'post-1',
+    },
+    state: 'enabled',
+  });
+  assert.equal(savedAttempts.length, 1);
+  assert.equal(savedAttempts[0].attemptStatus, 'skipped');
+  assert.equal(savedAttempts[0].errorCode, 'no_device_token');
+});
+
+test('notification service skips self forum interaction notifications', async () => {
+  const { NotificationService } = require('../dist/modules/notifications/notification.service.js');
+  const { NotificationPresenter } = require('../dist/modules/notifications/notification.presenter.js');
+  const savedNotifications = [];
+  const manager = {
+    getRepository(entity) {
+      if (String(entity?.name).includes('AppNotificationEntity')) {
+        return {
+          create(value) {
+            return value;
+          },
+          async save(value) {
+            savedNotifications.push(value);
+            return value;
+          },
+        };
+      }
+      throw new Error('Unexpected repository ' + entity?.name);
+    },
+  };
+  const service = new NotificationService(
+    {},
+    {},
+    {},
+    createVerifier(),
+    new NotificationPresenter(),
+  );
+
+  const result = await service.createForumInteractionNotification(
+    {
+      tab: 'likes',
+      title: '有新的论坛点赞',
+      body: '有人点赞了你的帖子。',
+      recipientUserId: 'same-user',
+      recipientOrganizationId: 'same-org',
+      actorUserId: 'same-user',
+      targetId: 'post-1',
+    },
+    manager,
+  );
+
+  assert.equal(result, null);
+  assert.equal(savedNotifications.length, 0);
+});

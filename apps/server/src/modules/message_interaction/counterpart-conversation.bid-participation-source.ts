@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { Brackets, In, Repository } from 'typeorm';
 import { BidParticipationRequestEntity } from '../bid_participation_request/entities/bid-participation-request.entity';
 import {
   buildBidParticipationSubmitRouteTarget,
@@ -21,6 +21,14 @@ import {
 export class CounterpartConversationBidParticipationSource
   implements CounterpartConversationCardSource
 {
+  private static readonly joinedProjectAliases = {
+    id: 'joined_project_id',
+    organizationId: 'joined_project_organization_id',
+    creatorUserId: 'joined_project_creator_user_id',
+    state: 'joined_project_state',
+    publishedAt: 'joined_project_published_at',
+  } as const;
+
   constructor(
     @InjectRepository(BidParticipationRequestEntity)
     private readonly requestRepository: Repository<BidParticipationRequestEntity>,
@@ -35,41 +43,79 @@ export class CounterpartConversationBidParticipationSource
   ) {}
 
   async buildSeeds(viewerOrganizationId: string) {
-    const requests = await this.requestRepository
-      .createQueryBuilder('request')
-      .innerJoin(ProjectEntity, 'project', 'project.id = request.project_id')
-      .where('request.requester_organization_id = :organizationId', {
-        organizationId: viewerOrganizationId,
-      })
-      .orWhere('project.organization_id = :organizationId', {
-        organizationId: viewerOrganizationId,
-      })
-      .orderBy('request.updated_at', 'DESC')
-      .addOrderBy('request.created_at', 'DESC')
-      .getMany();
+    const { requests, projectMap } = await this.loadRequestsWithProjectMap(
+      viewerOrganizationId,
+    );
     if (!requests.length) {
       return [];
     }
 
-    const projectMap = await this.loadProjectMap(requests);
     const counterpart = await this.loadCounterpartContext(
       requests,
       projectMap,
       viewerOrganizationId,
     );
-    const seeds: CounterpartConversationCardSeed[] = [];
-    for (const request of requests) {
-      const seed = await this.toSeed({
+    const avatarUrlCache = new Map<string, Promise<string | null>>();
+    const seeds = await Promise.all(requests.map((request) =>
+      this.toSeed({
         request,
         projectMap,
         counterpart,
         viewerOrganizationId,
-      });
-      if (seed) {
-        seeds.push(seed);
-      }
+        avatarUrlCache,
+      }),
+    ));
+    return seeds.filter((seed): seed is CounterpartConversationCardSeed =>
+      Boolean(seed),
+    );
+  }
+
+  private async loadRequestsWithProjectMap(viewerOrganizationId: string) {
+    const query = this.requestRepository
+      .createQueryBuilder('request')
+      .innerJoin(ProjectEntity, 'project', 'project.id = request.project_id')
+      .where(new Brackets((where) => {
+        where
+          .where('request.requester_organization_id = :organizationId', {
+            organizationId: viewerOrganizationId,
+          })
+          .orWhere('project.organization_id = :organizationId', {
+            organizationId: viewerOrganizationId,
+          });
+      }));
+    if (typeof query.andWhere === 'function') {
+      query
+        .andWhere('project.state <> :archivedState', { archivedState: 'archived' })
+        .andWhere('project.published_at IS NOT NULL');
     }
-    return seeds;
+    if (
+      typeof query.addSelect === 'function' &&
+      typeof query.getRawAndEntities === 'function'
+    ) {
+      const aliases = CounterpartConversationBidParticipationSource.joinedProjectAliases;
+      query
+        .addSelect('project.id', aliases.id)
+        .addSelect('project.organization_id', aliases.organizationId)
+        .addSelect('project.creator_user_id', aliases.creatorUserId)
+        .addSelect('project.state', aliases.state)
+        .addSelect('project.published_at', aliases.publishedAt);
+      const { raw, entities } = await query
+        .orderBy('request.updated_at', 'DESC')
+        .addOrderBy('request.created_at', 'DESC')
+        .getRawAndEntities();
+      return {
+        requests: entities,
+        projectMap: this.buildProjectMapFromRaw(raw),
+      };
+    }
+    const requests = await query
+      .orderBy('request.updated_at', 'DESC')
+      .addOrderBy('request.created_at', 'DESC')
+      .getMany();
+    return {
+      requests,
+      projectMap: await this.loadProjectMap(requests),
+    };
   }
 
   private async loadProjectMap(requests: BidParticipationRequestEntity[]) {
@@ -80,7 +126,7 @@ export class CounterpartConversationBidParticipationSource
 
   private async loadCounterpartContext(
     requests: BidParticipationRequestEntity[],
-    projectMap: Map<string, ProjectEntity>,
+    projectMap: Map<string, BidParticipationProjectSnapshot>,
     viewerOrganizationId: string,
   ) {
     const organizationIds = new Set<string>();
@@ -119,10 +165,11 @@ export class CounterpartConversationBidParticipationSource
 
   private async toSeed(input: {
     request: BidParticipationRequestEntity;
-    projectMap: Map<string, ProjectEntity>;
+    projectMap: Map<string, BidParticipationProjectSnapshot>;
     counterpart: Awaited<ReturnType<CounterpartConversationBidParticipationSource['loadCounterpartContext']>>;
     viewerOrganizationId: string;
-  }) {
+    avatarUrlCache: Map<string, Promise<string | null>>;
+  }): Promise<CounterpartConversationCardSeed | null> {
     const project = input.projectMap.get(input.request.projectId);
     if (!project || project.state === 'archived' || project.publishedAt == null) {
       return null;
@@ -164,7 +211,8 @@ export class CounterpartConversationBidParticipationSource
       counterpartDisplayName,
       counterpartNickname: this.displayNameService.resolveNickname(counterpartUser),
       counterpartCompanyName,
-      counterpartAvatarUrl: await this.avatarService.readAvatarUrl(
+      counterpartAvatarUrl: await this.readCachedAvatarUrl(
+        input.avatarUrlCache,
         counterpartUser?.avatarUrl ?? null,
       ),
       counterpartCertificationSummary:
@@ -211,4 +259,60 @@ export class CounterpartConversationBidParticipationSource
       },
     };
   }
+
+  private buildProjectMapFromRaw(rawRows: Record<string, unknown>[]) {
+    const aliases = CounterpartConversationBidParticipationSource.joinedProjectAliases;
+    const projectMap = new Map<string, BidParticipationProjectSnapshot>();
+    for (const row of rawRows) {
+      const id = this.readString(row[aliases.id]);
+      if (!id) {
+        continue;
+      }
+      projectMap.set(id, {
+        id,
+        organizationId: this.readString(row[aliases.organizationId]),
+        creatorUserId: this.readString(row[aliases.creatorUserId]),
+        state: this.readString(row[aliases.state]),
+        publishedAt: this.readDate(row[aliases.publishedAt]),
+      });
+    }
+    return projectMap;
+  }
+
+  private readString(value: unknown) {
+    return typeof value === 'string' ? value.trim() : '';
+  }
+
+  private readDate(value: unknown) {
+    if (!value) {
+      return null;
+    }
+    if (value instanceof Date) {
+      return Number.isNaN(value.getTime()) ? null : value;
+    }
+    const date = new Date(String(value));
+    return Number.isNaN(date.getTime()) ? null : date;
+  }
+
+  private async readCachedAvatarUrl(
+    cache: Map<string, Promise<string | null>>,
+    value: string | null | undefined,
+  ) {
+    const normalized = value?.trim() ?? '';
+    if (!normalized) {
+      return null;
+    }
+    const existing = cache.get(normalized);
+    if (existing) {
+      return existing;
+    }
+    const pending = this.avatarService.readAvatarUrl(normalized);
+    cache.set(normalized, pending);
+    return pending;
+  }
 }
+
+type BidParticipationProjectSnapshot = Pick<
+  ProjectEntity,
+  'id' | 'organizationId' | 'creatorUserId' | 'state' | 'publishedAt'
+>;

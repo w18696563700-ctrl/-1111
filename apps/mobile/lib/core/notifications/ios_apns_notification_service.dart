@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -37,6 +38,47 @@ class IosApnsNotificationService {
           channel ?? const MethodChannel('exhibition_home/apns_notifications');
 
   final MethodChannel _channel;
+
+  Future<void> installRouteTargetOpenHandler(
+    FutureOr<void> Function(Map<String, Object?> routeTarget)
+    onRouteTargetOpened,
+  ) async {
+    if (!Platform.isIOS) {
+      return;
+    }
+    _channel.setMethodCallHandler((MethodCall call) async {
+      if (call.method != 'notificationRouteTargetOpened') {
+        throw MissingPluginException(
+          'Unsupported APNs notification method ${call.method}',
+        );
+      }
+      final routeTarget = _mapRouteTarget(call.arguments);
+      if (routeTarget == null) {
+        return;
+      }
+      await onRouteTargetOpened(routeTarget);
+    });
+    final pending = await consumePendingRouteTarget();
+    if (pending != null) {
+      await onRouteTargetOpened(pending);
+    }
+  }
+
+  Future<Map<String, Object?>?> consumePendingRouteTarget() async {
+    if (!Platform.isIOS) {
+      return null;
+    }
+    try {
+      final payload = await _channel.invokeMapMethod<String, Object?>(
+        'pendingRouteTarget',
+      );
+      return _mapRouteTarget(payload);
+    } on PlatformException {
+      return null;
+    } on MissingPluginException {
+      return null;
+    }
+  }
 
   Future<IosApnsRegistrationResult> requestAuthorizationAndToken() async {
     if (!Platform.isIOS) {
@@ -90,5 +132,15 @@ class IosApnsNotificationService {
       deviceToken: token == null || token.isEmpty ? null : token,
       message: payload['message']?.toString(),
     );
+  }
+
+  Map<String, Object?>? _mapRouteTarget(Object? payload) {
+    if (payload is! Map) {
+      return null;
+    }
+    final mapped = payload.map<String, Object?>(
+      (Object? key, Object? value) => MapEntry('$key', value),
+    );
+    return mapped.isEmpty ? null : mapped;
   }
 }

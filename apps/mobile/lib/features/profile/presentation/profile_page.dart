@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:mobile/core/api/app_ui_contracts.dart';
 import 'package:mobile/core/auth/app_session_store.dart';
 import 'package:mobile/core/boot/app_shell_context.dart';
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_published_change_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_workbench_consumer_layer.dart';
@@ -357,10 +358,13 @@ class _ProfilePageState extends State<ProfilePage> {
                         companyEntry,
                         memberManagementEntry,
                         membershipEntry,
-                        creditEntry,
-                        reserveCreditScoringEntry,
+                        if (RcReleaseFlags.profileCreditReserveEntriesEnabled)
+                          creditEntry,
+                        if (RcReleaseFlags.profileCreditReserveEntriesEnabled)
+                          reserveCreditScoringEntry,
                         governanceAppealsEntry,
-                        paymentEntry,
+                        if (RcReleaseFlags.profileFinancialReserveEntriesEnabled)
+                          paymentEntry,
                       ],
                     ),
                     const SizedBox(height: 24),
@@ -368,7 +372,7 @@ class _ProfilePageState extends State<ProfilePage> {
                       title: '我的资产',
                       children: <Widget>[
                         projectEntry,
-                        forumEntry,
+                        if (RcReleaseFlags.forumPublishingEnabled) forumEntry,
                         companyDisplayEntry,
                         factoryDisplayEntry,
                         supplierDisplayEntry,
@@ -385,12 +389,15 @@ class _ProfilePageState extends State<ProfilePage> {
                   companyEntry,
                   memberManagementEntry,
                   membershipEntry,
-                  creditEntry,
-                  reserveCreditScoringEntry,
+                  if (RcReleaseFlags.profileCreditReserveEntriesEnabled)
+                    creditEntry,
+                  if (RcReleaseFlags.profileCreditReserveEntriesEnabled)
+                    reserveCreditScoringEntry,
                   governanceAppealsEntry,
-                  paymentEntry,
+                  if (RcReleaseFlags.profileFinancialReserveEntriesEnabled)
+                    paymentEntry,
                   projectEntry,
-                  forumEntry,
+                  if (RcReleaseFlags.forumPublishingEnabled) forumEntry,
                   companyDisplayEntry,
                   factoryDisplayEntry,
                   supplierDisplayEntry,

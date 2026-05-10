@@ -56,10 +56,11 @@ class _HomeForumModulePanelState extends State<_HomeForumModulePanel> {
               onPressed: widget.onOpenForum,
               primary: true,
             ),
-            _HomeChannelAction(
-              label: '去写帖子',
-              onPressed: widget.onOpenForumPublish,
-            ),
+            if (RcReleaseFlags.forumPublishingEnabled)
+              _HomeChannelAction(
+                label: '去写帖子',
+                onPressed: widget.onOpenForumPublish,
+              ),
             _HomeChannelAction(label: '刷新', onPressed: _loadFeed),
           ],
         ),
@@ -94,16 +95,19 @@ class _HomeForumModulePanelState extends State<_HomeForumModulePanel> {
         else if (state == AppPageState.empty)
           _HomeStateNotice(
             title: '当前论坛还没有公开帖子',
-            message: '可以先打开论坛查看全部内容，或直接去写帖子。',
+            message: RcReleaseFlags.forumPublishingEnabled
+                ? '可以先打开论坛查看全部内容，或直接去写帖子。'
+                : '可以先打开论坛查看全部内容。论坛发帖入口当前暂未开放。',
             actions: <Widget>[
               OutlinedButton(
                 onPressed: widget.onOpenForum,
                 child: const Text('打开论坛'),
               ),
-              FilledButton(
-                onPressed: widget.onOpenForumPublish,
-                child: const Text('去写帖子'),
-              ),
+              if (RcReleaseFlags.forumPublishingEnabled)
+                FilledButton(
+                  onPressed: widget.onOpenForumPublish,
+                  child: const Text('去写帖子'),
+                ),
             ],
           )
         else

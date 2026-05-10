@@ -500,6 +500,120 @@ test('business state opens project free-send after frozen service fee authorizat
   assert.equal(result.chatAvailability.requiredNextAction, 'none');
 });
 
+test('business state batch keeps project and counterpart pairs isolated', async () => {
+  const {
+    ProjectCommunicationBusinessStateService,
+  } = require('../dist/modules/project_communication/project-communication-business-state.service.js');
+  const bidUpdatedAt = new Date('2026-05-02T01:05:00.000Z');
+  const service = new ProjectCommunicationBusinessStateService(
+    {
+      async find() {
+        return [
+          {
+            projectId: 'project-1',
+            requesterOrganizationId: 'org-bidder-a',
+            state: 'pending',
+          },
+        ];
+      },
+      async countBy() {
+        throw new Error('batch path should not call countBy');
+      },
+    },
+    {
+      async find(options) {
+        const whereItems = Array.isArray(options?.where) ? options.where : [options?.where ?? {}];
+        const bids = [
+          {
+            id: 'bid-2',
+            projectId: 'project-2',
+            bidderOrganizationId: 'org-bidder-b',
+            organizationId: 'org-bidder-b',
+            projectUnderstandingFileAssetId: 'file-understanding',
+            quoteSheetFileAssetId: 'file-quote',
+            schedulePlanFileAssetId: 'file-schedule',
+            updatedAt: bidUpdatedAt,
+          },
+        ];
+        return bids.filter((bid) =>
+          whereItems.some(
+            (where) =>
+              (!where.projectId || where.projectId === bid.projectId) &&
+              (!where.bidderOrganizationId || where.bidderOrganizationId === bid.bidderOrganizationId),
+          ),
+        );
+      },
+      async findOneBy() {
+        throw new Error('batch path should not call findOneBy');
+      },
+    },
+    {
+      async find() {
+        return [];
+      },
+    },
+    {
+      async find() {
+        return confirmedBidMaterialReviews({
+          bidId: 'bid-2',
+          projectId: 'project-2',
+          reviewerOrganizationId: 'org-publisher',
+          updatedAt: bidUpdatedAt,
+        });
+      },
+    },
+    {
+      async find() {
+        return [];
+      },
+    },
+    {
+      async find() {
+        return [
+          {
+            taskId: 'project-2',
+            bidId: 'bid-2',
+            bidderOrganizationId: 'org-bidder-b',
+            factoryOrganizationId: 'org-bidder-b',
+            status: 'frozen',
+            authorizationQuotaAmount: '4000.00',
+            updatedAt: new Date('2026-05-02T02:00:00.000Z'),
+          },
+        ];
+      },
+    },
+  );
+
+  const states = await service.buildForPairs([
+    {
+      cacheKey: 'project-1:org-publisher:org-bidder-a',
+      projectId: 'project-1',
+      ownerOrganizationId: 'org-publisher',
+      counterpartOrganizationId: 'org-bidder-a',
+      viewerOrganizationId: 'org-publisher',
+    },
+    {
+      cacheKey: 'project-2:org-publisher:org-bidder-b',
+      projectId: 'project-2',
+      ownerOrganizationId: 'org-publisher',
+      counterpartOrganizationId: 'org-bidder-b',
+      viewerOrganizationId: 'org-publisher',
+    },
+  ]);
+
+  const pendingState = states.get('project-1:org-publisher:org-bidder-a');
+  const readyState = states.get('project-2:org-publisher:org-bidder-b');
+
+  assert.equal(pendingState.businessTodoSummary.bidParticipationReviewPendingCount, 1);
+  assert.equal(pendingState.businessTodoSummary.totalPendingCount, 1);
+  assert.equal(pendingState.chatAvailability.lockReasonCode, 'bid_participation_review_pending');
+  assert.equal(readyState.businessTodoSummary.bidParticipationReviewPendingCount, 0);
+  assert.equal(readyState.businessTodoSummary.bidMaterialReviewPendingCount, 0);
+  assert.equal(readyState.businessTodoSummary.totalPendingCount, 0);
+  assert.equal(readyState.chatAvailability.canSendMessage, true);
+  assert.equal(readyState.chatAvailability.requiredNextAction, 'none');
+});
+
 test('workbench exposes 10 fixed entries and pending publisher material for bidder', async () => {
   const { service } = createHarness();
   const result = await service.getWorkbench(

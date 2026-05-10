@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { ProjectLifecycleService } from './project-lifecycle.service';
 import { ProjectService } from './project.service';
 
@@ -36,6 +37,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_create');
     return this.projectService.createProject(payload, headers);
   }
 
@@ -53,6 +55,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_save');
     return this.projectService.saveProject(payload, headers);
   }
 
@@ -62,6 +65,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_submit');
     return this.projectService.submitProject(payload, headers);
   }
 
@@ -71,6 +75,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_publish');
     return this.projectService.publishProject(payload, headers);
   }
 
@@ -80,6 +85,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_withdraw');
     return this.lifecycleService.withdrawProject(payload, headers);
   }
 
@@ -89,6 +95,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_archive');
     return this.lifecycleService.archiveProject(payload, headers);
   }
 
@@ -98,6 +105,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_close');
     return this.lifecycleService.closeProject(payload, headers);
   }
 
@@ -107,6 +115,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_withdraw_published');
     return this.lifecycleService.withdrawPublishedProject(payload, headers);
   }
 
@@ -116,6 +125,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_discard_submitted');
     return this.lifecycleService.discardSubmittedProject(payload, headers);
   }
 
@@ -125,6 +135,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_cancellation_request');
     return this.lifecycleService.requestCancellation(payload, headers);
   }
 
@@ -134,6 +145,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_cancellation_respond');
     return this.lifecycleService.respondCancellation(payload, headers);
   }
 
@@ -143,6 +155,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_publisher_breach_record');
     return this.lifecycleService.recordPublisherBreach(payload, headers);
   }
 
@@ -152,6 +165,7 @@ export class ProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('legacy_project_factory_breach_record');
     return this.lifecycleService.recordFactoryBreach(payload, headers);
   }
 

@@ -71,6 +71,8 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
   ExhibitionActionResult? _bidServiceFeeAuthorizationCreateResult;
   ExhibitionActionResult? _bidServiceFeeAuthorizationFreezeInitResult;
   ExhibitionLoadResult? _bidServiceFeeAuthorizationStatusResult;
+  P0PayPaymentPollResult? _bidServiceFeeAuthorizationPollResult;
+  String? _bidServiceFeeAuthorizationChannelHandoffMessage;
 
   bool get _isResultMode => widget.mode?.trim() == 'result';
   bool get _isSupplementMode => widget.mode?.trim() == 'supplement';
@@ -494,13 +496,17 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
     final bidId = _normalizeId(widget.bidId);
     final sections = <Widget>[
       _ActionCard(
-        title: '竞标服务费预授权',
-        summary: '资料确认已通过，当前只承接 4000 元竞标服务费预授权额度处理；预授权不是扣款。',
+        title: RcReleaseFlags.bidServiceFeeAuthorizationEnabled
+            ? '我的楼支付入口'
+            : rcFeatureUnavailableTitle,
+        summary: RcReleaseFlags.bidServiceFeeAuthorizationEnabled
+            ? '资料确认已通过，请在这里完成 4000 元竞标服务费预授权额度确认；预授权不是扣款。'
+            : rcFeatureUnavailableMessage,
         tone: _ActionCardTone.emphasis,
         children: <Widget>[
           const _DetailLine(
-            label: '处理边界',
-            value: '本页只消费 Server/BFF 返回的预授权入口，不在消息楼内判断支付真值。',
+            label: '入口说明',
+            value: '消息楼只负责跳转，本页只消费 Server/BFF 返回的预授权入口与状态。',
             highlight: true,
           ),
           if (routeProjectId != null)
@@ -510,11 +516,16 @@ class _BidSubmitPageState extends State<BidSubmitPage> {
           if (bidId != null)
             const _DetailLine(label: '竞标记录', value: '已定位', highlight: true),
           const SizedBox(height: 12),
-          ..._buildP0PayFixedPriceBidAuthorizationFields(),
-          ..._buildBidServiceFeeAuthorizationActionFields(
-            routeProjectId: routeProjectId,
-            bidParticipationRequestId: requestId,
-          ),
+          if (RcReleaseFlags.bidServiceFeeAuthorizationEnabled)
+            ..._buildBidServiceFeeAuthorizationActionFields(
+              routeProjectId: routeProjectId,
+              bidParticipationRequestId: requestId,
+            )
+          else
+            const _StateMessage(
+              title: rcFeatureUnavailableTitle,
+              body: '当前 RC 版本不会创建预授权记录、不会拉起 freeze-init，也不会打开支付通道。',
+            ),
         ],
       ),
     ];

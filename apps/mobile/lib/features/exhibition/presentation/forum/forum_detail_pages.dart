@@ -351,13 +351,19 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
             replyCount: detail.engagement.replyCount,
             likePending: _likePending,
             bookmarkPending: _bookmarkPending,
-            onLike: _likePending
+            onLike: !RcReleaseFlags.forumUserCommandsEnabled
+                ? _showForumUserCommandUnavailable
+                : _likePending
                 ? () {}
                 : () => _toggleLike(effectiveViewerHasLiked),
-            onBookmark: _bookmarkPending
+            onBookmark: !RcReleaseFlags.forumUserCommandsEnabled
+                ? _showForumUserCommandUnavailable
+                : _bookmarkPending
                 ? () {}
                 : () => _toggleBookmark(effectiveViewerHasBookmarked),
-            onReply: () => _openInlineComments(detail.postId),
+            onReply: !RcReleaseFlags.forumUserCommandsEnabled
+                ? _showForumUserCommandUnavailable
+                : () => _openInlineComments(detail.postId),
             onReport: () => _showForumReportSheet(
               context,
               target: _ForumReportTarget(
@@ -414,6 +420,10 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
 
   Future<void> _submitInlineComment(String postId) async {
     if (_inlineCommentSubmitting) {
+      return;
+    }
+    if (!RcReleaseFlags.forumUserCommandsEnabled) {
+      _showForumUserCommandUnavailable();
       return;
     }
     final body = _inlineCommentController.text.trim();
@@ -539,7 +549,9 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
 
   void _primeImageAccesses(List<ForumAttachmentRefView> attachments) {
     final visibleImageAttachments = attachments
-        .where((ForumAttachmentRefView item) => _isImageAttachment(item.mimeType))
+        .where(
+          (ForumAttachmentRefView item) => _isImageAttachment(item.mimeType),
+        )
         .take(9);
     for (final item in visibleImageAttachments) {
       if (_imageAccessByAssetId.containsKey(item.fileAssetId) ||
@@ -965,6 +977,10 @@ class _ForumPostDetailPageState extends State<ForumPostDetailPage> {
       'unbookmarked' => false,
       _ => fallback,
     };
+  }
+
+  void _showForumUserCommandUnavailable() {
+    _showActionMessage(context, '当前 RC 版本只保留论坛只读浏览，互动写入暂未开放。');
   }
 
   void _showActionMessage(BuildContext context, String? message) {

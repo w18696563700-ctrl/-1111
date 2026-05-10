@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/navigation/exhibition_routes.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/presentation/enterprise_hub_detail_pages.dart';
@@ -59,7 +60,10 @@ class AppRouter {
         name: building.routePath,
         arguments: settings.arguments,
       ),
-      builder: (_) => AppShellPage(currentBuilding: building),
+      builder: (_) => AppShellPage(
+        currentBuilding: building,
+        initialRouteQueryParameters: routeUri.queryParameters,
+      ),
     );
   }
 
@@ -74,6 +78,24 @@ class AppRouter {
         currentBuilding: AppBuilding.exhibition,
         titleOverride: '路由不可用',
         child: RouteUnavailablePage(routeName: settings.name),
+      ),
+    );
+  }
+
+  Route<dynamic> _rcFeatureUnavailableRoute(
+    RouteSettings settings, {
+    required AppBuilding currentBuilding,
+  }) {
+    return MaterialPageRoute<void>(
+      settings: settings,
+      builder: (_) => AppShellScaffold(
+        currentBuilding: currentBuilding,
+        titleOverride: rcFeatureUnavailableTitle,
+        child: RouteUnavailablePage(
+          routeName: settings.name,
+          title: rcFeatureUnavailableTitle,
+          message: rcFeatureUnavailableMessage,
+        ),
       ),
     );
   }
@@ -95,6 +117,14 @@ class AppRouter {
     );
     final commentPostId = routeUri.queryParameters['postId'];
     final initialFeedTopicId = routeUri.queryParameters['topicId'];
+
+    if (routePath == ExhibitionRoutes.forumPublish &&
+        !RcReleaseFlags.forumPublishingEnabled) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
 
     final Widget? child = switch (routePath) {
       ExhibitionRoutes.forum => ForumHubPage(
@@ -189,13 +219,15 @@ class AppRouter {
         authorId != null ||
         topicId != null ||
         postId != null;
-    final showForumPublishFab = <String>{
-      ExhibitionRoutes.forum,
-      ExhibitionRoutes.forumSquare,
-      ExhibitionRoutes.forumLocal,
-      ExhibitionRoutes.forumFollowing,
-      ExhibitionRoutes.forumTopics,
-    }.contains(routePath);
+    final showForumPublishFab =
+        RcReleaseFlags.forumPublishingEnabled &&
+        <String>{
+          ExhibitionRoutes.forum,
+          ExhibitionRoutes.forumSquare,
+          ExhibitionRoutes.forumLocal,
+          ExhibitionRoutes.forumFollowing,
+          ExhibitionRoutes.forumTopics,
+        }.contains(routePath);
 
     return MaterialPageRoute<void>(
       settings: settings,
@@ -250,6 +282,30 @@ class AppRouter {
 
     final routeUri = _routeUri(routeName);
     final routePath = routeUri.path;
+
+    if (!RcReleaseFlags.projectPublishingEnabled &&
+        (routePath == ExhibitionRoutes.projectCreate ||
+            routePath == ExhibitionRoutes.projectEdit)) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
+    if (!RcReleaseFlags.bidThreadEnabled &&
+        routePath == ExhibitionRoutes.bidThread) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
+    if (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled &&
+        routePath == ExhibitionRoutes.bidSubmit &&
+        routeUri.queryParameters['mode'] == 'service_fee_authorization') {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.exhibition,
+      );
+    }
     final boardListActionController = EnterpriseBoardListActionController();
 
     final Widget? child = switch (routePath) {
@@ -596,6 +652,22 @@ class AppRouter {
       routeUri,
       ProfileRoutes.governanceAppeals,
     );
+
+    if ((!RcReleaseFlags.profileCreditReserveEntriesEnabled &&
+            (routePath == ProfileRoutes.organizationCreditScoring ||
+                routePath ==
+                    ProfileRoutes.organizationCreditScoringExplanation ||
+                routePath == ProfileRoutes.organizationCreditScoringHandoff)) ||
+        (!RcReleaseFlags.forumPublishingEnabled &&
+            routePath == ProfileRoutes.forum) ||
+        (!RcReleaseFlags.bidServiceFeeAuthorizationEnabled &&
+            routePath == ProfileRoutes.bidServiceFeeAuthorization) ||
+        routePath == ProfileRoutes.rcFeatureUnavailable) {
+      return _rcFeatureUnavailableRoute(
+        settings,
+        currentBuilding: AppBuilding.profile,
+      );
+    }
     final Widget? child = switch (routePath) {
       ProfileRoutes.personal => const ProfilePersonalPage(),
       ProfileRoutes.company => const ProfileCompanyPage(),
@@ -610,6 +682,13 @@ class AppRouter {
         const ProfileGovernanceAppealListPage(),
       _ when appealCaseId != null => ProfileGovernanceAppealDetailPage(
         appealCaseId: appealCaseId,
+      ),
+      ProfileRoutes.bidServiceFeeAuthorization => BidSubmitPage(
+        projectId: routeUri.queryParameters['projectId'],
+        mode: 'service_fee_authorization',
+        bidParticipationRequestId:
+            routeUri.queryParameters['bidParticipationRequestId'],
+        bidId: routeUri.queryParameters['bidId'],
       ),
       ProfileRoutes.settings => const ProfileSettingsPage(),
       ProfileRoutes.privacyPermissions =>
@@ -635,6 +714,7 @@ class AppRouter {
       ProfileRoutes.forum => '我的论坛',
       ProfileRoutes.governanceAppeals => '我的申诉记录',
       _ when appealCaseId != null => '申诉详情',
+      ProfileRoutes.bidServiceFeeAuthorization => '竞标服务费预授权',
       ProfileRoutes.settings => '设置',
       ProfileRoutes.privacyPermissions => '隐私与权限说明',
       ProfileRoutes.certificationIdentityStatus => '公司认证与我的身份',

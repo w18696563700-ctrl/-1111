@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { ExhibitionP0PayService } from './exhibition-p0-pay.service';
 
 @Controller('api/app/project')
@@ -22,6 +23,7 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('project_authenticity_sincerity_order');
     return this.service.createProjectAuthenticitySincerityOrder(
       projectId,
       payload,
@@ -39,6 +41,7 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('project_authenticity_sincerity_payment');
     return this.service.initProjectAuthenticitySincerityPayment(
       projectId,
       orderId,
@@ -55,6 +58,7 @@ export class AppProjectPricingController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_authenticity_sincerity_freeze_feedback');
     return this.service.submitProjectAuthenticitySincerityFreezeFeedback(
       projectId,
       payload,
@@ -68,6 +72,7 @@ export class AppProjectPricingController {
     @Param('orderId') orderId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_authenticity_sincerity_order_detail');
     return this.service.getProjectAuthenticitySincerityOrder(projectId, orderId, headers);
   }
 
@@ -80,6 +85,7 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('project_authenticity_sincerity_refund');
     return this.service.initProjectAuthenticitySincerityRefund(
       projectId,
       orderId,
@@ -95,6 +101,7 @@ export class AppProjectPricingController {
     @Param('orderId') orderId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_authenticity_sincerity_refund_detail');
     return this.service.getProjectAuthenticitySincerityRefund(projectId, orderId, headers);
   }
 
@@ -106,6 +113,7 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('bid_service_fee_authorization');
     return this.service.createBidServiceFeeAuthorization(
       projectId,
       payload,
@@ -123,6 +131,7 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('bid_service_fee_authorization_freeze');
     return this.service.initBidServiceFeeAuthorizationFreeze(
       projectId,
       authorizationId,
@@ -138,6 +147,7 @@ export class AppProjectPricingController {
     @Param('authorizationId') authorizationId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('bid_service_fee_authorization_detail');
     return this.service.getBidServiceFeeAuthorization(projectId, authorizationId, headers);
   }
 
@@ -150,6 +160,7 @@ export class AppProjectPricingController {
     @Headers() headers: IncomingHttpHeaders,
     @Headers('x-idempotency-key') idempotencyKey?: string,
   ) {
+    rcFeatureDisabled('bid_service_fee_authorization_release');
     return this.service.releaseBidServiceFeeAuthorization(
       projectId,
       authorizationId,
@@ -184,6 +195,7 @@ export class AppProjectPricingController {
     @Param('projectId') projectId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_settlement_summary');
     return this.service.getProjectSettlementSummary(projectId, headers);
   }
 
@@ -193,6 +205,7 @@ export class AppProjectPricingController {
     @Param('projectId') projectId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_settlement_batch_draft');
     return this.service.createProjectSettlementBatchDraft(projectId, headers);
   }
 
@@ -201,6 +214,7 @@ export class AppProjectPricingController {
     @Param('projectId') projectId: string,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_settlement_reconciliation');
     return this.service.getProjectSettlementReconciliation(projectId, headers);
   }
 }

@@ -13,6 +13,9 @@ final class ProfileRoutes {
       '/profile/organization-credit-scoring/handoff';
   static const String forum = '/profile/forum';
   static const String governanceAppeals = '/profile/governance/appeals';
+  static const String bidServiceFeeAuthorization =
+      '/profile/payment-billing/bid-service-fee-authorization';
+  static const String rcFeatureUnavailable = '/profile/rc-feature-unavailable';
   static const String settings = '/profile/settings';
   static const String privacyPermissions =
       '/profile/settings/privacy-permissions';
@@ -24,5 +27,28 @@ final class ProfileRoutes {
 
   static String governanceAppealDetailWithCaseId(String appealCaseId) {
     return '$governanceAppeals/${Uri.encodeComponent(appealCaseId)}';
+  }
+
+  static String bidServiceFeeAuthorizationWithIds({
+    required String projectId,
+    required String bidParticipationRequestId,
+    String? bidId,
+  }) {
+    final query = <String, String>{
+      'projectId': projectId,
+      'bidParticipationRequestId': bidParticipationRequestId,
+      if (bidId != null && bidId.trim().isNotEmpty) 'bidId': bidId,
+    };
+    return Uri(
+      path: bidServiceFeeAuthorization,
+      queryParameters: query,
+    ).toString();
+  }
+
+  static String rcFeatureUnavailableFor(String featureKey) {
+    return Uri(
+      path: rcFeatureUnavailable,
+      queryParameters: <String, String>{'feature': featureKey},
+    ).toString();
   }
 }

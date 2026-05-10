@@ -129,7 +129,9 @@ class _ForumAuthorProfilePageState extends State<ForumAuthorProfilePage> {
                 _viewerFollowsAuthorOverride ?? profile.viewerFollowsAuthor,
             followPending: _followActionPending,
             isCurrentActor: isCurrentActor,
-            onToggleFollow: () => _toggleAuthorFollow(profile),
+            onToggleFollow: RcReleaseFlags.forumUserCommandsEnabled
+                ? () => _toggleAuthorFollow(profile)
+                : () => _showAuthorActionMessage('当前 RC 版本只保留论坛只读浏览，关注写入暂未开放。'),
             onOpenMessages: () =>
                 Navigator.of(context).pushNamed(AppBuilding.messages.routePath),
             onOpenMine: () =>

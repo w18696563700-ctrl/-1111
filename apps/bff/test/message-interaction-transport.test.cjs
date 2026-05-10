@@ -798,17 +798,7 @@ test("counterpart conversation detail service forwards frozen server path and hi
   );
   assert.equal(bidParticipationCard.requesterCompanyName, "重庆海川展览工厂");
   assert.equal(bidParticipationCard.requesterOrganizationId, "org-1");
-  assert.deepEqual(bidParticipationCard.detailRouteTarget, {
-    objectType: "bid_service_fee_authorization",
-    actionKey: "bid_service_fee_authorization.open",
-    canonicalPath:
-      "/api/app/project/{projectId}/bid-service-fee-authorizations",
-    params: {
-      projectId: "project-1",
-      bidParticipationRequestId: "request-2",
-      bidId: "bid-1",
-    },
-  });
+  assert.equal(bidParticipationCard.detailRouteTarget, null);
   assert.deepEqual(result.projectGroups[0].ratingEntry, {
     orderId: "order-1",
     projectId: "project-1",
@@ -1272,25 +1262,11 @@ test("project communication realtime gateway validates subscription through serv
     },
   );
 
-  assert.deepEqual(calls, [
-    {
-      pathName: "/server/project-communication/messages",
-      params: {
-        projectId: "project-1",
-        threadId: "thread-1",
-        limit: 1,
-      },
-      headers: {
-        authorization: "Bearer token",
-        "x-organization-id": "org-1",
-      },
-    },
-  ]);
+  assert.deepEqual(calls, []);
   assert.deepEqual(accepted, {
-    eventType: "project_communication.subscription.accepted",
-    projectId: "project-1",
-    threadId: "thread-1",
-    counterpartOrganizationId: "org-2",
+    eventType: "project_communication.subscription.rejected",
+    code: "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE",
+    message: "该功能暂未开放",
   });
   assert.deepEqual(sent, [accepted]);
 });
@@ -1321,8 +1297,8 @@ test("project communication realtime gateway rejects missing fields and unauthor
     ),
     {
       eventType: "project_communication.subscription.rejected",
-      code: "PROJECT_COMMUNICATION_INVALID",
-      message: "Subscription requires projectId and threadId.",
+      code: "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE",
+      message: "该功能暂未开放",
     },
   );
 
@@ -1338,8 +1314,8 @@ test("project communication realtime gateway rejects missing fields and unauthor
     ),
     {
       eventType: "project_communication.subscription.rejected",
-      code: "PROJECT_COMMUNICATION_FORBIDDEN",
-      message: "Current organization is not a participant.",
+      code: "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE",
+      message: "该功能暂未开放",
     },
   );
 });
@@ -1391,7 +1367,7 @@ test("project communication realtime gateway forwards only matching message-crea
       clientMessageId: "client-1",
       createdAt: "2026-05-18T00:00:00.000Z",
     }),
-    1,
+    0,
   );
   assert.equal(
     gateway.forwardMessageCreated({
@@ -1402,8 +1378,8 @@ test("project communication realtime gateway forwards only matching message-crea
     0,
   );
 
-  assert.equal(sentA.length, 2);
-  assert.equal(sentA[1].eventType, "project_communication.message.created");
-  assert.equal(sentA[1].messageId, "message-1");
+  assert.equal(sentA.length, 1);
+  assert.equal(sentA[0].code, "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE");
   assert.equal(sentB.length, 1);
+  assert.equal(sentB[0].code, "PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE");
 });

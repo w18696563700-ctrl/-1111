@@ -4,6 +4,7 @@ import { AuthModule } from '../auth/auth.module';
 import { ContentSafetyModule } from '../content_safety/content-safety.module';
 import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationModule } from '../organization/organization.module';
+import { NotificationModule } from '../notifications/notification.module';
 import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { FileAssetEntity } from '../upload/entities/file-asset.entity';
 import { UploadModule } from '../upload/upload.module';
@@ -43,6 +44,7 @@ import { ForumWriteService } from './forum.write.service';
     ]),
     AuthModule,
     ContentSafetyModule,
+    NotificationModule,
     OrganizationModule,
     UploadModule
   ],

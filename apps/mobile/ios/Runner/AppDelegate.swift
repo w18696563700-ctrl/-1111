@@ -1,11 +1,15 @@
 import Flutter
 import UIKit
 import UserNotifications
+import AlipaySDK
 
 @main
 @objc class AppDelegate: FlutterAppDelegate, FlutterImplicitEngineDelegate {
   private let apnsChannelName = "exhibition_home/apns_notifications"
+  private let alipayChannelName = "com.zhanlandingzhijia.mobile/alipay_app_pay"
+  private let alipaySchemeInfoKey = "AlipayAppScheme"
   private var apnsChannel: FlutterMethodChannel?
+  private var alipayChannel: FlutterMethodChannel?
   private var pendingApnsRegistrationResult: FlutterResult?
   private var latestApnsDeviceToken: String?
   private var pendingRouteTarget: [String: Any]?
@@ -17,6 +21,7 @@ import UserNotifications
     let result = super.application(application, didFinishLaunchingWithOptions: launchOptions)
     UNUserNotificationCenter.current().delegate = self
     configureApnsChannelIfPossible()
+    configureAlipayChannelIfPossible()
     if let launchOptions,
        let notification = launchOptions[.remoteNotification] as? [AnyHashable: Any] {
       pendingRouteTarget = extractRouteTarget(from: notification)
@@ -27,6 +32,35 @@ import UserNotifications
   func didInitializeImplicitFlutterEngine(_ engineBridge: FlutterImplicitEngineBridge) {
     GeneratedPluginRegistrant.register(with: engineBridge.pluginRegistry)
     configureApnsChannelIfPossible()
+    configureAlipayChannelIfPossible()
+  }
+
+  override func application(
+    _ app: UIApplication,
+    open url: URL,
+    options: [UIApplication.OpenURLOptionsKey : Any] = [:]
+  ) -> Bool {
+    if handleAlipayOpenUrl(url) {
+      return true
+    }
+    return super.application(app, open: url, options: options)
+  }
+
+  override func application(
+    _ application: UIApplication,
+    open url: URL,
+    sourceApplication: String?,
+    annotation: Any
+  ) -> Bool {
+    if handleAlipayOpenUrl(url) {
+      return true
+    }
+    return super.application(
+      application,
+      open: url,
+      sourceApplication: sourceApplication,
+      annotation: annotation
+    )
   }
 
   override func application(
@@ -105,6 +139,68 @@ import UserNotifications
     }
     apnsChannel = channel
     notifyFlutterRouteTargetIfPossible()
+  }
+
+  private func configureAlipayChannelIfPossible() {
+    guard alipayChannel == nil,
+          let controller = window?.rootViewController as? FlutterViewController else {
+      return
+    }
+    let channel = FlutterMethodChannel(
+      name: alipayChannelName,
+      binaryMessenger: controller.binaryMessenger
+    )
+    channel.setMethodCallHandler { [weak self] call, result in
+      guard let self else {
+        result(FlutterError(code: "ALIPAY_BRIDGE_UNAVAILABLE", message: "Alipay bridge is unavailable.", details: nil))
+        return
+      }
+      guard call.method == "pay" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      self.startAlipayAppPay(call: call, result: result)
+    }
+    alipayChannel = channel
+  }
+
+  private func startAlipayAppPay(call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard let arguments = call.arguments as? [String: Any],
+          let orderString = arguments["orderString"] as? String,
+          !orderString.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+      result(FlutterError(code: "ALIPAY_ORDER_STRING_MISSING", message: "支付宝支付参数缺失", details: nil))
+      return
+    }
+    let scheme = alipayAppScheme()
+    guard !scheme.isEmpty else {
+      result(FlutterError(code: "ALIPAY_SCHEME_MISSING", message: "支付宝回跳 Scheme 未配置", details: nil))
+      return
+    }
+    AlipaySDK.defaultService().payOrder(orderString, fromScheme: scheme) { payload in
+      result(self.flutterSafeAlipayPayload(payload))
+    }
+  }
+
+  private func handleAlipayOpenUrl(_ url: URL) -> Bool {
+    guard url.scheme == alipayAppScheme() else {
+      return false
+    }
+    AlipaySDK.defaultService().processOrder(withPaymentResult: url) { _ in }
+    AlipaySDK.defaultService().processAuth_V2Result(url) { _ in }
+    return true
+  }
+
+  private func alipayAppScheme() -> String {
+    return (Bundle.main.object(forInfoDictionaryKey: alipaySchemeInfoKey) as? String)?
+      .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+  }
+
+  private func flutterSafeAlipayPayload(_ payload: [AnyHashable: Any]?) -> [String: Any] {
+    var result: [String: Any] = [:]
+    payload?.forEach { key, value in
+      result[String(describing: key)] = value
+    }
+    return result
   }
 
   private func requestAuthorizationAndRegister(result: @escaping FlutterResult) {

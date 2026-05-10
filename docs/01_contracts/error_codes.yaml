@@ -79,6 +79,9 @@ namespaces:
   - PLATFORM
   - NOTIFICATION
   - PUSH
+  - P0_PAY
+  - PAYMENT
+  - IDEMPOTENCY
   - FILE_PREVIEW
   - CONFIRMATION_SOFTLINK
 codes:
@@ -157,6 +160,9 @@ codes:
   - code: ORG_LAST_ADMIN_LEAVE_BLOCKED
     owner: Server
     meaning: Current actor is the last active organization administrator and cannot leave before another active administrator exists.
+  - code: ORGANIZATION_CERTIFICATION_REQUIRED
+    owner: Server
+    meaning: The current organization must complete the required certification boundary before entering the requested paid or publishing capability.
   - code: CERTIFICATION_SUBMIT_INVALID
     owner: Server
     meaning: Certification submit request is missing required fields or violates the current minimum certification submission boundary.
@@ -277,6 +283,9 @@ codes:
   - code: PROJECT_AUTHENTICITY_SINCERITY_INVALID_STATE
     owner: Server
     meaning: The current project or targeted `项目真实性诚意金` order is not in a state that allows the requested publish gate, order-create, or pay-init transition.
+  - code: PROJECT_AUTHENTICITY_SINCERITY_REFUND_REJECTED
+    owner: Server
+    meaning: The current `项目真实性诚意金` refund request is rejected because refund is hidden, disabled for RC, or not admitted by the bounded Server state.
   - code: PROJECT_ALBUM_INVALID
     owner: Server
     meaning: Project album photo bind, list, or delete request is missing required anchors or violates the bounded project album input contract.
@@ -316,6 +325,33 @@ codes:
   - code: BID_SERVICE_FEE_AUTHORIZATION_INVALID_STATE
     owner: Server
     meaning: The current project-bidder relation or targeted `竞标服务费预授权额度` object is not in a state that allows the requested create, freeze-init, release, or bid-submit continuation.
+  - code: P0_PAY_INVALID
+    owner: Server
+    meaning: The bounded P0 payment or funds route request is malformed or outside the frozen first-release payment boundary.
+  - code: P0_PAY_RESOURCE_UNAVAILABLE
+    owner: Server
+    meaning: The targeted P0 payment, preauthorization, sincerity, deposit, settlement, refund, or release resource is unavailable, hidden, or not materialized.
+  - code: P0_PAY_PERMISSION_DENIED
+    owner: Server
+    meaning: The current actor or organization scope is not allowed to read or mutate the targeted bounded P0 payment resource.
+  - code: P0_PAY_STATE_CONFLICT
+    owner: Server
+    meaning: The requested bounded P0 payment command conflicts with the current Server-owned state.
+  - code: P0_PAY_IDEMPOTENCY_CONFLICT
+    owner: Server
+    meaning: The submitted idempotency key conflicts with an existing bounded P0 payment command result.
+  - code: PROJECT_PRICING_SUMMARY_UNAVAILABLE
+    owner: BFF
+    meaning: The project pricing summary projection is controlled-unavailable, hidden, or not materialized for the current actor and project boundary.
+  - code: PAYMENT_CHANNEL_CONSTRAINT_REQUIRES_REVERIFICATION
+    owner: BFF
+    meaning: The selected payment channel requires a fresh eligibility or compliance check before any payment handoff can be initialized.
+  - code: PAYMENT_CHANNEL_UNAVAILABLE
+    owner: BFF
+    meaning: The requested payment channel is unavailable, disabled, or outside the current RC app-facing release boundary.
+  - code: IDEMPOTENCY_KEY_CONFLICT
+    owner: BFF
+    meaning: The submitted app-facing idempotency key conflicts with a previous request or cached command result.
   - code: BID_SEAT_INVALID
     owner: Server
     meaning: Seat lock, release, or status request is missing required fields or targets a bid seat object outside the bounded Package A contract truth.
@@ -556,6 +592,12 @@ codes:
   - code: PROJECT_COMMUNICATION_UNAVAILABLE
     owner: Server
     meaning: Project communication thread, message, or projection is unavailable, hidden, or not materialized under the current project relation boundary.
+  - code: PROJECT_COMMUNICATION_REALTIME_INVALID
+    owner: BFF
+    meaning: Project communication realtime subscribe request is malformed or outside the current bounded realtime contract.
+  - code: PROJECT_COMMUNICATION_REALTIME_UNAVAILABLE
+    owner: BFF
+    meaning: Project communication realtime channel is disabled, unavailable, or hidden under the current RC app-facing release boundary.
   - code: ENTERPRISE_HUB_INVALID_BOARD_TYPE
     owner: BFF
     meaning: Enterprise hub boardType is missing, unsupported, or outside the current frozen company/factory/supplier boundary.
@@ -699,4 +741,4 @@ codes:
     meaning: Confirmation softLink request is malformed, references an unsupported confirmation type, or is outside the current project/thread/message boundary.
   - code: PLATFORM_CAPABILITY_DISABLED
     owner: BFF
-    meaning: Live, geo, or map capability is flag-off in the current environment.
+    meaning: A reserved app-facing capability such as live, geo, map, payment, funds, membership purchase, forum write, project publish, BidThread, or realtime push is flag-off in the current RC environment.

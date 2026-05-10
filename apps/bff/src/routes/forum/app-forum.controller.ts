@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { ForumAuthorProfileService } from './forum-author-profile.service';
 import { ForumDraftDeleteService } from './forum-draft-delete.service';
 import { ForumDraftOpenService } from './forum-draft-open.service';
@@ -182,54 +183,63 @@ export class AppForumController {
   @Post('draft/save')
   @HttpCode(HttpStatus.ACCEPTED)
   saveDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_draft_save');
     return this.forumService.saveDraft(payload, headers);
   }
 
   @Post('draft/delete')
   @HttpCode(HttpStatus.ACCEPTED)
   deleteDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_draft_delete');
     return this.forumDraftDeleteService.deleteDraft(payload, headers);
   }
 
   @Post('publish')
   @HttpCode(HttpStatus.ACCEPTED)
   publishDraft(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_publish');
     return this.forumService.publishDraft(payload, headers);
   }
 
   @Post('post/comment')
   @HttpCode(HttpStatus.ACCEPTED)
   createComment(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_comment_create');
     return this.forumInteractionService.createComment(payload, headers);
   }
 
   @Post('post/edit')
   @HttpCode(HttpStatus.ACCEPTED)
   enterPostEdit(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_post_edit');
     return this.forumOwnPostContinuityService.enterEditDraft(payload, headers);
   }
 
   @Post('post/delete')
   @HttpCode(HttpStatus.ACCEPTED)
   deletePost(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_post_delete');
     return this.forumOwnPostContinuityService.deletePost(payload, headers);
   }
 
   @Post('post/like')
   @HttpCode(HttpStatus.ACCEPTED)
   toggleLike(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_post_like');
     return this.forumInteractionService.toggleLike(payload, headers);
   }
 
   @Post('post/bookmark')
   @HttpCode(HttpStatus.ACCEPTED)
   toggleBookmark(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_post_bookmark');
     return this.forumInteractionService.toggleBookmark(payload, headers);
   }
 
   @Post('author/follow')
   @HttpCode(HttpStatus.ACCEPTED)
   toggleAuthorFollow(@Body() payload: Record<string, unknown>, @Headers() headers: IncomingHttpHeaders) {
+    rcFeatureDisabled('forum_author_follow');
     return this.forumInteractionService.toggleAuthorFollow(payload, headers);
   }
 

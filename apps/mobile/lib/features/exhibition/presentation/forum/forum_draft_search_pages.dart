@@ -32,6 +32,10 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
   }
 
   Future<void> _deleteDraft(ForumDraftCardView draft) async {
+    if (!RcReleaseFlags.forumPublishingEnabled) {
+      _showDraftMessage('当前 RC 版本只保留论坛只读浏览，草稿删除暂未开放。');
+      return;
+    }
     if (_deletingDraftIds.contains(draft.draftId) ||
         _publishingDraftIds.contains(draft.draftId)) {
       return;
@@ -56,6 +60,10 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
   }
 
   Future<void> _publishDraft(ForumDraftCardView draft) async {
+    if (!RcReleaseFlags.forumPublishingEnabled) {
+      _showDraftMessage('当前 RC 版本只保留论坛只读浏览，发帖发布暂未开放。');
+      return;
+    }
     if (!_canPublishDraft(draft) ||
         _publishingDraftIds.contains(draft.draftId) ||
         _deletingDraftIds.contains(draft.draftId)) {
@@ -167,6 +175,7 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
                 padding: const EdgeInsets.only(bottom: 10),
                 child: _ForumSwipeDeleteCard(
                   enabled:
+                      RcReleaseFlags.forumPublishingEnabled &&
                       !_deletingDraftIds.contains(draft.draftId) &&
                       !_publishingDraftIds.contains(draft.draftId),
                   onDelete: () => _deleteDraft(draft),
@@ -183,6 +192,7 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
                         ? '删除中'
                         : null,
                     actionEnabled:
+                        RcReleaseFlags.forumPublishingEnabled &&
                         !_deletingDraftIds.contains(draft.draftId) &&
                         !_publishingDraftIds.contains(draft.draftId),
                   ),
@@ -198,7 +208,8 @@ class _ForumDraftsPageState extends State<ForumDraftsPage> {
 }
 
 bool _canPublishDraft(ForumDraftCardView draft) {
-  return draft.state.trim() == 'ready_to_publish';
+  return RcReleaseFlags.forumPublishingEnabled &&
+      draft.state.trim() == 'ready_to_publish';
 }
 
 class _ForumSwipeDeleteCard extends StatefulWidget {

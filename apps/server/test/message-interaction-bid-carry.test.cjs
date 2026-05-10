@@ -1611,6 +1611,312 @@ test('project communication unread query counts counterpart unread messages', as
   assert.equal(await service.countUnreadForShell('org-viewer'), 3);
 });
 
+test('project communication unread query aggregates unread rows through QueryBuilder', async () => {
+  const {
+    ProjectCommunicationUnreadQueryService,
+  } = require('../dist/modules/project_communication/project-communication-unread.query.service.js');
+  const threads = [
+    {
+      id: 'thread-a',
+      projectId: 'project-1',
+      ownerOrganizationId: 'org-viewer',
+      counterpartOrganizationId: 'org-other-a',
+      lastMessageId: 'message-a-2',
+      lastMessageAt: new Date('2026-04-24T09:40:00.000Z'),
+    },
+    {
+      id: 'thread-b',
+      projectId: 'project-1',
+      ownerOrganizationId: 'org-third',
+      counterpartOrganizationId: 'org-viewer',
+      lastMessageId: 'message-b-1',
+      lastMessageAt: new Date('2026-04-24T09:45:00.000Z'),
+    },
+    {
+      id: 'thread-c',
+      projectId: 'project-2',
+      ownerOrganizationId: 'org-viewer',
+      counterpartOrganizationId: 'org-fourth',
+      lastMessageId: 'message-c-1',
+      lastMessageAt: new Date('2026-04-24T08:00:00.000Z'),
+    },
+  ];
+  let queryBuilderUsed = false;
+  const service = new ProjectCommunicationUnreadQueryService(
+    {
+      async find() {
+        return threads;
+      },
+    },
+    {
+      async find() {
+        return [
+          {
+            threadId: 'thread-a',
+            organizationId: 'org-viewer',
+            projectId: 'project-1',
+            lastReadMessageId: 'message-a-boundary',
+            lastReadAt: new Date('2026-04-24T08:30:00.000Z'),
+          },
+        ];
+      },
+    },
+    {
+      async findBy() {
+        return [
+          {
+            id: 'message-a-boundary',
+            threadId: 'thread-a',
+            projectId: 'project-1',
+            createdAt: new Date('2026-04-24T08:30:00.000Z'),
+          },
+        ];
+      },
+      createQueryBuilder(alias) {
+        assert.equal(alias, 'message');
+        const qb = {
+          innerJoin() {
+            return qb;
+          },
+          leftJoin() {
+            return qb;
+          },
+          select(field, as) {
+            assert.equal(field, 'thread.project_id');
+            assert.equal(as, 'projectId');
+            return qb;
+          },
+          addSelect() {
+            return qb;
+          },
+          where(condition, params) {
+            assert.match(condition, /thread\.id IN/);
+            assert.deepEqual(params.threadIds, ['thread-a', 'thread-b', 'thread-c']);
+            return qb;
+          },
+          andWhere() {
+            return qb;
+          },
+          groupBy(field) {
+            assert.equal(field, 'thread.project_id');
+            return qb;
+          },
+          async getRawMany() {
+            queryBuilderUsed = true;
+            return [
+              {
+                projectId: 'project-1',
+                unreadCount: '1',
+                latestUnreadMessageAt: '2026-04-24T09:45:00.000Z',
+              },
+              {
+                projectId: 'project-1',
+                unreadCount: '2',
+                latestUnreadMessageAt: '2026-04-24T09:40:00.000Z',
+              },
+            ];
+          },
+        };
+        return qb;
+      },
+    },
+  );
+
+  const unreadStatsByProject = await service.buildUnreadStatsForCounterpartProjects(
+    ['project-1', 'project-2'],
+    'org-viewer',
+  );
+
+  assert.equal(queryBuilderUsed, true);
+  assert.equal(unreadStatsByProject.get('project-1').unreadCount, 3);
+  assert.equal(unreadStatsByProject.get('project-1').hasUnread, true);
+  assert.equal(
+    unreadStatsByProject.get('project-1').latestUnreadMessageAt,
+    '2026-04-24T09:45:00.000Z',
+  );
+  assert.equal(unreadStatsByProject.get('project-2').unreadCount, 0);
+});
+
+test('project-name-access source reuses joined project snapshot when QueryBuilder exposes raw entities', async () => {
+  const {
+    CounterpartConversationProjectNameAccessSource,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.project-name-access-source.js');
+  const now = new Date('2026-04-24T08:00:00.000Z');
+  let projectRepoUsed = false;
+  const source = new CounterpartConversationProjectNameAccessSource(
+    {
+      createQueryBuilder() {
+        const builder = {
+          innerJoin() {
+            return builder;
+          },
+          where() {
+            return builder;
+          },
+          andWhere() {
+            return builder;
+          },
+          orWhere() {
+            return builder;
+          },
+          addSelect() {
+            return builder;
+          },
+          orderBy() {
+            return builder;
+          },
+          addOrderBy() {
+            return builder;
+          },
+          async getRawAndEntities() {
+            return {
+              raw: [
+                {
+                  joined_project_id: 'project-1',
+                  joined_project_organization_id: 'org-owner',
+                  joined_project_creator_user_id: 'user-owner',
+                  joined_project_state: 'published',
+                  joined_project_published_at: now.toISOString(),
+                },
+              ],
+              entities: [
+                {
+                  id: 'request-1',
+                  projectId: 'project-1',
+                  requesterOrganizationId: 'org-requester',
+                  requestedByUserId: 'user-requester',
+                  state: 'pending',
+                  createdAt: now,
+                  updatedAt: now,
+                  reviewedAt: null,
+                },
+              ],
+            };
+          },
+        };
+        return builder;
+      },
+    },
+    {
+      async findBy() {
+        projectRepoUsed = true;
+        return [];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'org-requester', name: '海川组织简称' }];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'user-requester', nickname: '申请人昵称', avatarUrl: null }];
+      },
+    },
+    {
+      async readAvatarUrl() {
+        return null;
+      },
+    },
+    createDisplayNameService(),
+  );
+
+  const seeds = await source.buildSeeds('org-owner');
+  assert.equal(projectRepoUsed, false);
+  assert.equal(seeds.length, 1);
+  assert.equal(seeds[0].projectId, 'project-1');
+});
+
+test('bid-participation source reuses joined project snapshot when QueryBuilder exposes raw entities', async () => {
+  const {
+    CounterpartConversationBidParticipationSource,
+  } = require('../dist/modules/message_interaction/counterpart-conversation.bid-participation-source.js');
+  const now = new Date('2026-04-24T08:00:00.000Z');
+  let projectRepoUsed = false;
+  const source = new CounterpartConversationBidParticipationSource(
+    {
+      createQueryBuilder() {
+        const builder = {
+          innerJoin() {
+            return builder;
+          },
+          where() {
+            return builder;
+          },
+          andWhere() {
+            return builder;
+          },
+          orWhere() {
+            return builder;
+          },
+          addSelect() {
+            return builder;
+          },
+          orderBy() {
+            return builder;
+          },
+          addOrderBy() {
+            return builder;
+          },
+          async getRawAndEntities() {
+            return {
+              raw: [
+                {
+                  joined_project_id: 'project-1',
+                  joined_project_organization_id: 'org-owner',
+                  joined_project_creator_user_id: 'user-owner',
+                  joined_project_state: 'published',
+                  joined_project_published_at: now.toISOString(),
+                },
+              ],
+              entities: [
+                {
+                  id: 'request-1',
+                  projectId: 'project-1',
+                  requesterOrganizationId: 'org-requester',
+                  requestedByUserId: 'user-requester',
+                  state: 'pending',
+                  createdAt: now,
+                  updatedAt: now,
+                  reviewedAt: null,
+                },
+              ],
+            };
+          },
+        };
+        return builder;
+      },
+    },
+    {
+      async findBy() {
+        projectRepoUsed = true;
+        return [];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'org-requester', name: '坤特组织简称' }];
+      },
+    },
+    {
+      async findBy() {
+        return [{ id: 'user-requester', nickname: '申请人昵称', avatarUrl: null }];
+      },
+    },
+    {
+      async readAvatarUrl() {
+        return null;
+      },
+    },
+    createDisplayNameService(),
+  );
+
+  const seeds = await source.buildSeeds('org-owner');
+  assert.equal(projectRepoUsed, false);
+  assert.equal(seeds.length, 1);
+  assert.equal(seeds[0].projectId, 'project-1');
+});
+
 test('project communication mark read rejects message outside project thread', async () => {
   const {
     ProjectCommunicationMessageService,

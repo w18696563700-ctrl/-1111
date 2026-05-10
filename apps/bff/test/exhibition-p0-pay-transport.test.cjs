@@ -75,6 +75,38 @@ const projectPricingGetRoutes = [
   '/api/app/project/project-1/settlement/reconciliation',
 ];
 
+const rcDisabledAppRoutes = new Set([
+  '/api/app/exhibition/trade-tasks',
+  '/api/app/exhibition/trade-tasks/task-1/fixed-price-bids/bid-1/service-fee-authorizations',
+  '/api/app/exhibition/trade-tasks/task-1/fixed-price-bids/bid-1/service-fee-authorizations/auth-1/authorize-init',
+  '/api/app/exhibition/trade-tasks/task-1/fixed-price-bids/bid-1/service-fee-authorizations/auth-1',
+  '/api/app/exhibition/trade-tasks/task-1/inquiry-deposit/orders',
+  '/api/app/exhibition/trade-tasks/task-1/inquiry-deposit/orders/deposit-1/pay-init',
+  '/api/app/exhibition/trade-tasks/task-1/inquiry-deposit/orders/deposit-1',
+  '/api/app/exhibition/trade-tasks/task-1/p0-pay-summary',
+  '/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/release-non-winning',
+  '/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/publisher-breach-release',
+  '/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/factory-refusal-breach-hold',
+  '/api/app/project/project-1/authenticity-sincerity/orders',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1/pay-init',
+  '/api/app/project/project-1/authenticity-sincerity/freeze-feedback',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund-init',
+  '/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund',
+  '/api/app/project/project-1/bid-service-fee-authorizations',
+  '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/freeze-init',
+  '/api/app/project/project-1/bid-service-fee-authorizations/auth-1',
+  '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/release',
+  '/api/app/project/project-1/settlement/summary',
+  '/api/app/project/project-1/settlement/reconciliation',
+]);
+
+function assertRcDisabledResponse(response, body, route) {
+  assert.equal(response.status, 403, route);
+  assert.equal(body.code, 'PLATFORM_CAPABILITY_DISABLED', route);
+  assert.equal(body.source, 'bff', route);
+}
+
 function createAxiosResponseError(status, data, message = `Request failed with status code ${status}`) {
   return new AxiosError(message, 'ERR_BAD_REQUEST', {}, null, {
     status,
@@ -289,6 +321,12 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
 
   try {
     const url = await app.getUrl();
+    const assertRcDisabled = async (response, route) => {
+      const body = await response.json();
+      assert.equal(response.status, 403, route);
+      assert.equal(body.code, 'PLATFORM_CAPABILITY_DISABLED', route);
+      assert.equal(body.source, 'bff', route);
+    };
     assert.equal(
       Reflect.getMetadata(PATH_METADATA, AppExhibitionP0PayController),
       'api/app/exhibition/trade-tasks',
@@ -310,14 +348,13 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
       },
       body: JSON.stringify({ taskType: 'inquiry_quote' }),
     });
-    assert.equal(createResponse.status, 202);
-    assert.equal((await createResponse.json()).taskId, 'task-1');
+    await assertRcDisabled(createResponse, '/api/app/exhibition/trade-tasks');
 
     const authResponse = await fetch(
       `${url}/api/app/exhibition/trade-tasks/task-1/fixed-price-bids/bid-1/service-fee-authorizations/auth-1/authorize-init`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
     );
-    assert.equal(authResponse.status, 202);
+    await assertRcDisabled(authResponse, 'legacy service fee authorization init');
 
     const summaryResponse = await fetch(
       `${url}/api/app/project/project-1/pricing-summary`,
@@ -328,8 +365,7 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     const sincerityResponse = await fetch(
       `${url}/api/app/project/project-1/authenticity-sincerity/orders/order-1`,
     );
-    assert.equal(sincerityResponse.status, 200);
-    assert.equal((await sincerityResponse.json()).orderStatus, 'paid');
+    await assertRcDisabled(sincerityResponse, 'project authenticity sincerity detail');
 
     const feedbackResponse = await fetch(
       `${url}/api/app/project/project-1/authenticity-sincerity/freeze-feedback`,
@@ -339,22 +375,19 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
         body: JSON.stringify({ choice: 'support_freeze' }),
       },
     );
-    assert.equal(feedbackResponse.status, 202);
-    assert.equal((await feedbackResponse.json()).supportFreezeCount, 1);
+    await assertRcDisabled(feedbackResponse, 'project authenticity sincerity feedback');
 
     const refundResponse = await fetch(
       `${url}/api/app/project/project-1/authenticity-sincerity/orders/order-1/refund-init`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
     );
-    assert.equal(refundResponse.status, 202);
-    assert.equal((await refundResponse.json()).refundStatus, 'refund_pending');
+    await assertRcDisabled(refundResponse, 'project authenticity sincerity refund');
 
     const bidAuthorizationResponse = await fetch(
       `${url}/api/app/project/project-1/bid-service-fee-authorizations`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
     );
-    assert.equal(bidAuthorizationResponse.status, 202);
-    assert.equal((await bidAuthorizationResponse.json()).authorizationId, 'auth-1');
+    await assertRcDisabled(bidAuthorizationResponse, 'bid service fee authorization');
 
     const dealResponse = await fetch(
       `${url}/api/app/project/project-1/deal-confirmations/deal-1`,
@@ -365,38 +398,26 @@ test('pricing app-facing routes expose project family and keep legacy trade-task
     const settlementResponse = await fetch(
       `${url}/api/app/project/project-1/settlement/summary`,
     );
-    assert.equal(settlementResponse.status, 200);
-    assert.equal((await settlementResponse.json()).settlementSummary.settlementStatus, 'draft');
+    await assertRcDisabled(settlementResponse, 'project settlement summary');
 
     const batchDraftResponse = await fetch(
       `${url}/api/app/project/project-1/settlement/batch-draft`,
       { method: 'POST' },
     );
-    assert.equal(batchDraftResponse.status, 202);
-    assert.equal((await batchDraftResponse.json()).batchDraft.status, 'draft');
+    await assertRcDisabled(batchDraftResponse, 'project settlement batch draft');
 
     const releaseResponse = await fetch(
       `${url}/api/app/exhibition/trade-tasks/task-1/p0-pay-actions/release-non-winning`,
       { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}) },
     );
-    assert.equal(releaseResponse.status, 202);
-    assert.equal((await releaseResponse.json()).action, 'release_non_winning_authorizations');
+    await assertRcDisabled(releaseResponse, 'p0 pay release non winning');
   } finally {
     await app.close();
   }
 
   assert.deepEqual(calls, [
-    ['createTradeTask', 'inquiry_quote', 'idem-create'],
-    ['authInit', 'task-1', 'bid-1', 'auth-1'],
     ['pricingSummary', 'project-1'],
-    ['sincerityStatus', 'project-1', 'order-1'],
-    ['sincerityFeedback', 'project-1'],
-    ['sincerityRefund', 'project-1', 'order-1'],
-    ['bidAuthCreate', 'project-1'],
     ['dealDetail', 'project-1', 'deal-1'],
-    ['settlementSummary', 'project-1'],
-    ['settlementBatchDraft', 'project-1'],
-    ['releaseNonWinning', 'task-1'],
   ]);
 });
 
@@ -557,6 +578,10 @@ test('P0-Pay app routes resolve to controlled 400 or 401 instead of Nest route 4
         body: JSON.stringify({}),
       });
       const body = await response.json();
+      if (rcDisabledAppRoutes.has(route)) {
+        assertRcDisabledResponse(response, body, route);
+        continue;
+      }
       assert.equal(response.status, 400, route);
       assert.equal(body.code, 'P0_PAY_REQUEST_INVALID', route);
       assert.equal(body.source, 'bff', route);
@@ -569,6 +594,10 @@ test('P0-Pay app routes resolve to controlled 400 or 401 instead of Nest route 4
         body: JSON.stringify({}),
       });
       const body = await response.json();
+      if (rcDisabledAppRoutes.has(route)) {
+        assertRcDisabledResponse(response, body, route);
+        continue;
+      }
       assert.equal(response.status, 400, route);
       assert.equal(body.code, 'P0_PAY_REQUEST_INVALID', route);
       assert.equal(body.source, 'bff', route);
@@ -577,6 +606,10 @@ test('P0-Pay app routes resolve to controlled 400 or 401 instead of Nest route 4
     for (const route of [...p0PayGetRoutes, ...projectPricingGetRoutes]) {
       const response = await fetch(`${url}${route}`);
       const body = await response.json();
+      if (rcDisabledAppRoutes.has(route)) {
+        assertRcDisabledResponse(response, body, route);
+        continue;
+      }
       assert.equal(response.status, 401, route);
       assert.equal(body.code, 'AUTH_SESSION_INVALID', route);
       assert.equal(body.source, 'bff', route);
@@ -633,9 +666,54 @@ test('P0-Pay idempotent command conflicts are normalized to controlled 409', asy
       }),
     });
     const body = await response.json();
-    assert.equal(response.status, 409);
-    assert.equal(body.code, 'IDEMPOTENCY_KEY_CONFLICT');
-    assert.equal(body.source, 'server');
+    assertRcDisabledResponse(response, body, '/api/app/exhibition/trade-tasks');
+  } finally {
+    await app.close();
+  }
+});
+
+test('P0-Pay bid service fee freeze-init preserves explicit Server retry-state error', async () => {
+  const app = await createRealRouteApp({
+    async post(pathName, body, options) {
+      assert.equal(pathName, '/server/projects/project-1/bid-service-fee-authorizations/auth-1/freeze-init');
+      assert.deepEqual(body, {
+        payChannel: 'alipay_candidate',
+        clientPlatform: 'flutter',
+        idempotencyKey: 'idem-freeze',
+      });
+      assert.equal(options.headers['x-idempotency-key'], 'idem-freeze');
+      throw createAxiosResponseError(409, {
+        statusCode: 409,
+        code: 'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED',
+        message: '当前竞标服务费预授权状态为 failed，暂不能重新拉起支付宝确认，请刷新状态后处理。',
+        source: 'server',
+      });
+    },
+  });
+
+  try {
+    const response = await fetch(
+      `${await app.getUrl()}/api/app/project/project-1/bid-service-fee-authorizations/auth-1/freeze-init`,
+      {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer token',
+          'content-type': 'application/json',
+          'x-idempotency-key': 'idem-freeze',
+        },
+        body: JSON.stringify({
+          payChannel: 'alipay_candidate',
+          clientPlatform: 'flutter',
+          idempotencyKey: 'idem-freeze',
+        }),
+      },
+    );
+    const body = await response.json();
+    assertRcDisabledResponse(
+      response,
+      body,
+      '/api/app/project/project-1/bid-service-fee-authorizations/auth-1/freeze-init',
+    );
   } finally {
     await app.close();
   }

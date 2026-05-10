@@ -5,7 +5,7 @@ import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PlatformServiceFeeChargeEntity } from './entities/platform-service-fee-charge.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
 import { P0_PAY_ACCOUNT_BINDING_POLICY } from './p0-pay.state';
-import { normalizeDealConfirmationStatus } from './p0-pay.types';
+import { normalizeBidServiceFeeAuthorizationStatus, normalizeDealConfirmationStatus } from './p0-pay.types';
 
 type ChannelAction = {
   channelActionType: 'sdk_payload' | 'web_redirect' | 'qr_code' | 'unavailable';
@@ -93,7 +93,7 @@ export class P0PayPresenter {
 
   toAuthorizeInitResponse(
     authorization: PlatformServiceFeeAuthorizationEntity,
-    order: PaymentOrderEntity,
+    order: PaymentOrderEntity | null,
     action: ChannelAction = {
       channelActionType: 'unavailable',
       channelPayload: null,
@@ -101,22 +101,25 @@ export class P0PayPresenter {
     }
   ) {
     return {
-      authorizationInitStatus: order.status,
+      authorizationInitStatus: order?.status ?? authorization.status,
       authorizationId: authorization.id,
-      paymentReferenceId: order.merchantOrderNo,
-      paymentOrderId: order.id,
+      authorizationStatus: normalizeBidServiceFeeAuthorizationStatus(authorization.status),
+      paymentReferenceId: order?.merchantOrderNo ?? authorization.authorizationOrderId,
+      paymentOrderId: order?.id ?? authorization.paymentOrderId,
       channelActionType: action.channelActionType,
       channelPayload: action.channelPayload,
       callbackAwaiting: action.callbackAwaiting,
-      updatedAt: order.updatedAt,
-      paymentOrder: {
-        merchantOrderNo: order.merchantOrderNo,
-        paymentChannel: order.paymentChannel,
-        orderRole: order.orderRole,
-        status: order.status,
-        amount: order.amount,
-        currency: order.currency
-      },
+      updatedAt: order?.updatedAt ?? authorization.updatedAt,
+      paymentOrder: order
+        ? {
+            merchantOrderNo: order.merchantOrderNo,
+            paymentChannel: order.paymentChannel,
+            orderRole: order.orderRole,
+            status: order.status,
+            amount: order.amount,
+            currency: order.currency
+          }
+        : null,
       paymentHandoff: {
         mode: 'order_level_authorization',
         accountBinding: P0_PAY_ACCOUNT_BINDING_POLICY,

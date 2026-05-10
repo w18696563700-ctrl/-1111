@@ -7,6 +7,7 @@ import 'package:mobile/core/boot/app_bootstrap_controller.dart';
 import 'package:mobile/core/location/china_region_catalog.dart';
 import 'package:mobile/core/location/china_region_picker.dart';
 import 'package:mobile/core/location/device_location_service.dart';
+import 'package:mobile/core/rc/rc_release_flags.dart';
 import 'package:mobile/features/exhibition/data/exhibition_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/enterprise_hub_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_client.dart';

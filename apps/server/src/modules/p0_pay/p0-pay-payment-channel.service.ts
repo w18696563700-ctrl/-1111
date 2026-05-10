@@ -62,6 +62,10 @@ export class P0PayPaymentChannelService {
     return `sha256=${createHmac('sha256', secret).update(this.stableJson(payload), 'utf8').digest('hex')}`;
   }
 
+  canSignControlledCallback() {
+    return Boolean(process.env[P0_PAY_CALLBACK_SECRET_ENV]?.trim());
+  }
+
   stableJson(value: unknown): string {
     return JSON.stringify(this.sortValue(value));
   }

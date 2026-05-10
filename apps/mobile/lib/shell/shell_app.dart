@@ -15,6 +15,7 @@ import 'package:mobile/features/exhibition/data/exhibition_home_aggregation_clie
 import 'package:mobile/features/exhibition/data/project_name_access_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/forum_consumer_layer.dart';
 import 'package:mobile/features/exhibition/data/trading_im_consumer_layer.dart';
+import 'package:mobile/features/messages/data/app_notification_parser.dart';
 import 'package:mobile/features/messages/data/counterpart_conversation_consumer_layer.dart';
 import 'package:mobile/features/messages/data/messages_consumer_layer.dart';
 import 'package:mobile/features/profile/data/profile_consumer_layer.dart';
@@ -90,6 +91,7 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
   );
 
   final AppRouter _router = const AppRouter();
+  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   bool _notificationBootstrapStarted = false;
 
   @override
@@ -171,7 +173,31 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
       return;
     }
     _notificationBootstrapStarted = true;
-    unawaited(AppNotificationBootstrapService().initialize());
+    unawaited(
+      AppNotificationBootstrapService().initialize(
+        onRouteTargetOpened: _openNotificationRouteTarget,
+      ),
+    );
+  }
+
+  Future<void> _openNotificationRouteTarget(
+    Map<String, Object?> routeTargetPayload,
+  ) async {
+    final routeTarget = parseAppNotificationRouteTarget(routeTargetPayload);
+    final routeLocation = routeTarget?.routeLocation?.trim();
+    if (routeLocation == null || routeLocation.isEmpty) {
+      return;
+    }
+    final navigator = _navigatorKey.currentState;
+    if (navigator == null) {
+      return;
+    }
+    try {
+      await navigator.pushNamed(routeLocation);
+    } catch (_) {
+      // System notification taps must never mutate business state when routing
+      // is unavailable. The in-app notification stays as the recoverable entry.
+    }
   }
 
   @override
@@ -210,6 +236,7 @@ class _ExhibitionMobileAppState extends State<ExhibitionMobileApp> {
           GlobalCupertinoLocalizations.delegate,
         ],
         theme: AppTheme.light(),
+        navigatorKey: _navigatorKey,
         initialRoute: widget.initialRoute,
         onGenerateInitialRoutes: (String initialRoute) {
           final routeName = initialRoute.isEmpty ? '/' : initialRoute;

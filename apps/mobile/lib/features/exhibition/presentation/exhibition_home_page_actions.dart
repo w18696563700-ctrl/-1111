@@ -170,6 +170,12 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
   }
 
   void _openProjectCreate() {
+    if (!RcReleaseFlags.projectPublishingEnabled) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(rcFeatureUnavailableTitle)),
+      );
+      return;
+    }
     if (_redirectToLoginForPrivateAction(actionLabel: '发布项目')) {
       return;
     }
@@ -191,6 +197,12 @@ extension _ExhibitionHomePageStateActions on _ExhibitionHomePageState {
   }
 
   void _openForumPublish() {
+    if (!RcReleaseFlags.forumPublishingEnabled) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text(rcFeatureUnavailableTitle)),
+      );
+      return;
+    }
     if (_redirectToLoginForPrivateAction(actionLabel: '发布帖子')) {
       return;
     }

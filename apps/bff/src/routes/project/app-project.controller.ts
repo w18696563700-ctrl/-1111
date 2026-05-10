@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Headers, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
 import type { IncomingHttpHeaders } from 'http';
+import { rcFeatureDisabled } from '../../core/rc/rc-feature-disabled';
 import { ProjectBidMaterialService } from './project-bid-material.service';
 import { ProjectLifecycleService } from './project-lifecycle.service';
 import { ProjectPublicResourceService } from './project-public-resource.service';
@@ -40,6 +41,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_create');
     return this.projectService.createProject(payload, headers);
   }
 
@@ -57,6 +59,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_save');
     return this.projectService.saveProject(payload, headers);
   }
 
@@ -66,6 +69,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_submit');
     return this.projectService.submitProject(payload, headers);
   }
 
@@ -75,6 +79,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_publish');
     return this.projectService.publishProject(payload, headers);
   }
 
@@ -84,6 +89,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_withdraw');
     return this.lifecycleService.withdrawProject(payload, headers);
   }
 
@@ -93,6 +99,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_archive');
     return this.lifecycleService.archiveProject(payload, headers);
   }
 
@@ -102,6 +109,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_close');
     return this.lifecycleService.closeProject(payload, headers);
   }
 
@@ -111,6 +119,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_withdraw_published');
     return this.lifecycleService.withdrawPublishedProject(payload, headers);
   }
 
@@ -120,6 +129,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_discard_submitted');
     return this.lifecycleService.discardSubmittedProject(payload, headers);
   }
 
@@ -129,6 +139,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_cancellation_request');
     return this.lifecycleService.requestCancellation(payload, headers);
   }
 
@@ -138,6 +149,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_cancellation_respond');
     return this.lifecycleService.respondCancellation(payload, headers);
   }
 
@@ -147,6 +159,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_publisher_breach_record');
     return this.lifecycleService.recordPublisherBreach(payload, headers);
   }
 
@@ -156,6 +169,7 @@ export class AppProjectController {
     @Body() payload: Record<string, unknown>,
     @Headers() headers: IncomingHttpHeaders,
   ) {
+    rcFeatureDisabled('project_factory_breach_record');
     return this.lifecycleService.recordFactoryBreach(payload, headers);
   }
 

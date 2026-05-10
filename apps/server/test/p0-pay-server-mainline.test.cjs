@@ -66,6 +66,7 @@ test('P0-Pay payment channel supports controlled HMAC callbacks and Alipay APP P
     currency: 'CNY',
   };
   const signature = service.signPayload(payload);
+  assert.equal(service.canSignControlledCallback(), true);
   assert.deepEqual(service.verifyCallback(payload, signature, 'other'), {
     verified: true,
     reasonCode: '',
@@ -143,6 +144,261 @@ test('P0-Pay payment channel supports controlled HMAC callbacks and Alipay APP P
   delete process.env.P0_PAY_ALIPAY_APP_PRIVATE_KEY;
   delete process.env.P0_PAY_ALIPAY_PUBLIC_KEY;
   delete process.env.P0_PAY_ALIPAY_NOTIFY_URL;
+});
+
+test('P0-Pay other candidate service-fee authorization uses controlled callback completion', async () => {
+  const {
+    P0PayControlledOtherCallbackService,
+  } = require('../dist/modules/p0_pay/p0-pay-controlled-other-callback.service.js');
+
+  const calls = [];
+  const service = new P0PayControlledOtherCallbackService(
+    {
+      async handleCallback(paymentChannel, payload, signature, context) {
+        calls.push({ paymentChannel, payload, signature, context });
+        return { applyStatus: 'applied' };
+      },
+    },
+    {
+      canSignControlledCallback() {
+        return true;
+      },
+      signPayload(payload) {
+        assert.equal(payload.eventStatus, 'succeeded');
+        return 'sha256=test-signature';
+      },
+    },
+  );
+  const context = { requestId: 'req-1', traceId: 'trace-1', actorId: 'user-1', actorType: 'user' };
+  const order = {
+    id: 'order-1',
+    businessType: 'bid_service_fee_authorization_freeze',
+    businessId: 'auth-1',
+    paymentChannel: 'other',
+    orderRole: 'authorization',
+    status: 'pending_user_confirm',
+    merchantOrderNo: 'P0PAY_BID_AUTH_1',
+    amount: '4000.00',
+    currency: 'CNY',
+  };
+
+  assert.deepEqual(await service.completeAuthorizationFreezeIfEligible(order, context), { applyStatus: 'applied' });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].paymentChannel, 'other');
+  assert.equal(calls[0].signature, 'sha256=test-signature');
+  assert.equal(calls[0].payload.merchantOrderNo, 'P0PAY_BID_AUTH_1');
+  assert.equal(calls[0].payload.channelOrderId, 'other-order-1');
+  assert.equal(calls[0].payload.providerEventId, 'other-P0PAY_BID_AUTH_1-authorization-succeeded');
+  assert.equal(calls[0].payload.channelEventId, 'other-P0PAY_BID_AUTH_1-authorization-succeeded');
+  assert.equal(calls[0].payload.eventType, 'authorization_succeeded');
+  assert.equal(calls[0].payload.amount, '4000.00');
+
+  assert.equal(
+    await service.completeAuthorizationFreezeIfEligible({ ...order, paymentChannel: 'alipay' }, context),
+    null,
+  );
+});
+
+test('P0-Pay bid service fee freeze-init reuses existing order, reports completed state, and rejects non-retryable state clearly', async () => {
+  const {
+    P0PayServiceFeeAuthorizationService,
+  } = require('../dist/modules/p0_pay/p0-pay-service-fee-authorization.service.js');
+  const { P0PayPresenter } = require('../dist/modules/p0_pay/p0-pay.presenter.js');
+
+  function createService({
+    authorizationStatus,
+    orderStatus,
+    paymentOrderId = 'order-1',
+    paymentChannel = 'alipay',
+  }) {
+    let transactionCalled = false;
+    const authorization = {
+      id: 'auth-1',
+      taskId: 'project-1',
+      bidId: 'bid-1',
+      factoryOrganizationId: 'factory-1',
+      publisherOrganizationId: 'publisher-1',
+      bidderOrganizationId: 'factory-1',
+      quotedAmount: '80000.00',
+      estimatedFeeAmount: '2400.00',
+      authorizationQuotaAmount: '4000.00',
+      chargedAmountUsed: '0.00',
+      releasedAmount: '0.00',
+      finalFeeAmount: null,
+      paymentChannel,
+      paymentOrderId,
+      authorizationOrderId: 'P0PAY_AUTH_1',
+      status: authorizationStatus,
+      ruleVersion: 'platform_pricing_rules_master_v1',
+      ruleSnapshotHash: 'platform_pricing_rules_master_v1',
+      agreedAt: new Date('2026-05-10T10:00:00.000Z'),
+      createdAt: new Date('2026-05-10T10:00:00.000Z'),
+      updatedAt: new Date('2026-05-10T10:01:00.000Z'),
+    };
+    const order = paymentOrderId
+      ? {
+          id: paymentOrderId,
+          businessType: 'bid_service_fee_authorization_freeze',
+          businessId: authorization.id,
+          merchantOrderNo: 'P0PAY_AUTH_1',
+          channelOrderId: null,
+          paymentChannel,
+          orderRole: 'authorization',
+          status: orderStatus,
+          amount: '4000.00',
+          currency: 'CNY',
+          createdAt: new Date('2026-05-10T10:01:00.000Z'),
+          updatedAt: new Date('2026-05-10T10:01:30.000Z'),
+        }
+      : null;
+    const service = new P0PayServiceFeeAuthorizationService(
+      { async findOneBy() { return authorization; } },
+      { async findOneBy() { return order; } },
+      {
+        async findOneBy() {
+          return {
+            id: 'bid-1',
+            projectId: 'project-1',
+            bidderOrganizationId: 'factory-1',
+            state: 'submitted',
+          };
+        },
+      },
+      {
+        async findOneBy() {
+          return {
+            id: 'project-1',
+            projectNo: 'P-001',
+            state: 'published',
+            publishedAt: new Date('2026-05-10T09:00:00.000Z'),
+          };
+        },
+      },
+      {
+        async transaction() {
+          transactionCalled = true;
+          throw new Error('transaction should not be called for existing order scenarios');
+        },
+      },
+      {
+        async verifyCurrentSessionContext() {
+          return {
+            outcome: 'verified',
+            currentSession: {
+              sessionId: 'session-1',
+              actorId: 'actor-1',
+              userId: 'user-1',
+              organizationId: 'factory-1',
+              requestId: 'req-1',
+              traceId: 'trace-1',
+            },
+          };
+        },
+      },
+      {
+        async requireBidQualifiedScope() {
+          return {
+            organization: { id: 'factory-1' },
+            membership: { roleKey: 'factory' },
+          };
+        },
+      },
+      {
+        toAuthorizeInitCommand(taskId, bidId, authorizationId, payload) {
+          return {
+            taskId,
+            bidId,
+            authorizationId,
+            payChannel: payload.payChannel === 'alipay_candidate' ? 'alipay' : payload.payChannel,
+            clientPlatform: payload.clientPlatform ?? 'flutter',
+            idempotencyKey: payload.idempotencyKey ?? 'idem-freeze',
+          };
+        },
+      },
+      {
+        hashKey(value) { return `hash:${value}`; },
+        hashRequest(value) { return JSON.stringify(value); },
+      },
+      {
+        async findPaymentOrder() { return null; },
+      },
+      {
+        buildChannelAction(input) {
+          return {
+            channelActionType: 'sdk_payload',
+            channelPayload: {
+              orderString: 'alipay-order-string',
+              paymentOrderId: input.paymentOrderId,
+            },
+            callbackAwaiting: true,
+          };
+        },
+      },
+      {
+        async completeAuthorizationFreezeIfEligible() {
+          return null;
+        },
+      },
+      {},
+      { async record() { return undefined; } },
+      new P0PayPresenter(),
+    );
+    return { service, getTransactionCalled: () => transactionCalled };
+  }
+
+  const retryable = createService({
+    authorizationStatus: 'pending_authorization',
+    orderStatus: 'pending_user_confirm',
+  });
+  const retryableResult = await retryable.service.authorizeInit(
+    'project-1',
+    'bid-1',
+    'auth-1',
+    { payChannel: 'alipay_candidate', clientPlatform: 'flutter', idempotencyKey: 'idem-retry' },
+    { requestId: 'req-1', traceId: 'trace-1' },
+  );
+  assert.equal(retryable.getTransactionCalled(), false);
+  assert.equal(retryableResult.authorizationStatus, 'pending_freeze');
+  assert.equal(retryableResult.channelActionType, 'sdk_payload');
+  assert.equal(retryableResult.channelPayload.orderString, 'alipay-order-string');
+
+  const completed = createService({
+    authorizationStatus: 'frozen',
+    orderStatus: 'succeeded',
+  });
+  const completedResult = await completed.service.authorizeInit(
+    'project-1',
+    'bid-1',
+    'auth-1',
+    { payChannel: 'alipay_candidate', clientPlatform: 'flutter', idempotencyKey: 'idem-completed' },
+    { requestId: 'req-1', traceId: 'trace-1' },
+  );
+  assert.equal(completed.getTransactionCalled(), false);
+  assert.equal(completedResult.authorizationStatus, 'frozen');
+  assert.equal(completedResult.callbackAwaiting, false);
+  assert.equal(completedResult.channelActionType, 'unavailable');
+  assert.equal(completedResult.channelPayload.reasonCode, 'authorization_already_frozen');
+
+  const rejected = createService({
+    authorizationStatus: 'failed',
+    orderStatus: 'failed',
+  });
+  await assert.rejects(
+    () =>
+      rejected.service.authorizeInit(
+        'project-1',
+        'bid-1',
+        'auth-1',
+        { payChannel: 'alipay_candidate', clientPlatform: 'flutter', idempotencyKey: 'idem-failed' },
+        { requestId: 'req-1', traceId: 'trace-1' },
+      ),
+    (error) => {
+      assert.equal(error.getStatus(), 409);
+      assert.equal(error.getResponse().code, 'BID_SERVICE_FEE_AUTHORIZATION_FREEZE_INIT_REJECTED');
+      assert.match(error.getResponse().message, /暂不能重新拉起支付宝确认/);
+      return true;
+    },
+  );
 });
 
 test('P0-Pay server exposes BFF-forwarded trade task routes and controlled state actions', () => {
@@ -383,6 +639,129 @@ test('P0-Pay payment callbacks preserve locked authorization fee snapshot across
   assert.equal(failure.order.status, 'failed');
   assert.equal(failure.savedTransactions.length, 1);
   assert.equal(failure.response.applyStatus, 'applied');
+});
+
+test('P0-Pay bid service fee Alipay callback requires matched amount and currency before frozen', async () => {
+  const {
+    P0PayCallbackService,
+  } = require('../dist/modules/p0_pay/p0-pay-callback.service.js');
+
+  async function runBidAuthorizationCallback(payloadPatch) {
+    const authorization = {
+      id: 'bid-auth-1',
+      status: 'pending_freeze',
+      frozenAt: null,
+      authorizedAt: null,
+    };
+    const order = {
+      id: 'order-bid-auth-1',
+      businessType: 'bid_service_fee_authorization_freeze',
+      businessId: authorization.id,
+      merchantOrderNo: 'P0PAY_AUTH_BID_1',
+      paymentChannel: 'alipay',
+      orderRole: 'authorization',
+      amount: '4000.00',
+      currency: 'CNY',
+      status: 'pending_user_confirm',
+      channelOrderId: null,
+    };
+    const savedTransactions = [];
+    const manager = {
+      getRepository(entity) {
+        if (entity?.name === 'PaymentCallbackEventEntity') {
+          return { async save(value) { return value; } };
+        }
+        if (entity?.name === 'PaymentOrderEntity') {
+          return {
+            async findOneBy() { return order; },
+            async save(value) { return value; },
+          };
+        }
+        if (entity?.name === 'PaymentTransactionEntity') {
+          return {
+            async save(value) { savedTransactions.push({ ...value }); return value; },
+          };
+        }
+        if (entity?.name === 'PlatformServiceFeeAuthorizationEntity') {
+          return {
+            async findOneBy() { return authorization; },
+            async save(value) { return value; },
+            async update(_where, patch) { Object.assign(authorization, patch); },
+          };
+        }
+        return {
+          async findOneBy() { return null; },
+          async save(value) { return value; },
+          async update() { return undefined; },
+        };
+      },
+    };
+    const service = new P0PayCallbackService(
+      {
+        async findOneBy() { return null; },
+        create(value) { return value; },
+      },
+      {
+        async transaction(callback) {
+          return callback(manager);
+        },
+      },
+      {
+        verifyCallback() { return { verified: true, reasonCode: '' }; },
+        hashPayload() { return 'payload-hash'; },
+      },
+      { async record() { return undefined; } },
+    );
+
+    const response = await service.handleCallback(
+      'alipay',
+      {
+        out_trade_no: order.merchantOrderNo,
+        trade_no: `trade-${payloadPatch.notify_id ?? 'default'}`,
+        notify_id: 'notify-bid-auth',
+        notify_type: 'trade_status_sync',
+        trade_status: 'TRADE_SUCCESS',
+        total_amount: order.amount,
+        ...payloadPatch,
+      },
+      'alipay-signature',
+      { requestId: 'req-1', traceId: 'trace-1' },
+    );
+
+    return { authorization, order, response, savedTransactions };
+  }
+
+  const success = await runBidAuthorizationCallback({});
+  assert.equal(success.response.applyStatus, 'applied');
+  assert.equal(success.authorization.status, 'frozen');
+  assert.equal(success.order.status, 'succeeded');
+  assert.equal(success.savedTransactions.length, 1);
+
+  const amountMismatch = await runBidAuthorizationCallback({
+    notify_id: 'notify-bid-auth-amount-mismatch',
+    total_amount: '3999.99',
+  });
+  assert.equal(amountMismatch.response.applyStatus, 'apply_failed');
+  assert.equal(amountMismatch.response.rejectedReasonCode, 'payment_amount_mismatch');
+  assert.equal(amountMismatch.authorization.status, 'pending_freeze');
+  assert.equal(amountMismatch.order.status, 'pending_user_confirm');
+  assert.equal(amountMismatch.savedTransactions.length, 0);
+
+  const amountMissing = await runBidAuthorizationCallback({
+    notify_id: 'notify-bid-auth-amount-missing',
+    total_amount: '',
+  });
+  assert.equal(amountMissing.response.applyStatus, 'apply_failed');
+  assert.equal(amountMissing.response.rejectedReasonCode, 'payment_amount_mismatch');
+  assert.equal(amountMissing.authorization.status, 'pending_freeze');
+
+  const currencyMismatch = await runBidAuthorizationCallback({
+    notify_id: 'notify-bid-auth-currency-mismatch',
+    currency: 'USD',
+  });
+  assert.equal(currencyMismatch.response.applyStatus, 'apply_failed');
+  assert.equal(currencyMismatch.response.rejectedReasonCode, 'payment_currency_mismatch');
+  assert.equal(currencyMismatch.authorization.status, 'pending_freeze');
 });
 
 test('P0-Pay callback signature rejection records event without applying money state', async () => {

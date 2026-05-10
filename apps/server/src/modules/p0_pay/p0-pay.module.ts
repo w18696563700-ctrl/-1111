@@ -22,6 +22,7 @@ import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayCallbackService } from './p0-pay-callback.service';
 import { P0PayCommandParser } from './p0-pay-command.parser';
 import { P0PayContractConfirmationService } from './p0-pay-contract-confirmation.service';
+import { P0PayControlledOtherCallbackService } from './p0-pay-controlled-other-callback.service';
 import { P0PayController } from './p0-pay.controller';
 import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
@@ -68,6 +69,7 @@ import { P0PayTradeTaskService } from './p0-pay-trade-task.service';
     P0PayCallbackService,
     P0PayCommandParser,
     P0PayContractConfirmationService,
+    P0PayControlledOtherCallbackService,
     P0PayIdempotencyRecordService,
     P0PayIdempotencyService,
     P0PayInternalTestNoFreezeService,

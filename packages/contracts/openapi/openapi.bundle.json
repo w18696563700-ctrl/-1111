@@ -3480,37 +3480,6 @@
         }
       }
     },
-    "/api/app/forum/topic/follow": {
-      "post": {
-        "tags": [
-          "Forum"
-        ],
-        "summary": "Toggle topic follow via canonical path for Flutter App",
-        "operationId": "toggleAppForumTopicFollow",
-        "requestBody": {
-          "required": true,
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ForumTopicFollowToggleRequest"
-              }
-            }
-          }
-        },
-        "responses": {
-          "202": {
-            "description": "Minimum topic-follow toggle accepted response.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ForumToggleAcceptedResponse"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/api/app/forum/publish": {
       "post": {
         "tags": [
@@ -4555,7 +4524,7 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Project authenticity sincerity order created or returned through an idempotent current-order handoff. The formal name remains `项目真实性诚意金`.\n",
             "content": {
               "application/json": {
@@ -4611,7 +4580,7 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Project authenticity sincerity pay-init accepted for the current bounded order only.\n",
             "content": {
               "application/json": {
@@ -4704,7 +4673,7 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Bid service-fee authorization object created or returned through an idempotent current-authorization handoff.\n",
             "content": {
               "application/json": {
@@ -4760,7 +4729,7 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Bid service-fee authorization freeze-init accepted for the current bounded authorization only.\n",
             "content": {
               "application/json": {
@@ -4861,7 +4830,7 @@
           }
         },
         "responses": {
-          "200": {
+          "202": {
             "description": "Bid service-fee authorization release accepted for the current bounded authorization only.\n",
             "content": {
               "application/json": {
@@ -14787,25 +14756,6 @@
           }
         }
       },
-      "ForumTopicFollowToggleRequest": {
-        "type": "object",
-        "required": [
-          "topicId",
-          "action"
-        ],
-        "properties": {
-          "topicId": {
-            "type": "string"
-          },
-          "action": {
-            "type": "string",
-            "enum": [
-              "follow",
-              "unfollow"
-            ]
-          }
-        }
-      },
       "ForumToggleAcceptedResponse": {
         "type": "object",
         "required": [
@@ -16221,9 +16171,29 @@
           "charged",
           "breach_hold",
           "cancelled",
-          "failed"
+          "failed",
+          "expired"
         ],
         "description": "Canonical bounded state machine for the current project's `竞标服务费预授权额度` object only.\n"
+      },
+      "BidServiceFeeAuthorizationPayChannel": {
+        "type": "string",
+        "enum": [
+          "alipay_candidate",
+          "wechat_candidate",
+          "other_candidate"
+        ],
+        "description": "`alipay_candidate` is the only real external-payment channel candidate opened for the real-payment minimum closure package. `other_candidate` remains a Server-owned controlled test channel. `wechat_candidate` is retained for compatibility and may be rejected until a later runtime gate opens it.\n"
+      },
+      "PricingChannelActionType": {
+        "type": "string",
+        "enum": [
+          "sdk_payload",
+          "web_redirect",
+          "qr_code",
+          "unavailable"
+        ],
+        "description": "Transport action type returned by Server/BFF for the current payment-channel handoff. This field is not payment truth and must not be interpreted by Flutter or BFF as successful payment or successful authorization.\n"
       },
       "DealConfirmationStatus": {
         "type": "string",
@@ -17333,7 +17303,7 @@
         "description": "Freeze-init request for the current bounded `竞标服务费预授权额度` object only.\n",
         "properties": {
           "payChannel": {
-            "type": "string"
+            "$ref": "#/components/schemas/BidServiceFeeAuthorizationPayChannel"
           },
           "clientPlatform": {
             "type": "string"
@@ -17367,7 +17337,7 @@
             "type": "string"
           },
           "channelActionType": {
-            "type": "string"
+            "$ref": "#/components/schemas/PricingChannelActionType"
           },
           "channelPayload": {
             "type": "object",

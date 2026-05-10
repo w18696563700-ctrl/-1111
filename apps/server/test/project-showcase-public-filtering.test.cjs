@@ -68,6 +68,94 @@ function applyFindWhere(projects, where) {
   });
 }
 
+function createProjectListQueryBuilder(projects) {
+  const currentDate = new Date().toISOString().slice(0, 10);
+  const state = {
+    params: {},
+    skip: 0,
+    take: 20,
+  };
+  const builder = {
+    where(_clause, params = {}) {
+      Object.assign(state.params, params);
+      return builder;
+    },
+    andWhere(_clause, params = {}) {
+      Object.assign(state.params, params);
+      return builder;
+    },
+    orderBy() {
+      return builder;
+    },
+    addOrderBy() {
+      return builder;
+    },
+    skip(value) {
+      state.skip = value;
+      return builder;
+    },
+    take(value) {
+      state.take = value;
+      return builder;
+    },
+    async getManyAndCount() {
+      const filtered = projects.filter((project) => {
+        if (project.publishedAt == null) {
+          return false;
+        }
+        if (project.state !== 'published') {
+          return false;
+        }
+        if (project.plannedEndAt && project.plannedEndAt < currentDate) {
+          return false;
+        }
+        if (state.params.provinceCode && project.provinceCode !== state.params.provinceCode) {
+          return false;
+        }
+        if (state.params.cityCode && project.cityCode !== state.params.cityCode) {
+          return false;
+        }
+        const areaSqm = Number(project.areaSqm);
+        if (state.params.areaSqm !== undefined && areaSqm !== state.params.areaSqm) {
+          return false;
+        }
+        if (
+          state.params.maxStandardArea !== undefined &&
+          state.params.standardAreas === undefined &&
+          areaSqm <= state.params.maxStandardArea
+        ) {
+          return false;
+        }
+        if (state.params.standardAreas !== undefined) {
+          if (areaSqm <= 0 || areaSqm > state.params.maxStandardArea) {
+            return false;
+          }
+          if (state.params.standardAreas.includes(areaSqm)) {
+            return false;
+          }
+        }
+        const budgetAmount = Number(project.budgetAmount);
+        if (state.params.budgetMin !== undefined && budgetAmount < state.params.budgetMin) {
+          return false;
+        }
+        if (state.params.budgetMax !== undefined && budgetAmount >= state.params.budgetMax) {
+          return false;
+        }
+        return true;
+      }).sort((left, right) => {
+        const publishedDelta = right.publishedAt.getTime() - left.publishedAt.getTime();
+        if (publishedDelta !== 0) {
+          return publishedDelta;
+        }
+        const createdDelta = right.createdAt.getTime() - left.createdAt.getTime();
+        return createdDelta !== 0 ? createdDelta : left.id.localeCompare(right.id);
+      });
+      return [filtered.slice(state.skip, state.skip + state.take), filtered.length];
+    },
+  };
+  return builder;
+}
+
 function createProjectNameAccessProjectionService() {
   const toProjection = (project) => ({
     displayTitle: project.exhibitionName ?? project.title,
@@ -96,6 +184,9 @@ function createService(projects, options = {}) {
   const repository = {
     async find(options) {
       return applyFindWhere(projects, options?.where);
+    },
+    createQueryBuilder() {
+      return createProjectListQueryBuilder(projects);
     },
     async findOne(options) {
       return projects.find((project) => {

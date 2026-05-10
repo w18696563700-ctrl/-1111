@@ -34,6 +34,16 @@ type RegisterDeviceTokenCommand = {
   deviceLabel: string | null;
 };
 
+type ForumInteractionNotificationCommand = {
+  tab: 'replies' | 'likes' | 'follows';
+  title: string;
+  body: string;
+  recipientUserId: string;
+  recipientOrganizationId: string;
+  actorUserId: string;
+  targetId: string | null;
+};
+
 const PAGE_SIZE_DEFAULT = 30;
 const PAGE_SIZE_MAX = 50;
 const DEVICE_PLATFORMS = new Set(['ios', 'android']);
@@ -203,6 +213,40 @@ export class NotificationService {
     });
     await notificationRepository.save(notification);
     await this.recordDeliveryAttempts(notification, recipientOrganizationId, manager);
+    return notification;
+  }
+
+  async createForumInteractionNotification(
+    command: ForumInteractionNotificationCommand,
+    manager: EntityManager
+  ) {
+    const recipientUserId = command.recipientUserId.trim();
+    const recipientOrganizationId = command.recipientOrganizationId.trim();
+    if (!recipientUserId && !recipientOrganizationId) {
+      return null;
+    }
+    if (recipientUserId && recipientUserId === command.actorUserId.trim()) {
+      return null;
+    }
+    const notificationRepository = manager.getRepository(AppNotificationEntity);
+    const notification = notificationRepository.create({
+      id: randomUUID(),
+      userId: recipientUserId,
+      organizationId: recipientOrganizationId,
+      type: 'forum_interaction',
+      source: 'forum_interaction',
+      title: command.title,
+      body: command.body,
+      projectId: null,
+      threadId: null,
+      routeTarget: this.forumInteractionRouteTarget(command.tab, command.targetId),
+      readAt: null,
+      notificationState: 'active'
+    });
+    await notificationRepository.save(notification);
+    if (recipientOrganizationId) {
+      await this.recordDeliveryAttempts(notification, recipientOrganizationId, manager);
+    }
     return notification;
   }
 
@@ -522,6 +566,19 @@ export class NotificationService {
       localEntryKey: 'bid_participation_request.open',
       requiredParams: ['threadId', 'projectId', 'requestId'],
       routeParams: { threadId: requestId, projectId, requestId },
+      state: 'enabled'
+    };
+  }
+
+  private forumInteractionRouteTarget(tab: 'replies' | 'likes' | 'follows', targetId: string | null) {
+    return {
+      canonicalPath: '/api/app/forum/interaction/inbox',
+      localEntryKey: 'forum_interaction.open',
+      requiredParams: ['tab'],
+      routeParams: {
+        tab,
+        ...(targetId ? { targetId } : {})
+      },
       state: 'enabled'
     };
   }

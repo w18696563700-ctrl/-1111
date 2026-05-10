@@ -16,9 +16,15 @@ import { ProjectEntity } from '../project/entities/project.entity';
 import { PaymentOrderEntity } from './entities/payment-order.entity';
 import { PlatformServiceFeeAuthorizationEntity } from './entities/platform-service-fee-authorization.entity';
 import { AuthorizeInitCommand, CreateAuthorizationCommand } from './p0-pay.commands';
-import { p0PayPermissionDenied, p0PayResourceUnavailable, p0PayStateConflict } from './p0-pay.errors';
+import {
+  bidServiceFeeAuthorizationFreezeInitRejected,
+  p0PayPermissionDenied,
+  p0PayResourceUnavailable,
+  p0PayStateConflict
+} from './p0-pay.errors';
 import { P0PayAuditService } from './p0-pay-audit.service';
 import { P0PayCommandParser } from './p0-pay-command.parser';
+import { P0PayControlledOtherCallbackService } from './p0-pay-controlled-other-callback.service';
 import { P0PayIdempotencyRecordService } from './p0-pay-idempotency-record.service';
 import { P0PayIdempotencyService } from './p0-pay-idempotency.service';
 import { P0PayPaymentChannelService } from './p0-pay-payment-channel.service';
@@ -29,7 +35,12 @@ import {
   PLATFORM_PRICING_IDEMPOTENCY_OPERATION_KEYS,
   PLATFORM_PRICING_RESOURCE_TYPES
 } from './p0-pay.state';
-import { P0PayPaymentChannel } from './p0-pay.types';
+import {
+  normalizeBidServiceFeeAuthorizationStatus,
+  P0PayPaymentChannel,
+  P0PayPaymentOrderStatus,
+  PlatformServiceFeeAuthorizationStatus
+} from './p0-pay.types';
 
 @Injectable()
 export class P0PayServiceFeeAuthorizationService {
@@ -49,6 +60,7 @@ export class P0PayServiceFeeAuthorizationService {
     private readonly idempotencyService: P0PayIdempotencyService,
     private readonly idempotencyRecordService: P0PayIdempotencyRecordService,
     private readonly paymentChannelService: P0PayPaymentChannelService,
+    private readonly controlledOtherCallbackService: P0PayControlledOtherCallbackService,
     private readonly serviceFeeFactory: P0PayServiceFeeFactory,
     private readonly auditService: P0PayAuditService,
     private readonly presenter: P0PayPresenter
@@ -122,10 +134,28 @@ export class P0PayServiceFeeAuthorizationService {
       requestHash
     );
     if (existing) {
+      await this.controlledOtherCallbackService.completeAuthorizationFreezeIfEligible(existing, context);
+      const authorization = await this.reloadAuthorization(ownership.authorization.id);
       const action = this.paymentChannelService.buildChannelAction(
         this.toChannelActionInput(existing, command.clientPlatform)
       );
-      return this.presenter.toAuthorizeInitResponse(ownership.authorization, existing, action);
+      return this.presenter.toAuthorizeInitResponse(authorization ?? ownership.authorization, existing, action);
+    }
+
+    const existingAuthorizationOrder = await this.resolveExistingAuthorizeInitOrder(
+      ownership.authorization,
+      command.payChannel
+    );
+    if (existingAuthorizationOrder) {
+      await this.controlledOtherCallbackService.completeAuthorizationFreezeIfEligible(existingAuthorizationOrder, context);
+      const authorization = await this.reloadAuthorization(ownership.authorization.id);
+      const currentAuthorization = authorization ?? ownership.authorization;
+      const action = this.isAuthorizationFreezeCompleted(currentAuthorization.status)
+        ? this.completedAuthorizationAction(existingAuthorizationOrder, command.clientPlatform)
+        : this.paymentChannelService.buildChannelAction(
+            this.toChannelActionInput(existingAuthorizationOrder, command.clientPlatform)
+          );
+      return this.presenter.toAuthorizeInitResponse(currentAuthorization, existingAuthorizationOrder, action);
     }
 
     const result = await this.dataSource.transaction((manager) =>
@@ -136,6 +166,7 @@ export class P0PayServiceFeeAuthorizationService {
         context
       })
     );
+    await this.controlledOtherCallbackService.completeAuthorizationFreezeIfEligible(result.order, context);
     const action = this.paymentChannelService.buildChannelAction(
       this.toChannelActionInput(result.order, command.clientPlatform)
     );
@@ -165,12 +196,18 @@ export class P0PayServiceFeeAuthorizationService {
     const auth = await manager.getRepository(PlatformServiceFeeAuthorizationEntity).findOneBy({
       id: ownership.authorization.id
     });
-    if (!auth || auth.status !== 'pending_freeze') {
-      throw p0PayStateConflict('Current service fee authorization cannot be initialized.');
+    if (!auth) {
+      throw p0PayResourceUnavailable('Current service fee authorization is unavailable.');
     }
     const existingOrder = await this.resolveExistingOrderForAuthorization(auth, command.payChannel, manager);
     if (existingOrder) {
+      if (!this.canReuseExistingAuthorizeInitOrder(auth.status, existingOrder.status)) {
+        throw this.authorizationInitRejected(auth.status);
+      }
       return { authorization: auth, order: existingOrder };
+    }
+    if (auth.status !== 'pending_freeze') {
+      throw this.authorizationInitRejected(auth.status);
     }
     const order = this.serviceFeeFactory.buildPaymentOrder({
       authorization: auth,
@@ -277,9 +314,89 @@ export class P0PayServiceFeeAuthorizationService {
       throw p0PayResourceUnavailable('Current payment order is unavailable for authorization init.');
     }
     if (order.paymentChannel !== payChannel) {
-      throw p0PayStateConflict('Current service fee authorization already has another payment channel.');
+      throw bidServiceFeeAuthorizationFreezeInitRejected(
+        '当前竞标服务费预授权已使用其他支付通道，请刷新状态后继续处理。'
+      );
     }
     return order;
+  }
+
+  private async resolveExistingAuthorizeInitOrder(
+    authorization: PlatformServiceFeeAuthorizationEntity,
+    payChannel: P0PayPaymentChannel
+  ) {
+    if (!authorization.paymentOrderId) {
+      if (this.isAuthorizationFreezeCompleted(authorization.status)) {
+        return null;
+      }
+      if (authorization.status !== 'pending_freeze') {
+        throw this.authorizationInitRejected(authorization.status);
+      }
+      return null;
+    }
+    const order = await this.paymentOrderRepository.findOneBy({ id: authorization.paymentOrderId });
+    if (!order) {
+      throw p0PayResourceUnavailable('Current payment order is unavailable for authorization init.');
+    }
+    if (order.paymentChannel !== payChannel) {
+      throw bidServiceFeeAuthorizationFreezeInitRejected(
+        '当前竞标服务费预授权已使用其他支付通道，请刷新状态后继续处理。'
+      );
+    }
+    if (!this.canReuseExistingAuthorizeInitOrder(authorization.status, order.status)) {
+      throw this.authorizationInitRejected(authorization.status);
+    }
+    return order;
+  }
+
+  private canReuseExistingAuthorizeInitOrder(
+    authorizationStatus: PlatformServiceFeeAuthorizationStatus,
+    orderStatus: P0PayPaymentOrderStatus
+  ) {
+    if (this.isAuthorizationFreezeCompleted(authorizationStatus)) {
+      return orderStatus === 'succeeded';
+    }
+    if (!this.isAuthorizationFreezeInitOpen(authorizationStatus)) {
+      return false;
+    }
+    return orderStatus === 'created' || orderStatus === 'pending_user_confirm';
+  }
+
+  private isAuthorizationFreezeInitOpen(status: PlatformServiceFeeAuthorizationStatus) {
+    return status === 'pending_freeze' || status === 'pending_authorization';
+  }
+
+  private isAuthorizationFreezeCompleted(status: PlatformServiceFeeAuthorizationStatus) {
+    const normalized = normalizeBidServiceFeeAuthorizationStatus(status);
+    return normalized === 'frozen';
+  }
+
+  private authorizationInitRejected(status: PlatformServiceFeeAuthorizationStatus) {
+    const normalized = normalizeBidServiceFeeAuthorizationStatus(status);
+    return bidServiceFeeAuthorizationFreezeInitRejected(
+      `当前竞标服务费预授权状态为 ${normalized}，暂不能重新拉起支付宝确认，请刷新状态后处理。`
+    );
+  }
+
+  private async reloadAuthorization(authorizationId: string) {
+    return this.authorizationRepository.findOneBy({ id: authorizationId });
+  }
+
+  private completedAuthorizationAction(order: PaymentOrderEntity, clientPlatform: string) {
+    return {
+      channelActionType: 'unavailable' as const,
+      channelPayload: {
+        provider: order.paymentChannel,
+        reasonCode: 'authorization_already_frozen',
+        paymentOrderId: order.id,
+        merchantOrderNo: order.merchantOrderNo,
+        amount: order.amount,
+        currency: order.currency,
+        clientPlatform,
+        callbackAwaiting: false
+      },
+      callbackAwaiting: false
+    };
   }
 
   private async saveAuthorizationIdempotency(

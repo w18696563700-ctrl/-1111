@@ -178,11 +178,12 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
               primary: true,
               icon: Icons.snippet_folder_outlined,
             ),
-            _HomeChannelAction(
-              label: '去发布项目',
-              onPressed: widget.onOpenProjectCreate,
-              icon: Icons.workspace_premium_outlined,
-            ),
+            if (RcReleaseFlags.projectPublishingEnabled)
+              _HomeChannelAction(
+                label: '去发布项目',
+                onPressed: widget.onOpenProjectCreate,
+                icon: Icons.workspace_premium_outlined,
+              ),
             _HomeChannelAction(
               label: '刷新',
               onPressed: _refreshActiveFilter,
@@ -300,17 +301,20 @@ class _HomeProjectModulePanelState extends State<_HomeProjectModulePanel> {
         AppPageStateView(
           state: AppPageState.empty,
           title: title,
-          message: '可以先进入项目列表继续查看，或直接发布项目。',
+          message: RcReleaseFlags.projectPublishingEnabled
+              ? '可以先进入项目列表继续查看，或直接发布项目。'
+              : '可以先进入项目列表继续查看。项目发布入口当前暂未开放。',
           retryLabel: '进入项目列表',
           onRetry: widget.onOpenProjectList,
           content: const SizedBox.shrink(),
           scope: AppPageStateViewScope.card,
         ),
         const SizedBox(height: 8),
-        FilledButton(
-          onPressed: widget.onOpenProjectCreate,
-          child: const Text('去发布项目'),
-        ),
+        if (RcReleaseFlags.projectPublishingEnabled)
+          FilledButton(
+            onPressed: widget.onOpenProjectCreate,
+            child: const Text('去发布项目'),
+          ),
       ];
     }
 

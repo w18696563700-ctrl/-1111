@@ -19,20 +19,32 @@ const Duration _rootBuildingTransitionDuration = Duration(milliseconds: 180);
 const Curve _rootBuildingTransitionCurve = Curves.easeOutCubic;
 
 class AppShellPage extends StatelessWidget {
-  const AppShellPage({super.key, required this.currentBuilding});
+  const AppShellPage({
+    super.key,
+    required this.currentBuilding,
+    this.initialRouteQueryParameters = const <String, String>{},
+  });
 
   final AppBuilding currentBuilding;
+  final Map<String, String> initialRouteQueryParameters;
 
   @override
   Widget build(BuildContext context) {
-    return _PersistentShellPage(initialBuilding: currentBuilding);
+    return _PersistentShellPage(
+      initialBuilding: currentBuilding,
+      initialRouteQueryParameters: initialRouteQueryParameters,
+    );
   }
 }
 
 class _PersistentShellPage extends StatefulWidget {
-  const _PersistentShellPage({required this.initialBuilding});
+  const _PersistentShellPage({
+    required this.initialBuilding,
+    required this.initialRouteQueryParameters,
+  });
 
   final AppBuilding initialBuilding;
+  final Map<String, String> initialRouteQueryParameters;
 
   @override
   State<_PersistentShellPage> createState() => _PersistentShellPageState();
@@ -255,6 +267,9 @@ class _PersistentShellPageState extends State<_PersistentShellPage>
       AppBuilding.messages => MessagesPage(
         refreshSignal: _messagesRefreshSignal,
         entrySignal: _messagesEntrySignal,
+        initialPrimaryTabKey: widget.initialRouteQueryParameters['tab'],
+        initialForumInteractionTabKey:
+            widget.initialRouteQueryParameters['interactionTab'],
       ),
       AppBuilding.profile => const ProfilePage(),
     };

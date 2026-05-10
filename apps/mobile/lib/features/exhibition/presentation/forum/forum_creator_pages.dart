@@ -98,6 +98,10 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
   }
 
   Future<void> _saveDraft() async {
+    if (!RcReleaseFlags.forumPublishingEnabled) {
+      _showActionFeedback('当前 RC 版本只保留论坛只读浏览，发帖与草稿写入暂未开放。');
+      return;
+    }
     final result = await _submitDraftSave(
       showFeedback: true,
       resumePendingUploadsOnSuccess: false,
@@ -563,6 +567,7 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
       _activeDraftId != null || _hasRequiredContent;
 
   bool get _canSaveDraft =>
+      RcReleaseFlags.forumPublishingEnabled &&
       !_saving &&
       !_hasActiveMediaTransfer &&
       !_hasPendingMediaSelection &&
@@ -597,6 +602,9 @@ class _ForumPublishPageState extends State<ForumPublishPage> {
   );
 
   String? get _composerHelperText {
+    if (!RcReleaseFlags.forumPublishingEnabled) {
+      return '当前 RC 版本只保留论坛只读浏览，发帖与草稿写入暂未开放。';
+    }
     if (_loading) {
       return _selectedDraftId == null ? '正在准备草稿编辑页' : '正在恢复草稿内容';
     }
