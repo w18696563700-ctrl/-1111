@@ -1,4 +1,4 @@
-export const AUDIT_SOURCE_FAMILIES = ['identity', 'project_publish'] as const;
+export const AUDIT_SOURCE_FAMILIES = ['identity', 'project_publish', 'content_safety'] as const;
 
 export type AuditSourceFamily = (typeof AUDIT_SOURCE_FAMILIES)[number];
 

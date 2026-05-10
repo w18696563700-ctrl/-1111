@@ -45,3 +45,10 @@ export function contentSafetyReviewTaskUnavailable(message: string) {
     message
   });
 }
+
+export function contentSafetyReviewTaskInvalidState(message: string) {
+  return new ConflictException({
+    code: 'CONTENT_SAFETY_REVIEW_TASK_INVALID_STATE',
+    message
+  });
+}

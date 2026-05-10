@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { requireVerifiedCurrentSessionContext } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
+import { ContentSafetyAuditLogEntity } from '../content_safety/entities/content-safety-audit-log.entity';
 import { CurrentActorEligibilityService } from '../organization/current-actor-eligibility.service';
 import { auditLogQueryInvalid, auditLogResourceUnavailable } from './audit-log.errors';
 import { matchesAuditLogFilters, readAuditLogListQuery } from './audit-log.query';
@@ -18,6 +19,8 @@ export class AuditLogQueryService {
     private readonly identityAuditRepository: Repository<IdentityAuditLogEntity>,
     @InjectRepository(ProjectPublishAuditLogEntity)
     private readonly projectPublishAuditRepository: Repository<ProjectPublishAuditLogEntity>,
+    @InjectRepository(ContentSafetyAuditLogEntity)
+    private readonly contentSafetyAuditRepository: Repository<ContentSafetyAuditLogEntity>,
     private readonly currentSessionVerificationService: CurrentSessionVerificationService,
     private readonly eligibilityService: CurrentActorEligibilityService,
     private readonly presenter: AuditLogPresenter
@@ -26,18 +29,22 @@ export class AuditLogQueryService {
   async list(query: Record<string, unknown>, context: RequestContext) {
     await this.requireReviewer(context);
     const normalizedQuery = readAuditLogListQuery(query, auditLogQueryInvalid);
-    const [identityRows, projectPublishRows] = await Promise.all([
-      normalizedQuery.sourceFamily === 'project_publish'
+    const [identityRows, projectPublishRows, contentSafetyRows] = await Promise.all([
+      normalizedQuery.sourceFamily && normalizedQuery.sourceFamily !== 'identity'
         ? []
         : this.identityAuditRepository.find(),
-      normalizedQuery.sourceFamily === 'identity'
+      normalizedQuery.sourceFamily && normalizedQuery.sourceFamily !== 'project_publish'
         ? []
-        : this.projectPublishAuditRepository.find()
+        : this.projectPublishAuditRepository.find(),
+      normalizedQuery.sourceFamily && normalizedQuery.sourceFamily !== 'content_safety'
+        ? []
+        : this.contentSafetyAuditRepository.find()
     ]);
 
     const items = [
       ...identityRows.map((row) => this.presenter.fromIdentity(row)),
-      ...projectPublishRows.map((row) => this.presenter.fromProjectPublish(row))
+      ...projectPublishRows.map((row) => this.presenter.fromProjectPublish(row)),
+      ...contentSafetyRows.map((row) => this.presenter.fromContentSafety(row))
     ]
       .filter((item) => matchesAuditLogFilters(item, normalizedQuery))
       .sort((left, right) => Date.parse(right.occurredAt) - Date.parse(left.occurredAt));
@@ -73,11 +80,19 @@ export class AuditLogQueryService {
       return this.presenter.toDetail(this.presenter.fromIdentity(entry));
     }
 
-    const entry = await this.projectPublishAuditRepository.findOneBy({ id: parsed.rawId });
+    if (parsed.sourceFamily === 'project_publish') {
+      const entry = await this.projectPublishAuditRepository.findOneBy({ id: parsed.rawId });
+      if (!entry) {
+        throw auditLogResourceUnavailable('Audit log resource is unavailable.');
+      }
+      return this.presenter.toDetail(this.presenter.fromProjectPublish(entry));
+    }
+
+    const entry = await this.contentSafetyAuditRepository.findOneBy({ id: parsed.rawId });
     if (!entry) {
       throw auditLogResourceUnavailable('Audit log resource is unavailable.');
     }
-    return this.presenter.toDetail(this.presenter.fromProjectPublish(entry));
+    return this.presenter.toDetail(this.presenter.fromContentSafety(entry));
   }
 
   private async requireReviewer(context: RequestContext) {

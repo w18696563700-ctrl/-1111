@@ -4,7 +4,7 @@ import { ProfileSafetySubmissionEntity } from '../profile/entities/profile-safet
 
 const PROFILE_SAFETY_TASK_TYPE = 'profile_safety_submission';
 const FORUM_REPORT_TASK_TYPE = 'forum_report_ticket';
-const FORUM_VIEW_ONLY_REASON = 'forum_report_ticket_p0_view_only';
+const FORUM_REPORT_DECIDABLE_STATUSES = new Set(['submitted', 'pending_review']);
 
 @Injectable()
 export class ContentSafetyReviewTaskPresenter {
@@ -63,7 +63,7 @@ export class ContentSafetyReviewTaskPresenter {
       targetAuthorUserId: ticket.targetAuthorUserId,
       submittedAt: ticket.createdAt.toISOString(),
       updatedAt: ticket.updatedAt.toISOString(),
-      allowedActions: []
+      allowedActions: this.toForumReportAllowedActions(ticket.status)
     };
   }
 
@@ -76,8 +76,7 @@ export class ContentSafetyReviewTaskPresenter {
       reporterOrganizationId: ticket.reporterOrganizationId,
       reasonCode: ticket.reasonCode,
       reasonDetail: ticket.reasonDetail,
-      targetSnapshot: ticket.targetSnapshot,
-      viewOnlyReason: FORUM_VIEW_ONLY_REASON
+      targetSnapshot: ticket.targetSnapshot
     };
   }
 
@@ -87,5 +86,9 @@ export class ContentSafetyReviewTaskPresenter {
 
   private toProfileAllowedActions(status: string) {
     return status === 'pending_review' ? ['approve', 'reject'] : [];
+  }
+
+  private toForumReportAllowedActions(status: string) {
+    return FORUM_REPORT_DECIDABLE_STATUSES.has(status) ? ['decide'] : [];
   }
 }

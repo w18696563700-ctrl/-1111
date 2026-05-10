@@ -303,7 +303,7 @@ test('S1-C03 review-tasks list/detail return the current minimal profile/forum u
   assert.equal(list.traceId, 'trace-review-task-list');
   assert.equal(list.items[0].taskId, 'forum_report_ticket:ticket-1');
   assert.equal(list.items[0].taskType, 'forum_report_ticket');
-  assert.deepEqual(list.items[0].allowedActions, []);
+  assert.deepEqual(list.items[0].allowedActions, ['decide']);
   assert.equal(list.items[1].taskId, 'profile_safety_submission:submission-1');
   assert.equal(list.items[1].taskType, 'profile_safety_submission');
   assert.deepEqual(list.items[1].allowedActions, ['approve', 'reject']);
@@ -326,8 +326,7 @@ test('S1-C03 review-tasks list/detail return the current minimal profile/forum u
   assert.equal(forumDetail.subjectId, 'ticket-1');
   assert.equal(forumDetail.targetType, 'post');
   assert.equal(forumDetail.reasonCode, 'spam');
-  assert.equal(forumDetail.viewOnlyReason, 'forum_report_ticket_p0_view_only');
-  assert.deepEqual(forumDetail.allowedActions, []);
+  assert.deepEqual(forumDetail.allowedActions, ['decide']);
 });
 
 test('S1-C03 review-tasks fail closed for non-reviewer actor', async () => {
@@ -418,4 +417,165 @@ test('S1-C03 admin-facing approve/reject paths hand off directly to ProfileSafet
   ]);
   assert.equal(approveResult.status, 'approved');
   assert.equal(rejectResult.status, 'rejected');
+});
+
+test('S1-C03 forum report decide writes only ticket decision and content-safety audit', async () => {
+  const {
+    ContentSafetyReviewTaskWriteService,
+  } = require('../dist/modules/content_safety/content-safety-review-task.write.service.js');
+
+  const ticket = {
+    id: 'ticket-1',
+    targetType: 'post',
+    targetId: 'post-1',
+    targetAuthorUserId: 'author-1',
+    targetOrganizationId: 'org-author-1',
+    reporterUserId: 'reporter-1',
+    reporterActorId: 'reporter-actor-1',
+    reporterOrganizationId: 'org-reporter-1',
+    reasonCode: 'spam',
+    reasonDetail: 'contains spam links',
+    status: 'submitted',
+    targetSnapshot: { excerpt: 'reported excerpt' },
+    createdAt: new Date('2026-04-09T11:00:00.000Z'),
+    updatedAt: new Date('2026-04-09T11:20:00.000Z'),
+  };
+  const saves = [];
+  const auditRecords = [];
+  const forumRepository = {
+    findOneBy: async ({ id }) => (id === ticket.id ? ticket : null),
+    save: async (value) => {
+      saves.push({ ...value });
+      return value;
+    },
+  };
+  const manager = {
+    getRepository(entity) {
+      if (entity.name === 'ForumReportTicketEntity') {
+        return forumRepository;
+      }
+      throw new Error(`Unexpected repository request: ${entity.name}`);
+    },
+  };
+  const dataSource = {
+    transaction: async (callback) => callback(manager),
+  };
+  const verifier = {
+    async verifyCurrentSessionContext(queryContext) {
+      return {
+        outcome: 'verified',
+        currentSession: {
+          sessionId: 'session-reviewer',
+          actorId: 'reviewer-1',
+          userId: 'reviewer-1',
+          organizationId: 'platform-org',
+          requestId: queryContext.requestId,
+          traceId: queryContext.traceId,
+        },
+      };
+    },
+  };
+  const eligibility = {
+    async requireManualReviewer() {
+      return {
+        actorRole: 'platform_reviewer',
+        organizationId: 'platform-org',
+        user: { id: 'reviewer-1' },
+      };
+    },
+  };
+  const auditService = {
+    async record(input, queryContext, entityManager) {
+      auditRecords.push({ input, queryContext, entityManager });
+      return input;
+    },
+  };
+  const service = new ContentSafetyReviewTaskWriteService(
+    {
+      approveSubmission: async () => {
+        throw new Error('not used');
+      },
+      rejectSubmission: async () => {
+        throw new Error('not used');
+      },
+    },
+    dataSource,
+    verifier,
+    eligibility,
+    auditService,
+  );
+
+  const result = await service.decideForumReport(
+    ticket.id,
+    { decision: 'resolved', reason: 'confirmed report' },
+    createReviewTaskContext('Bearer reviewer', 'forum-decide'),
+  );
+
+  assert.equal(result.ok, true);
+  assert.equal(result.status, 'resolved');
+  assert.equal(result.previousStatus, 'submitted');
+  assert.equal(ticket.status, 'resolved');
+  assert.equal(saves.length, 1);
+  assert.equal(auditRecords.length, 1);
+  assert.equal(auditRecords[0].input.subjectType, 'forum_report_ticket');
+  assert.equal(auditRecords[0].input.action, 'forum_report_decide');
+  assert.equal(auditRecords[0].input.actorRole, 'platform_reviewer');
+  assert.equal(auditRecords[0].input.decision, 'resolved');
+  assert.equal(auditRecords[0].input.reason, 'confirmed report');
+  assert.equal(auditRecords[0].input.metadata.previousStatus, 'submitted');
+  assert.equal(auditRecords[0].input.metadata.nextStatus, 'resolved');
+});
+
+test('S1-C03 forum report decide fails closed for non-decidable ticket state', async () => {
+  const {
+    ContentSafetyReviewTaskWriteService,
+  } = require('../dist/modules/content_safety/content-safety-review-task.write.service.js');
+
+  const ticket = {
+    id: 'ticket-1',
+    status: 'resolved',
+  };
+  const dataSource = {
+    transaction: async (callback) =>
+      callback({
+        getRepository() {
+          return {
+            findOneBy: async () => ticket,
+            save: async () => ticket,
+          };
+        },
+      }),
+  };
+  const verifier = {
+    async verifyCurrentSessionContext(queryContext) {
+      return {
+        outcome: 'verified',
+        currentSession: {
+          sessionId: 'session-reviewer',
+          actorId: 'reviewer-1',
+          userId: 'reviewer-1',
+          organizationId: 'platform-org',
+          requestId: queryContext.requestId,
+          traceId: queryContext.traceId,
+        },
+      };
+    },
+  };
+  const service = new ContentSafetyReviewTaskWriteService(
+    {},
+    dataSource,
+    verifier,
+    { requireManualReviewer: async () => ({ actorRole: 'platform_reviewer' }) },
+    { record: async () => null },
+  );
+
+  await assert.rejects(
+    () =>
+      service.decideForumReport(
+        'ticket-1',
+        { decision: 'closed', reason: 'already handled' },
+        createReviewTaskContext('Bearer reviewer', 'forum-decide-state'),
+      ),
+    (error) => error?.response?.code === 'CONTENT_SAFETY_REVIEW_TASK_INVALID_STATE',
+  );
 });
