@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Not, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
+import type { SelectQueryBuilder } from 'typeorm';
 import { CurrentSessionVerificationResult } from '../../shared/current-session-verification';
 import { RequestContext } from '../../shared/request-context';
 import { CurrentSessionVerificationService } from '../auth/current-session-verification.service';
@@ -94,22 +95,31 @@ export class ProjectQueryService {
     const budgetBucket = this.normalizeText(query.budgetBucket);
     const page = this.readPositiveInt(query.page, 1, 10_000);
     const pageSize = this.readPositiveInt(query.pageSize, 20, 50);
-    const projects = await this.projectRepository.find({
-      where: {
-        publishedAt: Not(IsNull()),
-        ...(provinceCode ? { provinceCode } : {}),
-        ...(cityCode ? { cityCode } : {})
-      },
-      order: { publishedAt: 'DESC', createdAt: 'DESC' }
-    });
-    const visibleProjects = projects.filter(
-      (project) =>
-        this.isPublicShowcaseVisible(project) &&
-        this.matchesAreaBucket(project, areaBucket) &&
-        this.matchesBudgetBucket(project, budgetBucket)
-    );
-    const total = visibleProjects.length;
-    const pagedProjects = visibleProjects.slice((page - 1) * pageSize, page * pageSize);
+    const queryBuilder = this.projectRepository
+      .createQueryBuilder('project')
+      .where('"project"."published_at" IS NOT NULL')
+      .andWhere('"project"."state" = :publishedState', { publishedState: 'published' })
+      .andWhere('("project"."planned_end_at" IS NULL OR "project"."planned_end_at" >= CURRENT_DATE)');
+    if (provinceCode) {
+      queryBuilder.andWhere('"project"."province_code" = :provinceCode', { provinceCode });
+    }
+    if (cityCode) {
+      queryBuilder.andWhere('"project"."city_code" = :cityCode', { cityCode });
+    }
+    if (
+      !this.applyAreaBucketFilter(queryBuilder, areaBucket) ||
+      !this.applyBudgetBucketFilter(queryBuilder, budgetBucket)
+    ) {
+      return this.presenter.toListResponse([], page, pageSize, 0, new Map());
+    }
+
+    const [pagedProjects, total] = await queryBuilder
+      .orderBy('"project"."published_at"', 'DESC')
+      .addOrderBy('"project"."created_at"', 'DESC')
+      .addOrderBy('"project"."id"', 'ASC')
+      .skip((page - 1) * pageSize)
+      .take(pageSize)
+      .getManyAndCount();
     const viewer = await this.resolveOptionalViewerContext(context);
     const accessProjectionByProjectId =
       await this.projectNameAccessProjectionService.buildPublicProjectionMap({
@@ -128,6 +138,64 @@ export class ProjectQueryService {
       total,
       accessProjectionByProjectId,
     );
+  }
+
+  private applyAreaBucketFilter(
+    queryBuilder: SelectQueryBuilder<ProjectEntity>,
+    areaBucket: string,
+  ) {
+    if (!areaBucket) {
+      return true;
+    }
+
+    const standardArea = STANDARD_AREA_BUCKETS.get(areaBucket);
+    if (standardArea !== undefined) {
+      queryBuilder.andWhere('"project"."area_sqm" = :areaSqm', {
+        areaSqm: standardArea,
+      });
+      return true;
+    }
+    if (areaBucket === 'gt_108_sqm') {
+      queryBuilder.andWhere('"project"."area_sqm" > :maxStandardArea', {
+        maxStandardArea: 108,
+      });
+      return true;
+    }
+    if (areaBucket === 'custom_sqm') {
+      queryBuilder.andWhere(
+        '"project"."area_sqm" > 0 AND "project"."area_sqm" <= :maxStandardArea ' +
+          'AND "project"."area_sqm" NOT IN (:...standardAreas)',
+        {
+          maxStandardArea: 108,
+          standardAreas: [...STANDARD_AREA_BUCKETS.values()],
+        },
+      );
+      return true;
+    }
+    return false;
+  }
+
+  private applyBudgetBucketFilter(
+    queryBuilder: SelectQueryBuilder<ProjectEntity>,
+    budgetBucket: string,
+  ) {
+    if (!budgetBucket) {
+      return true;
+    }
+
+    const range = BUDGET_BUCKET_RANGES.get(budgetBucket);
+    if (!range) {
+      return false;
+    }
+    queryBuilder.andWhere('"project"."budget_amount" >= :budgetMin', {
+      budgetMin: range.min,
+    });
+    if (range.max !== null) {
+      queryBuilder.andWhere('"project"."budget_amount" < :budgetMax', {
+        budgetMax: range.max,
+      });
+    }
+    return true;
   }
 
   async getProjectById(projectId: string, context: RequestContext) {
