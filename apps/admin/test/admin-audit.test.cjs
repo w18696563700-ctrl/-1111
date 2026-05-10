@@ -112,3 +112,62 @@ test('audit queue/detail consumption surfaces controlled Server Admin API errors
     error: 'AUDIT_LOG_RESOURCE_UNAVAILABLE: not found',
   });
 });
+
+test('audit queue accepts content_safety sourceFamily filters', async () => {
+  const calls = [];
+  const state = await loadAuditState(
+    {
+      sourceFamily: 'content_safety',
+      objectType: 'forum_report_ticket',
+    },
+    {
+      fetchList: async (query) => {
+        calls.push({ kind: 'list', query });
+        return {
+          items: [
+            {
+              auditLogId: 'content_safety:content-audit-1',
+              sourceFamily: 'content_safety',
+              objectType: 'forum_report_ticket',
+              objectId: 'ticket-1',
+              objectNo: null,
+              action: 'forum_report_decide',
+              actorId: 'reviewer-user',
+              actorRole: 'platform_reviewer',
+              requestId: 'request-1',
+              traceId: 'trace-1',
+              occurredAt: '2026-04-11T03:00:00.000Z',
+            },
+          ],
+          pagination: {
+            page: 1,
+            pageSize: 20,
+            total: 1,
+          },
+        };
+      },
+      fetchDetail: async (auditLogId) => ({
+        auditLogId,
+        sourceFamily: 'content_safety',
+        objectType: 'forum_report_ticket',
+        objectId: 'ticket-1',
+        objectNo: null,
+        action: 'forum_report_decide',
+        actorId: 'reviewer-user',
+        actorRole: 'platform_reviewer',
+        requestId: 'request-1',
+        traceId: 'trace-1',
+        occurredAt: '2026-04-11T03:00:00.000Z',
+        beforeState: null,
+        afterState: 'resolved',
+        reason: 'confirmed report',
+        payload: {},
+      }),
+    },
+  );
+
+  assert.equal(calls[0].query.sourceFamily, 'content_safety');
+  assert.equal(calls[0].query.objectType, 'forum_report_ticket');
+  assert.equal(state.items[0].sourceFamily, 'content_safety');
+  assert.equal(state.detail.auditLogId, 'content_safety:content-audit-1');
+});

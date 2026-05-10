@@ -1,6 +1,6 @@
 import { adminJsonRequest, toQueryString } from './admin-api-runtime';
 
-export type AuditSourceFamily = 'identity' | 'project_publish';
+export type AuditSourceFamily = 'identity' | 'project_publish' | 'content_safety';
 
 export type AdminAuditLogListItem = {
   auditLogId: string;

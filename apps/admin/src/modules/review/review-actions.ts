@@ -3,6 +3,7 @@
 import { redirect } from 'next/navigation';
 import {
   approveProfileSafetySubmission,
+  decideForumReport,
   rejectProfileSafetySubmission
 } from '@/core/server/admin-api-client';
 
@@ -37,6 +38,24 @@ export async function rejectProfileSubmissionAction(formData: FormData) {
   redirect(nextUrl);
 }
 
+export async function decideForumReportAction(formData: FormData) {
+  const ticketId = readRequiredFormString(formData, 'ticketId');
+  const decision = readRequiredFormString(formData, 'decision');
+  const reason = readRequiredFormString(formData, 'reason');
+  const taskId = `forum_report_ticket:${ticketId}`;
+  let nextUrl = `/review?taskId=${encodeURIComponent(taskId)}&notice=forum_report_decided`;
+
+  try {
+    await decideForumReport(ticketId, {
+      decision: readForumReportDecision(decision),
+      reason
+    });
+  } catch (error) {
+    nextUrl = buildErrorUrl(taskId, error);
+  }
+  redirect(nextUrl);
+}
+
 function readRequiredFormString(formData: FormData, key: string) {
   const value = formData.get(key);
   if (typeof value !== 'string' || !value.trim()) {
@@ -52,6 +71,13 @@ function readOptionalFormString(formData: FormData, key: string) {
   }
   const normalized = value.trim();
   return normalized ? normalized : null;
+}
+
+function readForumReportDecision(value: string) {
+  if (value === 'resolved' || value === 'rejected' || value === 'closed') {
+    return value;
+  }
+  throw new Error('decision 为非法值。');
 }
 
 function buildErrorUrl(taskId: string, error: unknown) {

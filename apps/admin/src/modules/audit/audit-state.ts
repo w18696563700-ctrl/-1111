@@ -24,7 +24,11 @@ const DEFAULT_CLIENT: AuditClient = {
   fetchDetail: fetchAdminAuditLog
 };
 
-const SOURCE_FAMILY_OPTIONS: AuditSourceFamily[] = ['identity', 'project_publish'];
+const SOURCE_FAMILY_OPTIONS: AuditSourceFamily[] = [
+  'identity',
+  'project_publish',
+  'content_safety'
+];
 
 export async function loadAuditState(
   input: {

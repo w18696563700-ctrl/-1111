@@ -8,6 +8,7 @@ import {
 } from '@/core/server/admin-api-client';
 import {
   approveProfileSubmissionAction,
+  decideForumReportAction,
   rejectProfileSubmissionAction
 } from './review-actions';
 
@@ -155,11 +156,19 @@ function ProfileSubmissionDetail({ detail }: { detail: AdminReviewTaskDetail }) 
 }
 
 function ForumReportDetail({ detail }: { detail: AdminReviewTaskDetail }) {
+  const canDecide = detail.allowedActions?.includes('decide') ?? false;
+
   return (
     <div className="detail-stack">
-      <div className="notice warning">
-        在审核台 P0 中，论坛举报工单仅允许查看，不在这里开放处罚、申诉或下架动作。
-      </div>
+      {canDecide ? (
+        <div className="notice warning">
+          论坛举报 P0 只允许案件裁决并写入 audit；不直接隐藏/恢复内容，不限制作者。
+        </div>
+      ) : (
+        <div className="notice">
+          当前状态不可继续裁决；如需隐藏、恢复或限制作者，必须走后续独立治理包。
+        </div>
+      )}
       <dl className="meta-grid compact">
         <div><dt>目标对象</dt><dd>{detail.targetType}:{detail.targetId}</dd></div>
         <div><dt>目标作者</dt><dd>{detail.targetAuthorUserId ?? '暂无'}</dd></div>
@@ -167,6 +176,24 @@ function ForumReportDetail({ detail }: { detail: AdminReviewTaskDetail }) {
         <div><dt>原因编码</dt><dd>{detail.reasonCode}</dd></div>
       </dl>
       <pre className="json-panel">{JSON.stringify(detail.targetSnapshot ?? {}, null, 2)}</pre>
+      {canDecide ? (
+        <form className="action-card" action={decideForumReportAction}>
+          <input type="hidden" name="ticketId" value={detail.subjectId} />
+          <label>
+            裁决结果
+            <select name="decision" defaultValue="resolved">
+              <option value="resolved">举报成立</option>
+              <option value="rejected">举报不成立</option>
+              <option value="closed">关闭工单</option>
+            </select>
+          </label>
+          <label>
+            裁决原因
+            <textarea name="reason" required placeholder="必填，写入 append-only audit" />
+          </label>
+          <button className="primary" type="submit">提交举报裁决</button>
+        </form>
+      ) : null}
     </div>
   );
 }
@@ -184,6 +211,15 @@ function toReviewStatusLabel(status: string) {
   }
   if (status === 'rejected') {
     return '已驳回';
+  }
+  if (status === 'submitted') {
+    return '待处理';
+  }
+  if (status === 'resolved') {
+    return '举报成立';
+  }
+  if (status === 'closed') {
+    return '已关闭';
   }
   return status;
 }
@@ -209,6 +245,9 @@ function toNoticeText(value: string) {
   }
   if (value === 'profile_rejected') {
     return '资料提审驳回命令已提交到服务端。';
+  }
+  if (value === 'forum_report_decided') {
+    return '论坛举报裁决已提交到服务端，并进入 append-only audit。';
   }
   return value;
 }

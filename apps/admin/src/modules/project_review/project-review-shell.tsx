@@ -10,6 +10,7 @@ import {
   requestExhibitionReportExplanationAction
 } from './project-review-actions';
 import { loadProjectReviewState } from './project-review-state';
+import { EvidenceFileAssetRefs } from '../evidence-file-asset-refs';
 
 type ProjectReviewShellProps = {
   selectedReportCaseId?: string;
@@ -206,15 +207,9 @@ function ProjectReviewDetail({ detail }: { detail: AdminExhibitionReportCaseDeta
         <div><span>decisionNote</span><p>{detail.decisionNote ?? '暂无'}</p></div>
       </div>
       <pre className="json-panel">
-        {JSON.stringify(
-          {
-            reporter: detail.reporter ?? null,
-            evidenceFileAssetIds: detail.evidenceFileAssetIds ?? []
-          },
-          null,
-          2
-        )}
+        {JSON.stringify({ reporter: detail.reporter ?? null }, null, 2)}
       </pre>
+      <EvidenceFileAssetRefs ids={detail.evidenceFileAssetIds} />
     </div>
   );
 }

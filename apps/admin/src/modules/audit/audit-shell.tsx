@@ -21,7 +21,11 @@ type AuditShellProps = {
   error?: string;
 };
 
-const SOURCE_FAMILY_OPTIONS: AuditSourceFamily[] = ['identity', 'project_publish'];
+const SOURCE_FAMILY_OPTIONS: AuditSourceFamily[] = [
+  'identity',
+  'project_publish',
+  'content_safety'
+];
 
 export async function AuditShell(props: AuditShellProps) {
   const state = await loadAuditState(props);
@@ -208,6 +212,9 @@ function toSourceFamilyLabel(value: string) {
   }
   if (value === 'project_publish') {
     return 'project_publish';
+  }
+  if (value === 'content_safety') {
+    return 'content_safety';
   }
   return value;
 }
