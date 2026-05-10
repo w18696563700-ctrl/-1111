@@ -5875,6 +5875,221 @@ paths:
       responses:
         '202':
           description: Placeholder until contract freeze
+  "/server/admin/content-safety/review-tasks":
+    get:
+      tags:
+      - Admin
+      summary: Admin content-safety review task queue canonical path
+      operationId: getAdminContentSafetyReviewTasks
+      responses:
+        '200':
+          description: Minimum content-safety task queue for Server Admin only.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminReviewTaskListResponse"
+  "/server/admin/content-safety/review-tasks/{taskId}":
+    get:
+      tags:
+      - Admin
+      summary: Admin content-safety review task detail canonical path
+      operationId: getAdminContentSafetyReviewTaskDetail
+      parameters:
+      - in: path
+        name: taskId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Minimum content-safety task detail for Server Admin only.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminReviewTaskDetailResponse"
+        '404':
+          description: Controlled unavailable response for missing review task.
+  "/server/admin/content-safety/profile-submissions/{submissionId}/approve":
+    post:
+      tags:
+      - Admin
+      summary: Admin profile safety submission approve canonical path
+      operationId: postAdminContentSafetyProfileSubmissionApprove
+      parameters:
+      - in: path
+        name: submissionId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AdminProfileSafetyApproveRequest"
+      responses:
+        '200':
+          description: Minimum profile safety approve response.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  "/server/admin/content-safety/profile-submissions/{submissionId}/reject":
+    post:
+      tags:
+      - Admin
+      summary: Admin profile safety submission reject canonical path
+      operationId: postAdminContentSafetyProfileSubmissionReject
+      parameters:
+      - in: path
+        name: submissionId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AdminProfileSafetyRejectRequest"
+      responses:
+        '200':
+          description: Minimum profile safety reject response.
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  "/server/admin/content-safety/forum-reports/{ticketId}/decide":
+    post:
+      tags:
+      - Admin
+      summary: Admin forum report decision canonical path
+      operationId: postAdminContentSafetyForumReportDecide
+      parameters:
+      - in: path
+        name: ticketId
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/AdminForumReportDecideRequest"
+      responses:
+        '200':
+          description: Minimum forum report decision acknowledgment.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ActionAckResponse"
+        '400':
+          description: Controlled invalid forum report decision response.
+        '409':
+          description: Controlled invalid-state forum report decision response.
+  "/server/admin/audit/logs":
+    get:
+      tags:
+      - Admin
+      summary: Admin audit log queue canonical path
+      operationId: getAdminAuditLogs
+      parameters:
+      - in: query
+        name: sourceFamily
+        required: false
+        schema:
+          "$ref": "#/components/schemas/AdminAuditSourceFamily"
+      - in: query
+        name: objectType
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: objectId
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: objectNo
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: actorId
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: requestId
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: traceId
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: action
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: occurredFrom
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: occurredTo
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - in: query
+        name: page
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+      - in: query
+        name: pageSize
+        required: false
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+      responses:
+        '200':
+          description: Append-only Admin audit queue for read-only inspection.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminAuditLogListResponse"
+  "/server/admin/audit/logs/{auditLogId}":
+    get:
+      tags:
+      - Admin
+      summary: Admin audit log detail canonical path
+      operationId: getAdminAuditLogDetail
+      parameters:
+      - in: path
+        name: auditLogId
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Append-only Admin audit detail for read-only inspection.
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/AdminAuditLogDetailResponse"
+        '404':
+          description: Controlled unavailable response for missing audit log.
   "/server/admin/reviews/organizations":
     get:
       tags:
@@ -9565,6 +9780,278 @@ components:
           minimum: 0
         hasMore:
           type: boolean
+    AdminReviewTaskType:
+      type: string
+      enum:
+      - profile_safety_submission
+      - forum_report_ticket
+    AdminReviewTaskListItem:
+      type: object
+      required:
+      - taskId
+      - taskType
+      - sourceTable
+      - subjectId
+      - status
+      - submittedAt
+      - updatedAt
+      properties:
+        taskId:
+          type: string
+        taskType:
+          "$ref": "#/components/schemas/AdminReviewTaskType"
+        sourceTable:
+          type: string
+        subjectId:
+          type: string
+        subjectUserId:
+          type:
+          - string
+          - 'null'
+        status:
+          type: string
+        fieldKey:
+          type:
+          - string
+          - 'null'
+        targetType:
+          type:
+          - string
+          - 'null'
+        targetId:
+          type:
+          - string
+          - 'null'
+        targetAuthorUserId:
+          type:
+          - string
+          - 'null'
+        submittedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        allowedActions:
+          type: array
+          items:
+            type: string
+    AdminReviewTaskListResponse:
+      type: object
+      required:
+      - items
+      - count
+      - traceId
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AdminReviewTaskListItem"
+        count:
+          type: integer
+          minimum: 0
+        traceId:
+          type: string
+    AdminReviewTaskDetailResponse:
+      allOf:
+      - "$ref": "#/components/schemas/AdminReviewTaskListItem"
+      - type: object
+        properties:
+          currentValue:
+            type:
+            - string
+            - 'null'
+          proposedValue:
+            type:
+            - string
+            - 'null'
+          proposedFileAssetId:
+            type:
+            - string
+            - 'null'
+          proposedAvatarUrl:
+            type:
+            - string
+            - 'null'
+          engineType:
+            type:
+            - string
+            - 'null'
+          ruleDecision:
+            type:
+            - string
+            - 'null'
+          matchedRuleIds:
+            type: array
+            items:
+              type: string
+          rejectReasonCode:
+            type:
+            - string
+            - 'null'
+          rejectReason:
+            type:
+            - string
+            - 'null'
+          targetOrganizationId:
+            type:
+            - string
+            - 'null'
+          reporterUserId:
+            type:
+            - string
+            - 'null'
+          reporterActorId:
+            type:
+            - string
+            - 'null'
+          reporterOrganizationId:
+            type:
+            - string
+            - 'null'
+          reasonCode:
+            type:
+            - string
+            - 'null'
+          reasonDetail:
+            type:
+            - string
+            - 'null'
+          targetSnapshot:
+            type: object
+            additionalProperties: true
+    AdminProfileSafetyApproveRequest:
+      type: object
+      properties:
+        reviewNote:
+          type:
+          - string
+          - 'null'
+    AdminProfileSafetyRejectRequest:
+      type: object
+      required:
+      - reason
+      properties:
+        reason:
+          type: string
+    AdminForumReportDecision:
+      type: string
+      enum:
+      - resolved
+      - rejected
+      - closed
+    AdminForumReportDecideRequest:
+      type: object
+      required:
+      - decision
+      - reason
+      properties:
+        decision:
+          "$ref": "#/components/schemas/AdminForumReportDecision"
+        reason:
+          type: string
+    AdminAuditSourceFamily:
+      type: string
+      enum:
+      - identity
+      - project_publish
+      - content_safety
+    AdminAuditPagination:
+      type: object
+      required:
+      - page
+      - pageSize
+      - total
+      properties:
+        page:
+          type: integer
+          minimum: 1
+        pageSize:
+          type: integer
+          minimum: 1
+        total:
+          type: integer
+          minimum: 0
+    AdminAuditLogListItem:
+      type: object
+      required:
+      - auditLogId
+      - sourceFamily
+      - objectType
+      - objectId
+      - action
+      - occurredAt
+      properties:
+        auditLogId:
+          type: string
+        sourceFamily:
+          "$ref": "#/components/schemas/AdminAuditSourceFamily"
+        objectType:
+          type: string
+        objectId:
+          type: string
+        objectNo:
+          type:
+          - string
+          - 'null'
+        action:
+          type: string
+        actorId:
+          type:
+          - string
+          - 'null'
+        actorRole:
+          type:
+          - string
+          - 'null'
+        requestId:
+          type:
+          - string
+          - 'null'
+        traceId:
+          type:
+          - string
+          - 'null'
+        occurredAt:
+          type: string
+          format: date-time
+    AdminAuditLogListResponse:
+      type: object
+      required:
+      - items
+      - pagination
+      properties:
+        items:
+          type: array
+          items:
+            "$ref": "#/components/schemas/AdminAuditLogListItem"
+        pagination:
+          "$ref": "#/components/schemas/AdminAuditPagination"
+    AdminAuditLogDetailResponse:
+      allOf:
+      - "$ref": "#/components/schemas/AdminAuditLogListItem"
+      - type: object
+        required:
+        - beforeState
+        - afterState
+        - reason
+        - payload
+        properties:
+          beforeState:
+            type:
+            - string
+            - 'null'
+          afterState:
+            type:
+            - string
+            - 'null'
+          reason:
+            type:
+            - string
+            - 'null'
+          payload:
+            type: object
+            additionalProperties: true
     OrganizationReviewListItem:
       type: object
       required:
