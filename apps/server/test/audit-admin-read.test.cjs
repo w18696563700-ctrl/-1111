@@ -16,8 +16,10 @@ const context = {
 function makeService(options = {}) {
   const identityLogs = [...(options.identityLogs ?? [])];
   const projectLogs = [...(options.projectLogs ?? [])];
+  const contentSafetyLogs = [...(options.contentSafetyLogs ?? [])];
   const identityById = new Map(identityLogs.map((item) => [item.id, item]));
   const projectById = new Map(projectLogs.map((item) => [item.id, item]));
+  const contentSafetyById = new Map(contentSafetyLogs.map((item) => [item.id, item]));
 
   const identityRepository = {
     find: async () => identityLogs,
@@ -26,6 +28,10 @@ function makeService(options = {}) {
   const projectRepository = {
     find: async () => projectLogs,
     findOneBy: async ({ id }) => projectById.get(id) ?? null
+  };
+  const contentSafetyRepository = {
+    find: async () => contentSafetyLogs,
+    findOneBy: async ({ id }) => contentSafetyById.get(id) ?? null
   };
   const verifier = {
     verifyCurrentSessionContext: async () => ({
@@ -50,6 +56,7 @@ function makeService(options = {}) {
   return new AuditLogQueryService(
     identityRepository,
     projectRepository,
+    contentSafetyRepository,
     verifier,
     eligibility,
     new AuditLogPresenter()
@@ -242,4 +249,63 @@ test('audit detail inspect returns normalized identity and project_publish detai
   assert.equal(projectDetail.afterState, null);
   assert.equal(projectDetail.reason, null);
   assert.deepEqual(projectDetail.payload, { publishedState: 'published' });
+});
+
+test('audit queue/list and detail include content_safety audit logs as read-only family', async () => {
+  const createdAt = new Date('2026-04-11T03:00:00.000Z');
+  const service = makeService({
+    contentSafetyLogs: [
+      {
+        id: 'content-safety-audit-1',
+        subjectType: 'forum_report_ticket',
+        subjectId: 'ticket-1',
+        userId: 'reporter-1',
+        actorId: 'reviewer-user',
+        actorRole: 'platform_reviewer',
+        action: 'forum_report_decide',
+        engineType: 'manual',
+        decision: 'resolved',
+        reasonCode: 'forum_report_decide',
+        reason: 'confirmed report',
+        matchedRuleIds: [],
+        metadata: { targetType: 'post', targetId: 'post-1' },
+        requestId: 'request-content-1',
+        traceId: 'trace-content-1',
+        createdAt
+      }
+    ]
+  });
+
+  const list = await service.list(
+    { sourceFamily: 'content_safety', page: '1', pageSize: '10' },
+    context
+  );
+  const detail = await service.detail(
+    'content_safety:content-safety-audit-1',
+    context
+  );
+
+  assert.equal(list.pagination.total, 1);
+  assert.deepEqual(list.items[0], {
+    auditLogId: 'content_safety:content-safety-audit-1',
+    sourceFamily: 'content_safety',
+    objectType: 'forum_report_ticket',
+    objectId: 'ticket-1',
+    objectNo: null,
+    action: 'forum_report_decide',
+    actorId: 'reviewer-user',
+    actorRole: 'platform_reviewer',
+    requestId: 'request-content-1',
+    traceId: 'trace-content-1',
+    occurredAt: createdAt.toISOString()
+  });
+  assert.equal(detail.afterState, 'resolved');
+  assert.equal(detail.reason, 'confirmed report');
+  assert.deepEqual(detail.payload, {
+    reasonCode: 'forum_report_decide',
+    matchedRuleIds: [],
+    metadata: { targetType: 'post', targetId: 'post-1' },
+    engineType: 'manual',
+    userId: 'reporter-1'
+  });
 });

@@ -8,6 +8,7 @@ import {
   fetchGovernanceAppeal,
   fetchGovernanceAppeals
 } from '@/core/server/admin-api-client';
+import { EvidenceFileAssetRefs } from '../evidence-file-asset-refs';
 import { decideGovernanceAppealAction } from './appeal-actions';
 import { GovernanceTabs } from './governance-tabs';
 
@@ -181,7 +182,7 @@ function AppealDetailPanel({ detail }: { detail: AdminGovernanceAppealDetail | n
         <div><span>申诉原因</span><p>{detail.reason}</p></div>
         <div><span>裁决备注</span><p>{detail.decisionNote ?? '暂无'}</p></div>
       </div>
-      <pre className="json-panel">{JSON.stringify({ evidenceFileAssetIds: detail.evidenceFileAssetIds ?? [] }, null, 2)}</pre>
+      <EvidenceFileAssetRefs ids={detail.evidenceFileAssetIds} />
     </div>
   );
 }

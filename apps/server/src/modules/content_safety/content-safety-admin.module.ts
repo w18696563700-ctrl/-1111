@@ -5,6 +5,7 @@ import { ForumReportTicketEntity } from '../forum/entities/forum-report-ticket.e
 import { OrganizationModule } from '../organization/organization.module';
 import { ProfileModule } from '../profile/profile.module';
 import { ProfileSafetySubmissionEntity } from '../profile/entities/profile-safety-submission.entity';
+import { ContentSafetyModule } from './content-safety.module';
 import { ContentSafetyAdminController } from './content-safety-admin.controller';
 import { ContentSafetyReviewTaskPresenter } from './content-safety-review-task.presenter';
 import { ContentSafetyReviewTaskQueryService } from './content-safety-review-task.query.service';
@@ -13,6 +14,7 @@ import { ContentSafetyReviewTaskWriteService } from './content-safety-review-tas
 @Module({
   imports: [
     AuthModule,
+    ContentSafetyModule,
     OrganizationModule,
     ProfileModule,
     TypeOrmModule.forFeature([ProfileSafetySubmissionEntity, ForumReportTicketEntity])

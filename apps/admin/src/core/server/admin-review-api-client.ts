@@ -40,6 +40,8 @@ export type AdminReviewTaskDetail = AdminReviewTask & {
   viewOnlyReason?: string;
 };
 
+export type AdminForumReportDecision = 'resolved' | 'rejected' | 'closed';
+
 export type AdminReviewTaskListResponse = {
   items: AdminReviewTask[];
   count: number;
@@ -75,6 +77,19 @@ export async function rejectProfileSafetySubmission(
 ) {
   return adminJsonRequest<Record<string, unknown>>(
     `/content-safety/profile-submissions/${encodeURIComponent(submissionId)}/reject`,
+    {
+      method: 'POST',
+      body: payload
+    }
+  );
+}
+
+export async function decideForumReport(
+  ticketId: string,
+  payload: { decision: AdminForumReportDecision; reason: string }
+) {
+  return adminJsonRequest<Record<string, unknown>>(
+    `/content-safety/forum-reports/${encodeURIComponent(ticketId)}/decide`,
     {
       method: 'POST',
       body: payload

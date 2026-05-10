@@ -48,4 +48,18 @@ export class ContentSafetyAdminController {
       resolveRequestContext(headers)
     );
   }
+
+  @Post('forum-reports/:ticketId/decide')
+  @HttpCode(200)
+  decideForumReport(
+    @Param('ticketId') ticketId: string,
+    @Body() body: Record<string, unknown>,
+    @Headers() headers: HeaderBag
+  ) {
+    return this.writeService.decideForumReport(
+      ticketId,
+      body,
+      resolveRequestContext(headers)
+    );
+  }
 }

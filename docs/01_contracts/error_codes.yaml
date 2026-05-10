@@ -70,6 +70,7 @@ namespaces:
   - PROJECT_COMMUNICATION
   - PROJECT_ALBUM
   - ENTERPRISE_HUB
+  - CONTENT_SAFETY
   - GOVERNANCE
   - FILE
   - REVIEW
@@ -523,6 +524,15 @@ codes:
   - code: REVIEW_REPORT_ESCALATE_INVALID
     owner: Server
     meaning: The exhibition report-case escalate command is missing required minimum fields or violates the bounded escalation contract.
+  - code: CONTENT_SAFETY_REVIEW_TASK_INVALID
+    owner: Server
+    meaning: Admin content-safety review task request is missing required minimum fields or violates the current bounded review-task contract.
+  - code: CONTENT_SAFETY_REVIEW_TASK_UNAVAILABLE
+    owner: Server
+    meaning: Admin content-safety review task truth is absent, hidden, or unavailable under the current reviewer scope.
+  - code: CONTENT_SAFETY_REVIEW_TASK_INVALID_STATE
+    owner: Server
+    meaning: Admin content-safety review task truth is not in a state that allows the requested bounded decision.
   - code: FORUM_TOPIC_UNAVAILABLE
     owner: Server
     meaning: Forum topic truth is absent, hidden by visibility or moderation, or otherwise unavailable to the current actor.

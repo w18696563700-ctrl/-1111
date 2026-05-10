@@ -7,6 +7,7 @@ import {
   fetchGovernancePenalties,
   fetchGovernancePenalty
 } from '@/core/server/admin-api-client';
+import { EvidenceFileAssetRefs } from '../evidence-file-asset-refs';
 import { applyGovernancePenaltyAction } from './penalty-actions';
 import { GovernanceTabs } from './governance-tabs';
 
@@ -175,7 +176,7 @@ function PenaltyDetailPanel({ detail }: { detail: AdminGovernancePenaltyDetail |
       <div className="value-compare single">
         <div><span>原因摘要</span><p>{detail.reasonSummary ?? '暂无'}</p></div>
       </div>
-      <pre className="json-panel">{JSON.stringify({ evidenceFileAssetIds: detail.evidenceFileAssetIds ?? [] }, null, 2)}</pre>
+      <EvidenceFileAssetRefs ids={detail.evidenceFileAssetIds} />
     </div>
   );
 }

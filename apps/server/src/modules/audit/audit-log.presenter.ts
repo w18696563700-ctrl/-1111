@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { ContentSafetyAuditLogEntity } from '../content_safety/entities/content-safety-audit-log.entity';
 import { IdentityAuditLogEntity } from './identity-audit-log.entity';
 import { ProjectPublishAuditLogEntity } from './project-publish-audit-log.entity';
 import type { AuditSourceFamily, NormalizedAuditLog } from './audit-log.types';
@@ -21,7 +22,7 @@ export class AuditLogPresenter {
     const [sourceFamily, ...rest] = value.trim().split(':');
     const rawId = rest.join(':').trim();
     if (
-      (sourceFamily !== 'identity' && sourceFamily !== 'project_publish') ||
+      !['identity', 'project_publish', 'content_safety'].includes(sourceFamily) ||
       !rawId
     ) {
       return null;
@@ -69,6 +70,32 @@ export class AuditLogPresenter {
       afterState: null,
       reason: null,
       payload: entry.payload ?? {}
+    };
+  }
+
+  fromContentSafety(entry: ContentSafetyAuditLogEntity): NormalizedAuditLog {
+    return {
+      auditLogId: this.toAuditLogId('content_safety', entry.id),
+      sourceFamily: 'content_safety',
+      objectType: entry.subjectType,
+      objectId: entry.subjectId,
+      objectNo: null,
+      action: entry.action,
+      actorId: this.toNullable(entry.actorId),
+      actorRole: this.toNullable(entry.actorRole),
+      requestId: this.toNullable(entry.requestId),
+      traceId: this.toNullable(entry.traceId),
+      occurredAt: entry.createdAt.toISOString(),
+      beforeState: null,
+      afterState: this.toNullable(entry.decision),
+      reason: this.toNullable(entry.reason),
+      payload: {
+        reasonCode: this.toNullable(entry.reasonCode),
+        matchedRuleIds: entry.matchedRuleIds ?? [],
+        metadata: entry.metadata ?? {},
+        engineType: entry.engineType,
+        userId: this.toNullable(entry.userId)
+      }
     };
   }
 

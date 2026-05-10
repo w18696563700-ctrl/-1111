@@ -15,8 +15,12 @@ test('review transport list/detail/action calls Server Admin API with the same s
   await client.fetchContentSafetyReviewTask('profile_safety_submission:submission-1');
   await client.approveProfileSafetySubmission('submission-1', { reviewNote: 'looks good' });
   await client.rejectProfileSafetySubmission('submission-1', { reason: 'manual reject' });
+  await client.decideForumReport('ticket-1', {
+    decision: 'resolved',
+    reason: 'confirmed report',
+  });
 
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 5);
   assert.equal(
     calls[0].url,
     'http://server.test/server/admin/content-safety/review-tasks',
@@ -33,8 +37,19 @@ test('review transport list/detail/action calls Server Admin API with the same s
     calls[3].url,
     'http://server.test/server/admin/content-safety/profile-submissions/submission-1/reject',
   );
+  assert.equal(
+    calls[4].url,
+    'http://server.test/server/admin/content-safety/forum-reports/ticket-1/decide',
+  );
   assert.equal(calls[2].options.body, JSON.stringify({ reviewNote: 'looks good' }));
   assert.equal(calls[3].options.body, JSON.stringify({ reason: 'manual reject' }));
+  assert.equal(
+    calls[4].options.body,
+    JSON.stringify({
+      decision: 'resolved',
+      reason: 'confirmed report',
+    }),
+  );
   assertForwardedCarrierHeaders(calls[0].options.headers);
   assert.equal(calls[0].options.method, 'GET');
   assert.equal(calls[2].options.method, 'POST');
