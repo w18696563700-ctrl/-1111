@@ -12,6 +12,7 @@ layer: L3 Admin
 - `docs/05_admin/admin_governance_surface_matrix.md`
 - `docs/00_ssot/admin_session_carrier_login_truth_addendum.md`
 - `docs/00_ssot/admin_login_truth_drift_cleanup_plan_addendum.md`
+- `docs/00_ssot/admin_server_owned_carrier_issuer_freeze_addendum.md`
 - relevant contract truth from `docs/01_contracts/*.yaml`
 - relevant governance and backend truth from `docs/02_backend/*.md`
 - relevant domain truth from `docs/00_ssot/*.md`

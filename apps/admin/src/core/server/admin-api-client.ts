@@ -1,4 +1,5 @@
 export * from './admin-api-runtime';
+export * from './admin-auth-api-client';
 export * from './admin-config-api-client';
 export * from './admin-review-api-client';
 export * from './admin-organization-review-api-client';
