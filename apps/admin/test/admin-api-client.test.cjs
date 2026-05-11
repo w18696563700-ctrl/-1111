@@ -500,6 +500,53 @@ test('session carrier verification probes Server Admin API before cookie write',
   assert.equal(calls[0].options.headers['x-actor-id'], undefined);
 });
 
+test('Admin carrier issuer calls Server-owned issuer without promoting incoming Authorization', async () => {
+  const calls = installRuntime(
+    {
+      adminSessionCarrier: 'issued-access-carrier',
+      expiresInSeconds: 899,
+      roleKey: 'platform_reviewer',
+      platformOrganizationId: 'platform-org',
+      nextPath: '/audit',
+      issuer: 'server_auth',
+    },
+    {
+      sessionCarrier: null,
+      incomingHeaders: new Headers([['authorization', 'Bearer stale-incoming-carrier']]),
+    },
+  );
+
+  const result = await client.issueAdminSessionCarrier({
+    mobile: '13800000000',
+    password: 'password-value',
+    consentAccepted: true,
+    deviceId: 'admin-carrier-browser',
+    deviceName: 'Admin Governance Console',
+    osType: 'web',
+  });
+
+  assert.equal(result.adminSessionCarrier, 'issued-access-carrier');
+  assert.equal(calls.length, 1);
+  assert.equal(
+    calls[0].url,
+    'http://server.test/server/admin/auth/session-carrier/issue',
+  );
+  assert.equal(calls[0].options.method, 'POST');
+  assert.equal(calls[0].options.headers.authorization, undefined);
+  assert.equal(calls[0].options.headers['content-type'], 'application/json');
+  assert.equal(
+    calls[0].options.body,
+    JSON.stringify({
+      mobile: '13800000000',
+      password: 'password-value',
+      consentAccepted: true,
+      deviceId: 'admin-carrier-browser',
+      deviceName: 'Admin Governance Console',
+      osType: 'web',
+    }),
+  );
+});
+
 test('admin runtime prefers admin_session over incoming Authorization', async () => {
   const calls = installRuntime({ items: [], count: 0, traceId: 'trace-cookie-first' }, {
     sessionCarrier: 'opaque-access-carrier',

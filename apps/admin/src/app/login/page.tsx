@@ -10,6 +10,7 @@ import {
 import {
   clearAdminSessionCarrierAction,
   connectAdminSessionCarrierAction,
+  issueAdminSessionCarrierAction,
 } from '@/core/auth/session-carrier-actions';
 
 type LoginPageProps = {
@@ -166,9 +167,47 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
                   <p className="eyebrow">Admin Session Carrier</p>
                   <h2>管理员会话接入</h2>
                   <p>
-                    粘贴 Server 签发的管理员 session carrier，验证通过后写入当前浏览器会话。
+                    由 Server Auth 签发管理员 session carrier，验证通过后写入当前浏览器会话。
                   </p>
                 </div>
+              </div>
+              <form className="issuer-form" action={issueAdminSessionCarrierAction}>
+                <input name="next" type="hidden" value={nextPath} />
+                <div className="issuer-form-grid">
+                  <label>
+                    管理员手机号
+                    <input
+                      autoComplete="username"
+                      inputMode="tel"
+                      name="mobile"
+                      placeholder="输入已具备平台审核角色的手机号"
+                      required
+                    />
+                  </label>
+                  <label>
+                    Server Auth 密码
+                    <input
+                      autoComplete="current-password"
+                      name="password"
+                      placeholder="输入 Server Auth 密码"
+                      required
+                      type="password"
+                    />
+                  </label>
+                </div>
+                <input name="deviceId" type="hidden" value="admin-carrier-browser" />
+                <label className="issuer-consent">
+                  <input name="consentAccepted" required type="checkbox" />
+                  <span>
+                    确认仅由 Server Auth 校验凭据并签发 carrier，Admin 不保存账号密码。
+                  </span>
+                </label>
+                <button className="primary admin-login-submit" type="submit">
+                  由 Server 签发并进入治理后台
+                </button>
+              </form>
+              <div className="login-divider">
+                <span>或粘贴已签发 carrier</span>
               </div>
               <form className="carrier-form" action={connectAdminSessionCarrierAction}>
                 <input name="next" type="hidden" value={nextPath} />
@@ -224,7 +263,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               items={[
                 '仅依赖 Server 签发的管理员会话载体',
                 '不经过 BFF',
-                '不接收账号密码',
+                '不建立独立 Admin 账号密码体系',
               ]}
             />
             <ProcessCard />
@@ -233,7 +272,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
               items={[
                 '不存储账号密码',
                 '不伪造登录成功',
-                '会话保护路由仍由 Server session 校验',
+                '平台角色仍由 Server DB-backed membership 校验',
               ]}
               tone="gold"
             />
@@ -250,7 +289,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
         <footer className="admin-login-footer">
           <span>Server Admin API 治理台</span>
           <span>仅接收 Server 签发的管理员会话载体</span>
-          <span>不接收账号密码</span>
+          <span>不建立独立 Admin 账号密码</span>
           <span>不经过 BFF</span>
         </footer>
       </div>
@@ -301,8 +340,8 @@ function InfoCard({
 
 function ProcessCard() {
   const steps = [
-    ['获取受控 Server 会话载体', '从受控 Server 来源取得管理员会话载体'],
-    ['粘贴 carrier 并验证可用性', '在左侧粘贴并验证载体是否有效'],
+    ['提交 Server Auth 凭据', '仅发送给 Server，由 Server 判断身份与平台角色'],
+    ['Server 签发 carrier', '通过 platform_reviewer 或 platform_super_admin 后返回管理员会话载体'],
     ['写入 admin_session 后进入工作台', '验证通过后写入浏览器会话并跳转'],
   ] as const;
 
