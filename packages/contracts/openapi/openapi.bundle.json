@@ -7393,6 +7393,46 @@
         }
       }
     },
+    "/server/admin/auth/session-carrier/issue": {
+      "post": {
+        "tags": [
+          "Admin"
+        ],
+        "summary": "Server-owned Admin session carrier issuer",
+        "operationId": "postServerAdminAuthSessionCarrierIssue",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AdminSessionCarrierIssueRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Issues an Admin-consumable carrier only after Server Auth credential validation and DB-backed platform reviewer membership gate. This is not an independent Admin password login and does not return a refresh token to Admin.\n",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminSessionCarrierIssueResponse"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Controlled invalid request or consent-required response."
+          },
+          "401": {
+            "description": "Controlled invalid Server Auth credential response."
+          },
+          "403": {
+            "description": "Current actor lacks platform reviewer or super-admin membership."
+          }
+        }
+      }
+    },
     "/server/admin/content-safety/review-tasks": {
       "get": {
         "tags": [
@@ -12107,6 +12147,54 @@
           }
         }
       },
+      "AdminSessionCarrierIssueRequest": {
+        "type": "object",
+        "required": [
+          "mobile",
+          "password",
+          "consentAccepted"
+        ],
+        "description": "Server-owned Admin carrier issuer input. This reuses Server Auth credentials only to establish a Server session before the platform role gate; it is not an independent Admin account-password system.\n",
+        "properties": {
+          "mobile": {
+            "type": "string"
+          },
+          "password": {
+            "type": "string",
+            "minLength": 1
+          },
+          "consentAccepted": {
+            "type": "boolean",
+            "enum": [
+              true
+            ]
+          },
+          "deviceId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "deviceName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "osType": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "appVersion": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        }
+      },
       "PasswordSetRequest": {
         "type": "object",
         "required": [
@@ -12163,6 +12251,48 @@
             "enum": [
               "authenticated",
               "no_organization"
+            ]
+          }
+        }
+      },
+      "AdminSessionCarrierIssueResponse": {
+        "type": "object",
+        "required": [
+          "adminSessionCarrier",
+          "expiresInSeconds",
+          "roleKey",
+          "platformOrganizationId",
+          "nextPath",
+          "issuer"
+        ],
+        "properties": {
+          "adminSessionCarrier": {
+            "type": "string"
+          },
+          "expiresInSeconds": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "roleKey": {
+            "type": "string",
+            "enum": [
+              "platform_reviewer",
+              "platform_super_admin"
+            ]
+          },
+          "platformOrganizationId": {
+            "type": "string"
+          },
+          "nextPath": {
+            "type": "string",
+            "enum": [
+              "/audit"
+            ]
+          },
+          "issuer": {
+            "type": "string",
+            "enum": [
+              "server_auth"
             ]
           }
         }
