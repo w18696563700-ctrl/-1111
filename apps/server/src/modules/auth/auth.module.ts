@@ -7,7 +7,10 @@ import { LoginOtpCodeEntity } from '../identity/entities/login-otp-code.entity';
 import { SessionEntity } from '../identity/entities/session.entity';
 import { UserEntity } from '../identity/entities/user.entity';
 import { OrganizationMemberEntity } from '../organization/entities/organization-member.entity';
+import { OrganizationEntity } from '../organization/entities/organization.entity';
 import { AccessCarrierService } from './access-carrier.service';
+import { AdminSessionCarrierIssuerController } from './admin-session-carrier-issuer.controller';
+import { AdminSessionCarrierIssuerService } from './admin-session-carrier-issuer.service';
 import { AuthAntiAbuseService } from './auth-anti-abuse.service';
 import { AuthCommandParser } from './auth-command.parser';
 import { AuthController } from './auth.controller';
@@ -32,14 +35,16 @@ import { AuthPasswordService } from './auth-password.service';
       DeviceEntity,
       LoginOtpCodeEntity,
       OrganizationMemberEntity,
+      OrganizationEntity,
       OrganizationCertificationEntity,
       PasswordCredentialEntity,
       IdentityAuditLogEntity,
       AuthSecurityEventEntity
     ])
   ],
-  controllers: [AuthController],
+  controllers: [AuthController, AdminSessionCarrierIssuerController],
   providers: [
+    AdminSessionCarrierIssuerService,
     AuthCommandParser,
     AuthPresenter,
     AccessCarrierService,
